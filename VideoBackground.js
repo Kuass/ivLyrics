@@ -38,6 +38,24 @@ const disableYouTubeCaptions = (player) => {
     } catch (e) { }
 };
 
+const isSpotifyPlaybackActive = (playerState = Spicetify.Player?.data) => {
+    try {
+        const isPaused = playerState?.is_paused ?? playerState?.isPaused;
+        if (typeof isPaused === "boolean") {
+            return !isPaused;
+        }
+
+        const isPlaying = playerState?.is_playing ?? playerState?.isPlaying;
+        if (typeof isPlaying === "boolean") {
+            return isPlaying;
+        }
+
+        return Boolean(Spicetify.Player?.isPlaying?.());
+    } catch (e) {
+        return false;
+    }
+};
+
 const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, coverMode, videoScale, externalVideoInfo, onLoadingChange }) => {
     const { useState, useEffect, useRef, useCallback } = react;
     const VIDEO_BACKGROUND_DEBUG = false;
@@ -188,16 +206,31 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
 
     // Monitor Spotify Playback State
     useEffect(() => {
-        const updateState = () => {
+        const updateState = (event) => {
+            if (useHelper) {
+                setIsPlaying(isSpotifyPlaybackActive(event?.data));
+                return;
+            }
+
             try {
                 setIsPlaying(Spicetify.Player?.isPlaying?.() ?? false);
             } catch (e) {
                 setIsPlaying(false);
             }
         };
+
+        updateState();
         Spicetify.Player?.addEventListener?.("onplaypause", updateState);
-        return () => Spicetify.Player?.removeEventListener?.("onplaypause", updateState);
-    }, []);
+        if (useHelper) {
+            Spicetify.Player?.addEventListener?.("songchange", updateState);
+        }
+        return () => {
+            Spicetify.Player?.removeEventListener?.("onplaypause", updateState);
+            if (useHelper) {
+                Spicetify.Player?.removeEventListener?.("songchange", updateState);
+            }
+        };
+    }, [useHelper]);
 
     // Fetch Video Info & Manage Player Lifecycle
     useEffect(() => {
@@ -676,7 +709,10 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                     }
                 }
 
-                if (targetVideoTime >= 0) {
+                if (
+                    targetVideoTime >= 0 &&
+                    (!Number.isFinite(video.currentTime) || Math.abs(video.currentTime - targetVideoTime) > 0.05)
+                ) {
                     video.currentTime = targetVideoTime;
                 }
             }
@@ -686,8 +722,10 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 didReportReady = true;
                 reportVideoBackgroundStatus("complete");
             }
-            if (Spicetify.Player.isPlaying()) {
+            if (isSpotifyPlaybackActive()) {
                 video.play().catch(() => { });
+            } else if (!video.paused) {
+                video.pause();
             }
         };
 
