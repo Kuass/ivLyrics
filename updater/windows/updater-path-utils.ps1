@@ -50,6 +50,43 @@ function ConvertFrom-IvLyricsTerminalText {
     return $text.Trim()
 }
 
+function Invoke-IvLyricsSpicetifyCommand {
+    param([string[]]$Arguments = @())
+
+    # Spicetify emits UTF-8 output, while Windows PowerShell 5.1 can decode
+    # redirected native output with the active console code page. Temporarily
+    # align the encodings so non-ASCII user-profile paths remain intact.
+    $utf8Encoding = [Text.UTF8Encoding]::new($false)
+    $previousInputEncoding = [Console]::InputEncoding
+    $previousConsoleOutputEncoding = [Console]::OutputEncoding
+    $previousOutputEncoding = $OutputEncoding
+    $previousErrorActionPreference = $ErrorActionPreference
+    $commandOutput = @()
+    $exitCode = -1
+
+    try {
+        [Console]::InputEncoding = $utf8Encoding
+        [Console]::OutputEncoding = $utf8Encoding
+        $OutputEncoding = $utf8Encoding
+        # Windows PowerShell 5.1 wraps successful native stderr as an error
+        # record. Preserve it as command output and rely on the native exit code.
+        $ErrorActionPreference = "Continue"
+        $commandOutput = @(& spicetify @Arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+        $OutputEncoding = $previousOutputEncoding
+        [Console]::InputEncoding = $previousInputEncoding
+        [Console]::OutputEncoding = $previousConsoleOutputEncoding
+    }
+
+    return [PSCustomObject]@{
+        Output = @($commandOutput)
+        ExitCode = $exitCode
+    }
+}
+
 function Resolve-IvLyricsSpicetifyConfigPath {
     param([object[]]$Output)
 
@@ -78,17 +115,9 @@ function Resolve-IvLyricsSpicetifyConfigPath {
 }
 
 function Get-SpicetifyAppDir {
-    $previousErrorActionPreference = $ErrorActionPreference
-    try {
-        # Windows PowerShell 5.1 turns successful native stderr into NativeCommandError.
-        # Spicetify may print this value on stderr, so rely on the native exit code instead.
-        $ErrorActionPreference = "Continue"
-        $configPathOutput = @(& spicetify -c 2>&1)
-        $exitCode = $LASTEXITCODE
-    }
-    finally {
-        $ErrorActionPreference = $previousErrorActionPreference
-    }
+    $result = Invoke-IvLyricsSpicetifyCommand -Arguments @("-c")
+    $configPathOutput = @($result.Output)
+    $exitCode = $result.ExitCode
     if ($exitCode -ne 0) {
         throw "Could not resolve the Spicetify config file (exit $exitCode): $($configPathOutput -join [Environment]::NewLine)"
     }

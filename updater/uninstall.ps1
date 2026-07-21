@@ -146,6 +146,43 @@ function ConvertFrom-IvLyricsUninstallerTerminalText {
     return $text.Trim()
 }
 
+function Invoke-IvLyricsSpicetifyCommand {
+    param([string[]]$Arguments = @())
+
+    # Spicetify emits UTF-8 output, while Windows PowerShell 5.1 can decode
+    # redirected native output with the active console code page. Temporarily
+    # align the encodings so non-ASCII user-profile paths remain intact.
+    $utf8Encoding = [Text.UTF8Encoding]::new($false)
+    $previousInputEncoding = [Console]::InputEncoding
+    $previousConsoleOutputEncoding = [Console]::OutputEncoding
+    $previousOutputEncoding = $OutputEncoding
+    $previousErrorActionPreference = $ErrorActionPreference
+    $commandOutput = @()
+    $exitCode = -1
+
+    try {
+        [Console]::InputEncoding = $utf8Encoding
+        [Console]::OutputEncoding = $utf8Encoding
+        $OutputEncoding = $utf8Encoding
+        # Windows PowerShell 5.1 wraps successful native stderr as an error
+        # record. Preserve it as command output and rely on the native exit code.
+        $ErrorActionPreference = "Continue"
+        $commandOutput = @(& spicetify @Arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+        $OutputEncoding = $previousOutputEncoding
+        [Console]::InputEncoding = $previousInputEncoding
+        [Console]::OutputEncoding = $previousConsoleOutputEncoding
+    }
+
+    return [PSCustomObject]@{
+        Output = @($commandOutput)
+        ExitCode = $exitCode
+    }
+}
+
 function Resolve-SpicetifyUninstallerConfigPath {
     param([object[]]$Output)
 
@@ -178,15 +215,9 @@ function Get-SpicetifyConfiguredIvLyricsPath {
         return $null
     }
 
-    $previousErrorActionPreference = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = "Continue"
-        $configOutput = @(& spicetify -c 2>&1)
-        $exitCode = $LASTEXITCODE
-    }
-    finally {
-        $ErrorActionPreference = $previousErrorActionPreference
-    }
+    $result = Invoke-IvLyricsSpicetifyCommand -Arguments @("-c")
+    $configOutput = @($result.Output)
+    $exitCode = $result.ExitCode
     if ($exitCode -ne 0) {
         return $null
     }
@@ -422,14 +453,16 @@ Write-Step 2 4 "Updating Spicetify configuration..." "running"
 try {
     $spicetifyExists = Get-Command spicetify -ErrorAction SilentlyContinue
     if ($spicetifyExists) {
-        $configOutput = @(spicetify config custom_apps ivLyrics- 2>&1)
-        if ($LASTEXITCODE -ne 0) {
+        $configResult = Invoke-IvLyricsSpicetifyCommand -Arguments @("config", "custom_apps", "ivLyrics-")
+        $configOutput = @($configResult.Output)
+        if ($configResult.ExitCode -ne 0) {
             throw "spicetify config failed: $($configOutput -join [Environment]::NewLine)"
         }
         Write-SubStep "Removed from custom_apps" "success"
 
-        $applyOutput = @(spicetify apply 2>&1)
-        if ($LASTEXITCODE -ne 0) {
+        $applyResult = Invoke-IvLyricsSpicetifyCommand -Arguments @("apply")
+        $applyOutput = @($applyResult.Output)
+        if ($applyResult.ExitCode -ne 0) {
             throw "spicetify apply failed: $($applyOutput -join [Environment]::NewLine)"
         }
         Write-SubStep "Spicetify applied" "success"
@@ -506,8 +539,9 @@ if ($spicetifyChoice -eq 'y' -or $spicetifyChoice -eq 'Y') {
     try {
         $spicetifyExists = Get-Command spicetify -ErrorAction SilentlyContinue
         if ($spicetifyExists) {
-            $restoreOutput = @(spicetify restore 2>&1)
-            if ($LASTEXITCODE -ne 0) {
+            $restoreResult = Invoke-IvLyricsSpicetifyCommand -Arguments @("restore")
+            $restoreOutput = @($restoreResult.Output)
+            if ($restoreResult.ExitCode -ne 0) {
                 throw "spicetify restore failed: $($restoreOutput -join [Environment]::NewLine)"
             }
             Write-SubStep "Spotify restored" "success"
