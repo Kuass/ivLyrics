@@ -198,6 +198,24 @@
         return `src-${(hash >>> 0).toString(36)}-${value.length.toString(36)}`;
     };
 
+    const isCachedTranslationStructurallyValid = (cached, text, isPhonetic = false) => {
+        const value = isPhonetic
+            ? cached?.phonetic
+            : (cached?.translation ?? cached?.vi);
+        const resultLines = Array.isArray(value)
+            ? value.map(line => String(line ?? ''))
+            : (typeof value === 'string' ? value.replace(/\r\n?/g, '\n').split('\n') : null);
+        if (!resultLines) return false;
+
+        const sourceLines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
+        if (resultLines.length !== sourceLines.length) return false;
+        if (resultLines.every(line => !line.trim())) return false;
+
+        return resultLines.every((line, index) => (
+            !sourceLines[index].trim() || !!line.trim()
+        ));
+    };
+
     const cleanupWorker = (worker) => {
         if (!worker) return;
         try {
@@ -7522,6 +7540,7 @@
             provider = null,
             ignoreCache = false,
             onLine = null,
+            onStreamReset = null,
         }) {
             if (!text?.trim()) throw new Error("No text provided for translation");
             const sourceHash = getLyricsTextCacheHash(text);
@@ -7540,7 +7559,7 @@
             if (!ignoreCache) {
                 try {
                     const localCached = await LyricsCache.getTranslation(finalTrackId, userLang, wantSmartPhonetic, provider, sourceHash);
-                    if (localCached) {
+                    if (localCached && isCachedTranslationStructurallyValid(localCached, text, wantSmartPhonetic)) {
                         if (window.ApiTracker) {
                             window.ApiTracker.logCacheHit(
                                 wantSmartPhonetic ? 'phonetic' : 'translation',
@@ -7549,6 +7568,9 @@
                             );
                         }
                         return localCached;
+                    }
+                    if (localCached) {
+                        serviceDebug('[Translator] Ignoring structurally invalid translation cache entry');
                     }
                 } catch (e) {
                     console.warn('[Translator] Local cache check failed:', e);
@@ -7574,7 +7596,8 @@
                             lang: userLang,
                             wantSmartPhonetic,
                             provider,
-                            onLine
+                            onLine,
+                            onStreamReset
                         });
 
                         if (result) {

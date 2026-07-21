@@ -36,6 +36,35 @@
     const CHARACTER_PRONUNCIATION_CJK_SCRIPT_RE = /[\u3040-\u30ff\uff66-\uff9f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/u;
     const CHARACTER_PRONUNCIATION_WORD_TEXT_RE = /[\p{L}\p{N}]/u;
 
+    const validateLyricsTranslationResult = (result, params, providerId) => {
+        const field = params?.wantSmartPhonetic ? 'phonetic' : 'translation';
+        const value = field === 'translation'
+            ? (result?.translation ?? result?.vi)
+            : result?.phonetic;
+        const lines = Array.isArray(value)
+            ? value.map(line => String(line ?? ''))
+            : (typeof value === 'string' ? value.replace(/\r\n?/g, '\n').split('\n') : null);
+        const sourceLines = String(params?.text ?? '').replace(/\r\n?/g, '\n').split('\n');
+        const providerLabel = String(providerId || 'unknown');
+
+        if (!lines) {
+            throw new Error(`[AIAddonManager] Provider ${providerLabel} returned an invalid ${field} result`);
+        }
+        if (lines.length !== sourceLines.length) {
+            throw new Error(`[AIAddonManager] Provider ${providerLabel} returned ${lines.length} lines; expected ${sourceLines.length}`);
+        }
+        if (lines.every(line => !line.trim())) {
+            throw new Error(`[AIAddonManager] Provider ${providerLabel} returned an empty ${field} result`);
+        }
+
+        const missingLineIndex = lines.findIndex((line, index) => sourceLines[index].trim() && !line.trim());
+        if (missingLineIndex >= 0) {
+            throw new Error(`[AIAddonManager] Provider ${providerLabel} returned an empty line at index ${missingLineIndex + 1}`);
+        }
+
+        return result;
+    };
+
     // ============================================
     // AIAddonManager Class
     // ============================================
@@ -634,9 +663,47 @@
             for (const addon of providers) {
                 if (typeof addon.translateLyrics !== 'function') continue;
 
+                let hasProvisionalOutput = false;
+                let maxProvisionalLineIndex = -1;
+                const resetProvisionalOutput = (detail = {}) => {
+                    if (!hasProvisionalOutput) return;
+
+                    try {
+                        if (typeof params.onStreamReset === 'function') {
+                            params.onStreamReset({ provider: addon.id, ...detail });
+                        } else if (typeof params.onLine === 'function') {
+                            for (let index = 0; index <= maxProvisionalLineIndex; index++) {
+                                params.onLine(index, '');
+                            }
+                        }
+                    } catch (resetError) {
+                        window.__ivLyricsDebugLog?.(`[AIAddonManager] Failed to reset ${addon.id} stream:`, resetError?.message);
+                    }
+
+                    hasProvisionalOutput = false;
+                    maxProvisionalLineIndex = -1;
+                };
+                const providerParams = {
+                    ...params,
+                    onLine: typeof params.onLine === 'function'
+                        ? (lineIndex, lineText, detail) => {
+                            hasProvisionalOutput = true;
+                            if (Number.isInteger(lineIndex) && lineIndex >= 0) {
+                                maxProvisionalLineIndex = Math.max(maxProvisionalLineIndex, lineIndex);
+                            }
+                            params.onLine(lineIndex, lineText, detail);
+                        }
+                        : null,
+                    onStreamReset: detail => resetProvisionalOutput(detail),
+                };
+
                 try {
                     window.__ivLyricsDebugLog?.(`[AIAddonManager] Trying translate provider: ${addon.id}`);
-                    const result = await addon.translateLyrics(params);
+                    const result = validateLyricsTranslationResult(
+                        await addon.translateLyrics(providerParams),
+                        params,
+                        addon.id
+                    );
 
                     // 디버그 타이머 종료
                     if (window.AddonDebug?.isEnabled()) {
@@ -650,6 +717,7 @@
                 } catch (e) {
                     console.warn(`[AIAddonManager] Provider ${addon.id} failed for translateLyrics:`, e.message);
                     lastError = e;
+                    resetProvisionalOutput({ reason: 'provider-fallback', error: e?.message || null });
 
                     // 다음 provider 시도
                     continue;

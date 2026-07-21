@@ -3,7 +3,7 @@
  * OpenRouter를 통한 다양한 AI 모델 사용 (번역, 발음, TMI 생성)
  * 
  * @author default
- * @version 1.0.0
+ * @version 1.0.1
  */
 
 (() => {
@@ -23,7 +23,7 @@
             ja: 'OpenRouterを通じて様々なAIモデルを使用（Claude、GPT、Gemini、Llamaなど）',
             'zh-CN': '通过 OpenRouter 使用多种 AI 模型（Claude、GPT、Gemini、Llama 等）',
         },
-        version: '1.0.0',
+        version: '1.0.1',
         apiKeyUrl: 'https://openrouter.ai/keys',
         supports: {
             translate: true,
@@ -533,7 +533,91 @@ ${JSON.stringify(payload)}`;
     // API Call Functions
     // ============================================
 
-    async function callOpenRouterAPIRaw(prompt, maxRetries = 3) {
+    function normalizeFinishReason(reason) {
+        return reason === null || reason === undefined
+            ? ''
+            : String(reason).trim().toLowerCase();
+    }
+
+    function createOpenRouterResponseError(reason, detail = '') {
+        const normalizedReason = normalizeFinishReason(reason) || 'missing_finish_reason';
+        const message = String(detail || '').trim();
+        const error = new Error(`[OpenRouter] Response rejected (${normalizedReason})${message ? `: ${message}` : ''}`);
+        error.code = 'OPENROUTER_RESPONSE_REJECTED';
+        error.reason = normalizedReason;
+        return error;
+    }
+
+    function readOpenRouterResponseText(data) {
+        if (data?.error) {
+            throw new Error(`[OpenRouter] ${data.error.message || data.error.code || 'API response error'}`);
+        }
+
+        const choice = data?.choices?.[0];
+        if (!choice) {
+            throw createOpenRouterResponseError('missing_choice');
+        }
+        if (choice.error) {
+            const detail = typeof choice.error === 'string'
+                ? choice.error
+                : choice.error.message || choice.error.code || 'Choice response error';
+            throw new Error(`[OpenRouter] ${detail}`);
+        }
+
+        const refusal = choice.message?.refusal;
+        if ((typeof refusal === 'string' && refusal.trim()) || (refusal && typeof refusal !== 'string')) {
+            throw createOpenRouterResponseError('refusal', typeof refusal === 'string' ? refusal : 'Request refused');
+        }
+
+        const finishReason = normalizeFinishReason(choice.finish_reason);
+        if (finishReason !== 'stop') {
+            throw createOpenRouterResponseError(finishReason, choice.finish_details?.message);
+        }
+
+        const content = choice.message?.content;
+        if (typeof content === 'string') return content;
+        if (Array.isArray(content)) {
+            return content
+                .map(part => typeof part === 'string' ? part : (typeof part?.text === 'string' ? part.text : ''))
+                .join('');
+        }
+        return '';
+    }
+
+    function readOpenRouterStreamChunk(data) {
+        if (data?.error) {
+            throw new Error(`[OpenRouter] ${data.error.message || data.error.code || 'API response error'}`);
+        }
+
+        const choice = data?.choices?.[0];
+        if (!choice) return { text: '', finishReason: '' };
+        if (choice.error) {
+            const detail = typeof choice.error === 'string'
+                ? choice.error
+                : choice.error.message || choice.error.code || 'Choice response error';
+            throw new Error(`[OpenRouter] ${detail}`);
+        }
+
+        const refusal = choice.delta?.refusal;
+        if ((typeof refusal === 'string' && refusal.trim()) || (refusal && typeof refusal !== 'string')) {
+            throw createOpenRouterResponseError('refusal', typeof refusal === 'string' ? refusal : 'Request refused');
+        }
+
+        const finishReason = normalizeFinishReason(choice.finish_reason);
+        if (finishReason && finishReason !== 'stop') {
+            throw createOpenRouterResponseError(finishReason, choice.finish_details?.message);
+        }
+
+        const content = choice.delta?.content;
+        const text = typeof content === 'string'
+            ? content
+            : Array.isArray(content)
+                ? content.map(part => typeof part === 'string' ? part : (typeof part?.text === 'string' ? part.text : '')).join('')
+                : '';
+        return { text, finishReason };
+    }
+
+    async function callOpenRouterAPIRaw(prompt, maxRetries = 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[OpenRouter] API key is required. Please configure your API key in settings.');
@@ -592,13 +676,15 @@ ${JSON.stringify(payload)}`;
                     }
 
                     const data = await response.json();
-                    const rawText = data.choices?.[0]?.message?.content || '';
+                    const rawText = readOpenRouterResponseText(data);
 
-                    if (!rawText) {
+                    if (!rawText.trim()) {
                         throw new Error('[OpenRouter] Empty response from API');
                     }
 
-                    return rawText;
+                    return typeof transformResult === 'function'
+                        ? transformResult(rawText)
+                        : rawText;
 
                 } catch (e) {
                     lastError = e;
@@ -622,8 +708,11 @@ ${JSON.stringify(payload)}`;
         if (!onLine) return;
 
         if (flush) {
+            if (state.offset >= accumulated.length) return;
             const finalLine = accumulated.slice(state.offset);
             onLine(state.index, finalLine);
+            state.index += 1;
+            state.offset = accumulated.length;
             return;
         }
 
@@ -645,7 +734,7 @@ ${JSON.stringify(payload)}`;
         }
     }
 
-    async function callOpenRouterAPIStream(prompt, onLine, maxRetries = 3) {
+    async function callOpenRouterAPIStream(prompt, onLine, onStreamReset, maxRetries = 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) throw new Error('[OpenRouter] API key is required.');
         const model = getSelectedModel();
@@ -654,6 +743,27 @@ ${JSON.stringify(payload)}`;
         for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex++) {
             const apiKey = apiKeys[keyIndex];
             for (let attempt = 0; attempt < maxRetries; attempt++) {
+                let emittedLineCount = 0;
+                let emittedProvisionalOutput = false;
+                const resetProvisionalOutput = (reason, error = null) => {
+                    if (!emittedProvisionalOutput) return;
+
+                    try {
+                        if (typeof onStreamReset === 'function') {
+                            onStreamReset({ reason, error: error?.message || null });
+                        } else if (typeof onLine === 'function') {
+                            for (let index = 0; index < emittedLineCount; index++) {
+                                onLine(index, '');
+                            }
+                        }
+                    } catch (resetError) {
+                        window.__ivLyricsDebugLog?.('[OpenRouter Addon] Failed to reset provisional stream:', resetError?.message);
+                    }
+
+                    emittedProvisionalOutput = false;
+                    emittedLineCount = 0;
+                };
+
                 try {
                     const response = await fetch(`${BASE_URL}/chat/completions`, {
                         method: 'POST',
@@ -669,24 +779,81 @@ ${JSON.stringify(payload)}`;
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder();
                     let sseBuffer = '', accumulated = '';
+                    let finalFinishReason = '';
                     const lineState = { index: 0, offset: 0 };
+
+                    const processSseLine = (line) => {
+                        const trimmedLine = String(line || '').trim();
+                        if (!trimmedLine.startsWith('data:')) return;
+
+                        const payload = trimmedLine.slice(5).trimStart();
+                        if (!payload || payload === '[DONE]') return;
+
+                        const parsed = JSON.parse(payload);
+                        const chunk = readOpenRouterStreamChunk(parsed);
+                        if (chunk.text) accumulated += chunk.text;
+                        if (chunk.finishReason) finalFinishReason = chunk.finishReason;
+                    };
+
+                    const drainSseBuffer = (flush = false) => {
+                        const parts = sseBuffer.split(/\r?\n/);
+                        if (flush) {
+                            sseBuffer = '';
+                        } else {
+                            sseBuffer = parts.pop() || '';
+                        }
+                        for (const line of parts) processSseLine(line);
+                    };
+
                     while (true) {
                         const { value, done } = await reader.read();
                         if (done) break;
                         sseBuffer += decoder.decode(value, { stream: true });
-                        const parts = sseBuffer.split('\n');
-                        sseBuffer = parts.pop() || '';
-                        for (const line of parts) {
-                            if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
-                            try { const p = JSON.parse(line.slice(6)); const t = p.choices?.[0]?.delta?.content || ''; if (t) accumulated += t; } catch (e) { }
-                        }
+                        drainSseBuffer();
+
+                        const beforeEmitCount = lineState.index;
                         emitStreamingLines(accumulated, onLine, lineState);
+                        if (lineState.index > beforeEmitCount) {
+                            emittedProvisionalOutput = true;
+                            emittedLineCount = Math.max(emittedLineCount, lineState.index);
+                        }
                     }
+
+                    sseBuffer += decoder.decode();
+                    drainSseBuffer(true);
+
+                    const beforeFlushCount = lineState.index;
                     emitStreamingLines(accumulated, onLine, lineState, true);
-                    if (!accumulated) throw new Error('[OpenRouter] Empty response from streaming API');
-                    return accumulated;
+                    if (lineState.index > beforeFlushCount) {
+                        emittedProvisionalOutput = true;
+                        emittedLineCount = Math.max(emittedLineCount, lineState.index);
+                    }
+
+                    if (finalFinishReason !== 'stop') {
+                        throw createOpenRouterResponseError(finalFinishReason);
+                    }
+                    if (!accumulated.trim()) throw new Error('[OpenRouter] Empty response from streaming API');
+
+                    const transformed = typeof transformResult === 'function'
+                        ? transformResult(accumulated)
+                        : accumulated;
+
+                    if (Array.isArray(transformed) && typeof onLine === 'function') {
+                        const provisionalLines = accumulated.split('\n');
+                        transformed.forEach((line, index) => {
+                            if (index >= emittedLineCount || provisionalLines[index] !== line) {
+                                onLine(index, line);
+                            }
+                        });
+                        for (let index = transformed.length; index < emittedLineCount; index++) {
+                            if (provisionalLines[index] !== '') onLine(index, '');
+                        }
+                    }
+
+                    return transformed;
                 } catch (e) {
                     lastError = e;
+                    resetProvisionalOutput(attempt < maxRetries - 1 ? 'retry' : 'failed', e);
                     if (e.message.includes('Invalid API key') || e.message.includes('permission denied')) throw e;
                     if (attempt < maxRetries - 1) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
                 }
@@ -696,27 +863,55 @@ ${JSON.stringify(payload)}`;
     }
 
     async function callOpenRouterAPI(prompt, maxRetries = 3) {
-        const rawText = await callOpenRouterAPIRaw(prompt, maxRetries);
-        return extractJSON(rawText);
+        return await callOpenRouterAPIRaw(prompt, maxRetries, extractJSON);
     }
 
-    function parseTextLines(text, expectedLineCount) {
-        let cleaned = text.replace(/```[a-z]*\s*/gi, '').replace(/```\s*/g, '').trim();
-        const lines = cleaned.split('\n');
-
-        if (lines.length === expectedLineCount) {
-            return lines;
+    function parseTextLines(text, expectedSourceLines) {
+        if (text === null || text === undefined) {
+            throw new Error('[OpenRouter] Empty response from API');
         }
 
-        if (lines.length > expectedLineCount) {
-            return lines.slice(-expectedLineCount);
+        const sourceLines = Array.isArray(expectedSourceLines)
+            ? expectedSourceLines.map(line => String(line ?? ''))
+            : null;
+        const expectedLineCount = sourceLines
+            ? sourceLines.length
+            : Number(expectedSourceLines);
+        let lines = String(text).replace(/\r\n?/g, '\n').split('\n');
+
+        let firstNonBlank = 0;
+        let lastNonBlank = lines.length - 1;
+        while (firstNonBlank <= lastNonBlank && !lines[firstNonBlank].trim()) firstNonBlank += 1;
+        while (lastNonBlank >= firstNonBlank && !lines[lastNonBlank].trim()) lastNonBlank -= 1;
+
+        const openingFence = lines[firstNonBlank]?.trim() || '';
+        const closingFence = lines[lastNonBlank]?.trim() || '';
+        if (/^```[a-z0-9_-]*$/i.test(openingFence) && closingFence === '```') {
+            lines = lines.slice(firstNonBlank + 1, lastNonBlank);
         }
 
-        while (lines.length < expectedLineCount) {
-            lines.push('');
+        const candidates = [lines];
+        if (lines[0]?.trim() === '') candidates.push(lines.slice(1));
+        if (lines[lines.length - 1]?.trim() === '') candidates.push(lines.slice(0, -1));
+        if (lines[0]?.trim() === '' && lines[lines.length - 1]?.trim() === '') {
+            candidates.push(lines.slice(1, -1));
         }
 
-        return lines;
+        const validLines = candidates.find(candidate => candidate.length === expectedLineCount);
+        if (!validLines) {
+            throw new Error(`[OpenRouter] Invalid response line count: expected ${expectedLineCount}, got ${lines.length}`);
+        }
+        if (validLines.every(line => !String(line).trim())) {
+            throw new Error('[OpenRouter] Empty response from API');
+        }
+        if (sourceLines) {
+            const missingLineIndex = validLines.findIndex((line, index) => sourceLines[index].trim() && !String(line).trim());
+            if (missingLineIndex >= 0) {
+                throw new Error(`[OpenRouter] Empty response line at index ${missingLineIndex + 1}`);
+            }
+        }
+
+        return validLines;
     }
 
     function extractJSON(text) {
@@ -925,20 +1120,21 @@ ${JSON.stringify(payload)}`;
             }
         },
 
-        async translateLyrics({ text, lang, wantSmartPhonetic, onLine }) {
+        async translateLyrics({ text, lang, wantSmartPhonetic, onLine, onStreamReset }) {
             if (!text?.trim()) {
                 throw new Error('No text provided');
             }
 
-            const expectedLineCount = text.split('\n').length;
+            const sourceLines = String(text).replace(/\r\n?/g, '\n').split('\n');
+            const normalizedText = sourceLines.join('\n');
             const prompt = wantSmartPhonetic
-                ? buildPhoneticPrompt(text, lang)
-                : buildTranslationPrompt(text, lang);
+                ? buildPhoneticPrompt(normalizedText, lang)
+                : buildTranslationPrompt(normalizedText, lang);
+            const parseLines = rawResponse => parseTextLines(rawResponse, sourceLines);
 
-            const rawResponse = onLine
-                ? await callOpenRouterAPIStream(prompt, onLine)
-                : await callOpenRouterAPIRaw(prompt);
-            const lines = parseTextLines(rawResponse, expectedLineCount);
+            const lines = onLine
+                ? await callOpenRouterAPIStream(prompt, onLine, onStreamReset, 3, parseLines)
+                : await callOpenRouterAPIRaw(prompt, 3, parseLines);
 
             if (wantSmartPhonetic) {
                 return { phonetic: lines };

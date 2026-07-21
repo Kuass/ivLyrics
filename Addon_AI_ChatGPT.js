@@ -3,7 +3,7 @@
  * OpenAI ChatGPT를 사용한 번역, 발음, TMI 생성
  * 
  * @author default
- * @version 1.0.0
+ * @version 1.0.1
  */
 
 (() => {
@@ -23,7 +23,7 @@
             ja: 'OpenAI ChatGPTを使用した翻訳、発音、TMI生成（OpenAI互換API対応）',
             'zh-CN': '使用 OpenAI ChatGPT 进行翻译、发音和 TMI 生成（支持 OpenAI 兼容 API）',
         },
-        version: '1.0.0',
+        version: '1.0.1',
         apiKeyUrl: 'https://platform.openai.com/api-keys',
         // 지원 기능
         supports: {
@@ -699,7 +699,91 @@ ${JSON.stringify(payload)}`;
     /**
      * Call ChatGPT API and return raw text response
      */
-    async function callChatGPTAPIRaw(prompt, maxRetries = 3) {
+    function normalizeFinishReason(reason) {
+        return reason === null || reason === undefined
+            ? ''
+            : String(reason).trim().toLowerCase();
+    }
+
+    function createChatGPTResponseError(reason, detail = '') {
+        const normalizedReason = normalizeFinishReason(reason) || 'missing_finish_reason';
+        const message = String(detail || '').trim();
+        const error = new Error(`[ChatGPT] Response rejected (${normalizedReason})${message ? `: ${message}` : ''}`);
+        error.code = 'CHATGPT_RESPONSE_REJECTED';
+        error.reason = normalizedReason;
+        return error;
+    }
+
+    function readChatGPTResponseText(data) {
+        if (data?.error) {
+            throw new Error(`[ChatGPT] ${data.error.message || data.error.code || 'API response error'}`);
+        }
+
+        const choice = data?.choices?.[0];
+        if (!choice) {
+            throw createChatGPTResponseError('missing_choice');
+        }
+        if (choice.error) {
+            const detail = typeof choice.error === 'string'
+                ? choice.error
+                : choice.error.message || choice.error.code || 'Choice response error';
+            throw new Error(`[ChatGPT] ${detail}`);
+        }
+
+        const refusal = choice.message?.refusal;
+        if ((typeof refusal === 'string' && refusal.trim()) || (refusal && typeof refusal !== 'string')) {
+            throw createChatGPTResponseError('refusal', typeof refusal === 'string' ? refusal : 'Request refused');
+        }
+
+        const finishReason = normalizeFinishReason(choice.finish_reason);
+        if (finishReason !== 'stop') {
+            throw createChatGPTResponseError(finishReason, choice.finish_details?.message);
+        }
+
+        const content = choice.message?.content;
+        if (typeof content === 'string') return content;
+        if (Array.isArray(content)) {
+            return content
+                .map(part => typeof part === 'string' ? part : (typeof part?.text === 'string' ? part.text : ''))
+                .join('');
+        }
+        return '';
+    }
+
+    function readChatGPTStreamChunk(data) {
+        if (data?.error) {
+            throw new Error(`[ChatGPT] ${data.error.message || data.error.code || 'API response error'}`);
+        }
+
+        const choice = data?.choices?.[0];
+        if (!choice) return { text: '', finishReason: '' };
+        if (choice.error) {
+            const detail = typeof choice.error === 'string'
+                ? choice.error
+                : choice.error.message || choice.error.code || 'Choice response error';
+            throw new Error(`[ChatGPT] ${detail}`);
+        }
+
+        const refusal = choice.delta?.refusal;
+        if ((typeof refusal === 'string' && refusal.trim()) || (refusal && typeof refusal !== 'string')) {
+            throw createChatGPTResponseError('refusal', typeof refusal === 'string' ? refusal : 'Request refused');
+        }
+
+        const finishReason = normalizeFinishReason(choice.finish_reason);
+        if (finishReason && finishReason !== 'stop') {
+            throw createChatGPTResponseError(finishReason, choice.finish_details?.message);
+        }
+
+        const content = choice.delta?.content;
+        const text = typeof content === 'string'
+            ? content
+            : Array.isArray(content)
+                ? content.map(part => typeof part === 'string' ? part : (typeof part?.text === 'string' ? part.text : '')).join('')
+                : '';
+        return { text, finishReason };
+    }
+
+    async function callChatGPTAPIRaw(prompt, maxRetries = 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[ChatGPT] API key is required. Please configure your API key in settings.');
@@ -756,13 +840,15 @@ ${JSON.stringify(payload)}`;
                     }
 
                     const data = await response.json();
-                    const rawText = data.choices?.[0]?.message?.content || '';
+                    const rawText = readChatGPTResponseText(data);
 
-                    if (!rawText) {
+                    if (!rawText.trim()) {
                         throw new Error('[ChatGPT] Empty response from API');
                     }
 
-                    return rawText;
+                    return typeof transformResult === 'function'
+                        ? transformResult(rawText)
+                        : rawText;
 
                 } catch (e) {
                     lastError = e;
@@ -786,8 +872,11 @@ ${JSON.stringify(payload)}`;
         if (!onLine) return;
 
         if (flush) {
+            if (state.offset >= accumulated.length) return;
             const finalLine = accumulated.slice(state.offset);
             onLine(state.index, finalLine);
+            state.index += 1;
+            state.offset = accumulated.length;
             return;
         }
 
@@ -809,7 +898,7 @@ ${JSON.stringify(payload)}`;
         }
     }
 
-    async function callChatGPTAPIStream(prompt, onLine, maxRetries = 3) {
+    async function callChatGPTAPIStream(prompt, onLine, onStreamReset, maxRetries = 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[ChatGPT] API key is required. Please configure your API key in settings.');
@@ -826,6 +915,27 @@ ${JSON.stringify(payload)}`;
             const apiKey = apiKeys[keyIndex];
 
             for (let attempt = 0; attempt < maxRetries; attempt++) {
+                let emittedLineCount = 0;
+                let emittedProvisionalOutput = false;
+                const resetProvisionalOutput = (reason, error = null) => {
+                    if (!emittedProvisionalOutput) return;
+
+                    try {
+                        if (typeof onStreamReset === 'function') {
+                            onStreamReset({ reason, error: error?.message || null });
+                        } else if (typeof onLine === 'function') {
+                            for (let index = 0; index < emittedLineCount; index++) {
+                                onLine(index, '');
+                            }
+                        }
+                    } catch (resetError) {
+                        window.__ivLyricsDebugLog?.('[ChatGPT Addon] Failed to reset provisional stream:', resetError?.message);
+                    }
+
+                    emittedProvisionalOutput = false;
+                    emittedLineCount = 0;
+                };
+
                 try {
                     const endpoint = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
 
@@ -859,36 +969,84 @@ ${JSON.stringify(payload)}`;
                     const decoder = new TextDecoder();
                     let sseBuffer = '';
                     let accumulated = '';
+                    let finalFinishReason = '';
                     const lineState = { index: 0, offset: 0 };
+
+                    const processSseLine = (line) => {
+                        const trimmedLine = String(line || '').trim();
+                        if (!trimmedLine.startsWith('data:')) return;
+
+                        const payload = trimmedLine.slice(5).trimStart();
+                        if (!payload || payload === '[DONE]') return;
+
+                        const parsed = JSON.parse(payload);
+                        const chunk = readChatGPTStreamChunk(parsed);
+                        if (chunk.text) accumulated += chunk.text;
+                        if (chunk.finishReason) finalFinishReason = chunk.finishReason;
+                    };
+
+                    const drainSseBuffer = (flush = false) => {
+                        const parts = sseBuffer.split(/\r?\n/);
+                        if (flush) {
+                            sseBuffer = '';
+                        } else {
+                            sseBuffer = parts.pop() || '';
+                        }
+                        for (const line of parts) processSseLine(line);
+                    };
 
                     while (true) {
                         const { value, done } = await reader.read();
                         if (done) break;
 
                         sseBuffer += decoder.decode(value, { stream: true });
-                        const parts = sseBuffer.split('\n');
-                        sseBuffer = parts.pop() || '';
+                        drainSseBuffer();
 
-                        for (const line of parts) {
-                            if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
-                            try {
-                                const parsed = JSON.parse(line.slice(6));
-                                const text = parsed.choices?.[0]?.delta?.content || '';
-                                if (text) accumulated += text;
-                            } catch (e) { }
-                        }
-
+                        const beforeEmitCount = lineState.index;
                         emitStreamingLines(accumulated, onLine, lineState);
+                        if (lineState.index > beforeEmitCount) {
+                            emittedProvisionalOutput = true;
+                            emittedLineCount = Math.max(emittedLineCount, lineState.index);
+                        }
                     }
 
-                    emitStreamingLines(accumulated, onLine, lineState, true);
+                    sseBuffer += decoder.decode();
+                    drainSseBuffer(true);
 
-                    if (!accumulated) throw new Error('[ChatGPT] Empty response from streaming API');
-                    return accumulated;
+                    const beforeFlushCount = lineState.index;
+                    emitStreamingLines(accumulated, onLine, lineState, true);
+                    if (lineState.index > beforeFlushCount) {
+                        emittedProvisionalOutput = true;
+                        emittedLineCount = Math.max(emittedLineCount, lineState.index);
+                    }
+
+                    if (finalFinishReason !== 'stop') {
+                        throw createChatGPTResponseError(finalFinishReason);
+                    }
+                    if (!accumulated.trim()) throw new Error('[ChatGPT] Empty response from streaming API');
+
+                    const transformed = typeof transformResult === 'function'
+                        ? transformResult(accumulated)
+                        : accumulated;
+
+                    if (Array.isArray(transformed) && typeof onLine === 'function') {
+                        const provisionalLines = accumulated.split('\n');
+                        transformed.forEach((line, index) => {
+                            if (index >= emittedLineCount || provisionalLines[index] !== line) {
+                                onLine(index, line);
+                            }
+                        });
+                        for (let index = transformed.length; index < emittedLineCount; index++) {
+                            if (provisionalLines[index] !== '') onLine(index, '');
+                        }
+                    }
+
+                    return transformed;
 
                 } catch (e) {
                     lastError = e;
                     window.__ivLyricsDebugLog?.(`[ChatGPT Addon] Stream attempt ${attempt + 1} failed:`, e.message);
+                    resetProvisionalOutput(attempt < maxRetries - 1 ? 'retry' : 'failed', e);
                     if (e.message.includes('Invalid API key') || e.message.includes('permission denied')) throw e;
                     if (attempt < maxRetries - 1) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
                 }
@@ -902,38 +1060,58 @@ ${JSON.stringify(payload)}`;
      * Call ChatGPT API and parse JSON response (for metadata, TMI, etc.)
      */
     async function callChatGPTAPI(prompt, maxRetries = 3) {
-        const rawText = await callChatGPTAPIRaw(prompt, maxRetries);
-        return extractJSON(rawText);
+        return await callChatGPTAPIRaw(prompt, maxRetries, extractJSON);
     }
 
     /**
      * Parse plain text lines from API response
      */
-    function parseTextLines(text, expectedLineCount) {
-        // Remove markdown code blocks if present
-        let cleaned = text.replace(/```[a-z]*\s*/gi, '').replace(/```\s*/g, '').trim();
-
-        // Split by newlines
-        const lines = cleaned.split('\n');
-
-        // If line count matches, return as-is
-        if (lines.length === expectedLineCount) {
-            return lines;
+    function parseTextLines(text, expectedSourceLines) {
+        if (text === null || text === undefined) {
+            throw new Error('[ChatGPT] Empty response from API');
         }
 
-        // If we have more lines, try to find the correct block
-        if (lines.length > expectedLineCount) {
-            window.__ivLyricsDebugLog?.(`[ChatGPT Addon] Got ${lines.length} lines, expected ${expectedLineCount}. Trimming...`);
-            return lines.slice(-expectedLineCount);
+        const sourceLines = Array.isArray(expectedSourceLines)
+            ? expectedSourceLines.map(line => String(line ?? ''))
+            : null;
+        const expectedLineCount = sourceLines
+            ? sourceLines.length
+            : Number(expectedSourceLines);
+        let lines = String(text).replace(/\r\n?/g, '\n').split('\n');
+
+        let firstNonBlank = 0;
+        let lastNonBlank = lines.length - 1;
+        while (firstNonBlank <= lastNonBlank && !lines[firstNonBlank].trim()) firstNonBlank += 1;
+        while (lastNonBlank >= firstNonBlank && !lines[lastNonBlank].trim()) lastNonBlank -= 1;
+
+        const openingFence = lines[firstNonBlank]?.trim() || '';
+        const closingFence = lines[lastNonBlank]?.trim() || '';
+        if (/^```[a-z0-9_-]*$/i.test(openingFence) && closingFence === '```') {
+            lines = lines.slice(firstNonBlank + 1, lastNonBlank);
         }
 
-        // If we have fewer lines, pad with empty strings
-        window.__ivLyricsDebugLog?.(`[ChatGPT Addon] Got ${lines.length} lines, expected ${expectedLineCount}. Padding...`);
-        while (lines.length < expectedLineCount) {
-            lines.push('');
+        const candidates = [lines];
+        if (lines[0]?.trim() === '') candidates.push(lines.slice(1));
+        if (lines[lines.length - 1]?.trim() === '') candidates.push(lines.slice(0, -1));
+        if (lines[0]?.trim() === '' && lines[lines.length - 1]?.trim() === '') {
+            candidates.push(lines.slice(1, -1));
         }
 
-        return lines;
+        const validLines = candidates.find(candidate => candidate.length === expectedLineCount);
+        if (!validLines) {
+            throw new Error(`[ChatGPT] Invalid response line count: expected ${expectedLineCount}, got ${lines.length}`);
+        }
+        if (validLines.every(line => !String(line).trim())) {
+            throw new Error('[ChatGPT] Empty response from API');
+        }
+        if (sourceLines) {
+            const missingLineIndex = validLines.findIndex((line, index) => sourceLines[index].trim() && !String(line).trim());
+            if (missingLineIndex >= 0) {
+                throw new Error(`[ChatGPT] Empty response line at index ${missingLineIndex + 1}`);
+            }
+        }
+
+        return validLines;
     }
 
     function extractJSON(text) {
@@ -1188,21 +1366,22 @@ ${JSON.stringify(payload)}`;
             }
         },
 
-        async translateLyrics({ text, lang, wantSmartPhonetic, onLine }) {
+        async translateLyrics({ text, lang, wantSmartPhonetic, onLine, onStreamReset }) {
             if (!text?.trim()) {
                 throw new Error('No text provided');
             }
 
-            const expectedLineCount = text.split('\n').length;
+            const sourceLines = String(text).replace(/\r\n?/g, '\n').split('\n');
+            const normalizedText = sourceLines.join('\n');
             const prompt = wantSmartPhonetic
-                ? buildPhoneticPrompt(text, lang)
-                : buildTranslationPrompt(text, lang);
+                ? buildPhoneticPrompt(normalizedText, lang)
+                : buildTranslationPrompt(normalizedText, lang);
+            const parseLines = rawResponse => parseTextLines(rawResponse, sourceLines);
 
-            // Get raw text response and parse lines
-            const rawResponse = onLine
-                ? await callChatGPTAPIStream(prompt, onLine)
-                : await callChatGPTAPIRaw(prompt);
-            const lines = parseTextLines(rawResponse, expectedLineCount);
+            // Validate inside the provider retry loop so partial/blocked output can retry safely.
+            const lines = onLine
+                ? await callChatGPTAPIStream(prompt, onLine, onStreamReset, 3, parseLines)
+                : await callChatGPTAPIRaw(prompt, 3, parseLines);
 
             // Return in the format expected by LyricsService
             if (wantSmartPhonetic) {

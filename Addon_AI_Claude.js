@@ -3,7 +3,7 @@
  * Anthropic Claude를 사용한 번역, 발음, TMI 생성
  * 
  * @author default
- * @version 1.0.0
+ * @version 1.0.1
  */
 
 (() => {
@@ -23,7 +23,7 @@
             ja: 'Anthropic Claudeを使用した翻訳、発音、TMI生成',
             'zh-CN': '使用 Anthropic Claude 进行翻译、发音和 TMI 生成',
         },
-        version: '1.0.0',
+        version: '1.0.1',
         apiKeyUrl: 'https://console.anthropic.com/settings/keys',
         supports: {
             translate: true,
@@ -534,7 +534,43 @@ ${JSON.stringify(payload)}`;
     // API Call Functions
     // ============================================
 
-    async function callClaudeAPIRaw(prompt, maxRetries = 3) {
+    const normalizeClaudeStopReason = (value) => String(value ?? '').trim().toLowerCase();
+
+    function createClaudeResponseError(reason, message = '') {
+        const normalizedReason = normalizeClaudeStopReason(reason) || 'unknown';
+        const detail = String(message || '').trim();
+        const error = new Error(`[Claude] Response rejected (${normalizedReason})${detail ? `: ${detail}` : ''}`);
+        error.code = 'CLAUDE_RESPONSE_REJECTED';
+        error.reason = normalizedReason;
+        return error;
+    }
+
+    function validateClaudeStopReason(reason, allowUnspecified = false) {
+        const normalizedReason = normalizeClaudeStopReason(reason);
+        if (!normalizedReason) {
+            if (allowUnspecified) return '';
+            throw createClaudeResponseError('missing_stop_reason');
+        }
+        if (normalizedReason !== 'end_turn' && normalizedReason !== 'stop_sequence') {
+            throw createClaudeResponseError(normalizedReason);
+        }
+        return normalizedReason;
+    }
+
+    function readClaudeResponseText(data) {
+        if (data?.type === 'error' || data?.error) {
+            throw new Error(`[Claude] ${data?.error?.message || data?.error?.type || data?.message || 'API response error'}`);
+        }
+
+        validateClaudeStopReason(data?.stop_reason);
+
+        return (Array.isArray(data?.content) ? data.content : [])
+            .filter(block => block?.type === 'text' && typeof block?.text === 'string')
+            .map(block => block.text)
+            .join('');
+    }
+
+    async function callClaudeAPIRaw(prompt, maxRetries = 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[Claude] API key is required. Please configure your API key in settings.');
@@ -593,13 +629,15 @@ ${JSON.stringify(payload)}`;
                     }
 
                     const data = await response.json();
-                    const rawText = data.content?.[0]?.text || '';
+                    const rawText = readClaudeResponseText(data);
 
-                    if (!rawText) {
+                    if (!rawText.trim()) {
                         throw new Error('[Claude] Empty response from API');
                     }
 
-                    return rawText;
+                    return typeof transformResult === 'function'
+                        ? transformResult(rawText)
+                        : rawText;
 
                 } catch (e) {
                     lastError = e;
@@ -623,8 +661,11 @@ ${JSON.stringify(payload)}`;
         if (!onLine) return;
 
         if (flush) {
+            if (state.offset >= accumulated.length) return;
             const finalLine = accumulated.slice(state.offset);
             onLine(state.index, finalLine);
+            state.index += 1;
+            state.offset = accumulated.length;
             return;
         }
 
@@ -646,7 +687,7 @@ ${JSON.stringify(payload)}`;
         }
     }
 
-    async function callClaudeAPIStream(prompt, onLine, maxRetries = 3) {
+    async function callClaudeAPIStream(prompt, onLine, onStreamReset, maxRetries = 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[Claude] API key is required. Please configure your API key in settings.');
@@ -659,6 +700,27 @@ ${JSON.stringify(payload)}`;
             const apiKey = apiKeys[keyIndex];
 
             for (let attempt = 0; attempt < maxRetries; attempt++) {
+                let emittedLineCount = 0;
+                let emittedProvisionalOutput = false;
+                const resetProvisionalOutput = (reason, error = null) => {
+                    if (!emittedProvisionalOutput) return;
+
+                    try {
+                        if (typeof onStreamReset === 'function') {
+                            onStreamReset({ reason, error: error?.message || null });
+                        } else if (typeof onLine === 'function') {
+                            for (let index = 0; index < emittedLineCount; index++) {
+                                onLine(index, '');
+                            }
+                        }
+                    } catch (resetError) {
+                        window.__ivLyricsDebugLog?.('[Claude Addon] Failed to reset provisional stream:', resetError?.message);
+                    }
+
+                    emittedProvisionalOutput = false;
+                    emittedLineCount = 0;
+                };
+
                 try {
                     const response = await fetch(`${BASE_URL}/messages`, {
                         method: 'POST',
@@ -705,49 +767,115 @@ ${JSON.stringify(payload)}`;
                     const decoder = new TextDecoder();
                     let sseBuffer = '';
                     let accumulated = '';
+                    let finalStopReason = '';
                     const lineState = { index: 0, offset: 0 };
+
+                    const processSseEvent = (event) => {
+                        const lines = String(event || '').split(/\r?\n/);
+                        let eventType = '';
+                        const dataLines = [];
+
+                        for (const line of lines) {
+                            if (line.startsWith('event:')) {
+                                eventType = line.slice(6).trim();
+                            } else if (line.startsWith('data:')) {
+                                dataLines.push(line.slice(5).trimStart());
+                            }
+                        }
+
+                        const payload = dataLines.join('\n').trim();
+                        if (!payload || payload === '[DONE]') return;
+
+                        const parsed = JSON.parse(payload);
+                        const parsedType = eventType || parsed?.type || '';
+                        if (parsedType === 'error' || parsed?.error) {
+                            throw new Error(`[Claude] ${parsed?.error?.message || parsed?.error?.type || 'Streaming API error'}`);
+                        }
+
+                        if (parsedType === 'message_start') {
+                            validateClaudeStopReason(parsed?.message?.stop_reason, true);
+                            return;
+                        }
+
+                        if (parsedType === 'content_block_delta') {
+                            const text = parsed?.delta?.type === 'text_delta' && typeof parsed?.delta?.text === 'string'
+                                ? parsed.delta.text
+                                : '';
+                            if (text) accumulated += text;
+                            return;
+                        }
+
+                        if (parsedType === 'message_delta') {
+                            const stopReason = validateClaudeStopReason(parsed?.delta?.stop_reason, true);
+                            if (stopReason) finalStopReason = stopReason;
+                        }
+                    };
+
+                    const drainSseBuffer = (flush = false) => {
+                        const events = sseBuffer.split(/\r?\n\r?\n/);
+                        if (flush) {
+                            sseBuffer = '';
+                        } else {
+                            sseBuffer = events.pop() || '';
+                        }
+                        for (const event of events) processSseEvent(event);
+                    };
 
                     while (true) {
                         const { value, done } = await reader.read();
                         if (done) break;
 
                         sseBuffer += decoder.decode(value, { stream: true });
-                        const events = sseBuffer.split('\n\n');
-                        sseBuffer = events.pop() || '';
-
-                        for (const event of events) {
-                            const lines = event.split('\n');
-                            let eventType = '';
-                            let eventData = '';
-                            for (const line of lines) {
-                                if (line.startsWith('event: ')) eventType = line.slice(7).trim();
-                                else if (line.startsWith('data: ')) eventData = line.slice(6);
-                            }
-                            if (eventType === 'content_block_delta' && eventData) {
-                                try {
-                                    const parsed = JSON.parse(eventData);
-                                    const text = parsed.delta?.text || '';
-                                    if (text) accumulated += text;
-                                } catch (e) { }
-                            }
-                        }
+                        drainSseBuffer();
 
                         // Emit completed lines
+                        const beforeEmitCount = lineState.index;
                         emitStreamingLines(accumulated, onLine, lineState);
+                        if (lineState.index > beforeEmitCount) {
+                            emittedProvisionalOutput = true;
+                            emittedLineCount = Math.max(emittedLineCount, lineState.index);
+                        }
                     }
 
-                    // Emit final line
-                    emitStreamingLines(accumulated, onLine, lineState, true);
+                    sseBuffer += decoder.decode();
+                    drainSseBuffer(true);
 
-                    if (!accumulated) {
+                    // Emit final line
+                    const beforeFlushCount = lineState.index;
+                    emitStreamingLines(accumulated, onLine, lineState, true);
+                    if (lineState.index > beforeFlushCount) {
+                        emittedProvisionalOutput = true;
+                        emittedLineCount = Math.max(emittedLineCount, lineState.index);
+                    }
+
+                    validateClaudeStopReason(finalStopReason);
+
+                    if (!accumulated.trim()) {
                         throw new Error('[Claude] Empty response from streaming API');
                     }
 
-                    return accumulated;
+                    const transformed = typeof transformResult === 'function'
+                        ? transformResult(accumulated)
+                        : accumulated;
+
+                    if (Array.isArray(transformed) && typeof onLine === 'function') {
+                        const provisionalLines = accumulated.split('\n');
+                        transformed.forEach((line, index) => {
+                            if (index >= emittedLineCount || provisionalLines[index] !== line) onLine(index, line);
+                        });
+                        for (let index = transformed.length; index < emittedLineCount; index++) {
+                            onLine(index, '');
+                        }
+                    }
+
+                    return transformed;
 
                 } catch (e) {
                     lastError = e;
                     window.__ivLyricsDebugLog?.(`[Claude Addon] Stream attempt ${attempt + 1} failed:`, e.message);
+
+                    const willRetry = attempt < maxRetries - 1 || keyIndex < apiKeys.length - 1;
+                    resetProvisionalOutput(willRetry ? 'retry' : 'failed', e);
 
                     if (e.message.includes('Invalid API key') || e.message.includes('permission denied')) {
                         throw e;
@@ -768,23 +896,52 @@ ${JSON.stringify(payload)}`;
         return extractJSON(rawText);
     }
 
-    function parseTextLines(text, expectedLineCount) {
-        let cleaned = text.replace(/```[a-z]*\s*/gi, '').replace(/```\s*/g, '').trim();
-        const lines = cleaned.split('\n');
-
-        if (lines.length === expectedLineCount) {
-            return lines;
+    function parseTextLines(text, expectedSourceLines) {
+        if (text === null || text === undefined) {
+            throw new Error('[Claude] Empty response from API');
         }
 
-        if (lines.length > expectedLineCount) {
-            return lines.slice(-expectedLineCount);
+        const sourceLines = Array.isArray(expectedSourceLines)
+            ? expectedSourceLines.map(line => String(line ?? ''))
+            : null;
+        const expectedLineCount = sourceLines
+            ? sourceLines.length
+            : Number(expectedSourceLines);
+        let lines = String(text).replace(/\r\n?/g, '\n').split('\n');
+
+        let firstNonBlank = 0;
+        let lastNonBlank = lines.length - 1;
+        while (firstNonBlank <= lastNonBlank && !lines[firstNonBlank].trim()) firstNonBlank += 1;
+        while (lastNonBlank >= firstNonBlank && !lines[lastNonBlank].trim()) lastNonBlank -= 1;
+
+        const openingFence = lines[firstNonBlank]?.trim() || '';
+        const closingFence = lines[lastNonBlank]?.trim() || '';
+        if (/^```[a-z0-9_-]*$/i.test(openingFence) && closingFence === '```') {
+            lines = lines.slice(firstNonBlank + 1, lastNonBlank);
         }
 
-        while (lines.length < expectedLineCount) {
-            lines.push('');
+        const candidates = [lines];
+        if (lines[0]?.trim() === '') candidates.push(lines.slice(1));
+        if (lines[lines.length - 1]?.trim() === '') candidates.push(lines.slice(0, -1));
+        if (lines[0]?.trim() === '' && lines[lines.length - 1]?.trim() === '') {
+            candidates.push(lines.slice(1, -1));
         }
 
-        return lines;
+        const validLines = candidates.find(candidate => candidate.length === expectedLineCount);
+        if (!validLines) {
+            throw new Error(`[Claude] Invalid response line count: expected ${expectedLineCount}, got ${lines.length}`);
+        }
+        if (validLines.every(line => !String(line).trim())) {
+            throw new Error('[Claude] Empty response from API');
+        }
+        if (sourceLines) {
+            const missingLineIndex = validLines.findIndex((line, index) => sourceLines[index].trim() && !String(line).trim());
+            if (missingLineIndex >= 0) {
+                throw new Error(`[Claude] Empty response line at index ${missingLineIndex + 1}`);
+            }
+        }
+
+        return validLines;
     }
 
     function extractJSON(text) {
@@ -978,23 +1135,21 @@ ${JSON.stringify(payload)}`;
             }
         },
 
-        async translateLyrics({ text, lang, wantSmartPhonetic, onLine }) {
+        async translateLyrics({ text, lang, wantSmartPhonetic, onLine, onStreamReset }) {
             if (!text?.trim()) {
                 throw new Error('No text provided');
             }
 
-            const expectedLineCount = text.split('\n').length;
+            const sourceLines = String(text).replace(/\r\n?/g, '\n').split('\n');
+            const normalizedText = sourceLines.join('\n');
             const prompt = wantSmartPhonetic
-                ? buildPhoneticPrompt(text, lang)
-                : buildTranslationPrompt(text, lang);
+                ? buildPhoneticPrompt(normalizedText, lang)
+                : buildTranslationPrompt(normalizedText, lang);
+            const parseLines = rawResponse => parseTextLines(rawResponse, sourceLines);
 
-            let rawResponse;
-            if (onLine) {
-                rawResponse = await callClaudeAPIStream(prompt, onLine);
-            } else {
-                rawResponse = await callClaudeAPIRaw(prompt);
-            }
-            const lines = parseTextLines(rawResponse, expectedLineCount);
+            const lines = onLine
+                ? await callClaudeAPIStream(prompt, onLine, onStreamReset, 3, parseLines)
+                : await callClaudeAPIRaw(prompt, 3, parseLines);
 
             if (wantSmartPhonetic) {
                 return { phonetic: lines };

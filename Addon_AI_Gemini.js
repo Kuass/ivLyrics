@@ -3,7 +3,7 @@
  * Google Gemini AI를 사용한 번역, 발음, TMI 생성
  * 
  * @author default
- * @version 1.0.0
+ * @version 1.0.1
  */
 
 (() => {
@@ -23,7 +23,7 @@
             ja: 'Google Gemini AIを使用した翻訳、発音、TMI生成',
             'zh-CN': '使用 Google Gemini AI 进行翻译、发音和 TMI 生成',
         },
-        version: '1.0.0',
+        version: '1.0.1',
         apiKeyUrl: 'https://aistudio.google.com/apikey',
         // 지원 기능
         supports: {
@@ -593,10 +593,56 @@ ${JSON.stringify(payload)}`;
     // API Call Functions
     // ============================================
 
+    const normalizeGeminiReason = (value) => String(value ?? '').trim().toUpperCase();
+
+    function createGeminiResponseError(reason, message = '') {
+        const normalizedReason = normalizeGeminiReason(reason) || 'UNKNOWN';
+        const detail = String(message || '').trim();
+        const error = new Error(`[Gemini] Response rejected (${normalizedReason})${detail ? `: ${detail}` : ''}`);
+        error.code = 'GEMINI_RESPONSE_REJECTED';
+        error.reason = normalizedReason;
+        return error;
+    }
+
+    function validateGeminiFinishReason(reason, allowUnspecified = false) {
+        const normalizedReason = normalizeGeminiReason(reason);
+        const isUnspecified = !normalizedReason ||
+            normalizedReason === 'FINISH_REASON_UNSPECIFIED' ||
+            normalizedReason === 'UNSPECIFIED' ||
+            normalizedReason === '0';
+        if (isUnspecified) {
+            if (allowUnspecified) return '';
+            throw createGeminiResponseError('MISSING_FINISH_REASON');
+        }
+        if (normalizedReason !== 'STOP') {
+            throw createGeminiResponseError(normalizedReason);
+        }
+        return normalizedReason;
+    }
+
+    function readGeminiResponseText(data, allowUnspecifiedFinishReason = false) {
+        if (data?.error) {
+            throw new Error(`[Gemini] ${data.error.message || data.error.status || 'API response error'}`);
+        }
+
+        const blockReason = normalizeGeminiReason(data?.promptFeedback?.blockReason);
+        if (blockReason && blockReason !== 'BLOCK_REASON_UNSPECIFIED' && blockReason !== 'UNSPECIFIED' && blockReason !== '0') {
+            throw createGeminiResponseError(blockReason, data?.promptFeedback?.blockReasonMessage);
+        }
+
+        const candidate = data?.candidates?.[0];
+        validateGeminiFinishReason(candidate?.finishReason, allowUnspecifiedFinishReason);
+
+        return (candidate?.content?.parts || [])
+            .filter(part => part?.thought !== true && typeof part?.text === 'string')
+            .map(part => part.text)
+            .join('');
+    }
+
     /**
      * Call Gemini API and return raw text response
      */
-    async function callGeminiAPIRaw(prompt, maxRetries = 3) {
+    async function callGeminiAPIRaw(prompt, maxRetries = 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[Gemini] API key is required. Please configure your Gemini API key in settings.');
@@ -650,13 +696,15 @@ ${JSON.stringify(payload)}`;
                     }
 
                     const data = await response.json();
-                    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                    const rawText = readGeminiResponseText(data);
 
-                    if (!rawText) {
+                    if (!rawText.trim()) {
                         throw new Error('[Gemini] Empty response from API');
                     }
 
-                    return rawText;
+                    return typeof transformResult === 'function'
+                        ? transformResult(rawText)
+                        : rawText;
 
                 } catch (e) {
                     lastError = e;
@@ -676,8 +724,11 @@ ${JSON.stringify(payload)}`;
         if (!onLine) return;
 
         if (flush) {
+            if (state.offset >= accumulated.length) return;
             const finalLine = accumulated.slice(state.offset);
             onLine(state.index, finalLine);
+            state.index += 1;
+            state.offset = accumulated.length;
             return;
         }
 
@@ -699,7 +750,7 @@ ${JSON.stringify(payload)}`;
         }
     }
 
-    async function callGeminiAPIStream(prompt, onLine, maxRetries = 3) {
+    async function callGeminiAPIStream(prompt, onLine, onStreamReset, maxRetries = 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) throw new Error('[Gemini] API key is required.');
         const model = getSelectedModel();
@@ -709,6 +760,27 @@ ${JSON.stringify(payload)}`;
         for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex++) {
             const apiKey = apiKeys[keyIndex];
             for (let attempt = 0; attempt < maxRetries; attempt++) {
+                let emittedLineCount = 0;
+                let emittedProvisionalOutput = false;
+                const resetProvisionalOutput = (reason, error = null) => {
+                    if (!emittedProvisionalOutput) return;
+
+                    try {
+                        if (typeof onStreamReset === 'function') {
+                            onStreamReset({ reason, error: error?.message || null });
+                        } else if (typeof onLine === 'function') {
+                            for (let index = 0; index < emittedLineCount; index++) {
+                                onLine(index, '');
+                            }
+                        }
+                    } catch (resetError) {
+                        window.__ivLyricsDebugLog?.('[Gemini Addon] Failed to reset provisional stream:', resetError?.message);
+                    }
+
+                    emittedProvisionalOutput = false;
+                    emittedLineCount = 0;
+                };
+
                 try {
                     const baseUrl = getBaseUrl();
                     const endpoint = `${baseUrl.replace(/\/$/, '')}/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
@@ -733,35 +805,84 @@ ${JSON.stringify(payload)}`;
                     const decoder = new TextDecoder();
                     let sseBuffer = '';
                     let accumulated = '';
+                    let finalFinishReason = '';
                     const lineState = { index: 0, offset: 0 };
+
+                    const processSseLine = (line) => {
+                        const trimmedLine = String(line || '').trim();
+                        if (!trimmedLine.startsWith('data:')) return;
+
+                        const payload = trimmedLine.slice(5).trimStart();
+                        if (!payload || payload === '[DONE]') return;
+
+                        const parsed = JSON.parse(payload);
+                        const finishReason = validateGeminiFinishReason(
+                            parsed?.candidates?.[0]?.finishReason,
+                            true
+                        );
+                        const text = readGeminiResponseText(parsed, true);
+                        if (text) accumulated += text;
+                        if (finishReason) finalFinishReason = finishReason;
+                    };
+
+                    const drainSseBuffer = (flush = false) => {
+                        const parts = sseBuffer.split(/\r?\n/);
+                        if (flush) {
+                            sseBuffer = '';
+                        } else {
+                            sseBuffer = parts.pop() || '';
+                        }
+                        for (const line of parts) processSseLine(line);
+                        if (flush && sseBuffer) processSseLine(sseBuffer);
+                    };
 
                     while (true) {
                         const { value, done } = await reader.read();
                         if (done) break;
 
                         sseBuffer += decoder.decode(value, { stream: true });
-                        const parts = sseBuffer.split('\n');
-                        sseBuffer = parts.pop() || '';
+                        drainSseBuffer();
 
-                        for (const line of parts) {
-                            if (!line.startsWith('data: ')) continue;
-                            try {
-                                const parsed = JSON.parse(line.slice(6));
-                                const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                                if (text) accumulated += text;
-                            } catch (e) { }
-                        }
-
+                        const beforeEmitCount = lineState.index;
                         emitStreamingLines(accumulated, onLine, lineState);
+                        if (lineState.index > beforeEmitCount) {
+                            emittedProvisionalOutput = true;
+                            emittedLineCount = Math.max(emittedLineCount, lineState.index);
+                        }
                     }
 
-                    emitStreamingLines(accumulated, onLine, lineState, true);
+                    sseBuffer += decoder.decode();
+                    drainSseBuffer(true);
 
-                    if (!accumulated) throw new Error('[Gemini] Empty response from streaming API');
-                    return accumulated;
+                    const beforeFlushCount = lineState.index;
+                    emitStreamingLines(accumulated, onLine, lineState, true);
+                    if (lineState.index > beforeFlushCount) {
+                        emittedProvisionalOutput = true;
+                        emittedLineCount = Math.max(emittedLineCount, lineState.index);
+                    }
+
+                    validateGeminiFinishReason(finalFinishReason);
+                    if (!accumulated.trim()) throw new Error('[Gemini] Empty response from streaming API');
+
+                    const transformed = typeof transformResult === 'function'
+                        ? transformResult(accumulated)
+                        : accumulated;
+
+                    if (Array.isArray(transformed) && typeof onLine === 'function') {
+                        const provisionalLines = accumulated.split('\n');
+                        transformed.forEach((line, index) => {
+                            if (index >= emittedLineCount || provisionalLines[index] !== line) onLine(index, line);
+                        });
+                        for (let index = transformed.length; index < emittedLineCount; index++) {
+                            onLine(index, '');
+                        }
+                    }
+
+                    return transformed;
 
                 } catch (e) {
                     lastError = e;
+                    resetProvisionalOutput(attempt < maxRetries - 1 ? 'retry' : 'failed', e);
                     if (attempt < maxRetries - 1) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
                 }
             }
@@ -780,37 +901,52 @@ ${JSON.stringify(payload)}`;
     /**
      * Parse plain text lines from API response
      */
-    function parseTextLines(text, expectedLineCount) {
-        // Remove markdown code blocks if present
-        let cleaned = text.replace(/```[a-z]*\s*/gi, '').replace(/```\s*/g, '').trim();
-
-        // Split by newlines
-        const lines = cleaned.split('\n');
-
-        // If line count matches, return as-is
-        if (lines.length === expectedLineCount) {
-            return lines;
+    function parseTextLines(text, expectedSourceLines) {
+        if (text === null || text === undefined) {
+            throw new Error('[Gemini] Empty response from API');
         }
 
-        // If we have more lines, try to find the correct block
-        // (AI might add extra text before/after the actual translation)
-        if (lines.length > expectedLineCount) {
-            // Try to find a contiguous block of expectedLineCount lines
-            // that looks most like translated content
-            window.__ivLyricsDebugLog?.(`[Gemini Addon] Got ${lines.length} lines, expected ${expectedLineCount}. Trimming...`);
+        const sourceLines = Array.isArray(expectedSourceLines)
+            ? expectedSourceLines.map(line => String(line ?? ''))
+            : null;
+        const expectedLineCount = sourceLines
+            ? sourceLines.length
+            : Number(expectedSourceLines);
+        let lines = String(text).replace(/\r\n?/g, '\n').split('\n');
 
-            // Simple heuristic: take the last expectedLineCount lines
-            // (AI often adds explanation at the beginning)
-            return lines.slice(-expectedLineCount);
+        let firstNonBlank = 0;
+        let lastNonBlank = lines.length - 1;
+        while (firstNonBlank <= lastNonBlank && !lines[firstNonBlank].trim()) firstNonBlank += 1;
+        while (lastNonBlank >= firstNonBlank && !lines[lastNonBlank].trim()) lastNonBlank -= 1;
+
+        const openingFence = lines[firstNonBlank]?.trim() || '';
+        const closingFence = lines[lastNonBlank]?.trim() || '';
+        if (/^```[a-z0-9_-]*$/i.test(openingFence) && closingFence === '```') {
+            lines = lines.slice(firstNonBlank + 1, lastNonBlank);
         }
 
-        // If we have fewer lines, pad with empty strings
-        window.__ivLyricsDebugLog?.(`[Gemini Addon] Got ${lines.length} lines, expected ${expectedLineCount}. Padding...`);
-        while (lines.length < expectedLineCount) {
-            lines.push('');
+        const candidates = [lines];
+        if (lines[0]?.trim() === '') candidates.push(lines.slice(1));
+        if (lines[lines.length - 1]?.trim() === '') candidates.push(lines.slice(0, -1));
+        if (lines[0]?.trim() === '' && lines[lines.length - 1]?.trim() === '') {
+            candidates.push(lines.slice(1, -1));
         }
 
-        return lines;
+        const validLines = candidates.find(candidate => candidate.length === expectedLineCount);
+        if (!validLines) {
+            throw new Error(`[Gemini] Invalid response line count: expected ${expectedLineCount}, got ${lines.length}`);
+        }
+        if (validLines.every(line => !String(line).trim())) {
+            throw new Error('[Gemini] Empty response from API');
+        }
+        if (sourceLines) {
+            const missingLineIndex = validLines.findIndex((line, index) => sourceLines[index].trim() && !String(line).trim());
+            if (missingLineIndex >= 0) {
+                throw new Error(`[Gemini] Empty response line at index ${missingLineIndex + 1}`);
+            }
+        }
+
+        return validLines;
     }
 
     function extractJSON(text) {
@@ -1064,21 +1200,22 @@ ${JSON.stringify(payload)}`;
             }
         },
 
-        async translateLyrics({ text, lang, wantSmartPhonetic, onLine }) {
+        async translateLyrics({ text, lang, wantSmartPhonetic, onLine, onStreamReset }) {
             if (!text?.trim()) {
                 throw new Error('No text provided');
             }
 
-            const expectedLineCount = text.split('\n').length;
+            const sourceLines = String(text).replace(/\r\n?/g, '\n').split('\n');
+            const normalizedText = sourceLines.join('\n');
             const prompt = wantSmartPhonetic
-                ? buildPhoneticPrompt(text, lang)
-                : buildTranslationPrompt(text, lang);
+                ? buildPhoneticPrompt(normalizedText, lang)
+                : buildTranslationPrompt(normalizedText, lang);
+            const parseLines = rawResponse => parseTextLines(rawResponse, sourceLines);
 
-            // Get raw text response and parse lines
-            const rawResponse = onLine
-                ? await callGeminiAPIStream(prompt, onLine)
-                : await callGeminiAPIRaw(prompt);
-            const lines = parseTextLines(rawResponse, expectedLineCount);
+            // Validate inside the provider retry loop so partial/blocked output can retry safely.
+            const lines = onLine
+                ? await callGeminiAPIStream(prompt, onLine, onStreamReset, 3, parseLines)
+                : await callGeminiAPIRaw(prompt, 3, parseLines);
 
             // Return in the format expected by LyricsService
             if (wantSmartPhonetic) {

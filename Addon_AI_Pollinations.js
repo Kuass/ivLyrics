@@ -3,7 +3,7 @@
  * Pollinations.ai를 사용한 번역, 발음, TMI 생성 (무료 API)
  * 
  * @author default
- * @version 1.1.0
+ * @version 1.1.1
  */
 
 (() => {
@@ -23,7 +23,7 @@
             ja: 'Pollinations.aiを使用した翻訳、発音、TMI生成（APIキー必要）',
             'zh-CN': '使用 Pollinations.ai 进行翻译、发音和 TMI 生成（需要 API 密钥）',
         },
-        version: '1.1.0',
+        version: '1.1.1',
         apiKeyUrl: 'https://enter.pollinations.ai',
         // 지원 기능
         supports: {
@@ -680,10 +680,47 @@ ${JSON.stringify(payload)}`;
     // API Call Functions
     // ============================================
 
+    function createPollinationsResponseError(reason, message = '') {
+        const normalizedReason = String(reason ?? '').trim().toLowerCase() || 'unknown';
+        const detail = String(message || '').trim();
+        const error = new Error(`[Pollinations.ai] Response rejected (${normalizedReason})${detail ? `: ${detail}` : ''}`);
+        error.code = 'POLLINATIONS_RESPONSE_REJECTED';
+        error.reason = normalizedReason;
+        return error;
+    }
+
+    function readPollinationsResponseText(data, streaming = false, requireStop = false) {
+        const choice = data?.choices?.[0];
+        const responseError = data?.error || choice?.error;
+        if (responseError) {
+            const message = typeof responseError === 'string'
+                ? responseError
+                : responseError.message || responseError.type || data?.message || 'API response error';
+            throw new Error(`[Pollinations.ai] ${message}`);
+        }
+
+        const finishReason = String(choice?.finish_reason ?? '').trim().toLowerCase();
+        if (finishReason && finishReason !== 'stop') {
+            throw createPollinationsResponseError(finishReason);
+        }
+        if (requireStop && finishReason !== 'stop') {
+            throw createPollinationsResponseError('missing_finish_reason');
+        }
+
+        const responsePart = streaming ? choice?.delta : choice?.message;
+        const refusal = responsePart?.refusal;
+        if ((typeof refusal === 'string' && refusal.trim()) || (refusal && typeof refusal !== 'string')) {
+            throw createPollinationsResponseError('refusal', typeof refusal === 'string' ? refusal : 'Request refused');
+        }
+
+        const content = responsePart?.content;
+        return typeof content === 'string' ? content : '';
+    }
+
     /**
      * Call Pollinations.ai API and return raw text response
      */
-    async function callPollinationsAPIRaw(prompt, maxRetries = 3) {
+    async function callPollinationsAPIRaw(prompt, maxRetries = 3, transformResult = null) {
         const model = getSelectedModel();
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
@@ -743,13 +780,15 @@ ${JSON.stringify(payload)}`;
                     }
 
                     const data = await response.json();
-                    const rawText = data.choices?.[0]?.message?.content || '';
+                    const rawText = readPollinationsResponseText(data, false, true);
 
-                    if (!rawText) {
+                    if (!rawText.trim()) {
                         throw new Error('[Pollinations.ai] Empty response from API');
                     }
 
-                    return rawText;
+                    return typeof transformResult === 'function'
+                        ? transformResult(rawText)
+                        : rawText;
 
                 } catch (e) {
                     lastError = e;
@@ -769,8 +808,11 @@ ${JSON.stringify(payload)}`;
         if (!onLine) return;
 
         if (flush) {
+            if (state.offset >= accumulated.length) return;
             const finalLine = accumulated.slice(state.offset);
             onLine(state.index, finalLine);
+            state.index += 1;
+            state.offset = accumulated.length;
             return;
         }
 
@@ -792,7 +834,7 @@ ${JSON.stringify(payload)}`;
         }
     }
 
-    async function callPollinationsAPIStream(prompt, onLine, maxRetries = 3) {
+    async function callPollinationsAPIStream(prompt, onLine, onStreamReset, maxRetries = 3, transformResult = null) {
         const model = getSelectedModel();
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
@@ -804,6 +846,27 @@ ${JSON.stringify(payload)}`;
         for (let keyIndex = 0; keyIndex < keysToTry.length; keyIndex++) {
             const apiKey = keysToTry[keyIndex];
             for (let attempt = 0; attempt < maxRetries; attempt++) {
+                let emittedLineCount = 0;
+                let emittedProvisionalOutput = false;
+                const resetProvisionalOutput = (reason, error = null) => {
+                    if (!emittedProvisionalOutput) return;
+
+                    try {
+                        if (typeof onStreamReset === 'function') {
+                            onStreamReset({ reason, error: error?.message || null });
+                        } else if (typeof onLine === 'function') {
+                            for (let index = 0; index < emittedLineCount; index++) {
+                                onLine(index, '');
+                            }
+                        }
+                    } catch (resetError) {
+                        window.__ivLyricsDebugLog?.('[Pollinations Addon] Failed to reset provisional stream:', resetError?.message);
+                    }
+
+                    emittedProvisionalOutput = false;
+                    emittedLineCount = 0;
+                };
+
                 try {
                     const endpoint = `${BASE_URL}/v1/chat/completions`;
                     const headers = { 'Content-Type': 'application/json' };
@@ -823,24 +886,70 @@ ${JSON.stringify(payload)}`;
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder();
                     let sseBuffer = '', accumulated = '';
+                    let sawStop = false;
                     const lineState = { index: 0, offset: 0 };
+                    const consumeSSELine = (rawLine) => {
+                        const line = String(rawLine || '').trim();
+                        if (!line.startsWith('data:')) return;
+
+                        const payload = line.slice(5).trimStart();
+                        if (!payload || payload === '[DONE]') return;
+
+                        const parsed = JSON.parse(payload);
+                        const chunk = readPollinationsResponseText(parsed, true);
+                        if (String(parsed?.choices?.[0]?.finish_reason ?? '').trim().toLowerCase() === 'stop') {
+                            sawStop = true;
+                        }
+                        if (chunk) accumulated += chunk;
+                    };
+
                     while (true) {
                         const { value, done } = await reader.read();
                         if (done) break;
                         sseBuffer += decoder.decode(value, { stream: true });
-                        const parts = sseBuffer.split('\n');
+                        const parts = sseBuffer.split(/\r?\n/);
                         sseBuffer = parts.pop() || '';
-                        for (const line of parts) {
-                            if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
-                            try { const p = JSON.parse(line.slice(6)); const t = p.choices?.[0]?.delta?.content || ''; if (t) accumulated += t; } catch (e) { }
-                        }
+                        for (const line of parts) consumeSSELine(line);
+
+                        const beforeEmitCount = lineState.index;
                         emitStreamingLines(accumulated, onLine, lineState);
+                        if (lineState.index > beforeEmitCount) {
+                            emittedProvisionalOutput = true;
+                            emittedLineCount = Math.max(emittedLineCount, lineState.index);
+                        }
                     }
+
+                    sseBuffer += decoder.decode();
+                    if (sseBuffer.trim()) consumeSSELine(sseBuffer);
+                    if (!sawStop) throw createPollinationsResponseError('missing_finish_reason');
+
+                    const beforeFlushCount = lineState.index;
                     emitStreamingLines(accumulated, onLine, lineState, true);
-                    if (!accumulated) throw new Error('[Pollinations.ai] Empty response from streaming API');
-                    return accumulated;
+                    if (lineState.index > beforeFlushCount) {
+                        emittedProvisionalOutput = true;
+                        emittedLineCount = Math.max(emittedLineCount, lineState.index);
+                    }
+
+                    if (!accumulated.trim()) throw new Error('[Pollinations.ai] Empty response from streaming API');
+
+                    const transformed = typeof transformResult === 'function'
+                        ? transformResult(accumulated)
+                        : accumulated;
+
+                    if (Array.isArray(transformed) && typeof onLine === 'function') {
+                        const provisionalLines = accumulated.split('\n');
+                        transformed.forEach((line, index) => {
+                            if (index >= emittedLineCount || provisionalLines[index] !== line) onLine(index, line);
+                        });
+                        for (let index = transformed.length; index < emittedLineCount; index++) {
+                            onLine(index, '');
+                        }
+                    }
+
+                    return transformed;
                 } catch (e) {
                     lastError = e;
+                    resetProvisionalOutput(attempt < maxRetries - 1 ? 'retry' : 'failed', e);
                     if (attempt < maxRetries - 1) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
                 }
             }
@@ -859,31 +968,52 @@ ${JSON.stringify(payload)}`;
     /**
      * Parse plain text lines from API response
      */
-    function parseTextLines(text, expectedLineCount) {
-        // Remove markdown code blocks if present
-        let cleaned = text.replace(/```[a-z]*\s*/gi, '').replace(/```\s*/g, '').trim();
-
-        // Split by newlines
-        const lines = cleaned.split('\n');
-
-        // If line count matches, return as-is
-        if (lines.length === expectedLineCount) {
-            return lines;
+    function parseTextLines(text, expectedSourceLines) {
+        if (text === null || text === undefined) {
+            throw new Error('[Pollinations.ai] Empty response from API');
         }
 
-        // If we have more lines, try to find the correct block
-        if (lines.length > expectedLineCount) {
-            window.__ivLyricsDebugLog?.(`[Pollinations Addon] Got ${lines.length} lines, expected ${expectedLineCount}. Trimming...`);
-            return lines.slice(-expectedLineCount);
+        const sourceLines = Array.isArray(expectedSourceLines)
+            ? expectedSourceLines.map(line => String(line ?? ''))
+            : null;
+        const expectedLineCount = sourceLines
+            ? sourceLines.length
+            : Number(expectedSourceLines);
+        let lines = String(text).replace(/\r\n?/g, '\n').split('\n');
+
+        let firstNonBlank = 0;
+        let lastNonBlank = lines.length - 1;
+        while (firstNonBlank <= lastNonBlank && !lines[firstNonBlank].trim()) firstNonBlank += 1;
+        while (lastNonBlank >= firstNonBlank && !lines[lastNonBlank].trim()) lastNonBlank -= 1;
+
+        const openingFence = lines[firstNonBlank]?.trim() || '';
+        const closingFence = lines[lastNonBlank]?.trim() || '';
+        if (/^```[a-z0-9_-]*$/i.test(openingFence) && closingFence === '```') {
+            lines = lines.slice(firstNonBlank + 1, lastNonBlank);
         }
 
-        // If we have fewer lines, pad with empty strings
-        window.__ivLyricsDebugLog?.(`[Pollinations Addon] Got ${lines.length} lines, expected ${expectedLineCount}. Padding...`);
-        while (lines.length < expectedLineCount) {
-            lines.push('');
+        const candidates = [lines];
+        if (lines[0]?.trim() === '') candidates.push(lines.slice(1));
+        if (lines[lines.length - 1]?.trim() === '') candidates.push(lines.slice(0, -1));
+        if (lines[0]?.trim() === '' && lines[lines.length - 1]?.trim() === '') {
+            candidates.push(lines.slice(1, -1));
         }
 
-        return lines;
+        const validLines = candidates.find(candidate => candidate.length === expectedLineCount);
+        if (!validLines) {
+            throw new Error(`[Pollinations.ai] Invalid response line count: expected ${expectedLineCount}, got ${lines.length}`);
+        }
+        if (validLines.every(line => !String(line).trim())) {
+            throw new Error('[Pollinations.ai] Empty response from API');
+        }
+        if (sourceLines) {
+            const missingLineIndex = validLines.findIndex((line, index) => sourceLines[index].trim() && !String(line).trim());
+            if (missingLineIndex >= 0) {
+                throw new Error(`[Pollinations.ai] Empty response line at index ${missingLineIndex + 1}`);
+            }
+        }
+
+        return validLines;
     }
 
     function extractJSON(text) {
@@ -1185,21 +1315,21 @@ ${JSON.stringify(payload)}`;
             }
         },
 
-        async translateLyrics({ text, lang, wantSmartPhonetic, onLine }) {
+        async translateLyrics({ text, lang, wantSmartPhonetic, onLine, onStreamReset }) {
             if (!text?.trim()) {
                 throw new Error('No text provided');
             }
 
-            const expectedLineCount = text.split('\n').length;
+            const sourceLines = String(text).replace(/\r\n?/g, '\n').split('\n');
+            const normalizedText = sourceLines.join('\n');
             const prompt = wantSmartPhonetic
-                ? buildPhoneticPrompt(text, lang)
-                : buildTranslationPrompt(text, lang);
+                ? buildPhoneticPrompt(normalizedText, lang)
+                : buildTranslationPrompt(normalizedText, lang);
+            const parseLines = rawResponse => parseTextLines(rawResponse, sourceLines);
 
-            // Get raw text response and parse lines
-            const rawResponse = onLine
-                ? await callPollinationsAPIStream(prompt, onLine)
-                : await callPollinationsAPIRaw(prompt);
-            const lines = parseTextLines(rawResponse, expectedLineCount);
+            const lines = onLine
+                ? await callPollinationsAPIStream(prompt, onLine, onStreamReset, 3, parseLines)
+                : await callPollinationsAPIRaw(prompt, 3, parseLines);
 
             // Return in the format expected by LyricsService
             if (wantSmartPhonetic) {

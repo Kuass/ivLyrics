@@ -3,7 +3,7 @@
  * Paxsenix OpenAI 호환 API를 사용한 번역, 발음, TMI 생성
  *
  * @author default
- * @version 1.0.0
+ * @version 1.0.1
  */
 
 (() => {
@@ -23,7 +23,7 @@
             ja: 'PaxsenixのOpenAI互換APIで翻訳、発音、TMIを生成します',
             'zh-CN': '使用 Paxsenix OpenAI 兼容 API 生成翻译、发音和 TMI',
         },
-        version: '1.0.0',
+        version: '1.0.1',
         apiKeyUrl: 'https://api.paxsenix.org/dashboard',
         supports: {
             translate: true,
@@ -552,7 +552,44 @@ ${JSON.stringify(payload)}`;
         return error;
     }
 
-    async function callPaxsenixAPIRaw(prompt, maxRetries = 3) {
+    function createPaxsenixResponseError(reason, message = '') {
+        const normalizedReason = String(reason ?? '').trim().toLowerCase() || 'unknown';
+        const detail = String(message || '').trim();
+        const error = new Error(`[Paxsenix] Response rejected (${normalizedReason})${detail ? `: ${detail}` : ''}`);
+        error.code = 'PAXSENIX_RESPONSE_REJECTED';
+        error.reason = normalizedReason;
+        return error;
+    }
+
+    function readPaxsenixResponseText(data, streaming = false, requireStop = false) {
+        const choice = data?.choices?.[0];
+        const responseError = data?.error || choice?.error;
+        if (responseError) {
+            const message = typeof responseError === 'string'
+                ? responseError
+                : responseError.message || responseError.type || data?.message || 'API response error';
+            throw new Error(`[Paxsenix] ${message}`);
+        }
+
+        const finishReason = String(choice?.finish_reason ?? '').trim().toLowerCase();
+        if (finishReason && finishReason !== 'stop') {
+            throw createPaxsenixResponseError(finishReason);
+        }
+        if (requireStop && finishReason !== 'stop') {
+            throw createPaxsenixResponseError('missing_finish_reason');
+        }
+
+        const responsePart = streaming ? choice?.delta : choice?.message;
+        const refusal = responsePart?.refusal;
+        if ((typeof refusal === 'string' && refusal.trim()) || (refusal && typeof refusal !== 'string')) {
+            throw createPaxsenixResponseError('refusal', typeof refusal === 'string' ? refusal : 'Request refused');
+        }
+
+        const content = responsePart?.content;
+        return typeof content === 'string' ? content : '';
+    }
+
+    async function callPaxsenixAPIRaw(prompt, maxRetries = 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[Paxsenix] API key is required. Please configure your API key in settings.');
@@ -592,13 +629,15 @@ ${JSON.stringify(payload)}`;
                     }
 
                     const data = await response.json();
-                    const rawText = data.choices?.[0]?.message?.content || '';
+                    const rawText = readPaxsenixResponseText(data, false, true);
 
-                    if (!rawText) {
+                    if (!rawText.trim()) {
                         throw new Error('[Paxsenix] Empty response from API');
                     }
 
-                    return rawText;
+                    return typeof transformResult === 'function'
+                        ? transformResult(rawText)
+                        : rawText;
 
                 } catch (e) {
                     lastError = e;
@@ -623,8 +662,11 @@ ${JSON.stringify(payload)}`;
         if (!onLine) return;
 
         if (flush) {
+            if (state.offset >= accumulated.length) return;
             const finalLine = accumulated.slice(state.offset);
             onLine(state.index, finalLine);
+            state.index += 1;
+            state.offset = accumulated.length;
             return;
         }
 
@@ -646,7 +688,7 @@ ${JSON.stringify(payload)}`;
         }
     }
 
-    async function callPaxsenixAPIStream(prompt, onLine, maxRetries = 3) {
+    async function callPaxsenixAPIStream(prompt, onLine, onStreamReset, maxRetries = 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) throw new Error('[Paxsenix] API key is required.');
         const model = getSelectedModel();
@@ -655,6 +697,27 @@ ${JSON.stringify(payload)}`;
         for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex++) {
             const apiKey = apiKeys[keyIndex];
             for (let attempt = 0; attempt < maxRetries; attempt++) {
+                let emittedLineCount = 0;
+                let emittedProvisionalOutput = false;
+                const resetProvisionalOutput = (reason, error = null) => {
+                    if (!emittedProvisionalOutput) return;
+
+                    try {
+                        if (typeof onStreamReset === 'function') {
+                            onStreamReset({ reason, error: error?.message || null });
+                        } else if (typeof onLine === 'function') {
+                            for (let index = 0; index < emittedLineCount; index++) {
+                                onLine(index, '');
+                            }
+                        }
+                    } catch (resetError) {
+                        window.__ivLyricsDebugLog?.('[Paxsenix Addon] Failed to reset provisional stream:', resetError?.message);
+                    }
+
+                    emittedProvisionalOutput = false;
+                    emittedLineCount = 0;
+                };
+
                 try {
                     const response = await fetch(`${BASE_URL}/chat/completions`, {
                         method: 'POST',
@@ -671,19 +734,21 @@ ${JSON.stringify(payload)}`;
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder();
                     let sseBuffer = '', accumulated = '';
+                    let sawStop = false;
                     const lineState = { index: 0, offset: 0 };
                     const consumeSSELine = (rawLine) => {
-                        const line = rawLine.trimEnd();
+                        const line = String(rawLine || '').trim();
                         if (!line.startsWith('data:')) return false;
 
                         const payload = line.slice(5).trimStart();
                         if (!payload || payload === '[DONE]') return payload === '[DONE]';
 
-                        try {
-                            const parsed = JSON.parse(payload);
-                            const chunk = parsed.choices?.[0]?.delta?.content || '';
-                            if (chunk) accumulated += chunk;
-                        } catch (e) { }
+                        const parsed = JSON.parse(payload);
+                        const chunk = readPaxsenixResponseText(parsed, true);
+                        if (String(parsed?.choices?.[0]?.finish_reason ?? '').trim().toLowerCase() === 'stop') {
+                            sawStop = true;
+                        }
+                        if (chunk) accumulated += chunk;
                         return false;
                     };
 
@@ -692,7 +757,7 @@ ${JSON.stringify(payload)}`;
                         const { value, done } = await reader.read();
                         if (done) break;
                         sseBuffer += decoder.decode(value, { stream: true });
-                        const parts = sseBuffer.split('\n');
+                        const parts = sseBuffer.split(/\r?\n/);
                         sseBuffer = parts.pop() || '';
                         for (const line of parts) {
                             if (consumeSSELine(line)) {
@@ -700,17 +765,47 @@ ${JSON.stringify(payload)}`;
                                 break;
                             }
                         }
+                        const beforeEmitCount = lineState.index;
                         emitStreamingLines(accumulated, onLine, lineState);
+                        if (lineState.index > beforeEmitCount) {
+                            emittedProvisionalOutput = true;
+                            emittedLineCount = Math.max(emittedLineCount, lineState.index);
+                        }
                     }
                     sseBuffer += decoder.decode();
                     if (!streamDone && sseBuffer.trim()) consumeSSELine(sseBuffer);
+                    if (!sawStop) throw createPaxsenixResponseError('missing_finish_reason');
+
+                    const beforeFlushCount = lineState.index;
                     emitStreamingLines(accumulated, onLine, lineState, true);
-                    if (!accumulated) throw new Error('[Paxsenix] Empty response from streaming API');
-                    return accumulated;
+                    if (lineState.index > beforeFlushCount) {
+                        emittedProvisionalOutput = true;
+                        emittedLineCount = Math.max(emittedLineCount, lineState.index);
+                    }
+
+                    if (!accumulated.trim()) throw new Error('[Paxsenix] Empty response from streaming API');
+
+                    const transformed = typeof transformResult === 'function'
+                        ? transformResult(accumulated)
+                        : accumulated;
+
+                    if (Array.isArray(transformed) && typeof onLine === 'function') {
+                        const provisionalLines = accumulated.split('\n');
+                        transformed.forEach((line, index) => {
+                            if (index >= emittedLineCount || provisionalLines[index] !== line) onLine(index, line);
+                        });
+                        for (let index = transformed.length; index < emittedLineCount; index++) {
+                            onLine(index, '');
+                        }
+                    }
+
+                    return transformed;
                 } catch (e) {
                     lastError = e;
-                    if ((e.status >= 400 && e.status < 500 && e.status !== 429)
-                        || /invalid api key|permission denied/i.test(e.message)) throw e;
+                    const isPermanentError = (e.status >= 400 && e.status < 500 && e.status !== 429)
+                        || /invalid api key|permission denied/i.test(e.message);
+                    resetProvisionalOutput(isPermanentError || attempt >= maxRetries - 1 ? 'failed' : 'retry', e);
+                    if (isPermanentError) throw e;
                     if (attempt < maxRetries - 1) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
                 }
             }
@@ -723,23 +818,52 @@ ${JSON.stringify(payload)}`;
         return extractJSON(rawText);
     }
 
-    function parseTextLines(text, expectedLineCount) {
-        let cleaned = text.replace(/```[a-z]*\s*/gi, '').replace(/```\s*/g, '').trim();
-        const lines = cleaned.split('\n');
-
-        if (lines.length === expectedLineCount) {
-            return lines;
+    function parseTextLines(text, expectedSourceLines) {
+        if (text === null || text === undefined) {
+            throw new Error('[Paxsenix] Empty response from API');
         }
 
-        if (lines.length > expectedLineCount) {
-            return lines.slice(-expectedLineCount);
+        const sourceLines = Array.isArray(expectedSourceLines)
+            ? expectedSourceLines.map(line => String(line ?? ''))
+            : null;
+        const expectedLineCount = sourceLines
+            ? sourceLines.length
+            : Number(expectedSourceLines);
+        let lines = String(text).replace(/\r\n?/g, '\n').split('\n');
+
+        let firstNonBlank = 0;
+        let lastNonBlank = lines.length - 1;
+        while (firstNonBlank <= lastNonBlank && !lines[firstNonBlank].trim()) firstNonBlank += 1;
+        while (lastNonBlank >= firstNonBlank && !lines[lastNonBlank].trim()) lastNonBlank -= 1;
+
+        const openingFence = lines[firstNonBlank]?.trim() || '';
+        const closingFence = lines[lastNonBlank]?.trim() || '';
+        if (/^```[a-z0-9_-]*$/i.test(openingFence) && closingFence === '```') {
+            lines = lines.slice(firstNonBlank + 1, lastNonBlank);
         }
 
-        while (lines.length < expectedLineCount) {
-            lines.push('');
+        const candidates = [lines];
+        if (lines[0]?.trim() === '') candidates.push(lines.slice(1));
+        if (lines[lines.length - 1]?.trim() === '') candidates.push(lines.slice(0, -1));
+        if (lines[0]?.trim() === '' && lines[lines.length - 1]?.trim() === '') {
+            candidates.push(lines.slice(1, -1));
         }
 
-        return lines;
+        const validLines = candidates.find(candidate => candidate.length === expectedLineCount);
+        if (!validLines) {
+            throw new Error(`[Paxsenix] Invalid response line count: expected ${expectedLineCount}, got ${lines.length}`);
+        }
+        if (validLines.every(line => !String(line).trim())) {
+            throw new Error('[Paxsenix] Empty response from API');
+        }
+        if (sourceLines) {
+            const missingLineIndex = validLines.findIndex((line, index) => sourceLines[index].trim() && !String(line).trim());
+            if (missingLineIndex >= 0) {
+                throw new Error(`[Paxsenix] Empty response line at index ${missingLineIndex + 1}`);
+            }
+        }
+
+        return validLines;
     }
 
     function extractJSON(text) {
@@ -966,20 +1090,21 @@ ${JSON.stringify(payload)}`;
             }
         },
 
-        async translateLyrics({ text, lang, wantSmartPhonetic, onLine }) {
+        async translateLyrics({ text, lang, wantSmartPhonetic, onLine, onStreamReset }) {
             if (!text?.trim()) {
                 throw new Error('No text provided');
             }
 
-            const expectedLineCount = text.split('\n').length;
+            const sourceLines = String(text).replace(/\r\n?/g, '\n').split('\n');
+            const normalizedText = sourceLines.join('\n');
             const prompt = wantSmartPhonetic
-                ? buildPhoneticPrompt(text, lang)
-                : buildTranslationPrompt(text, lang);
+                ? buildPhoneticPrompt(normalizedText, lang)
+                : buildTranslationPrompt(normalizedText, lang);
+            const parseLines = rawResponse => parseTextLines(rawResponse, sourceLines);
 
-            const rawResponse = onLine
-                ? await callPaxsenixAPIStream(prompt, onLine)
-                : await callPaxsenixAPIRaw(prompt);
-            const lines = parseTextLines(rawResponse, expectedLineCount);
+            const lines = onLine
+                ? await callPaxsenixAPIStream(prompt, onLine, onStreamReset, 3, parseLines)
+                : await callPaxsenixAPIRaw(prompt, 3, parseLines);
 
             if (wantSmartPhonetic) {
                 return { phonetic: lines };

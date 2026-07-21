@@ -493,7 +493,20 @@ const getCachedTranslationForText = async ({
 
   try {
     const sourceHash = getTranslationSourceCacheHash(text);
-    return await cacheApi.getTranslation(trackId, lang, isPhonetic, provider, sourceHash);
+    const cached = await cacheApi.getTranslation(trackId, lang, isPhonetic, provider, sourceHash);
+    if (!cached) return null;
+
+    const value = isPhonetic ? cached.phonetic : (cached.translation ?? cached.vi);
+    const resultLines = Array.isArray(value)
+      ? value.map((line) => String(line ?? ""))
+      : (typeof value === "string" ? value.replace(/\r\n?/g, "\n").split("\n") : null);
+    const sourceLines = String(text).replace(/\r\n?/g, "\n").split("\n");
+    const structurallyValid = resultLines &&
+      resultLines.length === sourceLines.length &&
+      resultLines.some((line) => line.trim()) &&
+      resultLines.every((line, index) => !sourceLines[index].trim() || !!line.trim());
+
+    return structurallyValid ? cached : null;
   } catch (error) {
     return null;
   }
@@ -5106,8 +5119,10 @@ class LyricsContainer extends react.Component {
         return outText;
       };
 
-      let streamedLyrics1 = this._dmResults[currentUri].mode1 || null;
-      let streamedLyrics2 = this._dmResults[currentUri].mode2 || null;
+      const initialStreamedLyrics1 = this._dmResults[currentUri].mode1 || null;
+      const initialStreamedLyrics2 = this._dmResults[currentUri].mode2 || null;
+      let streamedLyrics1 = initialStreamedLyrics1;
+      let streamedLyrics2 = initialStreamedLyrics2;
       const streamedPhoneticLines = [];
       const streamedTranslationLines = [];
 
@@ -5155,6 +5170,14 @@ class LyricsContainer extends react.Component {
           pushStreamingUpdate();
         }
         : null;
+      const handlePhoneticStreamReset = needPhonetic
+        ? () => {
+          streamedPhoneticLines.length = 0;
+          if (mode1 === "gemini_romaji") streamedLyrics1 = initialStreamedLyrics1;
+          if (mode2 === "gemini_romaji") streamedLyrics2 = initialStreamedLyrics2;
+          pushStreamingUpdate();
+        }
+        : null;
 
       const handleTranslationStreamLine = needTranslation
         ? (lineIndex, lineText) => {
@@ -5182,6 +5205,14 @@ class LyricsContainer extends react.Component {
           pushStreamingUpdate();
         }
         : null;
+      const handleTranslationStreamReset = needTranslation
+        ? () => {
+          streamedTranslationLines.length = 0;
+          if (mode1 === "gemini_ko") streamedLyrics1 = initialStreamedLyrics1;
+          if (mode2 === "gemini_ko") streamedLyrics2 = initialStreamedLyrics2;
+          pushStreamingUpdate();
+        }
+        : null;
 
       // 발음과 번역을 별도로 요청 (둘 다 필요한 경우)
       let phoneticResponse = null;
@@ -5198,6 +5229,7 @@ class LyricsContainer extends react.Component {
           provider: lyricsState.provider,
           ignoreCache: true,
           onLine: handlePhoneticStreamLine,
+          onStreamReset: handlePhoneticStreamReset,
         });
       }
 
@@ -5215,6 +5247,7 @@ class LyricsContainer extends react.Component {
           provider: lyricsState.provider,
           ignoreCache: true,
           onLine: handleTranslationStreamLine,
+          onStreamReset: handleTranslationStreamReset,
         });
       }
 
@@ -6288,6 +6321,28 @@ class LyricsContainer extends react.Component {
     // 스마트 로딩 전략: 두 모드 모두 활성화된 경우 둘 다 완료될 때까지 기다림
     const mode1Active = displayMode1 && displayMode1 !== "none";
     const mode2Active = displayMode2 && displayMode2 !== "none";
+    const applyModeStreamProgress = (slot, partialLyrics, detail = {}) => {
+      if (!isActivePresentation() || !this._dmResults?.[currentUri]) return;
+
+      if (slot === 1) {
+        lyricsMode1 = detail?.reset === true ? null : partialLyrics;
+        this._dmResults[currentUri].mode1 = lyricsMode1;
+      } else {
+        lyricsMode2 = detail?.reset === true ? null : partialLyrics;
+        this._dmResults[currentUri].mode2 = lyricsMode2;
+      }
+
+      if (detail?.reset !== true && !partialLyrics) return;
+      this.applyStreamingTranslation({
+        uri,
+        presentationSeq,
+        lyrics,
+        lyricsMode1,
+        lyricsMode2,
+        displayMode1,
+        displayMode2,
+      });
+    };
 
     ivLyricsDebug(
       "[displayTranslations] Mode1:",
@@ -6307,35 +6362,13 @@ class LyricsContainer extends react.Component {
       // 캐시된 결과가 있으면 재사용, 없으면 새로 요청
       const promise1 = lyricsMode1
         ? Promise.resolve(lyricsMode1)
-        : processMode(displayMode1, lyrics, (partialLyrics) => {
-          if (!isActivePresentation() || !partialLyrics || !this._dmResults?.[currentUri]) return;
-          lyricsMode1 = partialLyrics;
-          this._dmResults[currentUri].mode1 = partialLyrics;
-          this.applyStreamingTranslation({
-            uri,
-            presentationSeq,
-            lyrics,
-            lyricsMode1,
-            lyricsMode2,
-            displayMode1,
-            displayMode2,
-          });
+        : processMode(displayMode1, lyrics, (partialLyrics, detail) => {
+          applyModeStreamProgress(1, partialLyrics, detail);
         });
       const promise2 = lyricsMode2
         ? Promise.resolve(lyricsMode2)
-        : processMode(displayMode2, lyrics, (partialLyrics) => {
-          if (!isActivePresentation() || !partialLyrics || !this._dmResults?.[currentUri]) return;
-          lyricsMode2 = partialLyrics;
-          this._dmResults[currentUri].mode2 = partialLyrics;
-          this.applyStreamingTranslation({
-            uri,
-            presentationSeq,
-            lyrics,
-            lyricsMode1,
-            lyricsMode2,
-            displayMode1,
-            displayMode2,
-          });
+        : processMode(displayMode2, lyrics, (partialLyrics, detail) => {
+          applyModeStreamProgress(2, partialLyrics, detail);
         });
 
       // 각 promise가 완료되는 즉시 업데이트
@@ -6393,19 +6426,8 @@ class LyricsContainer extends react.Component {
       if (lyricsMode1) {
         updateCombinedLyrics();
       } else {
-        processMode(displayMode1, lyrics, (partialLyrics) => {
-          if (!isActivePresentation() || !partialLyrics || !this._dmResults?.[currentUri]) return;
-          lyricsMode1 = partialLyrics;
-          this._dmResults[currentUri].mode1 = partialLyrics;
-          this.applyStreamingTranslation({
-            uri,
-            presentationSeq,
-            lyrics,
-            lyricsMode1,
-            lyricsMode2,
-            displayMode1,
-            displayMode2,
-          });
+        processMode(displayMode1, lyrics, (partialLyrics, detail) => {
+          applyModeStreamProgress(1, partialLyrics, detail);
         })
           .then((result) => {
             if (!isActivePresentation() || !this._dmResults?.[currentUri]) {
@@ -6430,19 +6452,8 @@ class LyricsContainer extends react.Component {
       if (lyricsMode2) {
         updateCombinedLyrics();
       } else {
-        processMode(displayMode2, lyrics, (partialLyrics) => {
-          if (!isActivePresentation() || !partialLyrics || !this._dmResults?.[currentUri]) return;
-          lyricsMode2 = partialLyrics;
-          this._dmResults[currentUri].mode2 = partialLyrics;
-          this.applyStreamingTranslation({
-            uri,
-            presentationSeq,
-            lyrics,
-            lyricsMode1,
-            lyricsMode2,
-            displayMode1,
-            displayMode2,
-          });
+        processMode(displayMode2, lyrics, (partialLyrics, detail) => {
+          applyModeStreamProgress(2, partialLyrics, detail);
         })
           .then((result) => {
             if (!isActivePresentation() || !this._dmResults?.[currentUri]) {
@@ -6761,6 +6772,14 @@ class LyricsContainer extends react.Component {
           }
         }
         : null;
+      const handleStreamReset = onProgress
+        ? (detail = {}) => {
+          streamedLines.length = 0;
+          if (this.isCurrentLyricsState(lyricsState)) {
+            onProgress(null, { ...detail, reset: true });
+          }
+        }
+        : null;
 
       // Start appropriate loading indicator based on mode type (1초 후 표시)
       const loadingToken = wantSmartPhonetic
@@ -6807,6 +6826,7 @@ class LyricsContainer extends react.Component {
             wantSmartPhonetic,
             provider: lyricsState.provider,
             onLine: handleStreamLine,
+            onStreamReset: handleStreamReset,
           });
 
           if (wantSmartPhonetic) {
