@@ -827,6 +827,7 @@ window.LANG_TH = {
     "greetingPlaceholder": "เขียนคำทักทายที่จะแสดงบนโปรไฟล์ของคุณ",
     "greetingLoginRequired": "ต้องเข้าสู่ระบบ Discord เพื่อแก้ไขโปรไฟล์ผู้สร้างของคุณ",
     "greetingSaveFailed": "บันทึกคำทักทายไม่สำเร็จ",
+    "greetingTranslateFailed": "แปลคำทักทายไม่สำเร็จ",
     "greetingSaveSuccess": "บันทึกคำทักทายแล้ว",
     "ownProfile": "นี่คือโปรไฟล์ของคุณ",
     "loadMore": "โหลดเพิ่ม",
@@ -2056,6 +2057,16 @@ window.LANG_TH = {
       "downloading": "กำลังดาวน์โหลดวิดีโอ: {percent}%",
       "skip": "ข้าม"
     }
+  },
+  "vinyl": {
+    "mode": "โหมดแผ่นเสียง",
+    "openHint": "คลิกปกอัลบั้มเพื่อเปิด",
+    "closeHint": "คลิกปกอัลบั้มเพื่อกลับ",
+    "recordHint": "คลิกแผ่นเสียงเพื่อเล่นหรือหยุดชั่วคราว",
+    "tonearmHint": "ลากโทนอาร์มเพื่อเปลี่ยนตำแหน่งการเล่น",
+    "tmiHint": "คลิกขวาหรือคลิกปกอัลบั้มค้างไว้เพื่อเปิด TMI",
+    "click": "คลิก",
+    "tmiGesture": "คลิกขวา · กดค้าง"
   },
   "tmi": {
     "getApiKeyDesc": "รับ Gemini API Key",

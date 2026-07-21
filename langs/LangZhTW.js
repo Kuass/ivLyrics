@@ -827,6 +827,7 @@ window.LANG_ZH_TW = {
     "greetingPlaceholder": "寫一句要顯示在個人資料上的問候語。",
     "greetingLoginRequired": "需要登入 Discord 才能編輯創作者資料。",
     "greetingSaveFailed": "無法儲存問候語。",
+    "greetingTranslateFailed": "無法翻譯問候語。",
     "greetingSaveSuccess": "問候語已儲存。",
     "ownProfile": "這是你的個人資料。",
     "loadMore": "載入更多",
@@ -2056,6 +2057,16 @@ window.LANG_ZH_TW = {
       "downloading": "影片下載中: {percent}%",
       "skip": "跳過"
     }
+  },
+  "vinyl": {
+    "mode": "黑膠模式",
+    "openHint": "點擊專輯封面開啟",
+    "closeHint": "點擊專輯封面返回",
+    "recordHint": "點擊唱片播放或暫停",
+    "tonearmHint": "拖曳唱臂調整播放位置",
+    "tmiHint": "以右鍵點擊或長按專輯封面來開啟 TMI",
+    "click": "點擊",
+    "tmiGesture": "右鍵點擊 · 長按"
   },
   "tmi": {
     "getApiKeyDesc": "取得 Gemini API 金鑰",

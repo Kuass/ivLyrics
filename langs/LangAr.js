@@ -827,6 +827,7 @@ window.LANG_AR = {
     "greetingPlaceholder": "اكتب تحية لعرضها في ملفك الشخصي.",
     "greetingLoginRequired": "يلزم تسجيل الدخول عبر Discord لتعديل ملفك الشخصي كصانع.",
     "greetingSaveFailed": "تعذر حفظ التحية.",
+    "greetingTranslateFailed": "تعذرت ترجمة التحية.",
     "greetingSaveSuccess": "تم حفظ التحية.",
     "ownProfile": "هذا ملفك الشخصي.",
     "loadMore": "تحميل المزيد",
@@ -2055,6 +2056,16 @@ window.LANG_AR = {
       "downloading": "تنزيل الفيديو: {percent}%",
       "skip": "تخطي"
     }
+  },
+  "vinyl": {
+    "mode": "وضع الأسطوانة",
+    "openHint": "انقر على الغلاف للفتح",
+    "closeHint": "انقر على الغلاف للعودة",
+    "recordHint": "انقر على الأسطوانة للتشغيل أو الإيقاف المؤقت",
+    "tonearmHint": "اسحب ذراع التشغيل لتغيير موضع التشغيل",
+    "tmiHint": "انقر بزر الفأرة الأيمن أو اضغط مطولًا على الغلاف لفتح TMI",
+    "click": "نقر",
+    "tmiGesture": "نقر بالزر الأيمن · ضغط مطوّل"
   },
   "tmi": {
     "getApiKeyDesc": "الحصول على مفتاح Gemini API",

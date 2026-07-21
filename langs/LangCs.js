@@ -827,6 +827,7 @@ window.LANG_CS = {
     "greetingPlaceholder": "Napište pozdrav pro váš profil.",
     "greetingLoginRequired": "K úpravě profilu tvůrce je vyžadováno přihlášení Discord.",
     "greetingSaveFailed": "Pozdrav pro tvůrce se nepodařilo aktualizovat.",
+    "greetingTranslateFailed": "Pozdrav se nepodařilo přeložit.",
     "greetingSaveSuccess": "Pozdrav aktualizován.",
     "ownProfile": "Toto je váš profil.",
     "loadMore": "Načíst více",
@@ -2055,6 +2056,16 @@ window.LANG_CS = {
       "downloading": "Stahování videa: {percent}%",
       "skip": "Přeskočit"
     }
+  },
+  "vinyl": {
+    "mode": "Vinylový režim",
+    "openHint": "Kliknutím na obal otevřete",
+    "closeHint": "Kliknutím na obal se vrátíte",
+    "recordHint": "Kliknutím na desku spustíte nebo pozastavíte přehrávání",
+    "tonearmHint": "Přetažením raménka změníte pozici přehrávání",
+    "tmiHint": "Kliknutím pravým tlačítkem nebo podržením obalu otevřete TMI",
+    "click": "Kliknutí",
+    "tmiGesture": "Pravé tlačítko · Podržení"
   },
   "tmi": {
     "getApiKeyDesc": "Získejte Gemini API klíč",

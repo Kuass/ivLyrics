@@ -827,6 +827,7 @@ window.LANG_VI = {
     "greetingPlaceholder": "Viết lời chào để hiển thị trên hồ sơ của bạn.",
     "greetingLoginRequired": "Cần đăng nhập Discord để chỉnh sửa hồ sơ người tạo.",
     "greetingSaveFailed": "Không thể lưu lời chào.",
+    "greetingTranslateFailed": "Không thể dịch lời chào.",
     "greetingSaveSuccess": "Đã lưu lời chào.",
     "ownProfile": "Đây là hồ sơ của bạn.",
     "loadMore": "Tải thêm",
@@ -2056,6 +2057,16 @@ window.LANG_VI = {
       "downloading": "Đang tải video: {percent}%",
       "skip": "Bỏ qua"
     }
+  },
+  "vinyl": {
+    "mode": "Chế độ đĩa than",
+    "openHint": "Nhấp vào bìa album để mở",
+    "closeHint": "Nhấp vào bìa album để quay lại",
+    "recordHint": "Nhấp vào đĩa để phát hoặc tạm dừng",
+    "tonearmHint": "Kéo cần máy hát để thay đổi vị trí phát",
+    "tmiHint": "Nhấp chuột phải hoặc nhấn giữ bìa album để mở TMI",
+    "click": "Nhấp",
+    "tmiGesture": "Chuột phải · Nhấn giữ"
   },
   "tmi": {
     "getApiKeyDesc": "Nhận Gemini API Key",

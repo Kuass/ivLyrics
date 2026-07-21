@@ -827,6 +827,7 @@ window.LANG_TR = {
     "greetingPlaceholder": "Profiliniz için bir karşılama yazın.",
     "greetingLoginRequired": "Oluşturucu profilinizi düzenlemek için Discord girişi gereklidir.",
     "greetingSaveFailed": "Oluşturucu karşılaması güncellenemedi.",
+    "greetingTranslateFailed": "Karşılama çevrilemedi.",
     "greetingSaveSuccess": "Karşılama güncellendi.",
     "ownProfile": "Bu sizin profiliniz.",
     "loadMore": "Daha fazla yükle",
@@ -2056,6 +2057,16 @@ window.LANG_TR = {
       "downloading": "Video indiriliyor: %{percent}",
       "skip": "Atla"
     }
+  },
+  "vinyl": {
+    "mode": "Plak modu",
+    "openHint": "Açmak için albüm kapağına tıklayın",
+    "closeHint": "Geri dönmek için albüm kapağına tıklayın",
+    "recordHint": "Oynatmak veya duraklatmak için plağa tıklayın",
+    "tonearmHint": "Oynatma konumunu değiştirmek için pikap kolunu sürükleyin",
+    "tmiHint": "TMI'ı açmak için albüm kapağına sağ tıklayın veya basılı tutun",
+    "click": "Tıkla",
+    "tmiGesture": "Sağ tık · Basılı tut"
   },
   "tmi": {
     "getApiKeyDesc": "Gemini API Anahtarı Al",

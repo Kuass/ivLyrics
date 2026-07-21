@@ -827,6 +827,7 @@ window.LANG_ID = {
     "greetingPlaceholder": "Tulis sapaan untuk ditampilkan di profilmu.",
     "greetingLoginRequired": "Login Discord diperlukan untuk mengedit profil pembuat.",
     "greetingSaveFailed": "Gagal menyimpan sapaan.",
+    "greetingTranslateFailed": "Gagal menerjemahkan sapaan.",
     "greetingSaveSuccess": "Sapaan disimpan.",
     "ownProfile": "Ini profil Anda.",
     "loadMore": "Muat lebih banyak",
@@ -2055,6 +2056,16 @@ window.LANG_ID = {
       "downloading": "Mengunduh video: {percent}%",
       "skip": "Lewati"
     }
+  },
+  "vinyl": {
+    "mode": "Mode vinil",
+    "openHint": "Klik sampul album untuk membuka",
+    "closeHint": "Klik sampul album untuk kembali",
+    "recordHint": "Klik piringan untuk memutar atau menjeda",
+    "tonearmHint": "Seret lengan pemutar untuk mengubah posisi pemutaran",
+    "tmiHint": "Klik kanan atau tekan lama sampul album untuk membuka TMI",
+    "click": "Klik",
+    "tmiGesture": "Klik kanan · Tekan lama"
   },
   "tmi": {
     "getApiKeyDesc": "Dapatkan Kunci API Gemini",

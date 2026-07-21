@@ -827,6 +827,7 @@ window.LANG_PT = {
     "greetingPlaceholder": "Escreva uma saudação para exibir no seu perfil.",
     "greetingLoginRequired": "É necessário entrar com Discord para editar seu perfil de criador.",
     "greetingSaveFailed": "Não foi possível salvar a saudação.",
+    "greetingTranslateFailed": "Não foi possível traduzir a saudação.",
     "greetingSaveSuccess": "Saudação salva.",
     "ownProfile": "Este é o seu perfil.",
     "loadMore": "Carregar mais",
@@ -2056,6 +2057,16 @@ window.LANG_PT = {
       "downloading": "Baixando vídeo: {percent}%",
       "skip": "Pular"
     }
+  },
+  "vinyl": {
+    "mode": "Modo vinil",
+    "openHint": "Clique na capa para abrir",
+    "closeHint": "Clique na capa para voltar",
+    "recordHint": "Clique no disco para reproduzir ou pausar",
+    "tonearmHint": "Arraste o braço para alterar a posição da reprodução",
+    "tmiHint": "Clique com o botão direito ou mantenha a capa pressionada para abrir o TMI",
+    "click": "Clique",
+    "tmiGesture": "Botão direito · Manter pressionado"
   },
   "tmi": {
     "getApiKeyDesc": "Obter Chave API Gemini",

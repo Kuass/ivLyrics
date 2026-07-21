@@ -827,6 +827,7 @@ window.LANG_EN = {
     "greetingPlaceholder": "Write a greeting for your profile.",
     "greetingLoginRequired": "Discord login is required to edit your creator profile.",
     "greetingSaveFailed": "Failed to update creator greeting.",
+    "greetingTranslateFailed": "Failed to translate creator greeting.",
     "greetingSaveSuccess": "Greeting updated.",
     "ownProfile": "This is your profile.",
     "loadMore": "Load more",
@@ -2056,6 +2057,16 @@ window.LANG_EN = {
       "downloading": "Downloading video: {percent}%",
       "skip": "Skip"
     }
+  },
+  "vinyl": {
+    "mode": "Vinyl mode",
+    "openHint": "Click the album to open",
+    "closeHint": "Click the album to return",
+    "recordHint": "Click the record to play or pause",
+    "tonearmHint": "Drag the tonearm to seek",
+    "tmiHint": "Right-click or hold the album to open TMI",
+    "click": "Click",
+    "tmiGesture": "Right click · Hold"
   },
   "tmi": {
     "getApiKeyDesc": "Get Gemini API Key",

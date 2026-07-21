@@ -827,6 +827,7 @@ window.LANG_HI = {
     "greetingPlaceholder": "अपने प्रोफ़ाइल पर दिखाने के लिए एक अभिवादन लिखें।",
     "greetingLoginRequired": "निर्माता प्रोफ़ाइल संपादित करने के लिए Discord लॉगिन आवश्यक है।",
     "greetingSaveFailed": "अभिवादन सहेजा नहीं जा सका।",
+    "greetingTranslateFailed": "अभिवादन का अनुवाद नहीं हो सका।",
     "greetingSaveSuccess": "अभिवादन सहेजा गया।",
     "ownProfile": "यह आपकी प्रोफ़ाइल है।",
     "loadMore": "और लोड करें",
@@ -2055,6 +2056,16 @@ window.LANG_HI = {
       "downloading": "वीडियो डाउनलोड हो रहा है: {percent}%",
       "skip": "छोड़ें"
     }
+  },
+  "vinyl": {
+    "mode": "विनाइल मोड",
+    "openHint": "खोलने के लिए एल्बम कवर पर क्लिक करें",
+    "closeHint": "वापस जाने के लिए एल्बम कवर पर क्लिक करें",
+    "recordHint": "चलाने या रोकने के लिए रिकॉर्ड पर क्लिक करें",
+    "tonearmHint": "प्लेबैक की स्थिति बदलने के लिए टोनआर्म खींचें",
+    "tmiHint": "TMI खोलने के लिए एल्बम कवर पर दायाँ क्लिक करें या उसे दबाकर रखें",
+    "click": "क्लिक",
+    "tmiGesture": "दायाँ क्लिक · दबाकर रखें"
   },
   "tmi": {
     "getApiKeyDesc": "Gemini API कुंजी प्राप्त करें",

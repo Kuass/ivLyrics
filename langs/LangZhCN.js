@@ -827,6 +827,7 @@ window.LANG_ZH_CN = {
     "greetingPlaceholder": "写一句要显示在个人资料上的问候语。",
     "greetingLoginRequired": "需要登录 Discord 才能编辑创作者资料。",
     "greetingSaveFailed": "无法保存问候语。",
+    "greetingTranslateFailed": "无法翻译问候语。",
     "greetingSaveSuccess": "问候语已保存。",
     "ownProfile": "这是你的个人资料。",
     "loadMore": "加载更多",
@@ -2056,6 +2057,16 @@ window.LANG_ZH_CN = {
       "downloading": "视频下载中: {percent}%",
       "skip": "跳过"
     }
+  },
+  "vinyl": {
+    "mode": "黑胶模式",
+    "openHint": "点击专辑封面打开",
+    "closeHint": "点击专辑封面返回",
+    "recordHint": "点击唱片播放或暂停",
+    "tonearmHint": "拖动唱臂调整播放位置",
+    "tmiHint": "右键点击或长按专辑封面以打开 TMI",
+    "click": "点击",
+    "tmiGesture": "右键点击 · 长按"
   },
   "tmi": {
     "getApiKeyDesc": "获取 Gemini API 密钥",

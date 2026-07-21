@@ -3871,6 +3871,7 @@ class LyricsContainer extends react.Component {
         background: "",
         inactive: "",
       },
+      colorsUri: "",
       dynamicColors: null,
       tempo: "0.25s",
       explicitMode: -1,
@@ -5457,7 +5458,11 @@ class LyricsContainer extends react.Component {
       artist: meta.artist_name,
       title: meta.title,
       uri: track.uri,
-      image: meta.image_url,
+      image:
+        meta.image_xlarge_url ||
+        meta.image_large_url ||
+        track?.album?.images?.[0]?.url ||
+        meta.image_url,
     };
   }
 
@@ -5552,6 +5557,7 @@ class LyricsContainer extends react.Component {
         background: Utils.convertIntToRGB(vibrant),
         inactive: Utils.convertIntToRGB(vibrant, 3),
       },
+      colorsUri: uri,
       dynamicColors,
     });
   }
@@ -5728,10 +5734,9 @@ class LyricsContainer extends react.Component {
         }
       }
 
-      const effectiveBackgroundMode = this.getEffectiveBackgroundMode(trackBackgroundOverride);
-      if (shouldFetchIvLyricsBackgroundColors(effectiveBackgroundMode)) {
-        this.fetchColors(info.uri);
-      }
+      // The extracted track color also drives LP label accents, so keep it
+      // available even when the selected background is video or solid.
+      this.fetchColors(info.uri);
 
       this.fetchTempo(info.uri);
       this.resetDelay();
@@ -8217,6 +8222,8 @@ class LyricsContainer extends react.Component {
       backgroundStyle.filter = `brightness(${brightness})`;
     }
 
+    const vinylTrackAccent = this.state.colors.background || "";
+
     this.styleVariables = {
       ...this.styleVariables,
       ...getLyricsTypographyStyleVariables(CONFIG.visual),
@@ -8231,6 +8238,9 @@ class LyricsContainer extends react.Component {
       "--iv-motion-duration-slow": this.shouldReduceMotion() ? "1ms" : "420ms",
       "--iv-motion-distance-sm": this.shouldReduceMotion() ? "0px" : "10px",
       "--iv-motion-distance-md": this.shouldReduceMotion() ? "0px" : "18px",
+      ...(vinylTrackAccent ? {
+        "--iv-vinyl-track-accent": vinylTrackAccent,
+      } : {}),
     };
     if (isSyncCreatorActive) {
       this.styleVariables = {
@@ -8744,8 +8754,23 @@ class LyricsContainer extends react.Component {
           : Array.isArray(this.state.currentLyrics)
             ? this.state.currentLyrics.length
             : 0,
+        activeLyric: shouldHideFullscreenLyrics
+          ? ""
+          : getPlainLyricsLineText(
+            Array.isArray(this.state.currentLyrics)
+              ? this.state.currentLyrics[this.state.currentLyricIndex || 0]
+              : null
+          ),
+        activeLyrics: shouldHideFullscreenLyrics || !Array.isArray(this.state.currentLyrics)
+          ? []
+          : this.state.currentLyrics,
+        activeLyricsKaraoke: !shouldHideFullscreenLyrics && mode === KARAOKE && !!this.state.karaoke,
+        karaokeSource: this.state.karaokeSource,
+        lyricsSettingsRevision: this.reRenderLyricsPage,
         translatedMetadata: this.state.translatedMetadata,
         trackUri: this.state.uri,
+        trackAccent: vinylTrackAccent,
+        trackAccentUri: this.state.colorsUri || "",
         onExitFullscreen: this.toggleFullscreen
       }),
       // Tab bar for mode switching
@@ -8829,7 +8854,7 @@ class LyricsContainer extends react.Component {
             className: "lyrics-config-button lyrics-floating-menu-toggle",
             type: "button",
             "aria-label": this.state.isFloatingMenuOpen
-              ? (I18n.t("common.close") || "Close")
+              ? (I18n.t("buttons.close") || "Close")
               : "ivLyrics menu",
             "aria-expanded": this.state.isFloatingMenuOpen,
             onClick: (e) => {

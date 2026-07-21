@@ -15674,12 +15674,12 @@ const ConfigModal = ({
                       const contents = e.target.result;
                       try {
                         if (typeof contents !== "string") {
-                          throw new Error(I18n.t("settingsAdvanced.exportImport.import.invalidFormat"));
+                          throw new Error(I18n.t("settingsAdvanced.aboutTab.account.backup.invalidFormat"));
                         }
 
                         const cfg = JSON.parse(contents);
                         if (!cfg || typeof cfg !== "object" || Array.isArray(cfg)) {
-                          throw new Error(I18n.t("settingsAdvanced.exportImport.import.invalidFormat"));
+                          throw new Error(I18n.t("settingsAdvanced.aboutTab.account.backup.invalidFormat"));
                         }
                         await StorageManager.importConfig(cfg);
 
@@ -15981,7 +15981,7 @@ const ConfigModal = ({
                       const contents = e.target.result;
                       try {
                         if (typeof contents !== "string") {
-                          throw new Error(I18n.t("settingsAdvanced.exportImport.import.invalidFormat"));
+                          throw new Error(I18n.t("settingsAdvanced.aboutTab.account.backup.invalidFormat"));
                         }
                         const data = JSON.parse(contents);
                         await DBExportManager.importAllDBs(data);

@@ -827,6 +827,7 @@ window.LANG_MS = {
     "greetingPlaceholder": "Tulis ucapan untuk dipaparkan pada profil anda.",
     "greetingLoginRequired": "Log masuk Discord diperlukan untuk mengedit profil pencipta.",
     "greetingSaveFailed": "Gagal menyimpan ucapan.",
+    "greetingTranslateFailed": "Gagal menterjemahkan ucapan.",
     "greetingSaveSuccess": "Ucapan disimpan.",
     "ownProfile": "Ini adalah profil anda sendiri.",
     "loadMore": "Lihat Lagi",
@@ -2065,6 +2066,16 @@ window.LANG_MS = {
       "downloading": "Muat turun video: {percent}%",
       "skip": "Langkau"
     }
+  },
+  "vinyl": {
+    "mode": "Mod vinil",
+    "openHint": "Klik kulit album untuk membuka",
+    "closeHint": "Klik kulit album untuk kembali",
+    "recordHint": "Klik piring hitam untuk main atau jeda",
+    "tonearmHint": "Seret lengan pikap untuk menukar kedudukan main balik",
+    "tmiHint": "Klik kanan atau tekan lama kulit album untuk membuka TMI",
+    "click": "Klik",
+    "tmiGesture": "Klik kanan · Tekan lama"
   },
   "tmi": {
     "getApiKeyDesc": "Dapatkan Kunci API",

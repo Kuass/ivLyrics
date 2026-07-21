@@ -827,6 +827,7 @@ window.LANG_KO = {
     "greetingPlaceholder": "프로필에 표시할 인삿말을 입력하세요.",
     "greetingLoginRequired": "제작자 프로필을 수정하려면 디스코드 로그인이 필요합니다.",
     "greetingSaveFailed": "인삿말을 저장하지 못했습니다.",
+    "greetingTranslateFailed": "인삿말을 번역하지 못했습니다.",
     "greetingSaveSuccess": "인삿말을 저장했습니다.",
     "ownProfile": "내 프로필입니다.",
     "loadMore": "더 보기",
@@ -2056,6 +2057,16 @@ window.LANG_KO = {
       "downloading": "영상 다운로드 중: {percent}%",
       "skip": "건너뛰기"
     }
+  },
+  "vinyl": {
+    "mode": "LP 모드",
+    "openHint": "앨범을 클릭하여 열기",
+    "closeHint": "앨범을 클릭하여 돌아가기",
+    "recordHint": "LP를 클릭하여 재생 또는 일시정지",
+    "tonearmHint": "톤암을 드래그하여 재생 위치 이동",
+    "tmiHint": "앨범을 우클릭하거나 길게 눌러 TMI 열기",
+    "click": "클릭",
+    "tmiGesture": "우클릭 · 길게 누르기"
   },
   "tmi": {
     "getApiKeyDesc": "Gemini API 키 발급받기",

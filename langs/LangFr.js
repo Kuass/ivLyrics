@@ -827,6 +827,7 @@ window.LANG_FR = {
     "greetingPlaceholder": "Écrivez un message d’accueil pour votre profil.",
     "greetingLoginRequired": "Une connexion Discord est requise pour modifier votre profil de créateur.",
     "greetingSaveFailed": "Impossible d’enregistrer le message d’accueil.",
+    "greetingTranslateFailed": "Impossible de traduire le message d’accueil.",
     "greetingSaveSuccess": "Message enregistré.",
     "ownProfile": "Ceci est votre profil.",
     "loadMore": "Charger plus",
@@ -2056,6 +2057,16 @@ window.LANG_FR = {
       "downloading": "Téléchargement : {percent}%",
       "skip": "Passer"
     }
+  },
+  "vinyl": {
+    "mode": "Mode vinyle",
+    "openHint": "Cliquez sur la pochette pour ouvrir",
+    "closeHint": "Cliquez sur la pochette pour revenir",
+    "recordHint": "Cliquez sur le disque pour lire ou mettre en pause",
+    "tonearmHint": "Faites glisser le bras de lecture pour changer de position",
+    "tmiHint": "Faites un clic droit ou appuyez longuement sur la pochette pour ouvrir TMI",
+    "click": "Clic",
+    "tmiGesture": "Clic droit · Appui long"
   },
   "tmi": {
     "getApiKeyDesc": "Obtenir Clé API Gemini",

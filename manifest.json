@@ -41,6 +41,8 @@
 		"langs/LangTr.js",
 		"I18n.js",
 		"Pages.js",
+		"VinylActiveLyricRenderer.js",
+		"VinylPlayerMode.js",
 		"Settings.js",
 		"OptionsMenu.js",
 		"TabBar.js",

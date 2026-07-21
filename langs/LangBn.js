@@ -827,6 +827,7 @@ window.LANG_BN = {
     "greetingPlaceholder": "আপনার প্রোফাইলে দেখানোর জন্য একটি অভিবাদন লিখুন।",
     "greetingLoginRequired": "নির্মাতা প্রোফাইল সম্পাদনা করতে Discord লগইন প্রয়োজন।",
     "greetingSaveFailed": "অভিবাদন সংরক্ষণ করা যায়নি।",
+    "greetingTranslateFailed": "অভিবাদন অনুবাদ করা যায়নি।",
     "greetingSaveSuccess": "অভিবাদন সংরক্ষণ করা হয়েছে।",
     "ownProfile": "এটি আপনার প্রোফাইল।",
     "loadMore": "আরও লোড করুন",
@@ -2056,6 +2057,16 @@ window.LANG_BN = {
       "downloading": "ভিডিও ডাউনলোড হচ্ছে: {percent}%",
       "skip": "এড়িয়ে যান"
     }
+  },
+  "vinyl": {
+    "mode": "ভিনাইল মোড",
+    "openHint": "খুলতে অ্যালবাম কভারে ক্লিক করুন",
+    "closeHint": "ফিরে যেতে অ্যালবাম কভারে ক্লিক করুন",
+    "recordHint": "প্লে বা বিরতি দিতে রেকর্ডে ক্লিক করুন",
+    "tonearmHint": "প্লেব্যাকের অবস্থান বদলাতে টোনআর্ম টেনে নিন",
+    "tmiHint": "TMI খুলতে অ্যালবাম কভারে ডান-ক্লিক করুন বা চেপে ধরে রাখুন",
+    "click": "ক্লিক",
+    "tmiGesture": "ডান-ক্লিক · চেপে ধরে রাখুন"
   },
   "tmi": {
     "getApiKeyDesc": "Gemini API কি সংগ্রহ করুন",

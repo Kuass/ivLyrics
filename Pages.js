@@ -1974,10 +1974,10 @@ const useScrollActivity = (containerRef, deps = []) => {
 	return { isScrolling, handleContainerClick };
 };
 
-const renderLyricSubLine = (className, text, onContextMenu = null) => {
+const renderLyricSubLine = (className, text, onContextMenu = null, singleLineScroll = false) => {
 	if (!text) return null;
 	const props = {
-		className,
+		className: `${className}${singleLineScroll ? " ivlyrics-vinyl-lyric-scroll-viewport" : ""}`,
 		style: { "--sub-lyric-color": CONFIG.visual["inactive-color"] },
 	};
 	if (onContextMenu) {
@@ -1985,11 +1985,34 @@ const renderLyricSubLine = (className, text, onContextMenu = null) => {
 	}
 
 	if (typeof text === "string" && text) {
-		props.dangerouslySetInnerHTML = { __html: Utils.rubyTextToHTML(text) };
-		return react.createElement("p", props);
+		const html = Utils.rubyTextToHTML(text);
+		if (!singleLineScroll) {
+			props.dangerouslySetInnerHTML = { __html: html };
+			return react.createElement("p", props);
+		}
+
+		return react.createElement(
+			"p",
+			props,
+			react.createElement("span", {
+				className: "ivlyrics-vinyl-lyric-scroll-content",
+				dangerouslySetInnerHTML: { __html: html },
+			})
+		);
 	}
 
-	return react.createElement("p", props, safeRenderText(text));
+	const renderedText = safeRenderText(text);
+	return react.createElement(
+		"p",
+		props,
+		singleLineScroll
+			? react.createElement(
+				"span",
+				{ className: "ivlyrics-vinyl-lyric-scroll-content" },
+				renderedText
+			)
+			: renderedText
+	);
 };
 
 const renderLyricMainContent = ({
@@ -3609,6 +3632,7 @@ const LyricsLineBlock = react.memo(({
 	subText2CopyText = null,
 	subText2CopySuccessKey = "notifications.secondTranslationCopied",
 	subText2CopyFailureKey = "notifications.secondTranslationCopyFailed",
+	singleLineScroll = false,
 }) => {
 	const mainLine = line || (typeof mainText === "object" ? mainText : {
 		text: mainText,
@@ -3631,10 +3655,16 @@ const LyricsLineBlock = react.memo(({
 		),
 	};
 
+	const mainHtml = !shouldRenderInterlude && typeof mainText === "string" && !isKara && mainText
+		? Utils.rubyTextToHTML(mainText)
+		: null;
+
 	if (shouldRenderInterlude) {
 		mainProps.className = "lyrics-lyricsContainer-LyricsLine-interludeMain";
-	} else if (typeof mainText === "string" && !isKara && mainText) {
-		mainProps.dangerouslySetInnerHTML = { __html: Utils.rubyTextToHTML(mainText) };
+	} else if (singleLineScroll) {
+		mainProps.className = "ivlyrics-vinyl-lyric-scroll-viewport";
+	} else if (mainHtml) {
+		mainProps.dangerouslySetInnerHTML = { __html: mainHtml };
 	}
 
 	const handleClick = useCallback(() => {
@@ -3643,6 +3673,35 @@ const LyricsLineBlock = react.memo(({
 			Spicetify.Player.seek(seekTime);
 		}
 	}, [seekTime]);
+
+	const mainContent = shouldRenderInterlude
+		? (shouldShowInterlude ? react.createElement(InterludeIndicator, {
+			durationMs: interludeInfo.durationMs,
+			kind: interludeInfo.kind || "break",
+			settingsRevision,
+		}) : "\u00A0")
+		: renderLyricMainContent({
+			isKara,
+			mainText,
+			line: mainLine,
+			position: isKara ? position : 0,
+			isActive,
+			settingsRevision,
+			globalCharOffset,
+			activeGlobalCharIndex,
+			subText,
+			subText2,
+		});
+	const renderedMainContent = singleLineScroll && !shouldRenderInterlude
+		? react.createElement(
+			"span",
+			{
+				className: "ivlyrics-vinyl-lyric-scroll-content",
+				...(mainHtml ? { dangerouslySetInnerHTML: { __html: mainHtml } } : {}),
+			},
+			mainHtml ? null : mainContent
+		)
+		: mainContent;
 
 	return react.createElement(
 		"div",
@@ -3656,38 +3715,23 @@ const LyricsLineBlock = react.memo(({
 		react.createElement(
 			"p",
 			mainProps,
-			shouldRenderInterlude
-				? (shouldShowInterlude ? react.createElement(InterludeIndicator, {
-					durationMs: interludeInfo.durationMs,
-					kind: interludeInfo.kind || "break",
-					settingsRevision,
-				}) : "\u00A0")
-				: renderLyricMainContent({
-					isKara,
-					mainText,
-					line: mainLine,
-					position: isKara ? position : 0,
-					isActive,
-					settingsRevision,
-					globalCharOffset,
-                                  activeGlobalCharIndex,
-                                  subText,
-                                  subText2,
-                          })
+			renderedMainContent
           ),
 		!shouldRenderInterlude && !hasParallelKaraokeRows && renderLyricSubLine(
 			"lyrics-lyricsContainer-LyricsLine-phonetic",
 			subText,
 			subCopyText
 				? createCopyHandler(subCopyText, subCopySuccessKey, subCopyFailureKey)
-				: null
+				: null,
+			singleLineScroll
 		),
 		!shouldRenderInterlude && !hasParallelKaraokeRows && renderLyricSubLine(
 			"lyrics-lyricsContainer-LyricsLine-translation",
 			subText2,
 			subText2CopyText
 				? createCopyHandler(subText2CopyText, subText2CopySuccessKey, subText2CopyFailureKey)
-				: null
+				: null,
+			singleLineScroll
 		)
 	);
 });
@@ -5920,3 +5964,18 @@ const LyricsPageRenderer = react.memo(({
 });
 
 window.LyricsPageRenderer = LyricsPageRenderer;
+window.ivLyricsLyricRendererPrimitives = Object.freeze({
+	LyricsLineBlock,
+	IdlingIndicator,
+	useLyricsPlaybackPosition,
+	getPseudoKaraokeRenderAdvance,
+	prepareGlobalCharTimeline,
+	queryGlobalCharTimeline,
+	EMPTY_GLOBAL_CHAR_STATE,
+	getInterludeInfo,
+	createActiveTrailingKaraokeInterludeLine,
+	getEmbeddedAuxiliaryDisplayValues,
+	buildLyricDisplayState,
+	getKaraokeLineMetaClass,
+	getKaraokeSpeakerStyle,
+});

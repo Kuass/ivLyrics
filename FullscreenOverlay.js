@@ -1830,14 +1830,23 @@ const FullscreenOverlay = (() => {
         isFullscreen,
         currentLyricIndex = 0,
         totalLyrics = 0,
+        activeLyric = "",
+        activeLyrics = [],
+        activeLyricsKaraoke = false,
+        karaokeSource = null,
+        lyricsSettingsRevision = 0,
         translatedMetadata = null,
         trackUri = null,
+        trackAccent = "",
+        trackAccentUri = "",
         onExitFullscreen = null
     }) => {
         const [uiVisible, setUiVisible] = useState(true);
         const [tmiMode, setTmiMode] = useState(false);
         const [tmiData, setTmiData] = useState(null);
         const [tmiLoading, setTmiLoading] = useState(false);
+        const [lpMode, setLpMode] = useState(false);
+        const [lpModeClosing, setLpModeClosing] = useState(false);
         const [isPlaying, setIsPlaying] = useState(false);
         const [position, setPosition] = useState(0);
         const [duration, setDuration] = useState(0);
@@ -1849,6 +1858,53 @@ const FullscreenOverlay = (() => {
         });
         const hideTimerRef = useRef(null);
         const uiVisibleRef = useRef(true);
+        const tmiOpeningRef = useRef(false);
+        const albumPressTimerRef = useRef(null);
+        const albumPressStartRef = useRef(null);
+        const suppressAlbumClickRef = useRef(false);
+        const suppressAlbumClickTimerRef = useRef(null);
+        const lpModeExitTimerRef = useRef(null);
+        const lpViewTransitionRef = useRef(null);
+
+        const runLpSharedTransition = useCallback((direction, updateMode) => {
+            const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+            if (reducedMotion || typeof document?.startViewTransition !== "function") return false;
+            if (lpViewTransitionRef.current) return true;
+
+            const root = document.documentElement;
+            const directionClass = "is-lp-view-" + direction;
+            root.classList.add("is-lp-view-transition", directionClass);
+            let committed = false;
+            let transition = null;
+            const cleanup = () => {
+                if (lpViewTransitionRef.current === transition) lpViewTransitionRef.current = null;
+                root.classList.remove("is-lp-view-transition", directionClass);
+            };
+
+            try {
+                transition = document.startViewTransition(() => {
+                    const reactDom = window.ivLyricsEnsureReactDOM?.()
+                        || window.Spicetify?.ReactDOM
+                        || window.ReactDOM;
+                    if (typeof reactDom?.flushSync === "function") {
+                        reactDom.flushSync(updateMode);
+                        committed = true;
+                        return undefined;
+                    }
+
+                    updateMode();
+                    committed = true;
+                    return new Promise((resolve) => window.requestAnimationFrame(resolve));
+                });
+                lpViewTransitionRef.current = transition;
+                Promise.resolve(transition.finished).catch(() => undefined).finally(cleanup);
+                return true;
+            } catch (_) {
+                cleanup();
+                if (!committed) updateMode();
+                return true;
+            }
+        }, []);
 
         const navigateSpotifyUri = useCallback((uri) => {
             const path = spotifyUriToPath(uri);
@@ -2022,12 +2078,28 @@ const FullscreenOverlay = (() => {
             };
         }, [isFullscreen, autoHideUI, autoHideDelay]);
 
-        // Handle album art click - toggle TMI mode
-        const handleAlbumClick = useCallback(async () => {
-            if (tmiMode) {
-                setTmiMode(false);
-                return;
+        const clearAlbumPressTimer = useCallback(() => {
+            if (albumPressTimerRef.current) {
+                window.clearTimeout(albumPressTimerRef.current);
+                albumPressTimerRef.current = null;
             }
+            albumPressStartRef.current = null;
+        }, []);
+
+        const suppressNextAlbumClick = useCallback(() => {
+            suppressAlbumClickRef.current = true;
+            if (suppressAlbumClickTimerRef.current) {
+                window.clearTimeout(suppressAlbumClickTimerRef.current);
+            }
+            suppressAlbumClickTimerRef.current = window.setTimeout(() => {
+                suppressAlbumClickRef.current = false;
+                suppressAlbumClickTimerRef.current = null;
+            }, 800);
+        }, []);
+
+        // TMI is intentionally opened only through context click or a long press.
+        const openTmiMode = useCallback(async () => {
+            if (tmiMode || tmiOpeningRef.current) return;
 
             // Check if any AI provider is available for TMI generation
             const hasAIProvider = window.AIAddonManager?.getEnabledProvidersFor('tmi')?.length > 0;
@@ -2040,6 +2112,7 @@ const FullscreenOverlay = (() => {
             const trackId = trackUri?.split(":")[2];
             if (!trackId) return;
 
+            tmiOpeningRef.current = true;
             setTmiMode(true);
             setTmiLoading(true);
 
@@ -2051,8 +2124,117 @@ const FullscreenOverlay = (() => {
                 setTmiData(null);
             } finally {
                 setTmiLoading(false);
+                tmiOpeningRef.current = false;
             }
         }, [tmiMode, trackUri]);
+
+        const handleAlbumModeClick = useCallback((event) => {
+            event?.preventDefault?.();
+            event?.stopPropagation?.();
+
+            if (suppressAlbumClickRef.current) {
+                suppressAlbumClickRef.current = false;
+                if (suppressAlbumClickTimerRef.current) {
+                    window.clearTimeout(suppressAlbumClickTimerRef.current);
+                    suppressAlbumClickTimerRef.current = null;
+                }
+                return;
+            }
+
+            if (lpMode) {
+                if (lpModeClosing) return;
+                if (runLpSharedTransition("exit", () => {
+                    if (lpModeExitTimerRef.current) {
+                        window.clearTimeout(lpModeExitTimerRef.current);
+                        lpModeExitTimerRef.current = null;
+                    }
+                    setLpModeClosing(false);
+                    setLpMode(false);
+                })) return;
+
+                setLpModeClosing(true);
+                lpModeExitTimerRef.current = window.setTimeout(() => {
+                    lpModeExitTimerRef.current = null;
+                    setLpMode(false);
+                    setLpModeClosing(false);
+                }, 420);
+                return;
+            }
+
+            if (lpModeExitTimerRef.current) {
+                window.clearTimeout(lpModeExitTimerRef.current);
+                lpModeExitTimerRef.current = null;
+            }
+            setLpModeClosing(false);
+            if (runLpSharedTransition("enter", () => setLpMode(true))) return;
+            setLpMode(true);
+        }, [lpMode, lpModeClosing, runLpSharedTransition]);
+
+        const handleAlbumContextMenu = useCallback((event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            clearAlbumPressTimer();
+            suppressNextAlbumClick();
+            openTmiMode();
+        }, [clearAlbumPressTimer, openTmiMode, suppressNextAlbumClick]);
+
+        const handleAlbumPointerDown = useCallback((event) => {
+            if (event.button !== undefined && event.button !== 0) return;
+
+            clearAlbumPressTimer();
+            albumPressStartRef.current = {
+                pointerId: event.pointerId,
+                x: event.clientX,
+                y: event.clientY
+            };
+            albumPressTimerRef.current = window.setTimeout(() => {
+                albumPressTimerRef.current = null;
+                albumPressStartRef.current = null;
+                suppressNextAlbumClick();
+                openTmiMode();
+            }, 650);
+        }, [clearAlbumPressTimer, openTmiMode, suppressNextAlbumClick]);
+
+        const handleAlbumPointerMove = useCallback((event) => {
+            const start = albumPressStartRef.current;
+            if (!start || start.pointerId !== event.pointerId) return;
+            if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 12) {
+                clearAlbumPressTimer();
+            }
+        }, [clearAlbumPressTimer]);
+
+        const handleAlbumPointerEnd = useCallback(() => {
+            clearAlbumPressTimer();
+        }, [clearAlbumPressTimer]);
+
+        const handleAlbumKeyDown = useCallback((event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                handleAlbumModeClick(event);
+                return;
+            }
+
+            if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+                handleAlbumContextMenu(event);
+            }
+        }, [handleAlbumContextMenu, handleAlbumModeClick]);
+
+        useEffect(() => () => {
+            clearAlbumPressTimer();
+            if (suppressAlbumClickTimerRef.current) {
+                window.clearTimeout(suppressAlbumClickTimerRef.current);
+            }
+            if (lpModeExitTimerRef.current) {
+                window.clearTimeout(lpModeExitTimerRef.current);
+            }
+            lpViewTransitionRef.current?.skipTransition?.();
+            lpViewTransitionRef.current = null;
+            document.documentElement?.classList.remove(
+                "is-lp-view-transition",
+                "is-lp-view-enter",
+                "is-lp-view-exit"
+            );
+        }, [clearAlbumPressTimer]);
 
         // Handle Regenerate
         const handleRegenerate = useCallback(async () => {
@@ -2073,6 +2255,7 @@ const FullscreenOverlay = (() => {
 
         // Close TMI mode
         const closeTmiMode = useCallback(() => {
+            tmiOpeningRef.current = false;
             setTmiMode(false);
         }, []);
 
@@ -2093,11 +2276,115 @@ const FullscreenOverlay = (() => {
             }
         }, [trackUri]);
 
-        const currentTrackUri = getFirstSpotifyUri(trackUri, Spicetify.Player.data?.item?.uri);
+        const currentPlayerItem = Spicetify.Player.data?.item;
+        const currentPlayerMetadata = currentPlayerItem?.metadata;
+        const currentTrackUri = getFirstSpotifyUri(currentPlayerItem?.uri, trackUri);
         const currentArtistUri = getCurrentArtistUri();
         const currentAlbumUri = getCurrentAlbumUri();
+        const currentCoverUrl = currentPlayerMetadata?.image_xlarge_url
+            || currentPlayerMetadata?.image_large_url
+            || currentPlayerItem?.album?.images?.[0]?.url
+            || currentPlayerMetadata?.image_url
+            || coverUrl;
+        const currentVinylTitle = currentPlayerMetadata?.title || title || "LP";
+        const currentVinylArtist = currentPlayerMetadata?.artist_name || artist || "";
+        const currentVinylAlbum = currentPlayerMetadata?.album_title || currentVinylTitle;
+        const liveVinylTrack = {
+            uri: currentTrackUri || `${currentVinylTitle}\u0000${currentVinylArtist}`,
+            coverUrl: currentCoverUrl,
+            title: currentVinylTitle,
+            artist: currentVinylArtist,
+            album: currentVinylAlbum,
+            accent: currentTrackUri && currentTrackUri === trackAccentUri
+                ? String(trackAccent || "").trim()
+                : ""
+        };
+
+        const albumActionCopy = {
+            click: I18n.t("vinyl.click"),
+            lpTitle: I18n.t("vinyl.mode"),
+            lpHint: I18n.t("vinyl.openHint"),
+            tmiGesture: I18n.t("vinyl.tmiGesture")
+        };
+        const tmiTitle = I18n.t("tmi.title");
+        const vinylTmiHint = I18n.t("vinyl.tmiHint");
+        const tmiDisclaimer = I18n.t("tmi.disclaimer");
+        const albumInteractionLabel = [albumActionCopy.lpHint, vinylTmiHint, tmiDisclaimer]
+            .filter(Boolean)
+            .join(". ");
+
+        const albumInteractionProps = {
+            onClick: handleAlbumModeClick,
+            onContextMenu: handleAlbumContextMenu,
+            onPointerDown: handleAlbumPointerDown,
+            onPointerMove: handleAlbumPointerMove,
+            onPointerUp: handleAlbumPointerEnd,
+            onPointerCancel: handleAlbumPointerEnd,
+            onPointerLeave: handleAlbumPointerEnd,
+            onDragStart: (event) => event.preventDefault(),
+            onKeyDown: handleAlbumKeyDown,
+            role: "button",
+            tabIndex: 0,
+            "aria-label": albumInteractionLabel,
+            "aria-keyshortcuts": "Enter Space Shift+F10",
+            title: albumInteractionLabel
+        };
+
+        const renderAlbumModeHint = () => react.createElement("div", {
+            className: "album-mode-hint",
+            style: { borderRadius: `${albumRadius}px` },
+            "aria-hidden": "true"
+        },
+            react.createElement("div", { className: "album-mode-hint-layout" },
+                react.createElement("div", { className: "album-mode-actions" },
+                    react.createElement("div", { className: "album-mode-action is-primary" },
+                        react.createElement("div", { className: "album-mode-action-header" },
+                            react.createElement("span", { className: "album-mode-action-title" }, albumActionCopy.lpTitle),
+                            react.createElement("span", { className: "album-mode-action-gesture" }, albumActionCopy.click)
+                        ),
+                        react.createElement("span", { className: "album-mode-action-description" }, albumActionCopy.lpHint)
+                    ),
+                    react.createElement("div", { className: "album-mode-action is-secondary" },
+                        react.createElement("div", { className: "album-mode-action-header" },
+                            react.createElement("span", { className: "album-mode-action-title" }, tmiTitle),
+                            react.createElement("span", { className: "album-mode-action-gesture" }, albumActionCopy.tmiGesture)
+                        ),
+                        react.createElement("span", {
+                            className: "album-mode-action-description album-mode-tmi-disclaimer"
+                        }, tmiDisclaimer)
+                    )
+                )
+            )
+        );
 
         if (!isFullscreen) return null;
+
+        const VinylMode = window.ivLyricsVinylPlayerMode;
+        if (lpMode && !tmiMode && VinylMode) {
+            return react.createElement(VinylMode, {
+                track: liveVinylTrack,
+                albumRadius,
+                isClosing: lpModeClosing,
+                isPortraitLayout: isPortraitViewport,
+                isPlaying,
+                position,
+                duration,
+                interactionProps: albumInteractionProps,
+                activeLyric,
+                activeLyrics,
+                activeLineIndex: currentLyricIndex,
+                activeLyricsKaraoke,
+                karaokeSource,
+                lyricsSettingsRevision,
+                onSeek: (nextPosition) => Spicetify.Player.seek(Math.floor(nextPosition)),
+                onStopPlayback: () => {
+                    if (Spicetify.Player?.data?.isPaused === true) return;
+                    if (typeof Spicetify.Player?.pause === "function") Spicetify.Player.pause();
+                    else Spicetify.Player?.togglePlay?.();
+                },
+                onTogglePlayback: () => Spicetify.Player.togglePlay()
+            });
+        }
 
         const isPortraitFullscreen = isFullscreen && isPortraitViewport && !tvModeEnabled;
         const isTwoColumn = CONFIG?.visual?.["fullscreen-two-column"] !== false;
@@ -2164,8 +2451,9 @@ const FullscreenOverlay = (() => {
             tvModeEnabled ? react.createElement("div", {
                 className: "fullscreen-tv-song-info"
             },
-                // Album art (clickable for TMI)
+                // Album click toggles LP mode. Context click or hold opens TMI.
                 react.createElement("div", {
+                    ...albumInteractionProps,
                     className: "fullscreen-tv-album-wrapper clickable-album-container",
                     style: {
                         width: `${tvAlbumSize}px`,
@@ -2174,31 +2462,19 @@ const FullscreenOverlay = (() => {
                         cursor: 'pointer',
                         borderRadius: `${albumRadius}px`,
                         flexShrink: 0
-                    },
-                    onClick: handleAlbumClick
+                    }
                 },
                     react.createElement("img", {
-                        src: coverUrl || Spicetify.Player.data?.item?.metadata?.image_url,
-                        className: "fullscreen-tv-album",
+                        src: currentCoverUrl,
+                        className: "fullscreen-tv-album ivlyrics-fullscreen-shared-album",
                         style: {
                             width: '100%',
                             height: '100%',
                             borderRadius: `${albumRadius}px`
-                        }
+                        },
+                        draggable: false
                     }),
-                    // TMI Hint Overlay
-                    react.createElement("div", {
-                        className: "album-tmi-hint",
-                        style: { borderRadius: `${albumRadius}px` }
-                    },
-                        react.createElement("div", { className: "album-tmi-hint-content" },
-                            react.createElement("span", { className: "album-tmi-text" },
-                                (window.AIAddonManager?.getEnabledProvidersFor('tmi')?.length > 0)
-                                    ? I18n.t("tmi.viewInfo")
-                                    : I18n.t("tmi.requireKey")
-                            )
-                        )
-                    )
+                    renderAlbumModeHint()
                 ),
                 // Track info (Title, Artist, Album)
                 react.createElement("div", { className: "fullscreen-tv-track-info" },
@@ -2380,29 +2656,19 @@ const FullscreenOverlay = (() => {
                 (showAlbum || showInfo) && react.createElement("div", {
                     className: `portrait-overlay-top ${!uiVisible ? 'hidden' : ''} ${isLayoutReversed ? 'layout-reversed' : ''}`
                 },
-                    // 앨범아트
+                    // 앨범 클릭은 LP 모드, 우클릭/롱프레스는 TMI
                     showAlbum && react.createElement("div", {
+                        ...albumInteractionProps,
                         className: "portrait-album-container clickable-album-container",
-                        style: { borderRadius: `${albumRadius}px` },
-                        onClick: handleAlbumClick
+                        style: { borderRadius: `${albumRadius}px` }
                     },
                         react.createElement("img", {
-                            src: coverUrl || Spicetify.Player.data?.item?.metadata?.image_url,
-                            className: `portrait-album-art ${albumShadow ? 'with-shadow' : ''}`,
-                            style: { borderRadius: `${albumRadius}px` }
+                            src: currentCoverUrl,
+                            className: `portrait-album-art ivlyrics-fullscreen-shared-album ${albumShadow ? 'with-shadow' : ''}`,
+                            style: { borderRadius: `${albumRadius}px` },
+                            draggable: false
                         }),
-                        react.createElement("div", {
-                            className: "album-tmi-hint",
-                            style: { borderRadius: `${albumRadius}px` }
-                        },
-                            react.createElement("div", { className: "album-tmi-hint-content" },
-                                react.createElement("span", { className: "album-tmi-text" },
-                                    (window.AIAddonManager?.getEnabledProvidersFor('tmi')?.length > 0)
-                                        ? I18n.t("tmi.viewInfo")
-                                        : I18n.t("tmi.requireKey")
-                                )
-                            )
-                        )
+                        renderAlbumModeHint()
                     ),
                     // 곡정보 (메타데이터 번역 지원)
                     showInfo && react.createElement("div", { className: "portrait-track-info" },
@@ -2592,8 +2858,9 @@ const FullscreenOverlay = (() => {
                         className: "lyrics-fullscreen-left-content",
                         style: { gap: `${infoGap}px` }
                     },
-                        // Album art container (clickable for TMI)
+                        // Album click toggles LP mode. Context click or hold opens TMI.
                         showAlbum && react.createElement("div", {
+                            ...albumInteractionProps,
                             className: `lyrics-fullscreen-album-container clickable-album-container`,
                             style: {
                                 width: `${albumSize}px`,
@@ -2602,34 +2869,19 @@ const FullscreenOverlay = (() => {
                                 position: 'relative',
                                 cursor: 'pointer',
                                 borderRadius: `${albumRadius}px`
-                            },
-                            onClick: handleAlbumClick
+                            }
                         },
                             react.createElement("img", {
-                                src: coverUrl || Spicetify.Player.data?.item?.metadata?.image_url,
-                                className: `lyrics-fullscreen-album-art ${albumShadow ? 'with-shadow' : ''}`,
+                                src: currentCoverUrl,
+                                className: `lyrics-fullscreen-album-art ivlyrics-fullscreen-shared-album ${albumShadow ? 'with-shadow' : ''}`,
                                 style: {
                                     width: '100%',
                                     height: '100%',
                                     borderRadius: `${albumRadius}px`
-                                }
+                                },
+                                draggable: false
                             }),
-                            // TMI Hint Overlay
-                            react.createElement("div", {
-                                className: "album-tmi-hint",
-                                style: { borderRadius: `${albumRadius}px` }
-                            },
-                                react.createElement("div", { className: "album-tmi-hint-content" },
-                                    react.createElement("span", { className: "album-tmi-text" },
-                                        (window.AIAddonManager?.getEnabledProvidersFor('tmi')?.length > 0)
-                                            ? I18n.t("tmi.viewInfo")
-                                            : I18n.t("tmi.requireKey")
-                                    ),
-                                    (window.AIAddonManager?.getEnabledProvidersFor('tmi')?.length > 0) && react.createElement("span", {
-                                        className: "album-tmi-disclaimer"
-                                    }, I18n.t("tmi.disclaimer"))
-                                )
-                            )
+                            renderAlbumModeHint()
                         ),
                         // Track info with translated metadata support
                         showInfoInOverlay && react.createElement("div", { className: "lyrics-fullscreen-track-info" },

@@ -3574,7 +3574,7 @@ const SyncAdjustButtonFluent = react.memo(() => {
                 type: "button",
                 className: "ivlyrics-fluent-close",
                 onClick: () => setIsOpen(false),
-                "aria-label": I18n.t("common.close") || "Close",
+                "aria-label": I18n.t("buttons.close") || "Close",
               },
               react.createElement(
                 "svg",

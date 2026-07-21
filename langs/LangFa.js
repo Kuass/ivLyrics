@@ -827,6 +827,7 @@ window.LANG_FA = {
     "greetingPlaceholder": "یک متن خوشامدگویی برای نمایش در پروفایل خود بنویسید.",
     "greetingLoginRequired": "برای ویرایش پروفایل سازنده باید با Discord وارد شوید.",
     "greetingSaveFailed": "ذخیره خوشامدگویی ناموفق بود.",
+    "greetingTranslateFailed": "ترجمه خوشامدگویی ناموفق بود.",
     "greetingSaveSuccess": "خوشامدگویی ذخیره شد.",
     "ownProfile": "این پروفایل شماست.",
     "loadMore": "بارگذاری بیشتر",
@@ -2055,6 +2056,16 @@ window.LANG_FA = {
       "downloading": "در حال دانلود ویدیو: {percent}%",
       "skip": "رد کردن"
     }
+  },
+  "vinyl": {
+    "mode": "حالت وینیل",
+    "openHint": "برای باز کردن روی جلد آلبوم کلیک کنید",
+    "closeHint": "برای بازگشت روی جلد آلبوم کلیک کنید",
+    "recordHint": "برای پخش یا مکث روی صفحه کلیک کنید",
+    "tonearmHint": "برای جابه‌جایی زمان پخش، بازوی گرامافون را بکشید",
+    "tmiHint": "برای باز کردن TMI روی جلد آلبوم راست‌کلیک کنید یا آن را نگه دارید",
+    "click": "کلیک",
+    "tmiGesture": "راست‌کلیک · نگه‌داشتن"
   },
   "tmi": {
     "getApiKeyDesc": "دریافت کلید Gemini API",

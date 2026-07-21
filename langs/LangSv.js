@@ -827,6 +827,7 @@ window.LANG_SV = {
     "greetingPlaceholder": "Skriv en hälsning som visas på din profil.",
     "greetingLoginRequired": "Discord-inloggning krävs för att redigera din skaparprofil.",
     "greetingSaveFailed": "Kunde inte spara hälsningen.",
+    "greetingTranslateFailed": "Det gick inte att översätta hälsningen.",
     "greetingSaveSuccess": "Hälsningen har sparats.",
     "ownProfile": "Det här är din profil.",
     "loadMore": "Ladda mer",
@@ -2055,6 +2056,16 @@ window.LANG_SV = {
       "downloading": "Laddar ned video: {percent}%",
       "skip": "Hoppa över"
     }
+  },
+  "vinyl": {
+    "mode": "Vinylläge",
+    "openHint": "Klicka på omslaget för att öppna",
+    "closeHint": "Klicka på omslaget för att gå tillbaka",
+    "recordHint": "Klicka på skivan för att spela upp eller pausa",
+    "tonearmHint": "Dra tonarmen för att ändra uppspelningsposition",
+    "tmiHint": "Högerklicka eller håll ned omslaget för att öppna TMI",
+    "click": "Klicka",
+    "tmiGesture": "Högerklick · Håll ned"
   },
   "tmi": {
     "getApiKeyDesc": "Skaffa Gemini API Key",

@@ -827,6 +827,7 @@ window.LANG_JA = {
     "greetingPlaceholder": "プロフィールに表示する挨拶を書いてください。",
     "greetingLoginRequired": "制作者プロフィールを編集するにはDiscordログインが必要です。",
     "greetingSaveFailed": "挨拶を保存できませんでした。",
+    "greetingTranslateFailed": "挨拶を翻訳できませんでした。",
     "greetingSaveSuccess": "挨拶を保存しました。",
     "ownProfile": "あなたのプロフィールです。",
     "loadMore": "もっと見る",
@@ -2056,6 +2057,16 @@ window.LANG_JA = {
       "downloading": "動画ダウンロード中: {percent}%",
       "skip": "スキップ"
     }
+  },
+  "vinyl": {
+    "mode": "LP モード",
+    "openHint": "ジャケットをクリックして開く",
+    "closeHint": "ジャケットをクリックして戻る",
+    "recordHint": "レコードをクリックして再生または一時停止",
+    "tonearmHint": "トーンアームをドラッグして再生位置を変更",
+    "tmiHint": "ジャケットを右クリックまたは長押しして TMI を開く",
+    "click": "クリック",
+    "tmiGesture": "右クリック · 長押し"
   },
   "tmi": {
     "getApiKeyDesc": "Gemini APIキーを取得",

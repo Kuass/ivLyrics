@@ -827,6 +827,7 @@ window.LANG_DE = {
     "greetingPlaceholder": "Schreibe eine Begrüßung für dein Profil.",
     "greetingLoginRequired": "Zum Bearbeiten deines Erstellerprofils ist eine Discord-Anmeldung erforderlich.",
     "greetingSaveFailed": "Begrüßung konnte nicht gespeichert werden.",
+    "greetingTranslateFailed": "Begrüßung konnte nicht übersetzt werden.",
     "greetingSaveSuccess": "Begrüßung gespeichert.",
     "ownProfile": "Das ist dein Profil.",
     "loadMore": "Mehr laden",
@@ -2055,6 +2056,16 @@ window.LANG_DE = {
       "downloading": "Lade Video: {percent}%",
       "skip": "Überspringen"
     }
+  },
+  "vinyl": {
+    "mode": "Vinylmodus",
+    "openHint": "Zum Öffnen auf das Cover klicken",
+    "closeHint": "Zum Zurückkehren auf das Cover klicken",
+    "recordHint": "Zum Abspielen oder Pausieren auf die Platte klicken",
+    "tonearmHint": "Tonarm ziehen, um die Wiedergabeposition zu ändern",
+    "tmiHint": "Rechtsklicken oder das Cover gedrückt halten, um TMI zu öffnen",
+    "click": "Klicken",
+    "tmiGesture": "Rechtsklick · Gedrückt halten"
   },
   "tmi": {
     "getApiKeyDesc": "Gemini API-Schlüssel holen",

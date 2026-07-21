@@ -4322,7 +4322,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		const currentTime = Spicetify.Player.getProgress() / 1000;
 		const lockIndex = getActiveRecordingLockIndex();
 		if (lockIndex >= currentLineChars.length - 1) {
-			Toast.error(I18n.t('syncCreator.syncLockNoEditableChars') || 'Right-click an earlier character so there is something left to re-sync.');
+			Toast.error(I18n.t('settings.syncLockNoEditableChars') || 'Right-click an earlier character so there is something left to re-sync.');
 			return;
 		}
 		const firstEditableIndex = Math.max(0, lockIndex + 1);
@@ -5006,19 +5006,19 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			setDragStartCharIndex(-1);
 			setRecordingProgressIndex(-1);
 			setIsDragging(false);
-			Toast.success(I18n.t('syncCreator.syncLockCleared') || 'Sync lock cleared.');
+			Toast.success(I18n.t('settings.syncLockCleared') || 'Sync lock cleared.');
 			return;
 		}
 
 		if (safeIndex >= currentLineChars.length - 1) {
-			Toast.error(I18n.t('syncCreator.syncLockNoEditableChars') || 'Right-click an earlier character so there is something left to re-sync.');
+			Toast.error(I18n.t('settings.syncLockNoEditableChars') || 'Right-click an earlier character so there is something left to re-sync.');
 			return;
 		}
 
 		const savedChars = getCurrentSyncTargetSavedChars();
 		const missingSavedIndex = savedChars.findIndex((time, index) => index <= safeIndex && !isFiniteSyncCreatorTime(time));
 		if (missingSavedIndex >= 0) {
-			Toast.error(I18n.t('syncCreator.syncLockRequiresTiming') || 'Sync this line once before locking part of it.');
+			Toast.error(I18n.t('settings.syncLockRequiresTiming') || 'Sync this line once before locking part of it.');
 			return;
 		}
 
@@ -5041,7 +5041,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setDragStartCharIndex(-1);
 		setRecordingProgressIndex(safeIndex, { commitState: false });
 		setIsDragging(false);
-		Toast.success(I18n.t('syncCreator.syncLockSet') || 'Locked timing up to the selected character.');
+		Toast.success(I18n.t('settings.syncLockSet') || 'Locked timing up to the selected character.');
 	}, [
 		mode,
 		currentLineIndex,
@@ -5194,7 +5194,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				if (!isKeyboardSyncingRef.current) {
 					const lockIndex = getActiveRecordingLockIndex();
 					if (lockIndex >= currentLineChars.length - 1) {
-						Toast.error(I18n.t('syncCreator.syncLockNoEditableChars') || 'Right-click an earlier character so there is something left to re-sync.');
+						Toast.error(I18n.t('settings.syncLockNoEditableChars') || 'Right-click an earlier character so there is something left to re-sync.');
 						return -1;
 					}
 					// 키보드 싱크 시작
@@ -5317,7 +5317,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				if (!isKeyboardSyncingRef.current) {
 					const lockIndex = getActiveRecordingLockIndex();
 					if (lockIndex >= currentLineChars.length - 1) {
-						Toast.error(I18n.t('syncCreator.syncLockNoEditableChars') || 'Right-click an earlier character so there is something left to re-sync.');
+						Toast.error(I18n.t('settings.syncLockNoEditableChars') || 'Right-click an earlier character so there is something left to re-sync.');
 						return;
 					}
 					isKeyboardSyncingRef.current = true;
@@ -5554,7 +5554,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				if (!isKeyboardSyncingRef.current) {
 					const lockIndex = getActiveRecordingLockIndex();
 					if (lockIndex >= currentLineChars.length - 1) {
-						Toast.error(I18n.t('syncCreator.syncLockNoEditableChars') || 'Right-click an earlier character so there is something left to re-sync.');
+						Toast.error(I18n.t('settings.syncLockNoEditableChars') || 'Right-click an earlier character so there is something left to re-sync.');
 						return;
 					}
 					isKeyboardSyncingRef.current = true;
@@ -8890,7 +8890,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			'data-iv-sync-creator-base-background': baseBackground,
 			'data-iv-sync-creator-base-color': baseColor,
 			onContextMenu: options.wordSpacer ? undefined : (e) => handleCharacterContextMenu(i, e),
-			title: options.wordSpacer || mode !== 'record' ? undefined : (I18n.t('syncCreator.syncLockTooltip') || 'Right-click to lock timing up to this character')
+			title: options.wordSpacer || mode !== 'record' ? undefined : (I18n.t('settings.syncLockTooltip') || 'Right-click to lock timing up to this character')
 		},
 			usePrimaryLayout
 				? react.createElement('span', { style: s.charOriginalSmall }, originalContent)
@@ -10090,7 +10090,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					type: 'button',
 					style: s.lrcLibBtn,
 					onClick: applyBulkCustomSpeaker
-				}, I18n.t('videoBackground.apply') || 'Apply')
+				}, I18n.t('buttons.apply') || 'Apply')
 			)
 		)
 	);
