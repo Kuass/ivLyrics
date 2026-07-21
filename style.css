@@ -8072,10 +8072,10 @@ html.is-lp-view-exit::view-transition-new(root) {
   overflow: hidden;
   color: var(--lyrics-color-active, var(--spice-text, #fff));
   filter: none !important;
-  font-family: var(--lyrics-original-font-family, var(--lyrics-font-family, 'Pretendard Variable', Pretendard, sans-serif));
-  font-size: clamp(20px, 2.2vw, 34px);
-  font-weight: var(--lyrics-original-font-weight, 700);
-  letter-spacing: var(--lyrics-original-letter-spacing, -0.02em);
+  font-family: var(--iv-vinyl-original-font-family, 'Pretendard Variable'), Pretendard, sans-serif;
+  font-size: var(--iv-vinyl-original-font-size, 32px);
+  font-weight: var(--iv-vinyl-original-font-weight, 700);
+  letter-spacing: var(--iv-vinyl-original-letter-spacing, 0px);
   line-height: 1.25;
   text-align: center !important;
   opacity: 1 !important;
@@ -8093,6 +8093,14 @@ html.is-lp-view-exit::view-transition-new(root) {
   text-overflow: ellipsis;
   white-space: nowrap;
   transform: none !important;
+}
+
+.fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine > p {
+  font-family: var(--iv-vinyl-original-font-family, 'Pretendard Variable'), Pretendard, sans-serif !important;
+  font-size: var(--iv-vinyl-original-font-size, 32px) !important;
+  font-weight: var(--iv-vinyl-original-font-weight, 700) !important;
+  letter-spacing: var(--iv-vinyl-original-letter-spacing, 0px) !important;
+  opacity: var(--iv-vinyl-original-opacity, 1) !important;
 }
 
 .fullscreen-vinyl-active-lyric .ivlyrics-vinyl-lyric-scroll-viewport {
@@ -8157,14 +8165,22 @@ html.is-lp-view-exit::view-transition-new(root) {
 }
 
 .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-phonetic {
-  margin-top: 3px;
-  font-size: clamp(13px, 1.2vw, 18px);
+  margin-top: var(--iv-vinyl-phonetic-spacing, 3px);
+  font-family: var(--iv-vinyl-phonetic-font-family, 'Pretendard Variable'), Pretendard, sans-serif !important;
+  font-size: var(--iv-vinyl-phonetic-font-size, 17px) !important;
+  font-weight: var(--iv-vinyl-phonetic-font-weight, 500) !important;
+  letter-spacing: var(--iv-vinyl-phonetic-letter-spacing, 0px) !important;
+  opacity: var(--iv-vinyl-phonetic-opacity, 0.86) !important;
   line-height: 1.3;
 }
 
 .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-translation {
-  margin-top: 4px;
-  font-size: clamp(14px, 1.3vw, 20px);
+  margin-top: var(--iv-vinyl-translation-spacing, 4px);
+  font-family: var(--iv-vinyl-translation-font-family, 'Pretendard Variable'), Pretendard, sans-serif !important;
+  font-size: var(--iv-vinyl-translation-font-size, 18px) !important;
+  font-weight: var(--iv-vinyl-translation-font-weight, 500) !important;
+  letter-spacing: var(--iv-vinyl-translation-letter-spacing, 0px) !important;
+  opacity: var(--iv-vinyl-translation-opacity, 0.9) !important;
   line-height: 1.35;
 }
 
@@ -8238,7 +8254,7 @@ html.is-lp-view-exit::view-transition-new(root) {
 }
 
 .ivlyrics-vinyl-player--immersive {
-  --iv-vinyl-cover-size: min(42vw, 60svh);
+  --iv-vinyl-cover-size: min(42vw, 60svh, calc(72svh * var(--iv-vinyl-safe-scale-factor, 1)));
   width: min(calc(var(--iv-vinyl-cover-size) * 1.82), 88vw);
   max-width: 88vw;
   filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.28));
@@ -8280,6 +8296,7 @@ html.is-lp-view-exit::view-transition-new(root) {
   border-radius: var(--iv-vinyl-album-radius, 2.4%);
   transform: translate3d(0, 0, 0) rotate(0deg);
   transform-origin: 50% 50%;
+  scale: var(--iv-vinyl-album-scale, 1);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   cursor: pointer;
   transition:
@@ -8288,7 +8305,8 @@ html.is-lp-view-exit::view-transition-new(root) {
     top 620ms cubic-bezier(0.22, 1, 0.36, 1),
     left 620ms cubic-bezier(0.22, 1, 0.36, 1),
     width 620ms cubic-bezier(0.22, 1, 0.36, 1),
-    height 620ms cubic-bezier(0.22, 1, 0.36, 1);
+    height 620ms cubic-bezier(0.22, 1, 0.36, 1),
+    scale 620ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
 
@@ -8307,13 +8325,15 @@ html.is-lp-view-exit::view-transition-new(root) {
   transform: translate3d(0, 0, 0);
   filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.18));
   cursor: pointer;
+  scale: var(--iv-vinyl-record-scale, 1);
   transition:
     transform var(--iv-vinyl-record-duration) var(--iv-vinyl-record-ease),
     filter var(--iv-vinyl-record-duration) ease,
     top 620ms cubic-bezier(0.22, 1, 0.36, 1),
     left 620ms cubic-bezier(0.22, 1, 0.36, 1),
     width 620ms cubic-bezier(0.22, 1, 0.36, 1),
-    height 620ms cubic-bezier(0.22, 1, 0.36, 1);
+    height 620ms cubic-bezier(0.22, 1, 0.36, 1),
+    scale 620ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform, filter;
 }
 
@@ -8341,6 +8361,7 @@ html.is-lp-view-exit::view-transition-new(root) {
   opacity: 0;
   transform: translate3d(86vw, -38vh, 0) rotate(22deg) scale(0.56);
   transform-origin: 50% 50%;
+  scale: var(--iv-vinyl-album-scale, 1);
 }
 
 .ivlyrics-vinyl-incoming-sleeve img {
@@ -8377,6 +8398,7 @@ html.is-lp-view-exit::view-transition-new(root) {
   transform: var(--iv-vinyl-incoming-record-start-transform);
   clip-path: var(--iv-vinyl-incoming-record-start-clip);
   filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.12));
+  scale: var(--iv-vinyl-record-scale, 1);
 }
 
 .ivlyrics-vinyl-player.is-track-album-arriving .ivlyrics-vinyl-incoming-sleeve {
@@ -8669,11 +8691,14 @@ html.is-lp-view-exit::view-transition-new(root) {
   outline: none;
   touch-action: none;
   cursor: grab;
+  scale: var(--iv-vinyl-record-scale, 1);
+  transform-origin: -19.45% 50%;
   transition:
     top 620ms cubic-bezier(0.22, 1, 0.36, 1),
     left 620ms cubic-bezier(0.22, 1, 0.36, 1),
     width 620ms cubic-bezier(0.22, 1, 0.36, 1),
-    height 620ms cubic-bezier(0.22, 1, 0.36, 1);
+    height 620ms cubic-bezier(0.22, 1, 0.36, 1),
+    scale 620ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .ivlyrics-vinyl-tonearm[aria-disabled="true"] {
@@ -8883,7 +8908,7 @@ html.is-lp-view-exit::view-transition-new(root) {
 }
 
 .ivlyrics-vinyl-player--portrait-layout {
-  --iv-vinyl-cover-size: min(80vw, 34svh);
+  --iv-vinyl-cover-size: min(80vw, 34svh, calc(94vw * var(--iv-vinyl-safe-scale-factor, 1)));
   --iv-vinyl-flight-target-transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
   --iv-vinyl-incoming-record-start-transform: translate3d(0, -40%, 0) scale(0.78);
   --iv-vinyl-incoming-record-clear-transform: translate3d(0, 46%, 0) scale(1.008);
@@ -8920,6 +8945,7 @@ html.is-lp-view-exit::view-transition-new(root) {
   left: 71%;
   width: 29%;
   height: calc(var(--iv-vinyl-cover-size) * 0.7);
+  transform-origin: -72.41% 68.57%;
 }
 
 .ivlyrics-vinyl-player--portrait-layout .ivlyrics-vinyl-incoming-sleeve {
@@ -9034,15 +9060,36 @@ html.is-lp-view-exit::view-transition-new(root) {
 
 .fullscreen-vinyl-overlay.is-portrait-layout .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine {
   padding-block: 6px;
-  font-size: clamp(18px, 5.2vw, 31px);
+  font-size: var(--iv-vinyl-original-font-size, 32px);
 }
 
 .fullscreen-vinyl-overlay.is-portrait-layout .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-phonetic {
-  font-size: clamp(12px, 3.15vw, 17px);
+  font-size: var(--iv-vinyl-phonetic-font-size, 17px) !important;
 }
 
 .fullscreen-vinyl-overlay.is-portrait-layout .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-translation {
-  font-size: clamp(13px, 3.5vw, 19px);
+  font-size: var(--iv-vinyl-translation-font-size, 18px) !important;
+}
+
+.fullscreen-vinyl-overlay.is-motion-disabled,
+.fullscreen-vinyl-overlay.is-motion-disabled > .ivlyrics-vinyl-player,
+.fullscreen-vinyl-overlay.is-motion-disabled .fullscreen-vinyl-active-lyric,
+.fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-incoming-sleeve,
+.fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-incoming-record-shell {
+  animation-duration: 1ms !important;
+  animation-delay: 0ms !important;
+}
+
+.fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-visual-group,
+.fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-sleeve,
+.fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-record-shell,
+.fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-tonearm,
+.fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-tonearm-moving {
+  transition-duration: 1ms !important;
+}
+
+.fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-motion {
+  animation: none !important;
 }
 
 @keyframes fullscreen-vinyl-cover-arrive-portrait {

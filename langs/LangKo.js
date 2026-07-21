@@ -2066,7 +2066,17 @@ window.LANG_KO = {
     "tonearmHint": "톤암을 드래그하여 재생 위치 이동",
     "tmiHint": "앨범을 우클릭하거나 길게 눌러 TMI 열기",
     "click": "클릭",
-    "tmiGesture": "우클릭 · 길게 누르기"
+    "tmiGesture": "우클릭 · 길게 누르기",
+    "settings": {
+      "subtitle": "LP 모드의 크기, 모션, 하단 가사 글꼴을 조정합니다.",
+      "albumSizeLabel": "앨범 커버 크기",
+      "albumSizeDesc": "LP 모드의 앨범 커버 크기를 조절합니다.",
+      "recordSizeLabel": "LP 판 크기",
+      "recordSizeDesc": "LP 모드의 LP 판 크기를 조절합니다.",
+      "animationsLabel": "LP 애니메이션",
+      "animationsDesc": "재생·정지, 회전, 등장 및 곡 전환 애니메이션을 사용합니다.",
+      "typographySubtitle": "LP 아래에 표시되는 원문, 발음, 번역의 글꼴을 각각 조절합니다."
+    }
   },
   "tmi": {
     "getApiKeyDesc": "Gemini API 키 발급받기",

@@ -2065,7 +2065,17 @@ window.LANG_SV = {
     "tonearmHint": "Dra tonarmen för att ändra uppspelningsposition",
     "tmiHint": "Högerklicka eller håll ned omslaget för att öppna TMI",
     "click": "Klicka",
-    "tmiGesture": "Högerklick · Håll ned"
+    "tmiGesture": "Högerklick · Håll ned",
+    "settings": {
+      "subtitle": "Anpassa storlek, animationer och typografi för den nedre textraden i vinylläget.",
+      "albumSizeLabel": "Omslagsstorlek",
+      "albumSizeDesc": "Justerar albumomslagets storlek i vinylläget.",
+      "recordSizeLabel": "Skivstorlek",
+      "recordSizeDesc": "Justerar vinylskivans storlek i vinylläget.",
+      "animationsLabel": "Vinylanimationer",
+      "animationsDesc": "Använd animationer för uppspelning, paus, rotation, entré och låtbyte.",
+      "typographySubtitle": "Justera typsnitten för original, uttal och översättning under skivan separat."
+    }
   },
   "tmi": {
     "getApiKeyDesc": "Skaffa Gemini API Key",

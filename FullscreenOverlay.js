@@ -1868,7 +1868,8 @@ const FullscreenOverlay = (() => {
 
         const runLpSharedTransition = useCallback((direction, updateMode) => {
             const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-            if (reducedMotion || typeof document?.startViewTransition !== "function") return false;
+            const animationsEnabled = CONFIG?.visual?.["fullscreen-vinyl-animations"] !== false;
+            if (!animationsEnabled || reducedMotion || typeof document?.startViewTransition !== "function") return false;
             if (lpViewTransitionRef.current) return true;
 
             const root = document.documentElement;
@@ -1975,6 +1976,7 @@ const FullscreenOverlay = (() => {
         const albumSize = Number(CONFIG?.visual?.["fullscreen-album-size"]) || 400;
         const albumRadiusValue = Number(CONFIG?.visual?.["fullscreen-album-radius"]);
         const albumRadius = isNaN(albumRadiusValue) ? 12 : albumRadiusValue;
+        const vinylAnimationsEnabled = CONFIG?.visual?.["fullscreen-vinyl-animations"] !== false;
         const titleSize = Number(CONFIG?.visual?.["fullscreen-title-size"]) || 48;
         const artistSize = Number(CONFIG?.visual?.["fullscreen-artist-size"]) || 24;
 
@@ -2143,6 +2145,11 @@ const FullscreenOverlay = (() => {
 
             if (lpMode) {
                 if (lpModeClosing) return;
+                if (!vinylAnimationsEnabled) {
+                    setLpModeClosing(false);
+                    setLpMode(false);
+                    return;
+                }
                 if (runLpSharedTransition("exit", () => {
                     if (lpModeExitTimerRef.current) {
                         window.clearTimeout(lpModeExitTimerRef.current);
@@ -2166,9 +2173,13 @@ const FullscreenOverlay = (() => {
                 lpModeExitTimerRef.current = null;
             }
             setLpModeClosing(false);
+            if (!vinylAnimationsEnabled) {
+                setLpMode(true);
+                return;
+            }
             if (runLpSharedTransition("enter", () => setLpMode(true))) return;
             setLpMode(true);
-        }, [lpMode, lpModeClosing, runLpSharedTransition]);
+        }, [lpMode, lpModeClosing, runLpSharedTransition, vinylAnimationsEnabled]);
 
         const handleAlbumContextMenu = useCallback((event) => {
             event.preventDefault();
@@ -2376,6 +2387,28 @@ const FullscreenOverlay = (() => {
                 activeLyricsKaraoke,
                 karaokeSource,
                 lyricsSettingsRevision,
+                vinylSettings: {
+                    albumSize: CONFIG?.visual?.["fullscreen-vinyl-album-size"] ?? 100,
+                    recordSize: CONFIG?.visual?.["fullscreen-vinyl-record-size"] ?? 100,
+                    animations: CONFIG?.visual?.["fullscreen-vinyl-animations"] !== false,
+                    originalFontFamily: CONFIG?.visual?.["fullscreen-vinyl-original-font-family"] || "Pretendard Variable",
+                    originalFontSize: CONFIG?.visual?.["fullscreen-vinyl-original-font-size"] ?? 32,
+                    originalFontWeight: CONFIG?.visual?.["fullscreen-vinyl-original-font-weight"] ?? 700,
+                    originalOpacity: CONFIG?.visual?.["fullscreen-vinyl-original-opacity"] ?? 100,
+                    originalLetterSpacing: CONFIG?.visual?.["fullscreen-vinyl-original-letter-spacing"] ?? 0,
+                    phoneticFontFamily: CONFIG?.visual?.["fullscreen-vinyl-phonetic-font-family"] || "Pretendard Variable",
+                    phoneticFontSize: CONFIG?.visual?.["fullscreen-vinyl-phonetic-font-size"] ?? 17,
+                    phoneticFontWeight: CONFIG?.visual?.["fullscreen-vinyl-phonetic-font-weight"] ?? 500,
+                    phoneticOpacity: CONFIG?.visual?.["fullscreen-vinyl-phonetic-opacity"] ?? 86,
+                    phoneticSpacing: CONFIG?.visual?.["fullscreen-vinyl-phonetic-spacing"] ?? 3,
+                    phoneticLetterSpacing: CONFIG?.visual?.["fullscreen-vinyl-phonetic-letter-spacing"] ?? 0,
+                    translationFontFamily: CONFIG?.visual?.["fullscreen-vinyl-translation-font-family"] || "Pretendard Variable",
+                    translationFontSize: CONFIG?.visual?.["fullscreen-vinyl-translation-font-size"] ?? 18,
+                    translationFontWeight: CONFIG?.visual?.["fullscreen-vinyl-translation-font-weight"] ?? 500,
+                    translationOpacity: CONFIG?.visual?.["fullscreen-vinyl-translation-opacity"] ?? 90,
+                    translationSpacing: CONFIG?.visual?.["fullscreen-vinyl-translation-spacing"] ?? 4,
+                    translationLetterSpacing: CONFIG?.visual?.["fullscreen-vinyl-translation-letter-spacing"] ?? 0
+                },
                 onSeek: (nextPosition) => Spicetify.Player.seek(Math.floor(nextPosition)),
                 onStopPlayback: () => {
                     if (Spicetify.Player?.data?.isPaused === true) return;

@@ -2066,7 +2066,17 @@ window.LANG_TR = {
     "tonearmHint": "Oynatma konumunu değiştirmek için pikap kolunu sürükleyin",
     "tmiHint": "TMI'ı açmak için albüm kapağına sağ tıklayın veya basılı tutun",
     "click": "Tıkla",
-    "tmiGesture": "Sağ tık · Basılı tut"
+    "tmiGesture": "Sağ tık · Basılı tut",
+    "settings": {
+      "subtitle": "Plak modunun boyutunu, animasyonlarını ve alttaki şarkı sözü yazı tipini özelleştirin.",
+      "albumSizeLabel": "Albüm kapağı boyutu",
+      "albumSizeDesc": "Plak modundaki albüm kapağının boyutunu ayarlar.",
+      "recordSizeLabel": "Plak boyutu",
+      "recordSizeDesc": "Plak modundaki plağın boyutunu ayarlar.",
+      "animationsLabel": "Plak animasyonları",
+      "animationsDesc": "Oynatma, duraklatma, dönme, giriş ve parça geçişi animasyonlarını kullanır.",
+      "typographySubtitle": "Plağın altında görünen özgün metin, telaffuz ve çeviri yazı tiplerini ayrı ayrı ayarlayın."
+    }
   },
   "tmi": {
     "getApiKeyDesc": "Gemini API Anahtarı Al",

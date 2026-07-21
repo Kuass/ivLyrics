@@ -113,6 +113,7 @@ const VinylPlayerMode = (() => {
         onSeek,
         onStopPlayback,
         onTogglePlayback,
+        animationsEnabled = true,
         interactionProps = {},
         className = "",
         style = {}
@@ -191,7 +192,7 @@ const VinylPlayerMode = (() => {
             const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
             const finalPhase = isPlaying ? "playing" : "paused";
 
-            if (reducedMotion) {
+            if (!animationsEnabled || reducedMotion) {
                 setVisualPhase(finalPhase);
                 return undefined;
             }
@@ -215,7 +216,7 @@ const VinylPlayerMode = (() => {
                 window.cancelAnimationFrame(frameId);
                 timers.forEach((timer) => window.clearTimeout(timer));
             };
-        }, [isPlaying, setVisualPhase]);
+        }, [animationsEnabled, isPlaying, setVisualPhase]);
 
         useEffect(() => {
             if (!isPlaying) {
@@ -678,10 +679,15 @@ const VinylPlayerMode = (() => {
         activeLyricsKaraoke = false,
         karaokeSource = null,
         lyricsSettingsRevision = 0,
+        vinylSettings = {},
         onSeek,
         onStopPlayback,
         onTogglePlayback
     }) => {
+        const animationsEnabled = vinylSettings.animations !== false;
+        const albumScale = Math.min(1.4, Math.max(0.7, (Number(vinylSettings.albumSize) || 100) / 100));
+        const recordScale = Math.min(1.4, Math.max(0.7, (Number(vinylSettings.recordSize) || 100) / 100));
+        const safeScaleFactor = 1 / Math.max(1, albumScale, recordScale);
         const liveTrack = {
             uri: track.uri || `${track.title || "LP"}\u0000${track.artist || ""}`,
             coverUrl: track.coverUrl || "",
@@ -750,7 +756,7 @@ const VinylPlayerMode = (() => {
             clearTrackTimers();
             setOutgoingLyric(null);
 
-            if (!shownTrack?.uri || reducedMotion) {
+            if (!shownTrack?.uri || !animationsEnabled || reducedMotion) {
                 if (shownTrack?.uri && shownTrack.uri !== liveTrack.uri) {
                     lyricSnapshotsByTrackRef.current.delete(shownTrack.uri);
                 }
@@ -840,6 +846,7 @@ const VinylPlayerMode = (() => {
             liveTrack.title,
             liveTrack.artist,
             liveTrack.album,
+            animationsEnabled,
             clearTrackTimers
         ]);
 
@@ -926,7 +933,8 @@ const VinylPlayerMode = (() => {
                     isKara: renderableLyrics === snapshot.lyrics && snapshot.isKara,
                     karaokeSource: snapshot.karaokeSource,
                     settingsRevision: snapshot.settingsRevision,
-                    positionOverride: frozen ? snapshot.position : null
+                    positionOverride: frozen ? snapshot.position : null,
+                    motionEnabled: animationsEnabled
                 })
                 : snapshot.plainText);
         };
@@ -936,13 +944,33 @@ const VinylPlayerMode = (() => {
                 "fullscreen-vinyl-overlay",
                 isClosing ? "is-closing" : "is-open",
                 isPortraitLayout ? "is-portrait-layout" : "is-landscape-layout",
+                animationsEnabled ? "" : "is-motion-disabled",
                 transitionClass,
                 "has-lyric-slot",
                 hasVisibleLyric ? "has-active-lyric" : ""
             ].filter(Boolean).join(" "),
             role: "dialog",
             "aria-modal": "true",
-            "aria-label": I18n.t("vinyl.mode") || "LP"
+            "aria-label": I18n.t("vinyl.mode") || "LP",
+            style: {
+                "--iv-vinyl-original-font-family": `'${String(vinylSettings.originalFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
+                "--iv-vinyl-original-font-size": `${Number(vinylSettings.originalFontSize) || 32}px`,
+                "--iv-vinyl-original-font-weight": Number(vinylSettings.originalFontWeight) || 700,
+                "--iv-vinyl-original-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.originalOpacity) || 100) / 100)),
+                "--iv-vinyl-original-letter-spacing": `${Number(vinylSettings.originalLetterSpacing) || 0}px`,
+                "--iv-vinyl-phonetic-font-family": `'${String(vinylSettings.phoneticFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
+                "--iv-vinyl-phonetic-font-size": `${Number(vinylSettings.phoneticFontSize) || 17}px`,
+                "--iv-vinyl-phonetic-font-weight": Number(vinylSettings.phoneticFontWeight) || 500,
+                "--iv-vinyl-phonetic-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.phoneticOpacity) || 86) / 100)),
+                "--iv-vinyl-phonetic-spacing": `${Number(vinylSettings.phoneticSpacing) || 0}px`,
+                "--iv-vinyl-phonetic-letter-spacing": `${Number(vinylSettings.phoneticLetterSpacing) || 0}px`,
+                "--iv-vinyl-translation-font-family": `'${String(vinylSettings.translationFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
+                "--iv-vinyl-translation-font-size": `${Number(vinylSettings.translationFontSize) || 18}px`,
+                "--iv-vinyl-translation-font-weight": Number(vinylSettings.translationFontWeight) || 500,
+                "--iv-vinyl-translation-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.translationOpacity) || 90) / 100)),
+                "--iv-vinyl-translation-spacing": `${Number(vinylSettings.translationSpacing) || 0}px`,
+                "--iv-vinyl-translation-letter-spacing": `${Number(vinylSettings.translationLetterSpacing) || 0}px`
+            }
         },
             react.createElement(VinylPlayer, {
                 className: [
@@ -952,6 +980,26 @@ const VinylPlayerMode = (() => {
                 ].filter(Boolean).join(" "),
                 style: {
                     "--iv-vinyl-album-radius": `${albumRadius}px`,
+                    "--iv-vinyl-album-scale": albumScale,
+                    "--iv-vinyl-record-scale": recordScale,
+                    "--iv-vinyl-safe-scale-factor": safeScaleFactor,
+                    "--iv-vinyl-original-font-family": `'${String(vinylSettings.originalFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
+                    "--iv-vinyl-original-font-size": `${Number(vinylSettings.originalFontSize) || 32}px`,
+                    "--iv-vinyl-original-font-weight": Number(vinylSettings.originalFontWeight) || 700,
+                    "--iv-vinyl-original-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.originalOpacity) || 100) / 100)),
+                    "--iv-vinyl-original-letter-spacing": `${Number(vinylSettings.originalLetterSpacing) || 0}px`,
+                    "--iv-vinyl-phonetic-font-family": `'${String(vinylSettings.phoneticFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
+                    "--iv-vinyl-phonetic-font-size": `${Number(vinylSettings.phoneticFontSize) || 17}px`,
+                    "--iv-vinyl-phonetic-font-weight": Number(vinylSettings.phoneticFontWeight) || 500,
+                    "--iv-vinyl-phonetic-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.phoneticOpacity) || 86) / 100)),
+                    "--iv-vinyl-phonetic-spacing": `${Number(vinylSettings.phoneticSpacing) || 0}px`,
+                    "--iv-vinyl-phonetic-letter-spacing": `${Number(vinylSettings.phoneticLetterSpacing) || 0}px`,
+                    "--iv-vinyl-translation-font-family": `'${String(vinylSettings.translationFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
+                    "--iv-vinyl-translation-font-size": `${Number(vinylSettings.translationFontSize) || 18}px`,
+                    "--iv-vinyl-translation-font-weight": Number(vinylSettings.translationFontWeight) || 500,
+                    "--iv-vinyl-translation-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.translationOpacity) || 90) / 100)),
+                    "--iv-vinyl-translation-spacing": `${Number(vinylSettings.translationSpacing) || 0}px`,
+                    "--iv-vinyl-translation-letter-spacing": `${Number(vinylSettings.translationLetterSpacing) || 0}px`,
                     ...(displayedTrack.accent ? { "--iv-vinyl-accent": displayedTrack.accent } : {})
                 },
                 coverUrl: displayedTrack.coverUrl,
@@ -962,6 +1010,7 @@ const VinylPlayerMode = (() => {
                 isPlaying,
                 position,
                 duration,
+                animationsEnabled,
                 interactionProps,
                 onSeek,
                 onStopPlayback,

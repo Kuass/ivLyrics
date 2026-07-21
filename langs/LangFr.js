@@ -2066,7 +2066,17 @@ window.LANG_FR = {
     "tonearmHint": "Faites glisser le bras de lecture pour changer de position",
     "tmiHint": "Faites un clic droit ou appuyez longuement sur la pochette pour ouvrir TMI",
     "click": "Clic",
-    "tmiGesture": "Clic droit · Appui long"
+    "tmiGesture": "Clic droit · Appui long",
+    "settings": {
+      "subtitle": "Personnalisez la taille, les animations et la typographie inférieure du mode vinyle.",
+      "albumSizeLabel": "Taille de la pochette",
+      "albumSizeDesc": "Ajuste la taille de la pochette en mode vinyle.",
+      "recordSizeLabel": "Taille du disque",
+      "recordSizeDesc": "Ajuste la taille du disque en mode vinyle.",
+      "animationsLabel": "Animations du vinyle",
+      "animationsDesc": "Active les animations de lecture, pause, rotation, entrée et changement de morceau.",
+      "typographySubtitle": "Ajustez séparément les polices de l’original, de la prononciation et de la traduction sous le vinyle."
+    }
   },
   "tmi": {
     "getApiKeyDesc": "Obtenir Clé API Gemini",

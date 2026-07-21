@@ -2066,7 +2066,17 @@ window.LANG_EN = {
     "tonearmHint": "Drag the tonearm to seek",
     "tmiHint": "Right-click or hold the album to open TMI",
     "click": "Click",
-    "tmiGesture": "Right click · Hold"
+    "tmiGesture": "Right click · Hold",
+    "settings": {
+      "subtitle": "Customize the LP mode size, motion, and bottom lyric typography.",
+      "albumSizeLabel": "Album cover size",
+      "albumSizeDesc": "Adjusts the album cover size in LP mode.",
+      "recordSizeLabel": "Record size",
+      "recordSizeDesc": "Adjusts the vinyl record size in LP mode.",
+      "animationsLabel": "LP animations",
+      "animationsDesc": "Use play/pause, record spin, entrance, and track-change animations.",
+      "typographySubtitle": "Adjust the fonts for the original, pronunciation, and translation shown below the LP."
+    }
   },
   "tmi": {
     "getApiKeyDesc": "Get Gemini API Key",

@@ -2065,7 +2065,17 @@ window.LANG_CS = {
     "tonearmHint": "Přetažením raménka změníte pozici přehrávání",
     "tmiHint": "Kliknutím pravým tlačítkem nebo podržením obalu otevřete TMI",
     "click": "Kliknutí",
-    "tmiGesture": "Pravé tlačítko · Podržení"
+    "tmiGesture": "Pravé tlačítko · Podržení",
+    "settings": {
+      "subtitle": "Přizpůsobte velikost, animace a typografii spodního textu ve vinylovém režimu.",
+      "albumSizeLabel": "Velikost obalu",
+      "albumSizeDesc": "Upraví velikost obalu alba ve vinylovém režimu.",
+      "recordSizeLabel": "Velikost desky",
+      "recordSizeDesc": "Upraví velikost vinylové desky ve vinylovém režimu.",
+      "animationsLabel": "Animace vinylu",
+      "animationsDesc": "Použije animace přehrávání, pauzy, otáčení, příchodu a změny skladby.",
+      "typographySubtitle": "Samostatně upravte písma originálu, výslovnosti a překladu pod deskou."
+    }
   },
   "tmi": {
     "getApiKeyDesc": "Získejte Gemini API klíč",

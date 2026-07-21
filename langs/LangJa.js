@@ -2066,7 +2066,17 @@ window.LANG_JA = {
     "tonearmHint": "トーンアームをドラッグして再生位置を変更",
     "tmiHint": "ジャケットを右クリックまたは長押しして TMI を開く",
     "click": "クリック",
-    "tmiGesture": "右クリック · 長押し"
+    "tmiGesture": "右クリック · 長押し",
+    "settings": {
+      "subtitle": "LP モードのサイズ、アニメーション、下部歌詞のフォントを調整します。",
+      "albumSizeLabel": "アルバムジャケットのサイズ",
+      "albumSizeDesc": "LP モードのアルバムジャケットのサイズを調整します。",
+      "recordSizeLabel": "レコードのサイズ",
+      "recordSizeDesc": "LP モードのレコードのサイズを調整します。",
+      "animationsLabel": "LP アニメーション",
+      "animationsDesc": "再生・一時停止、回転、登場、曲変更のアニメーションを使用します。",
+      "typographySubtitle": "LP の下に表示する原文・発音・翻訳のフォントを個別に調整します。"
+    }
   },
   "tmi": {
     "getApiKeyDesc": "Gemini APIキーを取得",

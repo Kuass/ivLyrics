@@ -45,7 +45,7 @@ const VinylActiveLyricRenderer = (() => {
         };
     };
 
-    const useOverflowAutoScroll = (rootRef, resetKey) => {
+    const useOverflowAutoScroll = (rootRef, resetKey, motionEnabled) => {
         useLayoutEffect(() => {
             const root = rootRef.current;
             if (!root) return undefined;
@@ -69,7 +69,7 @@ const VinylActiveLyricRenderer = (() => {
                 if (disposed || !root.isConnected) return;
 
                 clearAnimations();
-                const reduceMotion = motionPreference?.matches === true;
+                const reduceMotion = !motionEnabled || motionPreference?.matches === true;
                 const viewports = root.querySelectorAll(".ivlyrics-vinyl-lyric-scroll-viewport");
 
                 viewports.forEach((viewport) => {
@@ -143,7 +143,7 @@ const VinylActiveLyricRenderer = (() => {
                 motionPreference?.removeEventListener?.("change", scheduleMeasure);
                 document.fonts?.removeEventListener?.("loadingdone", scheduleMeasure);
             };
-        }, [rootRef, resetKey]);
+        }, [rootRef, resetKey, motionEnabled]);
     };
 
     if (!primitives) {
@@ -174,6 +174,7 @@ const VinylActiveLyricRenderer = (() => {
         karaokeSource = null,
         settingsRevision = 0,
         positionOverride = null,
+        motionEnabled = true,
     }) => {
         const rootRef = useRef(null);
         const playbackPosition = useLyricsPlaybackPosition();
@@ -192,7 +193,7 @@ const VinylActiveLyricRenderer = (() => {
         );
         const sourceLine = Array.isArray(lyrics) ? lyrics[safeLineIndex] : null;
         const scrollResetKey = `${safeLineIndex}:${sourceLine?.startTime || 0}:${isKara ? 1 : 0}:${settingsRevision}`;
-        useOverflowAutoScroll(rootRef, scrollResetKey);
+        useOverflowAutoScroll(rootRef, scrollResetKey, motionEnabled);
         const globalCharTimeline = useMemo(
             () => isKara && Array.isArray(lyrics) ? prepareGlobalCharTimeline(lyrics) : null,
             [lyrics, isKara]

@@ -2066,7 +2066,17 @@ window.LANG_ZH_CN = {
     "tonearmHint": "拖动唱臂调整播放位置",
     "tmiHint": "右键点击或长按专辑封面以打开 TMI",
     "click": "点击",
-    "tmiGesture": "右键点击 · 长按"
+    "tmiGesture": "右键点击 · 长按",
+    "settings": {
+      "subtitle": "调整黑胶模式的尺寸、动效和底部歌词字体。",
+      "albumSizeLabel": "专辑封面大小",
+      "albumSizeDesc": "调整黑胶模式中的专辑封面大小。",
+      "recordSizeLabel": "唱片大小",
+      "recordSizeDesc": "调整黑胶模式中的唱片大小。",
+      "animationsLabel": "黑胶动画",
+      "animationsDesc": "启用播放/暂停、唱片旋转、入场和切歌动画。",
+      "typographySubtitle": "分别调整黑胶唱片下方原文、注音和翻译的字体。"
+    }
   },
   "tmi": {
     "getApiKeyDesc": "获取 Gemini API 密钥",

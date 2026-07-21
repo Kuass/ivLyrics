@@ -6274,6 +6274,14 @@ const ConfigModal = ({
     {
       section: I18n.t("tabs.fullscreen"),
       sectionKey: "fullscreen",
+      settingKey: "vinyl-mode",
+      name: I18n.t("vinyl.mode"),
+      desc: I18n.t("vinyl.settings.subtitle"),
+      i18nKeys: ["tabs.fullscreen", "vinyl.mode", "vinyl.settings.subtitle"]
+    },
+    {
+      section: I18n.t("tabs.fullscreen"),
+      sectionKey: "fullscreen",
       settingKey: "normal-mode",
       name: I18n.t("settingsAdvanced.normalMode.title"),
       desc: I18n.t("settingsAdvanced.normalMode.subtitle"),
@@ -8205,6 +8213,18 @@ const ConfigModal = ({
         })()
       )
     );
+
+  const saveVinylSetting = (name, value) => {
+    CONFIG.visual[name] = value;
+    StorageManager.saveConfig(name, value);
+    if (name.endsWith("font-family")) loadGoogleFontFamily(value);
+    lyricContainerUpdate?.();
+    window.dispatchEvent(
+      new CustomEvent("ivLyrics", {
+        detail: { type: "config", name, value },
+      })
+    );
+  };
 
   return react.createElement(
     "div",
@@ -16334,6 +16354,234 @@ const ConfigModal = ({
               })
             );
           },
+        }),
+
+        // ===== LP 모드 섹션 =====
+        react.createElement(SectionTitle, {
+          title: I18n.t("vinyl.mode"),
+          subtitle: I18n.t("vinyl.settings.subtitle"),
+          sectionKey: "vinyl-mode",
+        }),
+        react.createElement(OptionList, {
+          items: [
+            {
+              desc: I18n.t("vinyl.settings.albumSizeLabel"),
+              info: I18n.t("vinyl.settings.albumSizeDesc"),
+              key: "fullscreen-vinyl-album-size",
+              type: ConfigSliderRange,
+              min: 70,
+              max: 140,
+              step: 5,
+              unit: "%",
+              defaultValue: CONFIG.visual["fullscreen-vinyl-album-size"] ?? 100,
+            },
+            {
+              desc: I18n.t("vinyl.settings.recordSizeLabel"),
+              info: I18n.t("vinyl.settings.recordSizeDesc"),
+              key: "fullscreen-vinyl-record-size",
+              type: ConfigSliderRange,
+              min: 70,
+              max: 140,
+              step: 5,
+              unit: "%",
+              defaultValue: CONFIG.visual["fullscreen-vinyl-record-size"] ?? 100,
+            },
+            {
+              desc: I18n.t("vinyl.settings.animationsLabel"),
+              info: I18n.t("vinyl.settings.animationsDesc"),
+              key: "fullscreen-vinyl-animations",
+              type: ConfigSlider,
+              defaultValue: CONFIG.visual["fullscreen-vinyl-animations"] !== false,
+            },
+          ],
+          onChange: saveVinylSetting,
+        }),
+
+        react.createElement(SectionTitle, {
+          title: I18n.t("sections.typography"),
+          subtitle: I18n.t("vinyl.settings.typographySubtitle"),
+          sectionKey: "vinyl-typography",
+        }),
+        react.createElement(SectionTitle, {
+          title: I18n.t("settingsAdvanced.originalStyle.title"),
+          subtitle: I18n.t("settingsAdvanced.originalStyle.subtitle"),
+          sectionKey: "vinyl-original-style",
+        }),
+        react.createElement(OptionList, {
+          items: [
+            {
+              desc: I18n.t("settingsAdvanced.originalStyle.fontFamily"),
+              info: I18n.t("settingsAdvanced.originalStyle.fontFamilyDesc"),
+              key: "fullscreen-vinyl-original-font-family",
+              type: ConfigFontSelector,
+              defaultValue: CONFIG.visual["fullscreen-vinyl-original-font-family"] || "Pretendard Variable",
+            },
+            {
+              desc: I18n.t("settingsAdvanced.originalStyle.fontSize.label"),
+              info: I18n.t("settingsAdvanced.originalStyle.fontSize.desc"),
+              key: "fullscreen-vinyl-original-font-size",
+              type: ConfigSliderRange,
+              min: 16,
+              max: 64,
+              step: 1,
+              unit: "px",
+            },
+            {
+              desc: I18n.t("settingsAdvanced.originalStyle.fontWeight.label"),
+              info: I18n.t("settingsAdvanced.originalStyle.fontWeight.desc"),
+              key: "fullscreen-vinyl-original-font-weight",
+              type: ConfigFontWeightSlider,
+            },
+            {
+              desc: I18n.t("settingsAdvanced.originalStyle.opacity.label"),
+              info: I18n.t("settingsAdvanced.originalStyle.opacity.desc"),
+              key: "fullscreen-vinyl-original-opacity",
+              type: ConfigSliderRange,
+              min: 20,
+              max: 100,
+              step: 5,
+              unit: "%",
+            },
+            {
+              desc: I18n.t("settingsAdvanced.originalStyle.letterSpacing.label"),
+              info: I18n.t("settingsAdvanced.originalStyle.letterSpacing.desc"),
+              key: "fullscreen-vinyl-original-letter-spacing",
+              type: ConfigSliderRange,
+              min: -5,
+              max: 20,
+              step: 0.5,
+              unit: "px",
+            },
+          ],
+          onChange: saveVinylSetting,
+        }),
+
+        react.createElement(SectionTitle, {
+          title: I18n.t("settingsAdvanced.pronunciationStyle.title"),
+          subtitle: I18n.t("settingsAdvanced.pronunciationStyle.subtitle"),
+          sectionKey: "vinyl-pronunciation-style",
+        }),
+        react.createElement(OptionList, {
+          items: [
+            {
+              desc: I18n.t("settingsAdvanced.originalStyle.fontFamily"),
+              info: I18n.t("settingsAdvanced.pronunciationStyle.fontFamilyDesc"),
+              key: "fullscreen-vinyl-phonetic-font-family",
+              type: ConfigFontSelector,
+              defaultValue: CONFIG.visual["fullscreen-vinyl-phonetic-font-family"] || "Pretendard Variable",
+            },
+            {
+              desc: I18n.t("settingsAdvanced.originalStyle.fontSize.label"),
+              info: I18n.t("settingsAdvanced.pronunciationStyle.fontSize.desc"),
+              key: "fullscreen-vinyl-phonetic-font-size",
+              type: ConfigSliderRange,
+              min: 10,
+              max: 40,
+              step: 1,
+              unit: "px",
+            },
+            {
+              desc: I18n.t("settingsAdvanced.originalStyle.fontWeight.label"),
+              info: I18n.t("settingsAdvanced.pronunciationStyle.fontWeight.desc"),
+              key: "fullscreen-vinyl-phonetic-font-weight",
+              type: ConfigFontWeightSlider,
+            },
+            {
+              desc: I18n.t("settingsAdvanced.originalStyle.opacity.label"),
+              info: I18n.t("settingsAdvanced.pronunciationStyle.opacity.desc"),
+              key: "fullscreen-vinyl-phonetic-opacity",
+              type: ConfigSliderRange,
+              min: 20,
+              max: 100,
+              step: 5,
+              unit: "%",
+            },
+            {
+              desc: I18n.t("settingsAdvanced.pronunciationStyle.gap.label"),
+              info: I18n.t("settingsAdvanced.pronunciationStyle.gap.desc"),
+              key: "fullscreen-vinyl-phonetic-spacing",
+              type: ConfigSliderRange,
+              min: -10,
+              max: 24,
+              step: 1,
+              unit: "px",
+            },
+            {
+              desc: I18n.t("settingsAdvanced.pronunciationStyle.letterSpacing.label"),
+              info: I18n.t("settingsAdvanced.pronunciationStyle.letterSpacing.desc"),
+              key: "fullscreen-vinyl-phonetic-letter-spacing",
+              type: ConfigSliderRange,
+              min: -5,
+              max: 20,
+              step: 0.5,
+              unit: "px",
+            },
+          ],
+          onChange: saveVinylSetting,
+        }),
+
+        react.createElement(SectionTitle, {
+          title: I18n.t("settingsAdvanced.translationStyle.title"),
+          subtitle: I18n.t("settingsAdvanced.translationStyle.subtitle"),
+          sectionKey: "vinyl-translation-style",
+        }),
+        react.createElement(OptionList, {
+          items: [
+            {
+              desc: I18n.t("settingsAdvanced.originalStyle.fontFamily"),
+              info: I18n.t("settingsAdvanced.translationStyle.fontFamilyDesc"),
+              key: "fullscreen-vinyl-translation-font-family",
+              type: ConfigFontSelector,
+              defaultValue: CONFIG.visual["fullscreen-vinyl-translation-font-family"] || "Pretendard Variable",
+            },
+            {
+              desc: I18n.t("settingsAdvanced.originalStyle.fontSize.label"),
+              info: I18n.t("settingsAdvanced.translationStyle.fontSize.desc"),
+              key: "fullscreen-vinyl-translation-font-size",
+              type: ConfigSliderRange,
+              min: 10,
+              max: 44,
+              step: 1,
+              unit: "px",
+            },
+            {
+              desc: I18n.t("settingsAdvanced.originalStyle.fontWeight.label"),
+              info: I18n.t("settingsAdvanced.translationStyle.fontWeight.desc"),
+              key: "fullscreen-vinyl-translation-font-weight",
+              type: ConfigFontWeightSlider,
+            },
+            {
+              desc: I18n.t("settingsAdvanced.originalStyle.opacity.label"),
+              info: I18n.t("settingsAdvanced.translationStyle.opacity.desc"),
+              key: "fullscreen-vinyl-translation-opacity",
+              type: ConfigSliderRange,
+              min: 20,
+              max: 100,
+              step: 5,
+              unit: "%",
+            },
+            {
+              desc: I18n.t("settingsAdvanced.translationStyle.gap.label"),
+              info: I18n.t("settingsAdvanced.translationStyle.gap.desc"),
+              key: "fullscreen-vinyl-translation-spacing",
+              type: ConfigSliderRange,
+              min: -10,
+              max: 30,
+              step: 1,
+              unit: "px",
+            },
+            {
+              desc: I18n.t("settingsAdvanced.translationStyle.letterSpacing.label"),
+              info: I18n.t("settingsAdvanced.translationStyle.letterSpacing.desc"),
+              key: "fullscreen-vinyl-translation-letter-spacing",
+              type: ConfigSliderRange,
+              min: -5,
+              max: 20,
+              step: 0.5,
+              unit: "px",
+            },
+          ],
+          onChange: saveVinylSetting,
         }),
 
         // ===== 일반 모드 레이아웃 섹션 =====

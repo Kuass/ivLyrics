@@ -2066,7 +2066,17 @@ window.LANG_VI = {
     "tonearmHint": "Kéo cần máy hát để thay đổi vị trí phát",
     "tmiHint": "Nhấp chuột phải hoặc nhấn giữ bìa album để mở TMI",
     "click": "Nhấp",
-    "tmiGesture": "Chuột phải · Nhấn giữ"
+    "tmiGesture": "Chuột phải · Nhấn giữ",
+    "settings": {
+      "subtitle": "Tùy chỉnh kích thước, chuyển động và phông lời bên dưới của chế độ đĩa than.",
+      "albumSizeLabel": "Kích thước bìa album",
+      "albumSizeDesc": "Điều chỉnh kích thước bìa album trong chế độ đĩa than.",
+      "recordSizeLabel": "Kích thước đĩa",
+      "recordSizeDesc": "Điều chỉnh kích thước đĩa trong chế độ đĩa than.",
+      "animationsLabel": "Hoạt ảnh đĩa than",
+      "animationsDesc": "Dùng hoạt ảnh phát, tạm dừng, xoay, xuất hiện và chuyển bài.",
+      "typographySubtitle": "Điều chỉnh riêng phông chữ cho lời gốc, phiên âm và bản dịch bên dưới đĩa."
+    }
   },
   "tmi": {
     "getApiKeyDesc": "Nhận Gemini API Key",

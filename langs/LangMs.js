@@ -2075,7 +2075,17 @@ window.LANG_MS = {
     "tonearmHint": "Seret lengan pikap untuk menukar kedudukan main balik",
     "tmiHint": "Klik kanan atau tekan lama kulit album untuk membuka TMI",
     "click": "Klik",
-    "tmiGesture": "Klik kanan · Tekan lama"
+    "tmiGesture": "Klik kanan · Tekan lama",
+    "settings": {
+      "subtitle": "Sesuaikan saiz, animasi dan tipografi lirik bawah bagi mod vinil.",
+      "albumSizeLabel": "Saiz kulit album",
+      "albumSizeDesc": "Melaraskan saiz kulit album dalam mod vinil.",
+      "recordSizeLabel": "Saiz piring hitam",
+      "recordSizeDesc": "Melaraskan saiz piring hitam dalam mod vinil.",
+      "animationsLabel": "Animasi vinil",
+      "animationsDesc": "Gunakan animasi main, jeda, putaran, kemunculan dan pertukaran lagu.",
+      "typographySubtitle": "Laraskan fon teks asal, sebutan dan terjemahan di bawah piring hitam secara berasingan."
+    }
   },
   "tmi": {
     "getApiKeyDesc": "Dapatkan Kunci API",

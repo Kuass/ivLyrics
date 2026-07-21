@@ -2355,6 +2355,68 @@ const CONFIG = {
     "fullscreen-album-radius":
       StorageManager.getItem("ivLyrics:visual:fullscreen-album-radius") ||
       "12",
+    // Fullscreen vinyl mode
+    "fullscreen-vinyl-album-size":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-album-size")) ||
+      100,
+    "fullscreen-vinyl-record-size":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-record-size")) ||
+      100,
+    "fullscreen-vinyl-animations": StorageManager.get(
+      "ivLyrics:visual:fullscreen-vinyl-animations",
+      true
+    ),
+    "fullscreen-vinyl-original-font-family":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-font-family") ||
+      "Pretendard Variable",
+    "fullscreen-vinyl-original-font-size":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-font-size")) ||
+      32,
+    "fullscreen-vinyl-original-font-weight":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-font-weight")) ||
+      700,
+    "fullscreen-vinyl-original-opacity":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-opacity")) ||
+      100,
+    "fullscreen-vinyl-original-letter-spacing":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-letter-spacing")) ||
+      0,
+    "fullscreen-vinyl-phonetic-font-family":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-font-family") ||
+      "Pretendard Variable",
+    "fullscreen-vinyl-phonetic-font-size":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-font-size")) ||
+      17,
+    "fullscreen-vinyl-phonetic-font-weight":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-font-weight")) ||
+      500,
+    "fullscreen-vinyl-phonetic-opacity":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-opacity")) ||
+      86,
+    "fullscreen-vinyl-phonetic-spacing":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-spacing")) ||
+      3,
+    "fullscreen-vinyl-phonetic-letter-spacing":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-letter-spacing")) ||
+      0,
+    "fullscreen-vinyl-translation-font-family":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-font-family") ||
+      "Pretendard Variable",
+    "fullscreen-vinyl-translation-font-size":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-font-size")) ||
+      18,
+    "fullscreen-vinyl-translation-font-weight":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-font-weight")) ||
+      500,
+    "fullscreen-vinyl-translation-opacity":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-opacity")) ||
+      90,
+    "fullscreen-vinyl-translation-spacing":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-spacing")) ||
+      4,
+    "fullscreen-vinyl-translation-letter-spacing":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-letter-spacing")) ||
+      0,
     "fullscreen-title-size":
       StorageManager.getItem("ivLyrics:visual:fullscreen-title-size") ||
       "48",
@@ -9144,6 +9206,9 @@ class LyricsContainer extends react.Component {
   addFonts(CONFIG.visual["phonetic-font-family"]);
   addFonts(CONFIG.visual["translation-font-family"]);
   addFonts(CONFIG.visual["instrumental-break-label-font-family"]);
+  addFonts(CONFIG.visual["fullscreen-vinyl-original-font-family"]);
+  addFonts(CONFIG.visual["fullscreen-vinyl-phonetic-font-family"]);
+  addFonts(CONFIG.visual["fullscreen-vinyl-translation-font-family"]);
 
   // Google Fonts 로드
   fontsToLoad.forEach((font) => {

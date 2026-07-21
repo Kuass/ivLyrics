@@ -2065,7 +2065,17 @@ window.LANG_ID = {
     "tonearmHint": "Seret lengan pemutar untuk mengubah posisi pemutaran",
     "tmiHint": "Klik kanan atau tekan lama sampul album untuk membuka TMI",
     "click": "Klik",
-    "tmiGesture": "Klik kanan · Tekan lama"
+    "tmiGesture": "Klik kanan · Tekan lama",
+    "settings": {
+      "subtitle": "Sesuaikan ukuran, animasi, dan tipografi lirik bawah pada mode vinil.",
+      "albumSizeLabel": "Ukuran sampul album",
+      "albumSizeDesc": "Menyesuaikan ukuran sampul album dalam mode vinil.",
+      "recordSizeLabel": "Ukuran piringan",
+      "recordSizeDesc": "Menyesuaikan ukuran piringan dalam mode vinil.",
+      "animationsLabel": "Animasi vinil",
+      "animationsDesc": "Gunakan animasi putar, jeda, rotasi, masuk, dan pergantian lagu.",
+      "typographySubtitle": "Sesuaikan font teks asli, pelafalan, dan terjemahan di bawah piringan secara terpisah."
+    }
   },
   "tmi": {
     "getApiKeyDesc": "Dapatkan Kunci API Gemini",

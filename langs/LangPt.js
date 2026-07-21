@@ -2066,7 +2066,17 @@ window.LANG_PT = {
     "tonearmHint": "Arraste o braço para alterar a posição da reprodução",
     "tmiHint": "Clique com o botão direito ou mantenha a capa pressionada para abrir o TMI",
     "click": "Clique",
-    "tmiGesture": "Botão direito · Manter pressionado"
+    "tmiGesture": "Botão direito · Manter pressionado",
+    "settings": {
+      "subtitle": "Personalize o tamanho, as animações e a tipografia inferior do modo vinil.",
+      "albumSizeLabel": "Tamanho da capa",
+      "albumSizeDesc": "Ajusta o tamanho da capa do álbum no modo vinil.",
+      "recordSizeLabel": "Tamanho do disco",
+      "recordSizeDesc": "Ajusta o tamanho do disco no modo vinil.",
+      "animationsLabel": "Animações do vinil",
+      "animationsDesc": "Usa animações de reprodução, pausa, rotação, entrada e troca de faixa.",
+      "typographySubtitle": "Ajuste separadamente as fontes do original, da pronúncia e da tradução abaixo do vinil."
+    }
   },
   "tmi": {
     "getApiKeyDesc": "Obter Chave API Gemini",

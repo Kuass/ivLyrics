@@ -2065,7 +2065,17 @@ window.LANG_DE = {
     "tonearmHint": "Tonarm ziehen, um die Wiedergabeposition zu ändern",
     "tmiHint": "Rechtsklicken oder das Cover gedrückt halten, um TMI zu öffnen",
     "click": "Klicken",
-    "tmiGesture": "Rechtsklick · Gedrückt halten"
+    "tmiGesture": "Rechtsklick · Gedrückt halten",
+    "settings": {
+      "subtitle": "Passe Größe, Animationen und die untere Liedtext-Typografie des Vinylmodus an.",
+      "albumSizeLabel": "Covergröße",
+      "albumSizeDesc": "Passt die Größe des Albumcovers im Vinylmodus an.",
+      "recordSizeLabel": "Plattengröße",
+      "recordSizeDesc": "Passt die Größe der Schallplatte im Vinylmodus an.",
+      "animationsLabel": "Vinyl-Animationen",
+      "animationsDesc": "Aktiviert Animationen für Wiedergabe, Pause, Drehung, Einblenden und Titelwechsel.",
+      "typographySubtitle": "Passe die Schriften für Original, Aussprache und Übersetzung unter der Platte getrennt an."
+    }
   },
   "tmi": {
     "getApiKeyDesc": "Gemini API-Schlüssel holen",
