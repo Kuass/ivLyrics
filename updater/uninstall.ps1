@@ -132,6 +132,47 @@ function Write-NotInstalled {
     Write-Colored $box $Colors.Warning
 }
 
+function ConvertFrom-IvLyricsUninstallerTerminalText {
+    param($Value)
+
+    $text = ([string]$Value).Trim()
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return ""
+    }
+
+    $escape = [regex]::Escape([string][char]27)
+    $text = [regex]::Replace($text, "${escape}\[[0-?]*[ -/]*[@-~]", "")
+    $text = [regex]::Replace($text, "[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "")
+    return $text.Trim()
+}
+
+function Resolve-SpicetifyUninstallerConfigPath {
+    param([object[]]$Output)
+
+    foreach ($rawLine in @($Output)) {
+        $plainText = ConvertFrom-IvLyricsUninstallerTerminalText -Value $rawLine
+        if ([string]::IsNullOrWhiteSpace($plainText)) {
+            continue
+        }
+        $candidate = $plainText.Trim().Trim('"')
+
+        try {
+            $fullPath = [IO.Path]::GetFullPath($candidate)
+            if ([IO.Path]::GetExtension($fullPath) -ine ".ini") {
+                continue
+            }
+            if (Test-Path -LiteralPath $fullPath -PathType Leaf) {
+                return $fullPath
+            }
+        }
+        catch {
+            continue
+        }
+    }
+
+    throw "Spicetify returned no existing config file path."
+}
+
 function Get-SpicetifyConfiguredIvLyricsPath {
     if ($null -eq (Get-Command spicetify -ErrorAction SilentlyContinue)) {
         return $null
@@ -150,22 +191,17 @@ function Get-SpicetifyConfiguredIvLyricsPath {
         return $null
     }
 
-    $configPath = @(
-        $configOutput |
-            ForEach-Object { ([string]$_).Trim() } |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-    ) | Select-Object -Last 1
-    if ([string]::IsNullOrWhiteSpace($configPath)) {
-        return $null
-    }
-
     try {
-        $configPath = [IO.Path]::GetFullPath($configPath.Trim().Trim('"'))
+        $configPath = Resolve-SpicetifyUninstallerConfigPath -Output $configOutput
+        $configDir = Split-Path -Parent $configPath
+        if ([string]::IsNullOrWhiteSpace($configDir)) {
+            return $null
+        }
+        return Join-Path (Join-Path $configDir "CustomApps") $FINAL_APP_NAME
     }
     catch {
         return $null
     }
-    return Join-Path (Join-Path (Split-Path -Parent $configPath) "CustomApps") $FINAL_APP_NAME
 }
 
 function Test-IvLyricsDirectoryIdentity {
@@ -239,7 +275,11 @@ function Remove-IvLyricsUninstallerPath {
 }
 
 function Get-IvLyricsInstallDirectories {
-    $directories = @($TARGET_DIRS)
+    $directories = @()
+    $configuredPath = Get-SpicetifyConfiguredIvLyricsPath
+    if (-not [string]::IsNullOrWhiteSpace($configuredPath)) {
+        $directories += $configuredPath
+    }
     if (Test-Path -LiteralPath $APP_DIRECTORY_STATE_PATH -PathType Leaf) {
         try {
             $state = Get-Content -LiteralPath $APP_DIRECTORY_STATE_PATH -Raw | ConvertFrom-Json
@@ -251,10 +291,7 @@ function Get-IvLyricsInstallDirectories {
             Write-SubStep "Could not read the recorded app directory" "warning"
         }
     }
-    $configuredPath = Get-SpicetifyConfiguredIvLyricsPath
-    if (-not [string]::IsNullOrWhiteSpace($configuredPath)) {
-        $directories += $configuredPath
-    }
+    $directories += @($TARGET_DIRS)
     return @($directories | Select-Object -Unique)
 }
 

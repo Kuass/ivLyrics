@@ -53,7 +53,6 @@ function ConvertFrom-IvLyricsTerminalText {
 function Resolve-IvLyricsSpicetifyConfigPath {
     param([object[]]$Output)
 
-    $fallbackPath = $null
     foreach ($rawLine in @($Output)) {
         $plainText = ConvertFrom-IvLyricsTerminalText -Value $rawLine
         if ([string]::IsNullOrWhiteSpace($plainText)) {
@@ -69,19 +68,13 @@ function Resolve-IvLyricsSpicetifyConfigPath {
             if (Test-Path -LiteralPath $fullPath -PathType Leaf) {
                 return $fullPath
             }
-            if ($null -eq $fallbackPath) {
-                $fallbackPath = $fullPath
-            }
         }
         catch {
             continue
         }
     }
 
-    if ($null -ne $fallbackPath) {
-        return $fallbackPath
-    }
-    throw "Spicetify returned no usable config file path."
+    throw "Spicetify returned no existing config file path."
 }
 
 function Get-SpicetifyAppDir {

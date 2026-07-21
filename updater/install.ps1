@@ -11,11 +11,15 @@ param(
 
 # --- Configuration ---
 $REPO = "ivLis-Studio/ivLyrics"
-$TARGET_DIR = "$env:LOCALAPPDATA\spicetify\CustomApps"
+$LEGACY_TARGET_DIRS = @(
+    "$env:LOCALAPPDATA\spicetify\CustomApps",
+    "$env:APPDATA\spicetify\CustomApps"
+)
+$TARGET_DIR = $LEGACY_TARGET_DIRS[0]
 $FINAL_APP_NAME = "ivLyrics"
 $PROXY_URL = "http://ivlis.kr/ivLyrics/proxy.php"
 $MAX_RETRIES = 3
-$SCRIPT_VERSION = "2.1.0"
+$SCRIPT_VERSION = "2.1.1"
 
 # --- Colors ---
 $script:Colors = @{
@@ -228,7 +232,6 @@ function ConvertFrom-IvLyricsInstallerTerminalText {
 function Resolve-SpicetifyInstallerConfigPath {
     param([object[]]$Output)
 
-    $fallbackPath = $null
     foreach ($rawLine in @($Output)) {
         $plainText = ConvertFrom-IvLyricsInstallerTerminalText -Value $rawLine
         if ([string]::IsNullOrWhiteSpace($plainText)) {
@@ -244,22 +247,16 @@ function Resolve-SpicetifyInstallerConfigPath {
             if (Test-Path -LiteralPath $fullPath -PathType Leaf) {
                 return $fullPath
             }
-            if ($null -eq $fallbackPath) {
-                $fallbackPath = $fullPath
-            }
         }
         catch {
             continue
         }
     }
 
-    if ($null -ne $fallbackPath) {
-        return $fallbackPath
-    }
-    throw "Spicetify returned no usable config file path."
+    throw "Spicetify returned no existing config file path."
 }
 
-function Get-SpicetifyInstallerAppDir {
+function Get-SpicetifyInstallerCustomAppsDir {
     $previousErrorActionPreference = $ErrorActionPreference
     try {
         $ErrorActionPreference = "Continue"
@@ -270,11 +267,19 @@ function Get-SpicetifyInstallerAppDir {
         $ErrorActionPreference = $previousErrorActionPreference
     }
     if ($exitCode -ne 0) {
-        throw "Could not resolve the active Spicetify config file (exit $exitCode)."
+        throw "Could not resolve the active Spicetify config file (exit $exitCode): $($configOutput -join [Environment]::NewLine)"
     }
 
     $configPath = Resolve-SpicetifyInstallerConfigPath -Output $configOutput
-    return Join-Path (Join-Path (Split-Path -Parent $configPath) "CustomApps") $FINAL_APP_NAME
+    $configDir = Split-Path -Parent $configPath
+    if ([string]::IsNullOrWhiteSpace($configDir)) {
+        throw "Could not determine the active Spicetify config directory from: $configPath"
+    }
+    return Join-Path $configDir "CustomApps"
+}
+
+function Get-SpicetifyInstallerAppDir {
+    return Join-Path (Get-SpicetifyInstallerCustomAppsDir) $FINAL_APP_NAME
 }
 
 function Get-IvLyricsInstallerPathEntry {
@@ -394,19 +399,6 @@ if ($Version) {
 Clear-Host
 Write-Logo
 
-# Check if this is an update
-$script:CurrentVersion = Get-CurrentVersion
-$script:IsUpdate = $null -ne $script:CurrentVersion
-
-$modeText = if ($IsUpdate) { "UPDATING" } else { "INSTALLING" }
-$modeColor = if ($IsUpdate) { $Colors.Warning } else { $Colors.Success }
-
-Write-Colored "                    [ $modeText ]" $modeColor
-if ($IsUpdate) {
-    Write-Colored "              Current version: $CurrentVersion" $Colors.Muted
-}
-Write-Host ""
-
 # Step 1: Check network connectivity
 Write-Section "CHECKING REQUIREMENTS"
 Write-Step 1 7 "Checking network connectivity..." "running"
@@ -490,6 +482,34 @@ if (-not (Test-SpicetifyInstalled)) {
 else {
     Write-SubStep "Spicetify found" "success"
 }
+
+# Resolve the install directory from the active Spicetify config. Do this only
+# after Spicetify is available, and reuse the result for the entire installation.
+try {
+    $TARGET_DIR = Get-SpicetifyInstallerCustomAppsDir
+    Write-SubStep "Using Spicetify app directory: $TARGET_DIR" "info"
+}
+catch {
+    Write-SubStep "Could not find the active Spicetify config directory" "error"
+    Write-Colored "  $($_.Exception.Message)" $Colors.Error
+    Write-Colored "  Run 'spicetify -c' and verify that it prints a valid config-xpui.ini path." $Colors.Warning
+    Write-Host ""
+    exit 1
+}
+
+# Check if this is an update after the active app directory has been resolved.
+$script:CurrentVersion = Get-CurrentVersion
+$script:IsUpdate = $null -ne $script:CurrentVersion
+
+$modeText = if ($IsUpdate) { "UPDATING" } else { "INSTALLING" }
+$modeColor = if ($IsUpdate) { $Colors.Warning } else { $Colors.Success }
+
+Write-Host ""
+Write-Colored "                    [ $modeText ]" $modeColor
+if ($IsUpdate) {
+    Write-Colored "              Current version: $CurrentVersion" $Colors.Muted
+}
+Write-Host ""
 
 # Step 3: Close Spotify
 Write-Step 3 7 "Checking Spotify process..." "running"
@@ -620,18 +640,13 @@ try {
         throw "Extraction failed"
     }
 
-    # Remove old fixed-location installations without following directory links.
+    # Remove the active installation and old fixed-location installations without
+    # following directory links.
     $FINAL_APP_DIR = Join-Path $TARGET_DIR $FINAL_APP_NAME
-    $OLD_PATH = "$env:APPDATA\spicetify\CustomApps\ivLyrics"
-    $ACTIVE_APP_DIR = [IO.Path]::GetFullPath((Get-SpicetifyInstallerAppDir)).TrimEnd('\', '/')
-    $NORMALIZED_FINAL_APP_DIR = [IO.Path]::GetFullPath($FINAL_APP_DIR).TrimEnd('\', '/')
-    foreach ($installPath in @($FINAL_APP_DIR, $OLD_PATH)) {
-        $normalizedInstallPath = [IO.Path]::GetFullPath($installPath).TrimEnd('\', '/')
-        if ($normalizedInstallPath.Equals($ACTIVE_APP_DIR, [StringComparison]::OrdinalIgnoreCase) -and
-            -not $normalizedInstallPath.Equals($NORMALIZED_FINAL_APP_DIR, [StringComparison]::OrdinalIgnoreCase)) {
-            Write-SubStep "Preserving the active Spicetify app directory for safe synchronization" "info"
-            continue
-        }
+    $installPaths = @($FINAL_APP_DIR) + @(
+        $LEGACY_TARGET_DIRS | ForEach-Object { Join-Path $_ $FINAL_APP_NAME }
+    )
+    foreach ($installPath in @($installPaths | Select-Object -Unique)) {
         Remove-IvLyricsInstallerPath -Path $installPath
     }
 
