@@ -421,6 +421,13 @@ window.LANG_PT = {
     "aiProviders": {
       "title": "Provedores de IA",
       "description": "Selecione e priorize os provedores de IA. Os provedores no topo são tentados primeiro. Em caso de falha, o próximo provedor será usado automaticamente.",
+      "translationStyle": {
+        "title": "Estilo de tradução",
+        "description": "Escolha quanto a tradução por IA deve seguir a redação original. A estrutura das linhas e o significado são preservados em todos os modos.",
+        "natural": { "label": "Natural (padrão)", "description": "Usa uma redação natural e idiomática, preservando o significado e o tom." },
+        "literal": { "label": "Literal", "description": "Permanece o mais próximo possível das palavras e da ordem originais." },
+        "adaptive": { "label": "Adaptativa", "description": "Usa as linhas próximas para produzir uma redação mais fluida e conectada." }
+      },
       "providerSelection": "Seleção de provedor de IA",
       "providerSelectionDesc": "Selecione o provedor de IA para tradução, romanização e geração de TMI",
       "metadataProvider": "Tradução de metadados",

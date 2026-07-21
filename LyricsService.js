@@ -7543,7 +7543,13 @@
             onStreamReset = null,
         }) {
             if (!text?.trim()) throw new Error("No text provided for translation");
-            const sourceHash = getLyricsTextCacheHash(text);
+            const sourceTextHash = getLyricsTextCacheHash(text);
+            const translationStyle = wantSmartPhonetic
+                ? null
+                : (window.AIAddonManager?.getTranslationStyle?.() || 'natural');
+            const sourceHash = !wantSmartPhonetic && translationStyle !== 'natural'
+                ? `${sourceTextHash}:style=${translationStyle}`
+                : sourceTextHash;
 
             let finalTrackId = trackId;
             if (!finalTrackId) {

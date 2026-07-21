@@ -421,6 +421,13 @@ window.LANG_VI = {
     "aiProviders": {
       "title": "Nhà cung cấp AI",
       "description": "Lựa chọn và ưu tiên các nhà cung cấp AI. Các nhà cung cấp ở đầu danh sách sẽ được thử trước. Nếu thất bại, nhà cung cấp tiếp theo sẽ tự động được sử dụng.",
+      "translationStyle": {
+        "title": "Phong cách dịch",
+        "description": "Chọn mức độ bản dịch AI bám sát cách diễn đạt gốc. Cấu trúc dòng và ý nghĩa được giữ nguyên ở mọi chế độ.",
+        "natural": { "label": "Tự nhiên (mặc định)", "description": "Dùng cách diễn đạt tự nhiên, quen thuộc trong khi vẫn giữ ý nghĩa và sắc thái." },
+        "literal": { "label": "Dịch sát", "description": "Bám sát tối đa từ ngữ và trật tự của bản gốc." },
+        "adaptive": { "label": "Dịch thoát ý", "description": "Dùng các dòng xung quanh làm ngữ cảnh để câu chữ liền mạch và tự nhiên nhất." }
+      },
       "providerSelection": "Lựa chọn nhà cung cấp AI",
       "providerSelectionDesc": "Chọn nhà cung cấp AI cho dịch thuật, phát âm và tạo TMI",
       "metadataProvider": "Dịch siêu dữ liệu (Metadata)",

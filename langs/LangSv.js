@@ -421,6 +421,13 @@ window.LANG_SV = {
     "aiProviders": {
       "title": "AI-leverantörer",
       "description": "Välj och prioritera AI-leverantörer. Leverantörer i toppen prövas först. Vid fel används nästa leverantör automatiskt.",
+      "translationStyle": {
+        "title": "Översättningsstil",
+        "description": "Välj hur nära AI-översättningen ska följa originalets formulering. Radstruktur och betydelse bevaras i alla lägen.",
+        "natural": { "label": "Naturlig (standard)", "description": "Använder naturliga och idiomatiska formuleringar med bibehållen betydelse och ton." },
+        "literal": { "label": "Ordagrann", "description": "Ligger så nära originalets ordval och ordning som möjligt." },
+        "adaptive": { "label": "Anpassad", "description": "Använder omgivande rader för ett så flytande och sammanhängande språk som möjligt." }
+      },
       "providerSelection": "Val av AI-leverantör",
       "providerSelectionDesc": "Välj AI-leverantörer för översättning, uttal och TMI-generering",
       "metadataProvider": "Metadataöversättning",

@@ -421,6 +421,13 @@ window.LANG_ID = {
     "aiProviders": {
       "title": "Penyedia AI",
       "description": "Pilih dan prioritaskan penyedia AI. Penyedia di urutan teratas akan dicoba terlebih dahulu. Jika gagal, penyedia berikutnya akan digunakan secara otomatis.",
+      "translationStyle": {
+        "title": "Gaya terjemahan",
+        "description": "Pilih seberapa dekat terjemahan AI mengikuti susunan kata asli. Struktur baris dan makna dipertahankan di semua mode.",
+        "natural": { "label": "Alami (bawaan)", "description": "Menggunakan ungkapan alami dan idiomatis sambil mempertahankan makna dan nuansa." },
+        "literal": { "label": "Harfiah", "description": "Sedekat mungkin dengan pilihan dan urutan kata asli." },
+        "adaptive": { "label": "Adaptif", "description": "Memakai konteks baris sekitar agar terjemahan paling lancar dan menyatu." }
+      },
       "providerSelection": "Pilihan Penyedia AI",
       "providerSelectionDesc": "Pilih penyedia AI untuk terjemahan, romanisasi, dan pembuatan TMI",
       "metadataProvider": "Terjemahan Metadata",

@@ -1626,6 +1626,30 @@ const LyricsProvidersTab = () => {
   );
 };
 
+const AI_TRANSLATION_STYLE_OPTIONS = [
+  {
+    id: "natural",
+    labelKey: "settings.aiProviders.translationStyle.natural.label",
+    descriptionKey: "settings.aiProviders.translationStyle.natural.description",
+    labelFallback: "Natural (Default)",
+    descriptionFallback: "Natural wording that preserves the original meaning and tone."
+  },
+  {
+    id: "literal",
+    labelKey: "settings.aiProviders.translationStyle.literal.label",
+    descriptionKey: "settings.aiProviders.translationStyle.literal.description",
+    labelFallback: "Literal",
+    descriptionFallback: "Stays close to the original wording and order."
+  },
+  {
+    id: "adaptive",
+    labelKey: "settings.aiProviders.translationStyle.adaptive.label",
+    descriptionKey: "settings.aiProviders.translationStyle.adaptive.description",
+    labelFallback: "Adaptive",
+    descriptionFallback: "Uses surrounding lines for the smoothest connected phrasing."
+  }
+];
+
 // AI 제공자 설정 탭 컴포넌트 (LyricsProvidersTab과 동일 스타일)
 const AIProvidersTab = () => {
   const [providers, setProviders] = useState([]);
@@ -1633,9 +1657,18 @@ const AIProvidersTab = () => {
   const [enabledProviders, setEnabledProviders] = useState({});
   const [expandedProviders, setExpandedProviders] = useState(new Set());
   const [refreshKey, setRefreshKey] = useState(0);
+  const [translationStyle, setTranslationStyle] = useState(
+    () => window.AIAddonManager?.getTranslationStyle?.() || "natural"
+  );
 
   useEffect(() => {
+    let retryTimer = null;
+    let unsubscribeStyle = null;
+    let disposed = false;
+
     const loadProviders = () => {
+      if (disposed) return;
+
       if (window.AIAddonManager) {
         const providerList = window.AIAddonManager.getAddons();
         setProviders(providerList);
@@ -1648,12 +1681,49 @@ const AIProvidersTab = () => {
           enabled[p.id] = window.AIAddonManager.isProviderEnabled(p.id);
         });
         setEnabledProviders(enabled);
+        setTranslationStyle(window.AIAddonManager.getTranslationStyle?.() || "natural");
+
+        unsubscribeStyle = window.AIAddonManager.on?.("translation:style:changed", ({ style }) => {
+          if (!disposed) setTranslationStyle(style || "natural");
+        });
       } else {
-        setTimeout(loadProviders, 100);
+        retryTimer = setTimeout(loadProviders, 100);
       }
     };
     loadProviders();
+
+    return () => {
+      disposed = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      if (typeof unsubscribeStyle === "function") unsubscribeStyle();
+    };
   }, [refreshKey]);
+
+  const handleTranslationStyleChange = (style) => {
+    const nextStyle = window.AIAddonManager?.setTranslationStyle?.(style) || style;
+    setTranslationStyle(nextStyle);
+  };
+
+  const handleTranslationStyleKeyDown = (event, index) => {
+    let nextIndex = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = (index + 1) % AI_TRANSLATION_STYLE_OPTIONS.length;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = (index - 1 + AI_TRANSLATION_STYLE_OPTIONS.length) % AI_TRANSLATION_STYLE_OPTIONS.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = AI_TRANSLATION_STYLE_OPTIONS.length - 1;
+    }
+
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextOption = AI_TRANSLATION_STYLE_OPTIONS[nextIndex];
+    handleTranslationStyleChange(nextOption.id);
+    event.currentTarget.parentElement
+      ?.querySelector(`[data-translation-style="${nextOption.id}"]`)
+      ?.focus();
+  };
 
   const handleToggleEnabled = (providerId, enabled) => {
     if (window.AIAddonManager) {
@@ -1697,6 +1767,51 @@ const AIProvidersTab = () => {
   return react.createElement("div", { className: "settings-section lyrics-providers-section" },
     // 통합 컨테이너
     react.createElement("div", { className: "lyrics-providers-container" },
+      react.createElement("section", {
+        className: "ai-translation-style-panel",
+        "aria-labelledby": "ai-translation-style-title"
+      },
+        react.createElement("div", { className: "ai-translation-style-header" },
+          react.createElement("div", {
+            id: "ai-translation-style-title",
+            className: "ai-translation-style-title"
+          }, I18n.t("settings.aiProviders.translationStyle.title") || "Translation style"),
+          react.createElement("p", { className: "ai-translation-style-description" },
+            I18n.t("settings.aiProviders.translationStyle.description")
+              || "Choose how closely AI translations follow the original wording. Line structure and meaning are preserved in every mode."
+          )
+        ),
+        react.createElement("div", {
+          className: "ai-translation-style-options",
+          role: "radiogroup",
+          "aria-label": I18n.t("settings.aiProviders.translationStyle.title") || "Translation style"
+        },
+          AI_TRANSLATION_STYLE_OPTIONS.map((option, index) => {
+            const active = translationStyle === option.id;
+            return react.createElement("button", {
+              key: option.id,
+              type: "button",
+              role: "radio",
+              "aria-checked": active,
+              tabIndex: active ? 0 : -1,
+              className: `ai-translation-style-option${active ? " active" : ""}`,
+              "data-translation-style": option.id,
+              onClick: () => handleTranslationStyleChange(option.id),
+              onKeyDown: (event) => handleTranslationStyleKeyDown(event, index)
+            },
+              react.createElement("span", { className: "ai-translation-style-option-heading" },
+                react.createElement("span", { className: "ai-translation-style-indicator", "aria-hidden": "true" }),
+                react.createElement("span", { className: "ai-translation-style-option-label" },
+                  I18n.t(option.labelKey) || option.labelFallback
+                )
+              ),
+              react.createElement("span", { className: "ai-translation-style-option-description" },
+                I18n.t(option.descriptionKey) || option.descriptionFallback
+              )
+            );
+          })
+        )
+      ),
       // Provider 목록
       providers.length > 0 && react.createElement("div", { className: "lyrics-providers-list" },
         sortedProviders.map((provider, index) =>
@@ -6405,7 +6520,16 @@ const ConfigModal = ({
       settingKey: "ai-providers",
       name: I18n.t("tabs.aiProviders"),
       desc: I18n.t("settings.aiProviders.description") || "Configure AI providers and capabilities",
-      i18nKeys: ["tabs.aiProviders", "settings.aiProviders.title", "settings.aiProviders.description"]
+      i18nKeys: [
+        "tabs.aiProviders",
+        "settings.aiProviders.title",
+        "settings.aiProviders.description",
+        "settings.aiProviders.translationStyle.title",
+        "settings.aiProviders.translationStyle.description",
+        "settings.aiProviders.translationStyle.natural.label",
+        "settings.aiProviders.translationStyle.literal.label",
+        "settings.aiProviders.translationStyle.adaptive.label"
+      ]
     },
     {
       section: I18n.t("tabs.about"),
@@ -13883,6 +14007,103 @@ const ConfigModal = ({
     margin-bottom: 16px;
 }
 
+#${APP_NAME}-config-container .ai-translation-style-panel {
+    overflow: hidden;
+    margin: 0 0 16px;
+    border: 1px solid var(--settings-section-outline);
+    border-radius: var(--settings-section-radius);
+    background: var(--settings-section-surface);
+}
+
+#${APP_NAME}-config-container .ai-translation-style-header {
+    padding: 15px 16px 13px;
+    border-bottom: 1px solid var(--settings-row-divider);
+}
+
+#${APP_NAME}-config-container .ai-translation-style-title {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+#${APP_NAME}-config-container .ai-translation-style-description {
+    margin: 5px 0 0;
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+#${APP_NAME}-config-container .ai-translation-style-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#${APP_NAME}-config-container .ai-translation-style-option {
+    min-width: 0;
+    padding: 13px 14px 14px;
+    border: 0;
+    border-right: 1px solid var(--settings-row-divider);
+    border-radius: 0;
+    background: transparent;
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+    transition: background 150ms ease, color 150ms ease;
+}
+
+#${APP_NAME}-config-container .ai-translation-style-option:last-child {
+    border-right: 0;
+}
+
+#${APP_NAME}-config-container .ai-translation-style-option:hover {
+    background: var(--settings-section-surface-hover);
+}
+
+#${APP_NAME}-config-container .ai-translation-style-option:focus-visible {
+    position: relative;
+    z-index: 1;
+    outline: 2px solid var(--accent-primary);
+    outline-offset: -2px;
+}
+
+#${APP_NAME}-config-container .ai-translation-style-option.active {
+    background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+#${APP_NAME}-config-container .ai-translation-style-option-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#${APP_NAME}-config-container .ai-translation-style-indicator {
+    box-sizing: border-box;
+    width: 13px;
+    height: 13px;
+    flex: 0 0 13px;
+    border: 1.5px solid var(--text-tertiary);
+    border-radius: 50%;
+}
+
+#${APP_NAME}-config-container .ai-translation-style-option.active .ai-translation-style-indicator {
+    border: 4px solid var(--accent-primary);
+}
+
+#${APP_NAME}-config-container .ai-translation-style-option-label {
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.35;
+}
+
+#${APP_NAME}-config-container .ai-translation-style-option-description {
+    display: block;
+    margin: 7px 0 0 21px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
 #${APP_NAME}-config-container .lyrics-providers-list {
     gap: 0;
     overflow: hidden;
@@ -14027,6 +14248,19 @@ const ConfigModal = ({
 }
 
 @media (max-width: 800px) {
+    #${APP_NAME}-config-container .ai-translation-style-options {
+        grid-template-columns: 1fr;
+    }
+
+    #${APP_NAME}-config-container .ai-translation-style-option {
+        border-right: 0;
+        border-bottom: 1px solid var(--settings-row-divider);
+    }
+
+    #${APP_NAME}-config-container .ai-translation-style-option:last-child {
+        border-bottom: 0;
+    }
+
     #${APP_NAME}-config-container .multi-vocal-color-groups {
         grid-template-columns: 1fr;
     }

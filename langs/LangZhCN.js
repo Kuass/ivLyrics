@@ -421,6 +421,13 @@ window.LANG_ZH_CN = {
     "aiProviders": {
       "title": "AI 提供者",
       "description": "选择并划分 AI 提供者的优先级。排在顶部的提供者将被优先尝试。失败时，将自动使用下一个提供者。",
+      "translationStyle": {
+        "title": "翻译方式",
+        "description": "选择 AI 翻译贴近原文措辞的程度。所有方式都会保留行结构和原意。",
+        "natural": { "label": "自然（默认）", "description": "在保留含义和语气的同时，使用自然地道的表达。" },
+        "literal": { "label": "直译", "description": "尽可能贴近原文的用词和语序。" },
+        "adaptive": { "label": "意译", "description": "结合前后行的语境，使表达尽可能流畅连贯。" }
+      },
       "providerSelection": "AI 提供者选择",
       "providerSelectionDesc": "选择用于翻译、发音和 TMI 生成的 AI 提供者",
       "metadataProvider": "元数据翻译",

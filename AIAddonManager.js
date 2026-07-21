@@ -30,6 +30,66 @@
         CHARACTER_PRONUNCIATION: 'characterPronunciation' // 문자별 발음
     };
 
+    const TRANSLATION_STYLES = Object.freeze({
+        NATURAL: 'natural',
+        LITERAL: 'literal',
+        ADAPTIVE: 'adaptive'
+    });
+    const DEFAULT_TRANSLATION_STYLE = TRANSLATION_STYLES.NATURAL;
+    const TRANSLATION_STYLE_STORAGE_KEY = `${STORAGE_PREFIX}translation-style`;
+    const VALID_TRANSLATION_STYLES = new Set(Object.values(TRANSLATION_STYLES));
+    const TRANSLATION_LANGUAGE_DATA = {
+        ko: { name: 'Korean', native: '한국어' },
+        en: { name: 'English', native: 'English' },
+        'zh-cn': { name: 'Simplified Chinese', native: '简体中文' },
+        'zh-tw': { name: 'Traditional Chinese', native: '繁體中文' },
+        ja: { name: 'Japanese', native: '日本語' },
+        hi: { name: 'Hindi', native: 'हिन्दी' },
+        es: { name: 'Spanish', native: 'Español' },
+        fr: { name: 'French', native: 'Français' },
+        ar: { name: 'Arabic', native: 'العربية' },
+        fa: { name: 'Persian', native: 'فارسی' },
+        de: { name: 'German', native: 'Deutsch' },
+        ru: { name: 'Russian', native: 'Русский' },
+        sv: { name: 'Swedish', native: 'Svenska' },
+        pt: { name: 'Portuguese', native: 'Português' },
+        bn: { name: 'Bengali', native: 'বাংলা' },
+        cs: { name: 'Czech', native: 'Čeština' },
+        it: { name: 'Italian', native: 'Italiano' },
+        th: { name: 'Thai', native: 'ไทย' },
+        tr: { name: 'Turkish', native: 'Türkçe' },
+        vi: { name: 'Vietnamese', native: 'Tiếng Việt' },
+        id: { name: 'Indonesian', native: 'Bahasa Indonesia' },
+        ms: { name: 'Malay', native: 'Bahasa Melayu' }
+    };
+
+    const normalizeTranslationStyle = (style) => {
+        const normalized = String(style || '').trim().toLowerCase();
+        return VALID_TRANSLATION_STYLES.has(normalized)
+            ? normalized
+            : DEFAULT_TRANSLATION_STYLE;
+    };
+
+    const getTranslationLanguageInfo = (lang) => {
+        const normalized = String(lang || 'en').trim().replace(/_/g, '-').toLowerCase();
+        const shortLang = normalized.split('-')[0];
+        return TRANSLATION_LANGUAGE_DATA[normalized]
+            || TRANSLATION_LANGUAGE_DATA[shortLang]
+            || { name: String(lang || 'English'), native: String(lang || 'English') };
+    };
+
+    const getTranslationStyleInstruction = (style) => {
+        switch (normalizeTranslationStyle(style)) {
+            case TRANSLATION_STYLES.LITERAL:
+                return 'Stay close to the original wording, word order, imagery, metaphors, and ambiguity. Change only what is necessary for grammatical, understandable target-language text.';
+            case TRANSLATION_STYLES.ADAPTIVE:
+                return 'Use nearby lines as context so the lyrics read as one smooth, connected passage. You may lightly reshape idioms and phrasing for fluency, but do not add, omit, or move meaning between lines.';
+            case TRANSLATION_STYLES.NATURAL:
+            default:
+                return 'Use natural, idiomatic phrasing while preserving each line\'s meaning, tone, imagery, and level of formality. Do not add, omit, or move meaning between lines.';
+        }
+    };
+
     // 기본 활성화 Addon (모든 AI Addon은 API 키 설정 후 활성화 권장)
     const DEFAULT_ENABLED_ADDONS = [];
     const CHARACTER_PRONUNCIATION_CJK_LANG_RE = /^(ja|jp|ko|kr|zh|zh-cn|zh-tw|cn|tw|yue|cmn)$/i;
@@ -90,6 +150,71 @@
                 return window.I18n.t(key) || fallback;
             }
             return fallback;
+        }
+
+        /**
+         * 가사 번역 스타일 저장
+         * @param {'natural'|'literal'|'adaptive'} style
+         * @returns {string} 정규화된 스타일
+         */
+        setTranslationStyle(style) {
+            const normalized = normalizeTranslationStyle(style);
+            const previous = this.getTranslationStyle();
+            setStoredValue(TRANSLATION_STYLE_STORAGE_KEY, normalized);
+
+            if (previous !== normalized) {
+                this.emit('translation:style:changed', { style: normalized, previous });
+            }
+            return normalized;
+        }
+
+        /**
+         * 현재 가사 번역 스타일 가져오기
+         * @returns {'natural'|'literal'|'adaptive'}
+         */
+        getTranslationStyle() {
+            return normalizeTranslationStyle(getStoredValue(TRANSLATION_STYLE_STORAGE_KEY));
+        }
+
+        /**
+         * 모든 AI 제공자가 공유하는 가사 번역 시스템 프롬프트 생성
+         * @param {Object} params - { text, lang, translationStyle }
+         * @returns {{systemPrompt: string, userPrompt: string, style: string, lineCount: number}}
+         */
+        buildLyricsTranslationPrompt({ text, lang, translationStyle } = {}) {
+            const normalizedText = String(text ?? '').replace(/\r\n?/g, '\n');
+            const lineCount = normalizedText.split('\n').length;
+            const style = normalizeTranslationStyle(translationStyle || this.getTranslationStyle());
+            const langInfo = getTranslationLanguageInfo(lang);
+            const styleInstruction = getTranslationStyleInstruction(style);
+
+            const systemPrompt = `You are the lyrics translation system for ivLyrics.
+
+Translate song lyrics into ${langInfo.name} (${langInfo.native}).
+
+TRANSLATION STYLE:
+${styleInstruction}
+
+CRITICAL OUTPUT CONTRACT:
+- This is a translation task. Translate the meaning of every non-empty lyric line.
+- Write the translated lyrics in ${langInfo.name} (${langInfo.native}) only.
+- Never return the original lyrics unchanged, romanization, or pronunciation instead of a translation.
+- Return exactly ${lineCount} lines, with one output line for each input line in the same order.
+- Never merge multiple input lines or split one input line into multiple output lines.
+- You may use surrounding lines only to understand context; output line N must still represent input line N.
+- Preserve " / " between simultaneous vocal parts and translate each part separately.
+- Preserve empty lines as empty lines.
+- Preserve music symbols and structural markers such as ♪, [Chorus], and (Yeah).
+- Do not add line numbers, prefixes, explanations, JSON, Markdown, or code fences.
+- Return only the translated lyric lines.`;
+
+            const userPrompt = `Translate the following ${lineCount} lyric lines. Return exactly ${lineCount} lines and nothing else.
+
+<lyrics>
+${normalizedText}
+</lyrics>`;
+
+            return { systemPrompt, userPrompt, style, lineCount };
         }
 
         // ============================================
@@ -644,12 +769,22 @@
                 throw new Error(this._t('aiProviders.noEnabledProviders', 'No AI providers enabled. Please enable at least one provider in settings.'));
             }
 
+            const translationStyle = this.getTranslationStyle();
+            const translationPrompt = params.wantSmartPhonetic
+                ? null
+                : this.buildLyricsTranslationPrompt({
+                    text: params.text,
+                    lang: params.lang,
+                    translationStyle
+                });
+
             // 디버그 로깅
             if (window.AddonDebug?.isEnabled()) {
                 window.AddonDebug.log('ai', 'translateLyrics called', {
                     providers: providers.map(p => p.id),
                     lang: params.lang,
                     wantSmartPhonetic: params.wantSmartPhonetic,
+                    translationStyle: params.wantSmartPhonetic ? null : translationStyle,
                     lineCount: params.text?.split('\n').length
                 });
                 window.AddonDebug.time('ai', 'translateLyrics');
@@ -685,6 +820,8 @@
                 };
                 const providerParams = {
                     ...params,
+                    translationStyle,
+                    translationPrompt,
                     onLine: typeof params.onLine === 'function'
                         ? (lineIndex, lineText, detail) => {
                             hasProvisionalOutput = true;
@@ -1460,6 +1597,10 @@
          */
         get CAPABILITIES() {
             return AI_CAPABILITIES;
+        }
+
+        get TRANSLATION_STYLES() {
+            return TRANSLATION_STYLES;
         }
     }
 

@@ -421,6 +421,13 @@ window.LANG_JA = {
     "aiProviders": {
       "title": "AIプロバイダー",
       "description": "AIプロバイダーを選択し、優先順位を設定します。上にあるプロバイダーから先に試行され、失敗した場合は次のプロバイダーが自動的に使用されます。",
+      "translationStyle": {
+        "title": "翻訳スタイル",
+        "description": "AI翻訳が原文の表現にどの程度沿うかを選択します。どのスタイルでも行構造と意味は維持されます。",
+        "natural": { "label": "自然（デフォルト）", "description": "意味と雰囲気を保ちながら、自然で慣用的に翻訳します。" },
+        "literal": { "label": "直訳", "description": "原文の語句と語順にできるだけ近い形で翻訳します。" },
+        "adaptive": { "label": "意訳", "description": "前後の行を文脈として使い、最も滑らかにつながる表現にします。" }
+      },
       "providerSelection": "AIプロバイダーの選択",
       "providerSelectionDesc": "翻訳、発音、TMI生成に使用するAIプロバイダーを選択します",
       "metadataProvider": "メタデータ翻訳",

@@ -421,6 +421,13 @@ window.LANG_ZH_TW = {
     "aiProviders": {
       "title": "AI 提供者",
       "description": "選擇並劃分 AI 提供者的優先級。排在頂部的提供者將被優先嘗試。失敗時，將自動使用下一個提供者。",
+      "translationStyle": {
+        "title": "翻譯方式",
+        "description": "選擇 AI 翻譯貼近原文措辭的程度。所有方式都會保留行結構和原意。",
+        "natural": { "label": "自然（預設）", "description": "在保留含義和語氣的同時，使用自然道地的表達。" },
+        "literal": { "label": "直譯", "description": "盡可能貼近原文的用詞和語序。" },
+        "adaptive": { "label": "意譯", "description": "結合前後行的語境，使表達盡可能流暢連貫。" }
+      },
       "providerSelection": "AI 提供者選擇",
       "providerSelectionDesc": "選擇用於翻譯、發音和 TMI 生成的 AI 提供者",
       "metadataProvider": "元數據翻譯",

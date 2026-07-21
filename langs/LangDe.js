@@ -421,6 +421,13 @@ window.LANG_DE = {
     "aiProviders": {
       "title": "KI-Anbieter",
       "description": "Wählen Sie KI-Anbieter aus und priorisieren Sie diese. Anbieter oben werden zuerst versucht. Bei Fehlern wird automatisch der nächste Anbieter verwendet.",
+      "translationStyle": {
+        "title": "Übersetzungsstil",
+        "description": "Wählen Sie, wie eng die KI-Übersetzung dem Wortlaut des Originals folgen soll. Zeilenstruktur und Bedeutung bleiben in allen Modi erhalten.",
+        "natural": { "label": "Natürlich (Standard)", "description": "Natürliche, idiomatische Formulierungen unter Wahrung von Bedeutung und Ton." },
+        "literal": { "label": "Wörtlich", "description": "Bleibt möglichst nah an Wortwahl und Reihenfolge des Originals." },
+        "adaptive": { "label": "Sinngemäß", "description": "Bezieht benachbarte Zeilen für einen besonders flüssigen Zusammenhang ein." }
+      },
       "providerSelection": "KI-Anbieter auswählen",
       "providerSelectionDesc": "Wählen Sie den KI-Anbieter für Übersetzungen, Transkriptionen und TMI-Generierung aus",
       "metadataProvider": "Metadaten-Übersetzung",

@@ -421,6 +421,13 @@ window.LANG_KO = {
     "aiProviders": {
       "title": "AI 제공자",
       "description": "AI 제공자를 선택하고 우선순위를 설정합니다. 위에 있는 제공자부터 먼저 시도하며, 실패 시 다음 제공자로 자동 전환됩니다.",
+      "translationStyle": {
+        "title": "번역 방식",
+        "description": "AI 번역이 원문의 표현을 따르는 정도를 선택합니다. 모든 방식에서 줄 구조와 의미는 유지됩니다.",
+        "natural": { "label": "자연스럽게 (기본값)", "description": "의미와 분위기를 유지하면서 자연스럽고 익숙한 표현으로 번역합니다." },
+        "literal": { "label": "직역", "description": "원문의 단어와 어순에 최대한 가깝게 번역합니다." },
+        "adaptive": { "label": "의역", "description": "앞뒤 줄의 문맥을 반영해 가장 매끄럽게 이어지도록 번역합니다." }
+      },
       "providerSelection": "AI 제공자 선택",
       "providerSelectionDesc": "번역, 발음 표기, TMI, 학습 모드에 사용할 AI 제공자를 선택하세요",
       "metadataProvider": "메타데이터 번역",

@@ -421,6 +421,13 @@ window.LANG_MS = {
     "aiProviders": {
       "title": "Penyedia AI",
       "description": "Pilih penyedia AI dan tetapkan keutamaan. Percubaan bermula dari penyedia di bahagian atas, dan bertukar secara automatik ke penyedia seterusnya jika gagal.",
+      "translationStyle": {
+        "title": "Gaya terjemahan",
+        "description": "Pilih sejauh mana terjemahan AI mengikut susunan kata asal. Struktur baris dan makna dikekalkan dalam semua mod.",
+        "natural": { "label": "Semula jadi (lalai)", "description": "Menggunakan ungkapan semula jadi sambil mengekalkan makna dan nada." },
+        "literal": { "label": "Harfiah", "description": "Kekal sedekat mungkin dengan perkataan dan susunan asal." },
+        "adaptive": { "label": "Adaptif", "description": "Menggunakan konteks baris berdekatan untuk ayat yang paling lancar dan bersambung." }
+      },
       "providerSelection": "Pilih Penyedia AI",
       "providerSelectionDesc": "Pilih penyedia AI yang akan digunakan untuk terjemahan, notasi sebutan, dan penjanaan TMI",
       "metadataProvider": "Terjemahan Metadata",

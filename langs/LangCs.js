@@ -421,6 +421,13 @@ window.LANG_CS = {
     "aiProviders": {
       "title": "Poskytovatelé AI",
       "description": "Vyberte a upřednostněte poskytovatele AI. Poskytovatelé nahoře jsou vyzkoušeni jako první. V případě selhání se automaticky použije další poskytovatel.",
+      "translationStyle": {
+        "title": "Styl překladu",
+        "description": "Zvolte, jak věrně má překlad AI sledovat formulace originálu. Struktura řádků a význam zůstávají zachovány ve všech režimech.",
+        "natural": { "label": "Přirozený (výchozí)", "description": "Přirozené a idiomatické znění se zachováním významu a tónu." },
+        "literal": { "label": "Doslovný", "description": "Drží se co nejblíže původním slovům a jejich pořadí." },
+        "adaptive": { "label": "Volný", "description": "Využívá okolní řádky pro co nejplynulejší a souvislé znění." }
+      },
       "providerSelection": "Výběr poskytovatele AI",
       "providerSelectionDesc": "Vyberte poskytovatele AI pro překlad, výslovnost, TMI a režim učení",
       "metadataProvider": "Překlad metadat",

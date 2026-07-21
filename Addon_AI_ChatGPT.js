@@ -337,11 +337,23 @@
         return JSON.parse(raw);
     }
 
+    function normalizePromptRequest(prompt) {
+        if (prompt && typeof prompt === 'object' && !Array.isArray(prompt)) {
+            return {
+                systemPrompt: String(prompt.systemPrompt || '').trim(),
+                userPrompt: String(prompt.userPrompt ?? prompt.prompt ?? '')
+            };
+        }
+        return { systemPrompt: '', userPrompt: String(prompt ?? '') };
+    }
+
     function buildChatGPTRequestBody(model, prompt, { stream = false } = {}) {
+        const { systemPrompt, userPrompt } = normalizePromptRequest(prompt);
         const requestBody = {
             model: model,
             messages: [
-                { role: 'user', content: prompt }
+                ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+                { role: 'user', content: userPrompt }
             ]
         };
 
@@ -355,47 +367,6 @@
     // ============================================
     // Prompt Builders (Plain Text Output - Simplified)
     // ============================================
-
-    function buildTranslationPrompt(text, lang) {
-        const langInfo = getLangInfo(lang);
-        const lineCount = text.split('\n').length;
-
-        return `You are a lyrics translator. Translate these ${lineCount} lines of song lyrics into ${langInfo.name} (${langInfo.native}).
-
-CRITICAL RULES:
-- This is a TRANSLATION task - translate the MEANING of each line
-- Output must be written in ${langInfo.name} (${langInfo.native}) only
-- Do NOT output the original lyrics unchanged
-- Do NOT output romanization or pronunciation instead of translation
-- Output EXACTLY ${lineCount} lines, one translation per line
-- Preserve the original line breaks exactly
-- Never merge multiple input lines into a single output line
-- Never split a single input line into multiple output lines
-- Line N in the output must translate only line N from the input
-- If an input line contains " / " between simultaneous vocal parts, preserve " / " and translate each part separately
-- Keep empty lines as empty
-- Keep ♪ symbols and markers like [Chorus], (Yeah) as-is
-- Do NOT add line numbers, prefixes, or explanations
-- Do NOT use JSON or code blocks
-- Just output the translated lines, nothing else
-
-INPUT:
-${text}
-
-Example:
-Input:
-Hello mr my
-yesterday
-
-Correct output:
-안녕 나의
-어제여
-
-Wrong output:
-안녕 나의 어제여
-
-OUTPUT (${lineCount} lines in ${langInfo.native}):`;
-    }
 
     function buildPhoneticPrompt(text, lang) {
         const langInfo = getLangInfo(lang);
@@ -1366,7 +1337,7 @@ ${JSON.stringify(payload)}`;
             }
         },
 
-        async translateLyrics({ text, lang, wantSmartPhonetic, onLine, onStreamReset }) {
+        async translateLyrics({ text, lang, wantSmartPhonetic, translationPrompt, translationStyle, onLine, onStreamReset }) {
             if (!text?.trim()) {
                 throw new Error('No text provided');
             }
@@ -1375,7 +1346,14 @@ ${JSON.stringify(payload)}`;
             const normalizedText = sourceLines.join('\n');
             const prompt = wantSmartPhonetic
                 ? buildPhoneticPrompt(normalizedText, lang)
-                : buildTranslationPrompt(normalizedText, lang);
+                : (translationPrompt || window.AIAddonManager?.buildLyricsTranslationPrompt?.({
+                    text: normalizedText,
+                    lang,
+                    translationStyle
+                }));
+            if (!prompt) {
+                throw new Error('[ChatGPT] Central lyrics translation prompt is unavailable.');
+            }
             const parseLines = rawResponse => parseTextLines(rawResponse, sourceLines);
 
             // Validate inside the provider retry loop so partial/blocked output can retry safely.

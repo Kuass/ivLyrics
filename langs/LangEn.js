@@ -421,6 +421,13 @@ window.LANG_EN = {
     "aiProviders": {
       "title": "AI Providers",
       "description": "Select and prioritize AI providers. Providers at the top are tried first. On failure, the next provider is automatically used.",
+      "translationStyle": {
+        "title": "Translation style",
+        "description": "Choose how closely AI translations follow the original wording. Line structure and meaning are preserved in every mode.",
+        "natural": { "label": "Natural (Default)", "description": "Uses natural, idiomatic phrasing while preserving meaning and tone." },
+        "literal": { "label": "Literal", "description": "Stays as close as possible to the original wording and order." },
+        "adaptive": { "label": "Adaptive", "description": "Uses surrounding lines for the smoothest, most connected phrasing." }
+      },
       "providerSelection": "AI Provider Selection",
       "providerSelectionDesc": "Select AI providers for translation, pronunciation, TMI, and learning mode",
       "metadataProvider": "Metadata Translation",

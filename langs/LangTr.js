@@ -421,6 +421,13 @@ window.LANG_TR = {
     "aiProviders": {
       "title": "Yapay Zeka Sağlayıcıları",
       "description": "Yapay zeka sağlayıcılarını seçin ve önceliklendirin. En üstteki sağlayıcılar önce denenir. Başarısız olursa otomatik olarak bir sonraki sağlayıcı kullanılır.",
+      "translationStyle": {
+        "title": "Çeviri stili",
+        "description": "Yapay zeka çevirisinin özgün ifadeye ne kadar bağlı kalacağını seçin. Satır yapısı ve anlam tüm modlarda korunur.",
+        "natural": { "label": "Doğal (varsayılan)", "description": "Anlamı ve tonu koruyarak doğal, deyimsel ifadeler kullanır." },
+        "literal": { "label": "Kelimesi kelimesine", "description": "Özgün sözcüklere ve sıralamaya olabildiğince yakın kalır." },
+        "adaptive": { "label": "Serbest", "description": "En akıcı ve bağlantılı anlatım için çevredeki satırları bağlam olarak kullanır." }
+      },
       "providerSelection": "Yapay Zeka Sağlayıcı Seçimi",
       "providerSelectionDesc": "Çeviri, okunuş, bilgi (TMI) ve öğrenme modu için YZ sağlayıcılarını seçin",
       "metadataProvider": "Meta Veri Çevirisi",
