@@ -37,7 +37,6 @@ const VinylPlayerMode = (() => {
     const TRACK_RECORD_RAISE_MS = 360;
     const TRACK_HANDOFF_MS = 96;
     const TRACK_COVER_PRELOAD_MAX_MS = 320;
-    const TRACK_LYRIC_CROSSFADE_MS = 420;
 
     const clampVinylProgress = (value) => Math.min(Math.max(value, 0), 1);
     const VINYL_TONEARM_MIN_ANGLE = -5.4;
@@ -45,7 +44,55 @@ const VinylPlayerMode = (() => {
     const VINYL_TONEARM_EJECT_ANGLE = -8.2;
     const VINYL_TONEARM_REST_ANGLE = -14;
     const VINYL_TONEARM_CUE_PLAY_ANGLE = -7.2;
+    const VINYL_TONEARM_LINEAR_REST_PROGRESS = -0.44;
+    const VINYL_TONEARM_LINEAR_EJECT_PROGRESS = -0.2;
+    const VINYL_TONEARM_LINEAR_CUE_PLAY_PROGRESS = -0.08;
+    const VINYL_TONEARM_LINEAR_TRAVEL = 95;
     const VINYL_POINTER_RELEASE_GRACE_MS = 90;
+    const VINYL_TONEARM_STYLES = new Set(["s", "straight", "j", "linear"]);
+    const VINYL_TONEARM_FINISHES = new Set(["white", "silver", "black"]);
+    const normalizeTonearmStyle = (value) => VINYL_TONEARM_STYLES.has(value) ? value : "s";
+    const normalizeTonearmFinish = (value) => VINYL_TONEARM_FINISHES.has(value) ? value : "white";
+    const VINYL_TONEARM_PATHS = Object.freeze({
+        s: {
+            tube: "M 189 75 C 184 172 151 330 78 474 L 58 513",
+            highlight: "M 184 79 C 178 179 145 330 74 469"
+        },
+        straight: {
+            tube: "M 189 75 L 58 513",
+            highlight: "M 184 79 L 53 508"
+        },
+        j: {
+            tube: "M 189 75 L 181 372 C 179 432 139 481 58 513",
+            highlight: "M 184 79 L 175 369 C 173 424 135 474 55 507"
+        }
+    });
+    const VINYL_TONEARM_APPEARANCES = Object.freeze({
+        white: {
+            base: ["#fff", "#fbfbfb", "#eee"],
+            tube: ["#aaa", "#fafafa", "#fff", "#bbb"],
+            housing: "rgba(252, 252, 252, .97)",
+            housingEdge: "rgba(230, 230, 230, .8)",
+            highlight: "rgba(255, 255, 255, .95)",
+            needle: "#eee"
+        },
+        silver: {
+            base: ["#f4f4f5", "#bfc1c5", "#777a80"],
+            tube: ["#55585d", "#dadce0", "#f7f7f8", "#73767b"],
+            housing: "rgba(184, 187, 192, .98)",
+            housingEdge: "rgba(98, 101, 107, .88)",
+            highlight: "rgba(255, 255, 255, .76)",
+            needle: "#b9bcc1"
+        },
+        black: {
+            base: ["#55565a", "#242529", "#08090b"],
+            tube: ["#050506", "#55565a", "#1d1e21", "#020203"],
+            housing: "rgba(24, 25, 28, .98)",
+            housingEdge: "rgba(91, 93, 99, .9)",
+            highlight: "rgba(255, 255, 255, .34)",
+            needle: "#a9abb0"
+        }
+    });
 
     const VinylDisc = react.memo(({
         title,
@@ -114,6 +161,9 @@ const VinylPlayerMode = (() => {
         onStopPlayback,
         onTogglePlayback,
         animationsEnabled = true,
+        tonearmStyle: tonearmStyleValue = "s",
+        tonearmFinish: tonearmFinishValue = "white",
+        tonearmSize = 100,
         interactionProps = {},
         className = "",
         style = {}
@@ -121,6 +171,7 @@ const VinylPlayerMode = (() => {
         const [phase, setPhase] = useState("paused");
         const [scrubPosition, setScrubPosition] = useState(null);
         const [dragTonearmAngle, setDragTonearmAngle] = useState(null);
+        const [dragTonearmProgress, setDragTonearmProgress] = useState(null);
         const [cueReady, setCueReady] = useState(false);
         const [optimisticPosition, setOptimisticPosition] = useState(null);
         const phaseRef = useRef("paused");
@@ -130,11 +181,16 @@ const VinylPlayerMode = (() => {
         const scrubPositionRef = useRef(null);
         const dragStateRef = useRef(null);
         const dragAngleOffsetRef = useRef(0);
+        const dragLinearOffsetRef = useRef(0);
         const pointerReleaseTimerRef = useRef(null);
         const optimisticSeekTimerRef = useRef(null);
         const cancelTonearmInteractionRef = useRef(null);
         const finishTonearmInteractionRef = useRef(null);
         const moveTonearmRef = useRef(null);
+        const tonearmStyle = normalizeTonearmStyle(tonearmStyleValue);
+        const tonearmFinish = normalizeTonearmFinish(tonearmFinishValue);
+        const tonearmAppearance = VINYL_TONEARM_APPEARANCES[tonearmFinish];
+        const safeTonearmScale = Math.min(1.2, Math.max(0.8, (Number(tonearmSize) || 100) / 100));
 
         const setVisualPhase = useCallback((nextPhase) => {
             phaseRef.current = nextPhase;
@@ -150,6 +206,7 @@ const VinylPlayerMode = (() => {
         const setTonearmPreview = useCallback((dragState, interactionMode = interactionModeRef.current) => {
             dragStateRef.current = dragState;
             setDragTonearmAngle(dragState.angle);
+            setDragTonearmProgress(dragState.progress);
             if (interactionMode === "seek") {
                 scrubPositionRef.current = dragState.position;
                 setScrubPosition(dragState.position);
@@ -163,6 +220,7 @@ const VinylPlayerMode = (() => {
             dragStateRef.current = null;
             setScrubPosition(null);
             setDragTonearmAngle(null);
+            setDragTonearmProgress(null);
             setCueReady(false);
         }, []);
 
@@ -258,6 +316,7 @@ const VinylPlayerMode = (() => {
         const tonearmRange = VINYL_TONEARM_MAX_ANGLE - VINYL_TONEARM_MIN_ANGLE;
         const playbackTonearmAngle = VINYL_TONEARM_MIN_ANGLE + playbackProgress * tonearmRange;
         const tonearmAngle = dragTonearmAngle ?? playbackTonearmAngle;
+        const tonearmProgress = dragTonearmProgress ?? playbackProgress;
         const canScrub = isPlaying && phase === "playing" && safeDuration > 0;
         const canCuePlay = !isPlaying && (phase === "paused" || phase === "sleeved");
         const canControlTonearm = canScrub || canCuePlay;
@@ -270,7 +329,40 @@ const VinylPlayerMode = (() => {
             return Math.atan2(event.clientY - pivotY, event.clientX - pivotX) * 180 / Math.PI;
         }, []);
 
+        const getPointerLinearProgress = useCallback((event) => {
+            const bounds = tonearmRef.current?.getBoundingClientRect();
+            if (!bounds || bounds.width <= 0) return 0;
+            const svgX = ((event.clientX - bounds.left) / bounds.width) * 260;
+            return (170 - svgX) / VINYL_TONEARM_LINEAR_TRAVEL;
+        }, []);
+
         const getTonearmDragState = useCallback((event, interactionMode = interactionModeRef.current) => {
+            if (tonearmStyle === "linear") {
+                const rawProgress = getPointerLinearProgress(event) + dragLinearOffsetRef.current;
+                if (interactionMode === "cue-play") {
+                    const cueProgress = Math.min(
+                        Math.max(rawProgress, VINYL_TONEARM_LINEAR_REST_PROGRESS),
+                        0
+                    );
+                    return {
+                        angle: VINYL_TONEARM_REST_ANGLE,
+                        progress: cueProgress,
+                        isOutside: false,
+                        shouldPlay: cueProgress >= VINYL_TONEARM_LINEAR_CUE_PLAY_PROGRESS,
+                        position: null
+                    };
+                }
+
+                const seekProgress = clampVinylProgress(rawProgress);
+                return {
+                    angle: VINYL_TONEARM_MIN_ANGLE + seekProgress * tonearmRange,
+                    progress: Math.min(Math.max(rawProgress, VINYL_TONEARM_LINEAR_REST_PROGRESS), 1),
+                    isOutside: rawProgress <= VINYL_TONEARM_LINEAR_EJECT_PROGRESS,
+                    shouldPlay: false,
+                    position: seekProgress * safeDuration
+                };
+            }
+
             const rawAngle = getPointerAngle(event) + dragAngleOffsetRef.current;
             if (interactionMode === "cue-play") {
                 const cueAngle = Math.min(
@@ -279,6 +371,7 @@ const VinylPlayerMode = (() => {
                 );
                 return {
                     angle: cueAngle,
+                    progress: (cueAngle - VINYL_TONEARM_MIN_ANGLE) / tonearmRange,
                     isOutside: false,
                     shouldPlay: cueAngle >= VINYL_TONEARM_CUE_PLAY_ANGLE,
                     position: null
@@ -296,11 +389,12 @@ const VinylPlayerMode = (() => {
             const nextProgress = (seekAngle - VINYL_TONEARM_MIN_ANGLE) / tonearmRange;
             return {
                 angle: displayAngle,
+                progress: (displayAngle - VINYL_TONEARM_MIN_ANGLE) / tonearmRange,
                 isOutside: rawAngle <= VINYL_TONEARM_EJECT_ANGLE,
                 shouldPlay: false,
                 position: clampVinylProgress(nextProgress) * safeDuration
             };
-        }, [getPointerAngle, safeDuration, tonearmRange]);
+        }, [getPointerAngle, getPointerLinearProgress, safeDuration, tonearmRange, tonearmStyle]);
 
         const commitSeek = useCallback((nextPosition) => {
             const clampedPosition = Math.min(Math.max(nextPosition, 0), safeDuration);
@@ -342,7 +436,14 @@ const VinylPlayerMode = (() => {
             const initialAngle = interactionMode === "seek"
                 ? playbackTonearmAngle
                 : VINYL_TONEARM_REST_ANGLE;
-            dragAngleOffsetRef.current = initialAngle - getPointerAngle(event);
+            const initialProgress = interactionMode === "seek"
+                ? playbackProgress
+                : VINYL_TONEARM_LINEAR_REST_PROGRESS;
+            if (tonearmStyle === "linear") {
+                dragLinearOffsetRef.current = initialProgress - getPointerLinearProgress(event);
+            } else {
+                dragAngleOffsetRef.current = initialAngle - getPointerAngle(event);
+            }
             try {
                 tonearmRef.current?.setPointerCapture?.(event.pointerId);
             } catch (_) {
@@ -357,9 +458,12 @@ const VinylPlayerMode = (() => {
             canScrub,
             clearPointerReleaseTimer,
             getPointerAngle,
+            getPointerLinearProgress,
             getTonearmDragState,
             playbackTonearmAngle,
-            setTonearmPreview
+            playbackProgress,
+            setTonearmPreview,
+            tonearmStyle
         ]);
 
         const finishTonearmInteraction = useCallback((event, shouldCommit = true, useLastPreview = false) => {
@@ -517,9 +621,10 @@ const VinylPlayerMode = (() => {
         const albumLabel = I18n.t("vinyl.closeHint")
             || I18n.t("fullscreen.backgroundOptions.albumArt");
         const tonearmLabel = I18n.t("vinyl.tonearmHint") || vinylModeLabel;
-        const isCueingTonearm = dragTonearmAngle !== null
+        const isDraggingTonearm = dragTonearmAngle !== null || dragTonearmProgress !== null;
+        const isCueingTonearm = isDraggingTonearm
             && interactionModeRef.current === "cue-play";
-        const isEjectingTonearm = dragTonearmAngle !== null
+        const isEjectingTonearm = isDraggingTonearm
             && interactionModeRef.current === "seek"
             && !!dragStateRef.current?.isOutside;
         const rootClassName = [
@@ -529,6 +634,8 @@ const VinylPlayerMode = (() => {
             isCueingTonearm ? "is-cueing" : "",
             cueReady ? "is-cue-ready" : "",
             isEjectingTonearm ? "is-ejecting" : "",
+            `tonearm-style-${tonearmStyle}`,
+            `tonearm-finish-${tonearmFinish}`,
             className
         ].filter(Boolean).join(" ");
 
@@ -536,7 +643,14 @@ const VinylPlayerMode = (() => {
             className: rootClassName,
             style: {
                 ...style,
-                "--iv-vinyl-tonearm-angle": `${tonearmAngle.toFixed(3)}deg`
+                "--iv-vinyl-tonearm-angle": `${tonearmAngle.toFixed(3)}deg`,
+                "--iv-vinyl-tonearm-linear-x": `${(-VINYL_TONEARM_LINEAR_TRAVEL * tonearmProgress).toFixed(3)}px`,
+                "--iv-vinyl-tonearm-linear-rest-x": `${(-VINYL_TONEARM_LINEAR_TRAVEL * VINYL_TONEARM_LINEAR_REST_PROGRESS).toFixed(3)}px`,
+                "--iv-vinyl-tonearm-scale": (Number(style["--iv-vinyl-record-scale"]) || 1) * safeTonearmScale,
+                "--iv-vinyl-tonearm-housing-fill": tonearmAppearance.housing,
+                "--iv-vinyl-tonearm-housing-edge": tonearmAppearance.housingEdge,
+                "--iv-vinyl-tonearm-highlight-color": tonearmAppearance.highlight,
+                "--iv-vinyl-tonearm-needle-color": tonearmAppearance.needle
             },
             role: "group",
             "aria-label": vinylModeLabel
@@ -624,29 +738,50 @@ const VinylPlayerMode = (() => {
                 react.createElement("title", null, "Tonearm"),
                 react.createElement("defs", null,
                     react.createElement("radialGradient", { id: "ivlyrics-vinyl-tonearm-base", cx: "42%", cy: "34%", r: "72%" },
-                        react.createElement("stop", { offset: "0", stopColor: "#fff", stopOpacity: ".88" }),
-                        react.createElement("stop", { offset: ".58", stopColor: "#fbfbfb", stopOpacity: ".62" }),
-                        react.createElement("stop", { offset: "1", stopColor: "#eee", stopOpacity: ".34" })
+                        react.createElement("stop", { offset: "0", stopColor: tonearmAppearance.base[0], stopOpacity: ".88" }),
+                        react.createElement("stop", { offset: ".58", stopColor: tonearmAppearance.base[1], stopOpacity: ".72" }),
+                        react.createElement("stop", { offset: "1", stopColor: tonearmAppearance.base[2], stopOpacity: ".58" })
                     ),
                     react.createElement("linearGradient", { id: "ivlyrics-vinyl-tonearm-tube", x1: "0", x2: "1" },
-                        react.createElement("stop", { offset: "0", stopColor: "#aaa" }),
-                        react.createElement("stop", { offset: ".24", stopColor: "#fafafa" }),
-                        react.createElement("stop", { offset: ".55", stopColor: "#fff" }),
-                        react.createElement("stop", { offset: "1", stopColor: "#bbb" })
+                        react.createElement("stop", { offset: "0", stopColor: tonearmAppearance.tube[0] }),
+                        react.createElement("stop", { offset: ".24", stopColor: tonearmAppearance.tube[1] }),
+                        react.createElement("stop", { offset: ".55", stopColor: tonearmAppearance.tube[2] }),
+                        react.createElement("stop", { offset: "1", stopColor: tonearmAppearance.tube[3] })
                     )
                 ),
-                react.createElement("circle", { className: "ivlyrics-vinyl-tonearm-base", cx: "183", cy: "64", r: "66" }),
-                react.createElement("circle", { className: "ivlyrics-vinyl-tonearm-base-edge", cx: "183", cy: "64", r: "66" }),
-                react.createElement("g", { className: "ivlyrics-vinyl-tonearm-moving" },
-                    react.createElement("path", { className: "ivlyrics-vinyl-tonearm-shadow", d: "M 189 75 C 184 172 151 330 78 474 L 58 513" }),
-                    react.createElement("path", { className: "ivlyrics-vinyl-tonearm-tube", d: "M 189 75 C 184 172 151 330 78 474 L 58 513" }),
-                    react.createElement("path", { className: "ivlyrics-vinyl-tonearm-highlight", d: "M 184 79 C 178 179 145 330 74 469" }),
-                    react.createElement("path", { className: "ivlyrics-vinyl-pivot-housing", d: "M 151 35 L 200 39 L 215 66 L 207 109 L 170 111 L 151 91 L 144 61 Z" }),
-                    react.createElement("path", { className: "ivlyrics-vinyl-pivot-highlight", d: "M 158 42 L 194 45 L 207 65 L 202 91" }),
-                    react.createElement("path", { className: "ivlyrics-vinyl-headshell", d: "M 47 490 L 75 508 L 54 546 L 30 540 L 17 522 L 24 506 Z" }),
-                    react.createElement("path", { className: "ivlyrics-vinyl-headshell-highlight", d: "M 28 509 L 66 517 L 49 539" }),
-                    react.createElement("path", { className: "ivlyrics-vinyl-needle", d: "M 35 539 L 33 555 M 48 542 L 53 557" })
-                )
+                tonearmStyle === "linear"
+                    ? react.createElement(react.Fragment, null,
+                        react.createElement("g", { className: "ivlyrics-vinyl-linear-rail" },
+                            react.createElement("path", { className: "ivlyrics-vinyl-linear-rail-shadow", d: "M 30 66 H 230" }),
+                            react.createElement("path", { className: "ivlyrics-vinyl-linear-rail-tube", d: "M 30 62 H 230" }),
+                            react.createElement("circle", { className: "ivlyrics-vinyl-linear-rail-cap", cx: "30", cy: "62", r: "18" }),
+                            react.createElement("circle", { className: "ivlyrics-vinyl-linear-rail-cap", cx: "230", cy: "62", r: "18" })
+                        ),
+                        react.createElement("g", { className: "ivlyrics-vinyl-tonearm-moving" },
+                            react.createElement("path", { className: "ivlyrics-vinyl-tonearm-shadow", d: "M 170 87 L 170 476 L 160 510" }),
+                            react.createElement("path", { className: "ivlyrics-vinyl-tonearm-tube", d: "M 170 87 L 170 476 L 160 510" }),
+                            react.createElement("path", { className: "ivlyrics-vinyl-tonearm-highlight", d: "M 165 91 L 165 472" }),
+                            react.createElement("rect", { className: "ivlyrics-vinyl-pivot-housing", x: "144", y: "38", width: "52", height: "66", rx: "13" }),
+                            react.createElement("path", { className: "ivlyrics-vinyl-pivot-highlight", d: "M 153 48 H 187 V 86" }),
+                            react.createElement("path", { className: "ivlyrics-vinyl-headshell", d: "M 139 487 L 182 487 L 184 529 L 146 542 L 132 523 Z" }),
+                            react.createElement("path", { className: "ivlyrics-vinyl-headshell-highlight", d: "M 146 496 H 174 L 175 521" }),
+                            react.createElement("path", { className: "ivlyrics-vinyl-needle", d: "M 149 537 L 148 555 M 164 533 L 168 552" })
+                        )
+                    )
+                    : react.createElement(react.Fragment, null,
+                        react.createElement("circle", { className: "ivlyrics-vinyl-tonearm-base", cx: "183", cy: "64", r: "66" }),
+                        react.createElement("circle", { className: "ivlyrics-vinyl-tonearm-base-edge", cx: "183", cy: "64", r: "66" }),
+                        react.createElement("g", { className: "ivlyrics-vinyl-tonearm-moving" },
+                            react.createElement("path", { className: "ivlyrics-vinyl-tonearm-shadow", d: VINYL_TONEARM_PATHS[tonearmStyle].tube }),
+                            react.createElement("path", { className: "ivlyrics-vinyl-tonearm-tube", d: VINYL_TONEARM_PATHS[tonearmStyle].tube }),
+                            react.createElement("path", { className: "ivlyrics-vinyl-tonearm-highlight", d: VINYL_TONEARM_PATHS[tonearmStyle].highlight }),
+                            react.createElement("path", { className: "ivlyrics-vinyl-pivot-housing", d: "M 151 35 L 200 39 L 215 66 L 207 109 L 170 111 L 151 91 L 144 61 Z" }),
+                            react.createElement("path", { className: "ivlyrics-vinyl-pivot-highlight", d: "M 158 42 L 194 45 L 207 65 L 202 91" }),
+                            react.createElement("path", { className: "ivlyrics-vinyl-headshell", d: "M 47 490 L 75 508 L 54 546 L 30 540 L 17 522 L 24 506 Z" }),
+                            react.createElement("path", { className: "ivlyrics-vinyl-headshell-highlight", d: "M 28 509 L 66 517 L 49 539" }),
+                            react.createElement("path", { className: "ivlyrics-vinyl-needle", d: "M 35 539 L 33 555 M 48 542 L 53 557" })
+                        )
+                    )
             )
         );
     });
@@ -675,6 +810,7 @@ const VinylPlayerMode = (() => {
         interactionProps = {},
         activeLyric = "",
         activeLyrics = [],
+        lyricsTrackUri = null,
         activeLineIndex = 0,
         activeLyricsKaraoke = false,
         karaokeSource = null,
@@ -711,9 +847,6 @@ const VinylPlayerMode = (() => {
         const trackRecordTimerRef = useRef(null);
         const trackRaiseTimerRef = useRef(null);
         const trackHandoffTimerRef = useRef(null);
-        const lyricHandoffTimerRef = useRef(null);
-        const lyricSnapshotsByTrackRef = useRef(new Map());
-        const [outgoingLyric, setOutgoingLyric] = useState(null);
 
         const clearTrackTimers = useCallback(() => {
             if (trackPreloadTimerRef.current) {
@@ -736,10 +869,6 @@ const VinylPlayerMode = (() => {
                 window.clearTimeout(trackHandoffTimerRef.current);
                 trackHandoffTimerRef.current = null;
             }
-            if (lyricHandoffTimerRef.current) {
-                window.clearTimeout(lyricHandoffTimerRef.current);
-                lyricHandoffTimerRef.current = null;
-            }
         }, []);
 
         useEffect(() => {
@@ -756,12 +885,8 @@ const VinylPlayerMode = (() => {
             trackTransitionRevisionRef.current = revision;
             requestedTrackKeyRef.current = nextTrackKey;
             clearTrackTimers();
-            setOutgoingLyric(null);
 
             if (!shownTrack?.uri || !animationsEnabled || reducedMotion) {
-                if (shownTrack?.uri && shownTrack.uri !== liveTrack.uri) {
-                    lyricSnapshotsByTrackRef.current.delete(shownTrack.uri);
-                }
                 displayedTrackRef.current = liveTrack;
                 setDisplayedTrack(liveTrack);
                 setIncomingTrack(null);
@@ -796,16 +921,6 @@ const VinylPlayerMode = (() => {
                             const committedTrack = liveTrackRef.current?.uri === liveTrack.uri
                                 ? liveTrackRef.current
                                 : liveTrack;
-                            const outgoingLyricSnapshot = lyricSnapshotsByTrackRef.current.get(shownTrack.uri) || null;
-                            if (outgoingLyricSnapshot) {
-                                setOutgoingLyric(outgoingLyricSnapshot);
-                                lyricHandoffTimerRef.current = window.setTimeout(() => {
-                                    if (trackTransitionRevisionRef.current !== revision) return;
-                                    lyricHandoffTimerRef.current = null;
-                                    setOutgoingLyric(null);
-                                    lyricSnapshotsByTrackRef.current.delete(shownTrack.uri);
-                                }, TRACK_LYRIC_CROSSFADE_MS);
-                            }
                             displayedTrackRef.current = committedTrack;
                             setDisplayedTrack(committedTrack);
                             setTrackTransition("handoff");
@@ -884,7 +999,11 @@ const VinylPlayerMode = (() => {
         const canRenderRichActiveLyric = !!ActiveLyricRenderer
             && Array.isArray(activeLyrics)
             && activeLyrics.length > 0;
-        const hasActiveLyric = canRenderRichActiveLyric || !!activeVinylLyric;
+        const normalizedLyricsTrackUri = String(lyricsTrackUri || "").trim();
+        const liveLyricsMatchTrack = !normalizedLyricsTrackUri
+            || normalizedLyricsTrackUri === liveTrack.uri;
+        const hasActiveLyric = liveLyricsMatchTrack
+            && (canRenderRichActiveLyric || !!activeVinylLyric);
         const liveLyricSnapshot = hasActiveLyric
             ? {
                 trackUri: liveTrack.uri,
@@ -898,22 +1017,13 @@ const VinylPlayerMode = (() => {
             }
             : null;
 
-        // Keep the latest usable line for each visual track. The main lyrics
-        // state is intentionally cleared as soon as Spotify changes tracks, so
-        // retaining this snapshot prevents the outgoing LP's lyric from being
-        // unmounted halfway through its own replacement animation.
-        if (liveLyricSnapshot) {
-            lyricSnapshotsByTrackRef.current.set(liveTrack.uri, liveLyricSnapshot);
-        }
-
         const transitionClass = trackTransition !== "idle" ? `is-track-${trackTransition}` : "";
-        const displayedLyric = displayedTrack.uri === liveTrack.uri
-            ? liveLyricSnapshot || lyricSnapshotsByTrackRef.current.get(displayedTrack.uri) || null
-            : lyricSnapshotsByTrackRef.current.get(displayedTrack.uri) || null;
-        const isDisplayedLyricFrozen = displayedTrack.uri !== liveTrack.uri;
-        const hasVisibleLyric = lyricsEnabled && (!!displayedLyric || !!outgoingLyric);
+        // Lyrics follow the live Spotify track immediately. Only the sleeve and
+        // record stay on displayedTrack until their replacement animation ends.
+        const displayedLyric = liveLyricSnapshot;
+        const hasVisibleLyric = lyricsEnabled && !!displayedLyric;
 
-        const renderLyricLayer = (snapshot, { outgoing = false, frozen = false } = {}) => {
+        const renderLyricLayer = (snapshot) => {
             if (!snapshot) return null;
             const renderableLyrics = Array.isArray(snapshot.lyrics) && snapshot.lyrics.length > 0
                 ? snapshot.lyrics
@@ -921,13 +1031,11 @@ const VinylPlayerMode = (() => {
                     ? [{ text: snapshot.plainText, startTime: 0 }]
                     : [];
             const canRenderSnapshotRichly = !!ActiveLyricRenderer && renderableLyrics.length > 0;
-            const layerRole = outgoing ? "outgoing" : "current";
 
             return react.createElement("div", {
-                key: `vinyl-active-lyric-${layerRole}-${snapshot.trackUri}-${snapshot.activeLineIndex}`,
-                className: `fullscreen-vinyl-active-lyric is-${layerRole}`,
-                dir: "auto",
-                "aria-hidden": outgoing ? "true" : undefined
+                key: `vinyl-active-lyric-current-${snapshot.trackUri}-${snapshot.activeLineIndex}`,
+                className: "fullscreen-vinyl-active-lyric is-current",
+                dir: "auto"
             }, canRenderSnapshotRichly
                 ? react.createElement(ActiveLyricRenderer, {
                     lyrics: renderableLyrics,
@@ -935,7 +1043,7 @@ const VinylPlayerMode = (() => {
                     isKara: renderableLyrics === snapshot.lyrics && snapshot.isKara,
                     karaokeSource: snapshot.karaokeSource,
                     settingsRevision: snapshot.settingsRevision,
-                    positionOverride: frozen ? snapshot.position : null,
+                    positionOverride: null,
                     motionEnabled: animationsEnabled
                 })
                 : snapshot.plainText);
@@ -1014,6 +1122,9 @@ const VinylPlayerMode = (() => {
                 position,
                 duration,
                 animationsEnabled,
+                tonearmStyle: vinylSettings.tonearmStyle,
+                tonearmFinish: vinylSettings.tonearmFinish,
+                tonearmSize: vinylSettings.tonearmSize,
                 interactionProps,
                 onSeek,
                 onStopPlayback,
@@ -1025,8 +1136,7 @@ const VinylPlayerMode = (() => {
                 "aria-atomic": "true",
                 "aria-busy": trackTransition !== "idle" && !displayedLyric ? "true" : undefined
             },
-                renderLyricLayer(displayedLyric, { frozen: isDisplayedLyricFrozen }),
-                renderLyricLayer(outgoingLyric, { outgoing: true, frozen: true })
+                renderLyricLayer(displayedLyric)
             ) : null
         );
     });

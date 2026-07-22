@@ -1858,6 +1858,39 @@ const UNSYNCED = 2;
 const LYRICS_MODE_TYPE_KEYS = ['karaoke', 'synced', 'unsynced'];
 const getLyricsModeTypeKey = (mode) => LYRICS_MODE_TYPE_KEYS[mode] || null;
 
+const VINYL_TYPOGRAPHY_DEFAULT_SCALE = 0.7;
+const getOrSeedVinylTypographySetting = (
+  vinylSettingName,
+  baseSettingName,
+  baseFallback,
+  { numeric = false, scale = 1 } = {}
+) => {
+  const vinylStorageKey = `${APP_NAME}:visual:fullscreen-vinyl-${vinylSettingName}`;
+  const baseStorageKey = `${APP_NAME}:visual:${baseSettingName}`;
+  const normalize = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    if (!numeric) {
+      const text = String(value).trim();
+      return text || null;
+    }
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  };
+
+  const storedVinylValue = normalize(StorageManager.getItem(vinylStorageKey));
+  if (storedVinylValue !== null) return storedVinylValue;
+
+  const baseValue = normalize(StorageManager.getItem(baseStorageKey));
+  const normalizedFallback = normalize(baseFallback);
+  const sourceValue = baseValue !== null ? baseValue : normalizedFallback;
+  const seededValue = numeric && scale !== 1
+    ? Math.round(sourceValue * scale)
+    : sourceValue;
+
+  StorageManager.setItem(vinylStorageKey, seededValue);
+  return seededValue;
+};
+
 const CONFIG = {
   visual: {
     language: StorageManager.getItem("ivLyrics:visual:language"),
@@ -2374,56 +2407,131 @@ const CONFIG = {
       "ivLyrics:visual:fullscreen-vinyl-lyrics-enabled",
       true
     ),
-    "fullscreen-vinyl-original-font-family":
-      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-font-family") ||
-      "Pretendard Variable",
-    "fullscreen-vinyl-original-font-size":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-font-size")) ||
-      31,
-    "fullscreen-vinyl-original-font-weight":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-font-weight")) ||
-      600,
-    "fullscreen-vinyl-original-opacity":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-opacity")) ||
-      95,
-    "fullscreen-vinyl-original-letter-spacing":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-letter-spacing")) ||
-      0,
-    "fullscreen-vinyl-phonetic-font-family":
-      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-font-family") ||
-      "Pretendard Variable",
-    "fullscreen-vinyl-phonetic-font-size":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-font-size")) ||
-      11,
-    "fullscreen-vinyl-phonetic-font-weight":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-font-weight")) ||
+    "fullscreen-vinyl-tonearm-style":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-tonearm-style") ||
+      "s",
+    "fullscreen-vinyl-tonearm-finish":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-tonearm-finish") ||
+      "white",
+    "fullscreen-vinyl-tonearm-size":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-tonearm-size")) ||
       100,
+    "fullscreen-vinyl-original-font-family":
+      getOrSeedVinylTypographySetting(
+        "original-font-family",
+        "original-font-family",
+        "Pretendard Variable"
+      ),
+    "fullscreen-vinyl-original-font-size":
+      getOrSeedVinylTypographySetting(
+        "original-font-size",
+        "original-font-size",
+        44,
+        { numeric: true, scale: VINYL_TYPOGRAPHY_DEFAULT_SCALE }
+      ),
+    "fullscreen-vinyl-original-font-weight":
+      getOrSeedVinylTypographySetting(
+        "original-font-weight",
+        "original-font-weight",
+        600,
+        { numeric: true }
+      ),
+    "fullscreen-vinyl-original-opacity":
+      getOrSeedVinylTypographySetting(
+        "original-opacity",
+        "original-opacity",
+        95,
+        { numeric: true }
+      ),
+    "fullscreen-vinyl-original-letter-spacing":
+      getOrSeedVinylTypographySetting(
+        "original-letter-spacing",
+        "original-letter-spacing",
+        0,
+        { numeric: true }
+      ),
+    "fullscreen-vinyl-phonetic-font-family":
+      getOrSeedVinylTypographySetting(
+        "phonetic-font-family",
+        "phonetic-font-family",
+        "Pretendard Variable"
+      ),
+    "fullscreen-vinyl-phonetic-font-size":
+      getOrSeedVinylTypographySetting(
+        "phonetic-font-size",
+        "phonetic-font-size",
+        16,
+        { numeric: true, scale: VINYL_TYPOGRAPHY_DEFAULT_SCALE }
+      ),
+    "fullscreen-vinyl-phonetic-font-weight":
+      getOrSeedVinylTypographySetting(
+        "phonetic-font-weight",
+        "phonetic-font-weight",
+        100,
+        { numeric: true }
+      ),
     "fullscreen-vinyl-phonetic-opacity":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-opacity")) ||
-      70,
+      getOrSeedVinylTypographySetting(
+        "phonetic-opacity",
+        "phonetic-opacity",
+        70,
+        { numeric: true }
+      ),
     "fullscreen-vinyl-phonetic-spacing":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-spacing") ?? -1),
+      getOrSeedVinylTypographySetting(
+        "phonetic-spacing",
+        "phonetic-spacing",
+        -1,
+        { numeric: true }
+      ),
     "fullscreen-vinyl-phonetic-letter-spacing":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-letter-spacing")) ||
-      0,
+      getOrSeedVinylTypographySetting(
+        "phonetic-letter-spacing",
+        "phonetic-letter-spacing",
+        0,
+        { numeric: true }
+      ),
     "fullscreen-vinyl-translation-font-family":
-      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-font-family") ||
-      "Pretendard Variable",
+      getOrSeedVinylTypographySetting(
+        "translation-font-family",
+        "translation-font-family",
+        "Pretendard Variable"
+      ),
     "fullscreen-vinyl-translation-font-size":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-font-size")) ||
-      15,
+      getOrSeedVinylTypographySetting(
+        "translation-font-size",
+        "translation-font-size",
+        22,
+        { numeric: true, scale: VINYL_TYPOGRAPHY_DEFAULT_SCALE }
+      ),
     "fullscreen-vinyl-translation-font-weight":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-font-weight")) ||
-      300,
+      getOrSeedVinylTypographySetting(
+        "translation-font-weight",
+        "translation-font-weight",
+        300,
+        { numeric: true }
+      ),
     "fullscreen-vinyl-translation-opacity":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-opacity")) ||
-      85,
+      getOrSeedVinylTypographySetting(
+        "translation-opacity",
+        "translation-opacity",
+        85,
+        { numeric: true }
+      ),
     "fullscreen-vinyl-translation-spacing":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-spacing")) ||
-      0,
+      getOrSeedVinylTypographySetting(
+        "translation-spacing",
+        "translation-spacing",
+        0,
+        { numeric: true }
+      ),
     "fullscreen-vinyl-translation-letter-spacing":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-letter-spacing")) ||
-      0,
+      getOrSeedVinylTypographySetting(
+        "translation-letter-spacing",
+        "translation-letter-spacing",
+        0,
+        { numeric: true }
+      ),
     "fullscreen-title-size":
       StorageManager.getItem("ivLyrics:visual:fullscreen-title-size") ||
       "48",

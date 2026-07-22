@@ -5874,6 +5874,64 @@ function renderSettingsReleaseMarkdown(markdown) {
   });
 }
 
+// Keep navigation ownership separate from the content order. A section only
+// appears here when it genuinely belongs to another settings section; every
+// unlisted section remains a direct child of its top-level tab.
+const SETTINGS_SECTION_PARENT_BY_KEY = Object.freeze({
+  "performance-visual-cost": "performance-rendering",
+  "performance-background-work": "performance-rendering",
+  "karaoke-mode": "playback",
+  "settings-presets": "export-import",
+  "db-export-import": "export-import",
+  "vinyl-tonearm": "vinyl-mode",
+  "vinyl-typography": "vinyl-mode",
+  "vinyl-original-style": "vinyl-typography",
+  "vinyl-pronunciation-style": "vinyl-typography",
+  "vinyl-translation-style": "vinyl-typography",
+  "fullscreen-ui": "fullscreen-style",
+  "controller-style": "fullscreen-style",
+  "auto-hide": "fullscreen-style",
+  "tmi-style": "fullscreen-style",
+  "panel-background": "panel-lyrics-general",
+  "panel-border": "panel-lyrics-general",
+  "about-client-info": "about-app-info",
+  "about-update": "about-app-info",
+  "about-patch-notes": "about-app-info",
+});
+
+const buildSettingsNavigationTree = (items = []) => {
+  const nodes = items.map((item) => ({ ...item, children: [] }));
+  const nodesByKey = new Map(nodes.map((node) => [node.settingKey, node]));
+  const roots = [];
+
+  nodes.forEach((node) => {
+    const parentKey =
+      node.parentSettingKey || SETTINGS_SECTION_PARENT_BY_KEY[node.settingKey];
+    const parent = parentKey ? nodesByKey.get(parentKey) : null;
+    if (!parent || parent === node || parent.tabId !== node.tabId) {
+      roots.push(node);
+      return;
+    }
+    parent.children.push(node);
+  });
+
+  const annotate = (node, ancestors = []) => {
+    const breadcrumbLabels = [...ancestors, node.label].filter(Boolean);
+    return {
+      ...node,
+      depth: Math.max(0, breadcrumbLabels.length - 1),
+      breadcrumb: breadcrumbLabels.join(" › "),
+      children: node.children.map((child) => annotate(child, breadcrumbLabels)),
+    };
+  };
+
+  return roots.map((root) => annotate(root));
+};
+
+const settingsNavigationNodeContains = (node, settingKey) =>
+  node.settingKey === settingKey ||
+  node.children.some((child) => settingsNavigationNodeContains(child, settingKey));
+
 const ConfigModal = ({
   onRequestClose = () => {},
   initialTab = "general",
@@ -7481,11 +7539,17 @@ const ConfigModal = ({
   };
 
   const SectionTitle = ({ title, subtitle, sectionKey }) => {
+    const parentSectionKey = sectionKey
+      ? SETTINGS_SECTION_PARENT_BY_KEY[sectionKey]
+      : null;
     return react.createElement(
       "div",
       {
         className: "section-title",
         ...(sectionKey ? { "data-setting-key": sectionKey } : {}),
+        ...(parentSectionKey
+          ? { "data-parent-setting-key": parentSectionKey }
+          : {}),
       },
       react.createElement(
         "div",
@@ -7664,9 +7728,12 @@ const ConfigModal = ({
     },
   ];
   const [sidebarSectionsByTab, setSidebarSectionsByTab] = react.useState({});
-  const [expandedGroupIds, setExpandedGroupIds] = react.useState(() =>
-    sidebarTabs.filter((tab) => !tab.standalone).map((tab) => tab.id)
-  );
+  const [expandedGroupIds, setExpandedGroupIds] = react.useState(() => {
+    const initialGroup = sidebarTabs.find(
+      (tab) => tab.id === (initialTab || "general") && !tab.standalone
+    );
+    return initialGroup ? [initialGroup.id] : [];
+  });
   const resolveNavItemId = (tabId, settingKey) => settingKey || tabId;
   const [activeNavItemId, setActiveNavItemId] = react.useState(() =>
     resolveNavItemId(initialTab || "general", initialSettingKey || (initialTab || "general"))
@@ -7716,6 +7783,8 @@ const ConfigModal = ({
               label,
               description: p?.textContent?.trim() || "",
               tabId,
+              parentSettingKey:
+                el.getAttribute("data-parent-setting-key") || null,
             };
           })
           .filter(Boolean);
@@ -7822,12 +7891,14 @@ const ConfigModal = ({
   // ---- 4. Auto-expand the sidebar group for the active tab ----
   react.useEffect(() => {
     const currentTab = sidebarTabs.find((tab) => tab.id === activeTab);
-    if (activeTab === "search" || !currentTab?.id || currentTab.standalone) {
+    if (activeTab === "search" || !currentTab?.id) {
       return;
     }
-    setExpandedGroupIds((prev) =>
-      prev.includes(currentTab.id) ? prev : [...prev, currentTab.id]
-    );
+    if (currentTab.standalone) {
+      setExpandedGroupIds([]);
+      return;
+    }
+    setExpandedGroupIds([currentTab.id]);
   }, [activeTab]);
 
   // ---- 5. Scroll-spy: update sidebar highlight on user scroll ----
@@ -7916,6 +7987,47 @@ const ConfigModal = ({
     pendingSidebarScrollRef.current = null;
     shouldRestoreSidebarScrollRef.current = false;
   }, [activeTab, expandedGroupIds]);
+
+  // Keep the selected branch visible when a compact settings window turns the
+  // sidebar into a short, independently scrolling region.
+  react.useEffect(() => {
+    let frameId = null;
+    const revealActiveNavigationItem = () => {
+      if (frameId != null) cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(() => {
+        frameId = null;
+        const sidebar = settingsSidebarRef.current;
+        const activeControl =
+          sidebar?.querySelector(".settings-nav-subitem.active") ||
+          sidebar?.querySelector(".settings-nav-card.active") ||
+          sidebar?.querySelector(".settings-nav-group-toggle.active");
+        if (!sidebar || !activeControl) return;
+
+        const sidebarRect = sidebar.getBoundingClientRect();
+        const activeRect = activeControl.getBoundingClientRect();
+        const inset = 8;
+        let scrollDelta = 0;
+        if (activeRect.top < sidebarRect.top + inset) {
+          scrollDelta = activeRect.top - sidebarRect.top - inset;
+        } else if (activeRect.bottom > sidebarRect.bottom - inset) {
+          scrollDelta = activeRect.bottom - sidebarRect.bottom + inset;
+        }
+        if (Math.abs(scrollDelta) > 0.5) {
+          sidebar.scrollTo({
+            top: Math.max(0, sidebar.scrollTop + scrollDelta),
+            behavior: "auto",
+          });
+        }
+      });
+    };
+
+    revealActiveNavigationItem();
+    window.addEventListener("resize", revealActiveNavigationItem);
+    return () => {
+      window.removeEventListener("resize", revealActiveNavigationItem);
+      if (frameId != null) cancelAnimationFrame(frameId);
+    };
+  }, [activeNavItemId, activeTab, expandedGroupIds]);
 
   // This component owns stateful helper controls. Keep its type stable across
   // ConfigModal renders so their mount effects cannot trigger a remount loop.
@@ -8206,10 +8318,71 @@ const ConfigModal = ({
     );
   }, []);
 
-  const SidebarNavigation = () =>
-    react.createElement(
+  const SidebarNavigation = () => {
+    const renderSectionNodes = (nodes) =>
+      nodes.map((item) => {
+        const isItemActive =
+          activeTab === item.tabId && activeNavItemId === item.settingKey;
+        const hasChildren = item.children.length > 0;
+        const containsActiveItem = settingsNavigationNodeContains(
+          item,
+          activeNavItemId
+        );
+
+        return react.createElement(
+          "div",
+          {
+            key: `${item.tabId}:${item.settingKey}`,
+            className: `settings-nav-tree-node${
+              containsActiveItem ? " has-active-path" : ""
+            }`,
+            role: "treeitem",
+            "aria-level": item.depth + 1,
+            ...(hasChildren ? { "aria-expanded": true } : {}),
+            "data-nav-depth": item.depth,
+            "data-setting-key": item.settingKey,
+          },
+          react.createElement(
+            "button",
+            {
+              className: `settings-nav-subitem${
+                hasChildren ? " has-children" : ""
+              }${containsActiveItem && !isItemActive ? " in-active-path" : ""}${
+                isItemActive ? " active" : ""
+              }`,
+              type: "button",
+              "aria-current": isItemActive ? "location" : undefined,
+              "aria-label": item.breadcrumb || item.label,
+              onClick: () =>
+                navigateToDestination(
+                  item.tabId,
+                  item.settingKey,
+                  resolveNavItemId(item.tabId, item.settingKey)
+                ),
+              title: [item.breadcrumb, item.description].filter(Boolean).join(" — "),
+            },
+            react.createElement(
+              "span",
+              { className: "settings-nav-subitem-label" },
+              item.label
+            )
+          ),
+          hasChildren &&
+            react.createElement(
+              "div",
+              {
+                className: "settings-nav-tree-children",
+                role: "group",
+                "aria-label": item.label,
+              },
+              renderSectionNodes(item.children)
+            )
+        );
+      });
+
+    return react.createElement(
       "div",
-      { className: "settings-sidebar-nav" },
+      { className: "settings-sidebar-nav", role: "navigation" },
       sidebarTabs.map((tab) =>
         (() => {
           const sectionItems = sidebarSectionsByTab[tab.id] || [];
@@ -8258,11 +8431,7 @@ const ConfigModal = ({
                 onClick: () => {
                   if (activeTab !== tab.id) {
                     navigateToDestination(tab.id, null, resolveNavItemId(tab.id));
-                    setExpandedGroupIds((prevGroupIds) =>
-                      prevGroupIds.includes(tab.id)
-                        ? prevGroupIds
-                        : [...prevGroupIds, tab.id]
-                    );
+                    setExpandedGroupIds([tab.id]);
                     return;
                   }
 
@@ -8301,42 +8470,18 @@ const ConfigModal = ({
                   {
                     id: submenuId,
                     className: "settings-nav-group-items",
-                    role: "group",
+                    role: "tree",
                     "aria-label": tab.label,
                   },
-                sectionItems.map((item) => {
-                  const isItemActive =
-                    activeTab === item.tabId && activeNavItemId === item.settingKey;
-
-                  return react.createElement(
-                    "button",
-                    {
-                      key: `${item.tabId}:${item.settingKey}`,
-                      className: `settings-nav-subitem ${
-                        isItemActive ? "active" : ""
-                      }`,
-                      type: "button",
-                      "aria-current": isItemActive ? "location" : undefined,
-                      onClick: () =>
-                        navigateToDestination(
-                          item.tabId,
-                          item.settingKey,
-                          resolveNavItemId(item.tabId, item.settingKey)
-                        ),
-                      title: item.description || item.label,
-                    },
-                    react.createElement(
-                      "span",
-                      { className: "settings-nav-subitem-label" },
-                      item.label
-                    )
-                  );
-                })
+                  renderSectionNodes(
+                    buildSettingsNavigationTree(sectionItems)
+                  )
               )
           );
         })()
       )
     );
+  };
 
   const saveVinylSetting = (name, value) => {
     CONFIG.visual[name] = value;
@@ -12441,6 +12586,32 @@ const ConfigModal = ({
     border-left: 1px solid var(--settings-divider);
 }
 
+#${APP_NAME}-config-container .settings-nav-tree-node {
+    position: relative;
+    width: 100%;
+}
+
+#${APP_NAME}-config-container .settings-nav-tree-children {
+    position: relative;
+    margin-left: 10px;
+    padding-left: 10px;
+}
+
+#${APP_NAME}-config-container .settings-nav-tree-children::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 1px;
+    background: var(--settings-divider);
+    transition: background-color 120ms ease;
+}
+
+#${APP_NAME}-config-container .settings-nav-tree-node.has-active-path > .settings-nav-tree-children::before {
+    background: rgba(var(--settings-accent-rgb), 0.34);
+}
+
 #${APP_NAME}-config-container .settings-nav-card,
 #${APP_NAME}-config-container .settings-nav-subitem {
     position: relative;
@@ -12482,6 +12653,33 @@ const ConfigModal = ({
     background: rgba(var(--settings-accent-rgb), 0.72);
 }
 
+#${APP_NAME}-config-container .settings-nav-subitem.has-children {
+    font-weight: 650;
+}
+
+#${APP_NAME}-config-container .settings-nav-subitem.in-active-path {
+    color: var(--text-primary);
+}
+
+#${APP_NAME}-config-container .settings-nav-subitem.in-active-path::before {
+    background: rgba(var(--settings-accent-rgb), 0.42);
+}
+
+#${APP_NAME}-config-container .settings-nav-tree-node[data-nav-depth="1"] > .settings-nav-subitem {
+    font-size: 12px;
+    color: color-mix(in srgb, var(--text-secondary) 88%, transparent);
+}
+
+#${APP_NAME}-config-container .settings-nav-tree-node[data-nav-depth="2"] > .settings-nav-subitem {
+    font-size: 11.5px;
+    color: color-mix(in srgb, var(--text-secondary) 76%, transparent);
+}
+
+#${APP_NAME}-config-container .settings-nav-tree-node[data-nav-depth="1"] > .settings-nav-subitem.active,
+#${APP_NAME}-config-container .settings-nav-tree-node[data-nav-depth="2"] > .settings-nav-subitem.active {
+    color: rgb(var(--settings-accent-rgb));
+}
+
 #${APP_NAME}-config-container .settings-nav-subitem.active::after {
     content: "";
     position: absolute;
@@ -12512,6 +12710,11 @@ const ConfigModal = ({
 #${APP_NAME}-config-container .settings-nav-group-indicator svg {
     width: 12px;
     height: 12px;
+}
+
+#${APP_NAME}-config-container .settings-nav-subitem-label {
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 /* Search and main content use the same translucent shells. */
@@ -16640,6 +16843,53 @@ const ConfigModal = ({
               key: "fullscreen-vinyl-lyrics-enabled",
               type: ConfigSlider,
               defaultValue: CONFIG.visual["fullscreen-vinyl-lyrics-enabled"] !== false,
+            },
+          ],
+          onChange: saveVinylSetting,
+        }),
+
+        react.createElement(SectionTitle, {
+          title: I18n.t("vinyl.settings.tonearmTitle"),
+          subtitle: I18n.t("vinyl.settings.tonearmSubtitle"),
+          sectionKey: "vinyl-tonearm",
+        }),
+        react.createElement(OptionList, {
+          items: [
+            {
+              desc: I18n.t("vinyl.settings.tonearmStyleLabel"),
+              info: I18n.t("vinyl.settings.tonearmStyleDesc"),
+              key: "fullscreen-vinyl-tonearm-style",
+              type: ConfigSelection,
+              options: {
+                s: I18n.t("vinyl.settings.tonearmStyleS"),
+                straight: I18n.t("vinyl.settings.tonearmStyleStraight"),
+                j: I18n.t("vinyl.settings.tonearmStyleJ"),
+                linear: I18n.t("vinyl.settings.tonearmStyleLinear"),
+              },
+              defaultValue: CONFIG.visual["fullscreen-vinyl-tonearm-style"] || "s",
+            },
+            {
+              desc: I18n.t("vinyl.settings.tonearmFinishLabel"),
+              info: I18n.t("vinyl.settings.tonearmFinishDesc"),
+              key: "fullscreen-vinyl-tonearm-finish",
+              type: ConfigSelection,
+              options: {
+                white: I18n.t("vinyl.settings.tonearmFinishWhite"),
+                silver: I18n.t("vinyl.settings.tonearmFinishSilver"),
+                black: I18n.t("vinyl.settings.tonearmFinishBlack"),
+              },
+              defaultValue: CONFIG.visual["fullscreen-vinyl-tonearm-finish"] || "white",
+            },
+            {
+              desc: I18n.t("vinyl.settings.tonearmSizeLabel"),
+              info: I18n.t("vinyl.settings.tonearmSizeDesc"),
+              key: "fullscreen-vinyl-tonearm-size",
+              type: ConfigSliderRange,
+              min: 80,
+              max: 120,
+              step: 5,
+              unit: "%",
+              defaultValue: CONFIG.visual["fullscreen-vinyl-tonearm-size"] ?? 100,
             },
           ],
           onChange: saveVinylSetting,

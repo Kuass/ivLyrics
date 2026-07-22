@@ -1684,6 +1684,7 @@
         const SYNC_DATA_REQUEST_VERSION = '20260701';
         const _syncDataCache = new Map();
         const _inflightRequests = new Map(); // 진행 중인 요청 추적
+        const _recentSyncDataResponses = new Map(); // 같은 가사 로딩 사이클의 응답 재사용
         const _isrcLookupCache = new Map(); // trackId -> { isrc, expiresAt }
         const _isrcInflightRequests = new Map(); // trackId -> Promise<string>
         const _fullyLoadedTracks = new Set(); // 전체 목록이 로드된 트랙 ID
@@ -1691,6 +1692,10 @@
         const _serverCacheBypassUntil = new Map(); // 로컬 캐시 삭제 직후 서버 캐시 우회
         const _trackCacheGenerations = new Map(); // 캐시 삭제 전 시작된 요청의 재저장을 방지
         const SERVER_CACHE_BYPASS_MS = 30 * 1000;
+        // One track can be loaded by the page renderer and background consumers
+        // several seconds apart. Keep the live response only long enough for that
+        // fan-out; persistent and session timing caches remain identity-redacted.
+        const RECENT_SYNC_DATA_RESPONSE_TTL_MS = 15 * 1000;
         const ISRC_LOOKUP_SUCCESS_TTL_MS = 24 * 60 * 60 * 1000;
         const OPENDB_BASE_URL = 'https://ivlis.kr/ivLyrics/opendb/';
         const OPENDB_MANIFEST_URL = `${OPENDB_BASE_URL}data/manifest.json`;
@@ -1749,6 +1754,31 @@
                     && contributor.identityRedacted === true
                 ))
             ));
+        }
+
+        function rememberRecentSyncDataResponse(cacheKey, syncData) {
+            if (!cacheKey || !syncData) return;
+
+            const recent = {
+                syncData,
+                expiresAt: Date.now() + RECENT_SYNC_DATA_RESPONSE_TTL_MS
+            };
+            _recentSyncDataResponses.set(cacheKey, recent);
+            setTimeout(() => {
+                if (_recentSyncDataResponses.get(cacheKey) === recent) {
+                    _recentSyncDataResponses.delete(cacheKey);
+                }
+            }, RECENT_SYNC_DATA_RESPONSE_TTL_MS);
+        }
+
+        function getRecentSyncDataResponse(cacheKey) {
+            const recent = _recentSyncDataResponses.get(cacheKey);
+            if (!recent) return null;
+            if (recent.expiresAt <= Date.now()) {
+                _recentSyncDataResponses.delete(cacheKey);
+                return null;
+            }
+            return recent.syncData;
         }
         let _spotifyProfilePromise = null;
         let _openDbState = null;
@@ -2787,6 +2817,7 @@
                 bumpCacheGeneration();
                 clearInflightRequests();
                 _syncDataCache.clear();
+                _recentSyncDataResponses.clear();
                 _fullyLoadedTracks.clear();
                 return info;
             })();
@@ -2926,45 +2957,65 @@
             }
 
             try {
-                const requestGeneration = getCacheGeneration(identityKey);
-                const url = new URL(`${API_BASE}/lyrics/sync-data`);
-                const reportsMetadata = appendSyncDataQueryParams(url, identity, metadata);
-                let requestUrl = url.toString();
-                if (identity.isrc && shouldBypassServerCache(identity.isrc)) {
-                    requestUrl += '&bypassCache=1';
-                }
-                syncDataConsoleLog('providers:request', {
-                    isrc: identity.isrc || null,
-                    trackId: identity.trackId || null,
-                    url: requestUrl
-                });
-                const response = await fetch(requestUrl, { cache: 'no-store' });
-                syncDataConsoleLog('providers:response', {
-                    isrc: identity.isrc || null,
-                    trackId: identity.trackId || null,
-                    status: response.status,
-                    ok: response.ok
-                }, response.ok ? 'info' : 'warn');
-                if (!response.ok) {
-                    if (response.status === 404) return [];
-                    throw new Error(`API Error: ${response.status}`);
-                }
-                const result = await response.json();
-                const resolvedIsrc = normalizeSyncDataIsrc(result?.isrc || result?.data?.isrc);
-                if (resolvedIsrc && identity.trackId) {
-                    _isrcLookupCache.set(identity.trackId, {
-                        isrc: resolvedIsrc,
-                        expiresAt: Date.now() + ISRC_LOOKUP_SUCCESS_TTL_MS
+                const inflightKey = `${cacheKey}:request`;
+                if (_inflightRequests.has(inflightKey)) {
+                    syncDataConsoleLog('providers:join-inflight', {
+                        isrc: identity.isrc || null,
+                        trackId: identity.trackId || null
                     });
+                    return await _inflightRequests.get(inflightKey);
                 }
-                if (reportsMetadata) {
-                    _syncTrackMetadataReported.add(identityKey);
+
+                const requestGeneration = getCacheGeneration(identityKey);
+                const fetchPromise = (async () => {
+                    const url = new URL(`${API_BASE}/lyrics/sync-data`);
+                    const reportsMetadata = appendSyncDataQueryParams(url, identity, metadata);
+                    let requestUrl = url.toString();
+                    if (identity.isrc && shouldBypassServerCache(identity.isrc)) {
+                        requestUrl += '&bypassCache=1';
+                    }
+                    syncDataConsoleLog('providers:request', {
+                        isrc: identity.isrc || null,
+                        trackId: identity.trackId || null,
+                        url: requestUrl
+                    });
+                    const response = await fetch(requestUrl, { cache: 'no-store' });
+                    syncDataConsoleLog('providers:response', {
+                        isrc: identity.isrc || null,
+                        trackId: identity.trackId || null,
+                        status: response.status,
+                        ok: response.ok
+                    }, response.ok ? 'info' : 'warn');
+                    if (!response.ok) {
+                        if (response.status === 404) return [];
+                        throw new Error(`API Error: ${response.status}`);
+                    }
+                    const result = await response.json();
+                    const resolvedIsrc = normalizeSyncDataIsrc(result?.isrc || result?.data?.isrc);
+                    if (resolvedIsrc && identity.trackId) {
+                        _isrcLookupCache.set(identity.trackId, {
+                            isrc: resolvedIsrc,
+                            expiresAt: Date.now() + ISRC_LOOKUP_SUCCESS_TTL_MS
+                        });
+                    }
+                    if (reportsMetadata) {
+                        _syncTrackMetadataReported.add(identityKey);
+                    }
+                    const providers = Array.isArray(result.providers) ? result.providers : [];
+                    if (requestGeneration === getCacheGeneration(identityKey)) {
+                        _syncDataCache.set(cacheKey, providers);
+                    }
+                    return providers;
+                })();
+
+                _inflightRequests.set(inflightKey, fetchPromise);
+                try {
+                    return await fetchPromise;
+                } finally {
+                    if (_inflightRequests.get(inflightKey) === fetchPromise) {
+                        _inflightRequests.delete(inflightKey);
+                    }
                 }
-                const providers = Array.isArray(result.providers) ? result.providers : [];
-                if (requestGeneration === getCacheGeneration(identityKey)) {
-                    _syncDataCache.set(cacheKey, providers);
-                }
-                return providers;
             } catch (e) {
                 console.warn(`[SyncDataService] Failed to fetch sync providers for ${identityKey}`, e);
                 return [];
@@ -2998,6 +3049,21 @@
 
             const queryProvider = provider === 'legacy' ? 'spotify' : provider;
             const specificKey = `${identityKey}:${queryProvider}`;
+
+            // LRCLIB source matching, karaoke rendering, and cached contributor
+            // hydration can all request the same live payload during one render.
+            // Reuse only this very recent response; the longer-lived timing cache
+            // below still strips contributor identity fields.
+            const recentSyncData = getRecentSyncDataResponse(specificKey);
+            if (recentSyncData) {
+                syncDataConsoleLog('getSyncData:recent-response-hit', {
+                    isrc: identity.isrc || null,
+                    trackId: identity.trackId || null,
+                    provider: queryProvider,
+                    contributorRefreshRequested: forceContributorRefresh
+                });
+                return recentSyncData;
+            }
 
             if (!forceContributorRefresh && _syncDataCache.has(specificKey)) {
                 const cachedSyncData = _syncDataCache.get(specificKey);
@@ -3047,9 +3113,10 @@
             }
 
             const requestGeneration = getCacheGeneration(identityKey);
-            const inflightKey = forceContributorRefresh
-                ? `${specificKey}:contributor-refresh`
-                : specificKey;
+            // A normal lookup and a contributor refresh hit the same endpoint.
+            // Sharing one request is safe because either response contains the
+            // current timing data and the current contributor privacy state.
+            const inflightKey = specificKey;
             let fetchPromise = null;
             try {
                 if (_inflightRequests.has(inflightKey)) {
@@ -3058,7 +3125,7 @@
                         trackId: identity.trackId || null,
                         provider: queryProvider
                     });
-                    return _inflightRequests.get(inflightKey);
+                    return await _inflightRequests.get(inflightKey);
                 }
 
                 fetchPromise = (async () => {
@@ -3141,6 +3208,7 @@
                         if (requestGeneration !== getCacheGeneration(identityKey)) {
                             return null;
                         }
+                        rememberRecentSyncDataResponse(specificKey, syncData);
                         const cachedSyncData = redactSyncDataForRuntimeCache(syncData);
                         _syncDataCache.set(specificKey, cachedSyncData);
                         if (resolvedIsrc) {
@@ -3191,6 +3259,11 @@
                         _syncDataCache.delete(key);
                     }
                 }
+                for (const key of _recentSyncDataResponses.keys()) {
+                    if (key === identityKey || key.startsWith(`${identityKey}:`)) {
+                        _recentSyncDataResponses.delete(key);
+                    }
+                }
                 _fullyLoadedTracks.delete(identityKey);
                 _syncTrackMetadataReported.delete(identityKey);
                 markServerCacheBypass(identityKey);
@@ -3198,6 +3271,7 @@
                 bumpCacheGeneration();
                 clearInflightRequests();
                 _syncDataCache.clear();
+                _recentSyncDataResponses.clear();
                 _fullyLoadedTracks.clear();
                 _syncTrackMetadataReported.clear();
                 _serverCacheBypassUntil.clear();
