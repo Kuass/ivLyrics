@@ -2081,6 +2081,8 @@ window.LANG_SV = {
       "recordSizeDesc": "Justerar vinylskivans storlek i vinylläget.",
       "animationsLabel": "Vinylanimationer",
       "animationsDesc": "Använd animationer för uppspelning, paus, rotation, entré och låtbyte.",
+      "centerRotationLabel": "Rotera skivans mitt",
+      "centerRotationDesc": "Roterar mittetiketten tillsammans med skivan under uppspelning.",
       "lyricsLabel": "Visa LP-text",
       "lyricsDesc": "Visar den aktuella textraden under skivan i LP-läget.",
       "typographySubtitle": "Justera typsnitten för original, uttal och översättning under skivan separat."

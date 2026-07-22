@@ -2081,6 +2081,8 @@ window.LANG_DE = {
       "recordSizeDesc": "Passt die Größe der Schallplatte im Vinylmodus an.",
       "animationsLabel": "Vinyl-Animationen",
       "animationsDesc": "Aktiviert Animationen für Wiedergabe, Pause, Drehung, Einblenden und Titelwechsel.",
+      "centerRotationLabel": "LP-Mitte drehen",
+      "centerRotationDesc": "Dreht das mittlere Etikett während der Wiedergabe mit der Schallplatte.",
       "lyricsLabel": "LP-Text anzeigen",
       "lyricsDesc": "Zeigt im LP-Modus die aktuelle Textzeile unter der Schallplatte an.",
       "typographySubtitle": "Passe die Schriften für Original, Aussprache und Übersetzung unter der Platte getrennt an."

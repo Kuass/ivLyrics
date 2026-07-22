@@ -2366,6 +2366,10 @@ const CONFIG = {
       "ivLyrics:visual:fullscreen-vinyl-animations",
       true
     ),
+    "fullscreen-vinyl-center-rotation": StorageManager.get(
+      "ivLyrics:visual:fullscreen-vinyl-center-rotation",
+      true
+    ),
     "fullscreen-vinyl-lyrics-enabled": StorageManager.get(
       "ivLyrics:visual:fullscreen-vinyl-lyrics-enabled",
       true

@@ -2082,6 +2082,8 @@ window.LANG_FR = {
       "recordSizeDesc": "Ajuste la taille du disque en mode vinyle.",
       "animationsLabel": "Animations du vinyle",
       "animationsDesc": "Active les animations de lecture, pause, rotation, entrée et changement de morceau.",
+      "centerRotationLabel": "Faire tourner le centre du vinyle",
+      "centerRotationDesc": "Fait tourner l’étiquette centrale avec le disque pendant la lecture.",
       "lyricsLabel": "Afficher les paroles en mode vinyle",
       "lyricsDesc": "Affiche la ligne actuelle sous le disque en mode vinyle.",
       "typographySubtitle": "Ajustez séparément les polices de l’original, de la prononciation et de la traduction sous le vinyle."

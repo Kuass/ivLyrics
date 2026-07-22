@@ -2082,6 +2082,8 @@ window.LANG_KO = {
       "recordSizeDesc": "LP 모드의 LP 판 크기를 조절합니다.",
       "animationsLabel": "LP 애니메이션",
       "animationsDesc": "재생·정지, 회전, 등장 및 곡 전환 애니메이션을 사용합니다.",
+      "centerRotationLabel": "LP 중앙 회전",
+      "centerRotationDesc": "재생 중 LP 중앙 라벨을 LP 판과 함께 회전합니다.",
       "lyricsLabel": "LP 가사 표시",
       "lyricsDesc": "LP 모드에서 LP 아래에 현재 가사를 표시합니다.",
       "typographySubtitle": "LP 아래에 표시되는 원문, 발음, 번역의 글꼴을 각각 조절합니다."

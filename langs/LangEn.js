@@ -2082,6 +2082,8 @@ window.LANG_EN = {
       "recordSizeDesc": "Adjusts the vinyl record size in LP mode.",
       "animationsLabel": "LP animations",
       "animationsDesc": "Use play/pause, record spin, entrance, and track-change animations.",
+      "centerRotationLabel": "Rotate LP center",
+      "centerRotationDesc": "Rotate the center label together with the record during playback.",
       "lyricsLabel": "Show LP lyrics",
       "lyricsDesc": "Show the current lyric below the record in LP mode.",
       "typographySubtitle": "Adjust the fonts for the original, pronunciation, and translation shown below the LP."

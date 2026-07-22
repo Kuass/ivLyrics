@@ -2082,6 +2082,8 @@ window.LANG_ZH_CN = {
       "recordSizeDesc": "调整黑胶模式中的唱片大小。",
       "animationsLabel": "黑胶动画",
       "animationsDesc": "启用播放/暂停、唱片旋转、入场和切歌动画。",
+      "centerRotationLabel": "旋转唱片中心",
+      "centerRotationDesc": "播放时让唱片中心标签随唱片一起旋转。",
       "lyricsLabel": "显示黑胶歌词",
       "lyricsDesc": "在黑胶模式的唱片下方显示当前歌词。",
       "typographySubtitle": "分别调整黑胶唱片下方原文、注音和翻译的字体。"

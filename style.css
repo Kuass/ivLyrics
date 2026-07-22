@@ -8614,6 +8614,12 @@ html.is-lp-view-exit::view-transition-new(root) {
     box-shadow 520ms ease;
 }
 
+.ivlyrics-vinyl-player.is-center-rotation-enabled .ivlyrics-vinyl-label {
+  animation: ivlyrics-vinyl-label-spin 6s linear infinite;
+  animation-play-state: paused;
+  will-change: transform;
+}
+
 .ivlyrics-vinyl-label-ring {
   position: absolute;
   inset: 8%;
@@ -8780,7 +8786,9 @@ html.is-lp-view-exit::view-transition-new(root) {
 }
 
 .ivlyrics-vinyl-player.is-playing .ivlyrics-vinyl-motion,
-.ivlyrics-vinyl-player.is-pausing .ivlyrics-vinyl-motion {
+.ivlyrics-vinyl-player.is-pausing .ivlyrics-vinyl-motion,
+.ivlyrics-vinyl-player.is-center-rotation-enabled.is-playing .ivlyrics-vinyl-label,
+.ivlyrics-vinyl-player.is-center-rotation-enabled.is-pausing .ivlyrics-vinyl-label {
   animation-play-state: running;
 }
 
@@ -9092,6 +9100,10 @@ html.is-lp-view-exit::view-transition-new(root) {
   animation: none !important;
 }
 
+.fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-label {
+  animation: none !important;
+}
+
 @keyframes fullscreen-vinyl-cover-arrive-portrait {
   0% {
     opacity: 0;
@@ -9188,6 +9200,16 @@ html.is-lp-view-exit::view-transition-new(root) {
   }
 }
 
+@keyframes ivlyrics-vinyl-label-spin {
+  from {
+    transform: translate(-50%, -50%) rotate(0turn);
+  }
+
+  to {
+    transform: translate(-50%, -50%) rotate(1turn);
+  }
+}
+
 @media (orientation: portrait) and (min-width: 768px) {
   .ivlyrics-vinyl-player--portrait {
     --iv-vinyl-cover-size: clamp(64px, 10svh, 100px);
@@ -9208,7 +9230,8 @@ html.is-lp-view-exit::view-transition-new(root) {
     transition-duration: 1ms !important;
   }
 
-  .ivlyrics-vinyl-motion {
+  .ivlyrics-vinyl-motion,
+  .ivlyrics-vinyl-label {
     animation-duration: 12s;
   }
 }

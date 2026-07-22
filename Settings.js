@@ -16628,6 +16628,13 @@ const ConfigModal = ({
               defaultValue: CONFIG.visual["fullscreen-vinyl-animations"] !== false,
             },
             {
+              desc: I18n.t("vinyl.settings.centerRotationLabel"),
+              info: I18n.t("vinyl.settings.centerRotationDesc"),
+              key: "fullscreen-vinyl-center-rotation",
+              type: ConfigSlider,
+              defaultValue: CONFIG.visual["fullscreen-vinyl-center-rotation"] !== false,
+            },
+            {
               desc: I18n.t("vinyl.settings.lyricsLabel"),
               info: I18n.t("vinyl.settings.lyricsDesc"),
               key: "fullscreen-vinyl-lyrics-enabled",

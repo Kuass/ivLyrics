@@ -2391,6 +2391,7 @@ const FullscreenOverlay = (() => {
                     albumSize: CONFIG?.visual?.["fullscreen-vinyl-album-size"] ?? 100,
                     recordSize: CONFIG?.visual?.["fullscreen-vinyl-record-size"] ?? 100,
                     animations: CONFIG?.visual?.["fullscreen-vinyl-animations"] !== false,
+                    centerRotation: CONFIG?.visual?.["fullscreen-vinyl-center-rotation"] !== false,
                     lyricsEnabled: CONFIG?.visual?.["fullscreen-vinyl-lyrics-enabled"] !== false,
                     originalFontFamily: CONFIG?.visual?.["fullscreen-vinyl-original-font-family"] || "Pretendard Variable",
                     originalFontSize: CONFIG?.visual?.["fullscreen-vinyl-original-font-size"] ?? 31,

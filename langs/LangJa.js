@@ -2082,6 +2082,8 @@ window.LANG_JA = {
       "recordSizeDesc": "LP モードのレコードのサイズを調整します。",
       "animationsLabel": "LP アニメーション",
       "animationsDesc": "再生・一時停止、回転、登場、曲変更のアニメーションを使用します。",
+      "centerRotationLabel": "LP中央を回転",
+      "centerRotationDesc": "再生中に中央ラベルをレコードと一緒に回転させます。",
       "lyricsLabel": "LP歌詞を表示",
       "lyricsDesc": "LPモードでレコードの下に現在の歌詞を表示します。",
       "typographySubtitle": "LP の下に表示する原文・発音・翻訳のフォントを個別に調整します。"

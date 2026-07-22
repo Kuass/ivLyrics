@@ -2082,6 +2082,8 @@ window.LANG_TR = {
       "recordSizeDesc": "Plak modundaki plağın boyutunu ayarlar.",
       "animationsLabel": "Plak animasyonları",
       "animationsDesc": "Oynatma, duraklatma, dönme, giriş ve parça geçişi animasyonlarını kullanır.",
+      "centerRotationLabel": "Plak merkezini döndür",
+      "centerRotationDesc": "Oynatma sırasında merkez etiketini plakla birlikte döndürür.",
       "lyricsLabel": "Plak modu sözlerini göster",
       "lyricsDesc": "Plak modunda geçerli söz satırını plağın altında gösterir.",
       "typographySubtitle": "Plağın altında görünen özgün metin, telaffuz ve çeviri yazı tiplerini ayrı ayrı ayarlayın."

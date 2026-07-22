@@ -2082,6 +2082,8 @@ window.LANG_ES = {
       "recordSizeDesc": "Ajusta el tamaño del disco en el modo vinilo.",
       "animationsLabel": "Animaciones del vinilo",
       "animationsDesc": "Usa animaciones de reproducción, pausa, giro, entrada y cambio de canción.",
+      "centerRotationLabel": "Girar el centro del vinilo",
+      "centerRotationDesc": "Gira la etiqueta central junto con el disco durante la reproducción.",
       "lyricsLabel": "Mostrar letra en modo LP",
       "lyricsDesc": "Muestra la línea actual debajo del disco en el modo LP.",
       "typographySubtitle": "Ajusta por separado las fuentes del original, la pronunciación y la traducción bajo el vinilo."

@@ -685,6 +685,7 @@ const VinylPlayerMode = (() => {
         onTogglePlayback
     }) => {
         const animationsEnabled = vinylSettings.animations !== false;
+        const centerRotationEnabled = vinylSettings.centerRotation !== false;
         const lyricsEnabled = vinylSettings.lyricsEnabled !== false;
         const albumScale = Math.min(1.4, Math.max(0.7, (Number(vinylSettings.albumSize) || 100) / 100));
         const recordScale = Math.min(1.4, Math.max(0.7, (Number(vinylSettings.recordSize) || 100) / 100));
@@ -977,6 +978,7 @@ const VinylPlayerMode = (() => {
                 className: [
                     "ivlyrics-vinyl-player--immersive",
                     isPortraitLayout ? "ivlyrics-vinyl-player--portrait-layout" : "",
+                    centerRotationEnabled ? "is-center-rotation-enabled" : "",
                     transitionClass
                 ].filter(Boolean).join(" "),
                 style: {

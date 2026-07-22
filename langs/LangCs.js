@@ -2081,6 +2081,8 @@ window.LANG_CS = {
       "recordSizeDesc": "Upraví velikost vinylové desky ve vinylovém režimu.",
       "animationsLabel": "Animace vinylu",
       "animationsDesc": "Použije animace přehrávání, pauzy, otáčení, příchodu a změny skladby.",
+      "centerRotationLabel": "Otáčet střed desky",
+      "centerRotationDesc": "Během přehrávání otáčí středovým štítkem společně s deskou.",
       "lyricsLabel": "Zobrazit text v režimu vinylu",
       "lyricsDesc": "V režimu vinylu zobrazí aktuální řádek textu pod deskou.",
       "typographySubtitle": "Samostatně upravte písma originálu, výslovnosti a překladu pod deskou."
