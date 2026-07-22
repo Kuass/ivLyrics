@@ -2366,18 +2366,22 @@ const CONFIG = {
       "ivLyrics:visual:fullscreen-vinyl-animations",
       true
     ),
+    "fullscreen-vinyl-lyrics-enabled": StorageManager.get(
+      "ivLyrics:visual:fullscreen-vinyl-lyrics-enabled",
+      true
+    ),
     "fullscreen-vinyl-original-font-family":
       StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-font-family") ||
       "Pretendard Variable",
     "fullscreen-vinyl-original-font-size":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-font-size")) ||
-      32,
+      31,
     "fullscreen-vinyl-original-font-weight":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-font-weight")) ||
-      700,
+      600,
     "fullscreen-vinyl-original-opacity":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-opacity")) ||
-      100,
+      95,
     "fullscreen-vinyl-original-letter-spacing":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-letter-spacing")) ||
       0,
@@ -2386,16 +2390,15 @@ const CONFIG = {
       "Pretendard Variable",
     "fullscreen-vinyl-phonetic-font-size":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-font-size")) ||
-      17,
+      11,
     "fullscreen-vinyl-phonetic-font-weight":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-font-weight")) ||
-      500,
+      100,
     "fullscreen-vinyl-phonetic-opacity":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-opacity")) ||
-      86,
+      70,
     "fullscreen-vinyl-phonetic-spacing":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-spacing")) ||
-      3,
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-spacing") ?? -1),
     "fullscreen-vinyl-phonetic-letter-spacing":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-letter-spacing")) ||
       0,
@@ -2404,16 +2407,16 @@ const CONFIG = {
       "Pretendard Variable",
     "fullscreen-vinyl-translation-font-size":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-font-size")) ||
-      18,
+      15,
     "fullscreen-vinyl-translation-font-weight":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-font-weight")) ||
-      500,
+      300,
     "fullscreen-vinyl-translation-opacity":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-opacity")) ||
-      90,
+      85,
     "fullscreen-vinyl-translation-spacing":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-spacing")) ||
-      4,
+      0,
     "fullscreen-vinyl-translation-letter-spacing":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-letter-spacing")) ||
       0,

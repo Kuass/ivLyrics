@@ -2091,6 +2091,8 @@ window.LANG_MS = {
       "recordSizeDesc": "Melaraskan saiz piring hitam dalam mod vinil.",
       "animationsLabel": "Animasi vinil",
       "animationsDesc": "Gunakan animasi main, jeda, putaran, kemunculan dan pertukaran lagu.",
+      "lyricsLabel": "Tunjukkan lirik mod vinil",
+      "lyricsDesc": "Memaparkan baris lirik semasa di bawah piring hitam dalam mod vinil.",
       "typographySubtitle": "Laraskan fon teks asal, sebutan dan terjemahan di bawah piring hitam secara berasingan."
     }
   },

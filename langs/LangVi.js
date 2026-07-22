@@ -2082,6 +2082,8 @@ window.LANG_VI = {
       "recordSizeDesc": "Điều chỉnh kích thước đĩa trong chế độ đĩa than.",
       "animationsLabel": "Hoạt ảnh đĩa than",
       "animationsDesc": "Dùng hoạt ảnh phát, tạm dừng, xoay, xuất hiện và chuyển bài.",
+      "lyricsLabel": "Hiện lời ở chế độ đĩa than",
+      "lyricsDesc": "Hiển thị câu hát hiện tại bên dưới đĩa trong chế độ đĩa than.",
       "typographySubtitle": "Điều chỉnh riêng phông chữ cho lời gốc, phiên âm và bản dịch bên dưới đĩa."
     }
   },

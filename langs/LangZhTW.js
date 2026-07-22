@@ -2082,6 +2082,8 @@ window.LANG_ZH_TW = {
       "recordSizeDesc": "調整黑膠模式中的唱片大小。",
       "animationsLabel": "黑膠動畫",
       "animationsDesc": "啟用播放/暫停、唱片旋轉、進場與切歌動畫。",
+      "lyricsLabel": "顯示黑膠歌詞",
+      "lyricsDesc": "在黑膠模式的唱片下方顯示目前歌詞。",
       "typographySubtitle": "分別調整黑膠唱片下方原文、注音與翻譯的字型。"
     }
   },

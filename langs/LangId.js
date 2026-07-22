@@ -2081,6 +2081,8 @@ window.LANG_ID = {
       "recordSizeDesc": "Menyesuaikan ukuran piringan dalam mode vinil.",
       "animationsLabel": "Animasi vinil",
       "animationsDesc": "Gunakan animasi putar, jeda, rotasi, masuk, dan pergantian lagu.",
+      "lyricsLabel": "Tampilkan lirik mode vinil",
+      "lyricsDesc": "Menampilkan baris lirik saat ini di bawah piringan dalam mode vinil.",
       "typographySubtitle": "Sesuaikan font teks asli, pelafalan, dan terjemahan di bawah piringan secara terpisah."
     }
   },

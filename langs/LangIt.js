@@ -2082,6 +2082,8 @@ window.LANG_IT = {
       "recordSizeDesc": "Regola la dimensione del disco in modalità vinile.",
       "animationsLabel": "Animazioni vinile",
       "animationsDesc": "Usa le animazioni di riproduzione, pausa, rotazione, ingresso e cambio brano.",
+      "lyricsLabel": "Mostra testo in modalità vinile",
+      "lyricsDesc": "Mostra la riga corrente sotto il disco nella modalità vinile.",
       "typographySubtitle": "Regola separatamente i font di originale, pronuncia e traduzione sotto il vinile."
     }
   },
