@@ -8940,18 +8940,19 @@ html.is-lp-view-exit::view-transition-new(root) {
 .ivlyrics-vinyl-player.is-track-record-emerging .ivlyrics-vinyl-sleeve,
 .ivlyrics-vinyl-player.is-track-record-raised .ivlyrics-vinyl-sleeve,
 .ivlyrics-vinyl-player.is-track-handoff .ivlyrics-vinyl-sleeve {
-  z-index: 2;
+  z-index: 1;
 }
 
-/* Track handoff stack, bottom to top: old LP (1), old album (2), new LP (3),
-   new album (4). After the new LP has fully emerged it jumps to layer 5. The
-   hidden base pair is then replaced and settles at album 1 / LP 2 on idle. */
+/* Keep the currently playing pair stable throughout track replacement:
+   old album (1), old LP (2), new LP (3), new album (4). After the new LP has
+   fully cleared its sleeve it rises to layer 5. Handoff then replaces the
+   hidden base pair without ever flipping the old album in front of its LP. */
 .ivlyrics-vinyl-player.is-track-preparing .ivlyrics-vinyl-record-shell,
 .ivlyrics-vinyl-player.is-track-album-arriving .ivlyrics-vinyl-record-shell,
 .ivlyrics-vinyl-player.is-track-record-emerging .ivlyrics-vinyl-record-shell,
 .ivlyrics-vinyl-player.is-track-record-raised .ivlyrics-vinyl-record-shell,
 .ivlyrics-vinyl-player.is-track-handoff .ivlyrics-vinyl-record-shell {
-  z-index: 1;
+  z-index: 2;
 }
 
 /* Portrait LP composition: the sleeve opens above a record that drops into
