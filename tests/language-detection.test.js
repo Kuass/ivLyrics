@@ -9,18 +9,27 @@ const vm = require('node:vm');
 // evaluate only that, so these tests still exercise the shipped implementation.
 const UTILS_START = '    const Utils = {';
 const UTILS_END = '    };';
+// Utils.detectLanguage calls this module-scope helper, so the slice has to
+// carry it too or the sandbox differs from how the file actually loads.
+const HASH_START = '    const getLyricsTextCacheHash = (text) => {';
+const HASH_END = '    };';
+
+function sliceBlock(lines, startLine, endLine, label) {
+    const startIndex = lines.indexOf(startLine);
+    assert.ok(startIndex >= 0, `LyricsService.js is missing ${label}`);
+    const endIndex = lines.findIndex((line, index) => index > startIndex && line === endLine);
+    assert.ok(endIndex > startIndex, `LyricsService.js has an unterminated ${label}`);
+    return lines.slice(startIndex, endIndex + 1).join('\n');
+}
 
 function extractUtilsSource() {
     const source = fs.readFileSync(path.join(__dirname, '..', 'LyricsService.js'), 'utf8');
     const lines = source.split('\n');
 
-    const startIndex = lines.indexOf(UTILS_START);
-    assert.ok(startIndex >= 0, 'LyricsService.js is missing the Utils object literal');
-
-    const endIndex = lines.findIndex((line, index) => index > startIndex && line === UTILS_END);
-    assert.ok(endIndex > startIndex, 'LyricsService.js has an unterminated Utils object literal');
-
-    return lines.slice(startIndex, endIndex + 1).join('\n');
+    return [
+        sliceBlock(lines, HASH_START, HASH_END, 'the getLyricsTextCacheHash helper'),
+        sliceBlock(lines, UTILS_START, UTILS_END, 'the Utils object literal')
+    ].join('\n\n');
 }
 
 function createUtils({ hansThreshold = 40, jaThreshold = 40 } = {}) {
@@ -256,6 +265,42 @@ tinggallah sebentar lagi`));
     );
 });
 
+test('an ordinary-length foreign line does not outvote the rest of the lyric', () => {
+    const Utils = createUtils();
+
+    // The Bengali line is 12.3% of the non-whitespace characters, so a gate
+    // that only asked whether a script was "present enough" let one line
+    // relabel the whole lyric. Latin has to be part of the comparison.
+    assert.equal(Utils.detectLanguage(toLyricLines(`I remember when the summer ended
+you said my name like it was ours
+and I keep it in my pocket now
+oh oh oh, I keep it now
+যখন রাত নেমে আসে`)), 'en');
+});
+
+test('a majority language survives a hook in another Latin language', () => {
+    const Utils = createUtils();
+
+    // Four French lines against one German line. The French text carries no
+    // accent, so an unconditional no-diacritic penalty halved it and handed
+    // the lyric to the single German line.
+    assert.equal(Utils.detectLanguage(toLyricLines(`quand la nuit tombe enfin
+je te cherche dans les rues vides
+je ne sais pas t'oublier
+reste encore un peu
+wenn die Nacht endlich fällt`)), 'fr');
+});
+
+test('traditional Chinese is not masked by characters shared with simplified', () => {
+    const Utils = createUtils();
+
+    // More than half of each character class also appears in the other, so
+    // counting a glyph that matches both as evidence for both made shared
+    // characters look like distinguishing evidence. Only exclusive matches
+    // carry information.
+    assert.equal(Utils.detectLanguage(toLyricLines('聽見你的聲音')), 'zh-hant');
+});
+
 test('short fragments still resolve to the right language', () => {
     const Utils = createUtils();
 
@@ -292,4 +337,180 @@ test('detection results are cached per lyric set', () => {
     assert.equal(Utils.detectLanguage(lines), 'en');
     assert.ok(Utils._langDetectCache.size > 0, 'expected the detection result to be cached');
     assert.equal(Utils.detectLanguage(lines), 'en');
+});
+
+test('two lyrics sharing an opening are not served the same cached verdict', () => {
+    const Utils = createUtils();
+
+    // The cache key used to be the first 200 characters of the lyric, so a
+    // shared intro made one song inherit the other's language.
+    const sharedOpening = 'la la la la la '.repeat(14);
+    const korean = Utils.detectLanguage(toLyricLines(
+        `${sharedOpening}\n너의 이름을 부르면 내 마음이 자꾸 흔들려 밤이 오면 더 선명해져 그대로 있어줘`
+    ));
+    const japanese = Utils.detectLanguage(toLyricLines(
+        `${sharedOpening}\n君の名前を呼んだら心が揺れてしまうよ夜が来ればもっと鮮明にそのままでいて`
+    ));
+
+    assert.equal(korean, 'ko');
+    assert.equal(japanese, 'ja');
+});
+
+test('a cached verdict matches what a fresh detector computes', () => {
+    const samples = ['ko', 'ja', 'fr', 'ru', 'ar'].map(
+        (id) => CORPUS.find((entry) => entry.id === id)
+    );
+
+    for (const { id, text } of samples) {
+        const fresh = createUtils().detectLanguage(toLyricLines(text));
+
+        const warmed = createUtils();
+        warmed.detectLanguage(toLyricLines(text));
+        const cached = warmed.detectLanguage(toLyricLines(text));
+
+        assert.equal(cached, fresh, `${id}: cached verdict differs from a fresh computation`);
+    }
+});
+
+test('malformed line shapes never throw and never return a foreign type', () => {
+    const Utils = createUtils();
+    const inputs = [
+        null, undefined, [], {}, 'not-an-array', 42, true,
+        [null], [undefined], [{}], [{ text: null }], [{ text: 42 }], [{ text: {} }],
+        [{ text: [] }], [{ originalText: null, text: undefined }],
+        [{ $$typeof: Symbol.for('react.element'), text: 'hola qué tal' }],
+        ['a bare string line'], [['a nested array']], [0], [false], [NaN]
+    ];
+
+    for (const input of inputs) {
+        const result = Utils.detectLanguage(input);
+        assert.ok(
+            result === null || typeof result === 'string',
+            `input ${JSON.stringify(input)} returned ${Object.prototype.toString.call(result)}`
+        );
+    }
+});
+
+test('content that carries no language returns null', () => {
+    const Utils = createUtils();
+
+    for (const sample of ['♪ ♪ ♪', '123 456 789', '...', '🎵🎶🎵', '- - -', '   ', '\t\n']) {
+        assert.equal(
+            Utils.detectLanguage(toLyricLines(sample)),
+            null,
+            `expected null for ${JSON.stringify(sample)}`
+        );
+    }
+});
+
+test('decomposed and precomposed input agree', () => {
+    // Providers do not normalise consistently, and the diacritic rules would
+    // silently stop matching if a lyric arrived decomposed.
+    for (const id of ['vi', 'es', 'fr', 'pt', 'cs', 'tr']) {
+        const { text } = CORPUS.find((entry) => entry.id === id);
+        const precomposed = createUtils().detectLanguage(toLyricLines(text.normalize('NFC')));
+        const decomposed = createUtils().detectLanguage(toLyricLines(text.normalize('NFD')));
+
+        assert.equal(decomposed, precomposed, `${id}: NFD input disagreed with NFC input`);
+    }
+});
+
+test('zero-width characters do not change the verdict', () => {
+    const { text } = CORPUS.find((entry) => entry.id === 'ko');
+    const clean = createUtils().detectLanguage(toLyricLines(text));
+    const padded = createUtils().detectLanguage(toLyricLines(text.replace(/ /g, '​ ')));
+
+    assert.equal(padded, clean);
+});
+
+test('threshold settings that are missing or nonsensical still yield a verdict', () => {
+    const { text } = CORPUS.find((entry) => entry.id === 'ja');
+    const stores = [
+        {},
+        { hansThreshold: 0 }, { hansThreshold: 100 },
+        { jaThreshold: 0 }, { jaThreshold: 100 },
+        { jaThreshold: -5 }, { jaThreshold: 'not-a-number' }
+    ];
+
+    for (const store of stores) {
+        const result = createUtils(store).detectLanguage(toLyricLines(text));
+        assert.ok(
+            result === null || typeof result === 'string',
+            `settings ${JSON.stringify(store)} produced ${result}`
+        );
+    }
+});
+
+test('a lone foreign line never captures a lyric of four lines or more', () => {
+    const Utils = createUtils();
+    const foreign = { ko: '너의 이름을 부르면', ja: '君の名前を呼んだら', bn: 'যখন রাত নেমে আসে', ru: 'когда наступает ночь' };
+    const english = 'I keep it in my pocket now';
+
+    for (const [lang, line] of Object.entries(foreign)) {
+        for (let total = 4; total <= 8; total++) {
+            const lyric = [line, ...Array(total - 1).fill(english)].join('\n');
+            assert.notEqual(
+                Utils.detectLanguage(toLyricLines(lyric)),
+                lang,
+                `one ${lang} line captured a ${total}-line English lyric`
+            );
+        }
+    }
+});
+
+test('a language present throughout still wins despite more English lines', () => {
+    const Utils = createUtils();
+
+    // Korean pop routinely carries more English lines than Korean ones. The
+    // Korean is present throughout rather than as a single borrowed hook.
+    const lyric = `너의 이름을 부르면
+baby I don't wanna let you go
+내 마음이 자꾸 흔들려
+oh oh, don't let me go
+밤이 오면 더 선명해져
+I keep it in my pocket now
+그대로 있어줘
+and I keep it now`;
+
+    assert.equal(Utils.detectLanguage(toLyricLines(lyric)), 'ko');
+});
+
+test('a single-line lyric in a non-Latin script is that language', () => {
+    const Utils = createUtils();
+
+    // The hook floor must not apply when there are too few lines for anything
+    // to be a hook.
+    assert.equal(Utils.detectLanguage(toLyricLines('너의 이름을 부르면')), 'ko');
+    assert.equal(Utils.detectLanguage(toLyricLines('君の名前を呼んだら')), 'ja');
+    assert.equal(Utils.detectLanguage(toLyricLines('когда наступает ночь')), 'ru');
+    assert.equal(Utils.detectLanguage(toLyricLines('যখন রাত নেমে আসে')), 'bn');
+});
+
+test('every verdict is a label the rest of the app understands', () => {
+    // index.js branches on these strings and injectExternals switches on the
+    // two-letter codes; an unexpected value would silently disable conversion.
+    const SUPPORTED = new Set([
+        'ar', 'bn', 'cs', 'de', 'en', 'es', 'fa', 'fr', 'hi', 'id', 'it', 'ja',
+        'ko', 'ms', 'nl', 'pl', 'pt', 'ru', 'sv', 'th', 'tr', 'vi',
+        'zh-hans', 'zh-hant'
+    ]);
+    const Utils = createUtils();
+
+    for (const { id, text } of CORPUS) {
+        const result = Utils.detectLanguage(toLyricLines(text));
+        assert.ok(result === null || SUPPORTED.has(result), `${id} produced unsupported label ${result}`);
+    }
+});
+
+test('a long lyric is handled without error or excessive delay', () => {
+    const Utils = createUtils();
+    const { text } = CORPUS.find((entry) => entry.id === 'ko');
+    const long = Array(2000).fill(text).join('\n');
+
+    const startedAt = Date.now();
+    const result = Utils.detectLanguage(toLyricLines(long));
+    const elapsed = Date.now() - startedAt;
+
+    assert.equal(result, 'ko');
+    assert.ok(elapsed < 5000, `detection took ${elapsed}ms`);
 });
