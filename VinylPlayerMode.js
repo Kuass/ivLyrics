@@ -32,6 +32,7 @@ const VinylPlayerMode = (() => {
         ["paused", 2030]
     ];
 
+    const TRACK_RECORD_CLEAR_MS = 180;
     const TRACK_RECORD_SLEEVE_MS = 680;
     const TRACK_ALBUM_DEPART_MS = 480;
     const TRACK_ALBUM_ARRIVE_MS = 700;
@@ -39,8 +40,25 @@ const VinylPlayerMode = (() => {
     const TRACK_RECORD_RAISE_MS = 360;
     const TRACK_HANDOFF_MS = 96;
     const TRACK_COVER_PRELOAD_MAX_MS = 320;
+    const VINYL_FALLBACK_ACCENT = "var(--spice-button-active, #ff809d)";
+    const VINYL_SEEK_END_GUARD_MIN_MS = 250;
+    const VINYL_SEEK_END_GUARD_MAX_MS = 500;
 
     const clampVinylProgress = (value) => Math.min(Math.max(value, 0), 1);
+    const clampVinylSeekPosition = (value, duration) => {
+        const safeDuration = Math.max(Number(duration) || 0, 0);
+        const safeValue = Math.max(Number(value) || 0, 0);
+        if (safeDuration <= 0) return safeValue;
+
+        const endGuard = Math.min(
+            safeDuration,
+            Math.max(
+                VINYL_SEEK_END_GUARD_MIN_MS,
+                Math.min(VINYL_SEEK_END_GUARD_MAX_MS, safeDuration * 0.02)
+            )
+        );
+        return Math.min(safeValue, Math.max(safeDuration - endGuard, 0));
+    };
     const VINYL_TONEARM_MIN_ANGLE = -5.4;
     const VINYL_TONEARM_MAX_ANGLE = 18;
     const VINYL_TONEARM_EJECT_ANGLE = -8.2;
@@ -399,7 +417,7 @@ const VinylPlayerMode = (() => {
         }, [getPointerAngle, getPointerLinearProgress, safeDuration, tonearmRange, tonearmStyle]);
 
         const commitSeek = useCallback((nextPosition) => {
-            const clampedPosition = Math.min(Math.max(nextPosition, 0), safeDuration);
+            const clampedPosition = clampVinylSeekPosition(nextPosition, safeDuration);
             clearTonearmPreview();
             setOptimisticPosition(clampedPosition);
             onSeek?.(clampedPosition);
@@ -705,9 +723,7 @@ const VinylPlayerMode = (() => {
                 incomingTrack && react.createElement("span", {
                     className: "ivlyrics-vinyl-incoming-record-shell",
                     "aria-hidden": "true",
-                    style: incomingTrack.accent
-                        ? { "--iv-vinyl-accent": incomingTrack.accent }
-                        : undefined
+                    style: { "--iv-vinyl-accent": incomingTrack.accent }
                 },
                     react.createElement(VinylDisc, {
                         title: incomingTrack.title,
@@ -836,13 +852,14 @@ const VinylPlayerMode = (() => {
             title: track.title || "LP",
             artist: track.artist || "",
             album: track.album || track.title || "ivLyrics",
-            accent: String(track.accent || "").trim()
+            accent: String(track.accent || "").trim() || VINYL_FALLBACK_ACCENT
         };
         const liveTrackRef = useRef(liveTrack);
         liveTrackRef.current = liveTrack;
         const [displayedTrack, setDisplayedTrack] = useState(() => liveTrack);
         const displayedTrackRef = useRef(liveTrack);
         const [incomingTrack, setIncomingTrack] = useState(null);
+        const incomingTrackRef = useRef(null);
         const [trackTransition, setTrackTransition] = useState("idle");
         const requestedTrackKeyRef = useRef("");
         const trackTransitionRevisionRef = useRef(0);
@@ -903,13 +920,15 @@ const VinylPlayerMode = (() => {
             if (!shownTrack?.uri || !animationsEnabled || reducedMotion) {
                 displayedTrackRef.current = liveTrack;
                 setDisplayedTrack(liveTrack);
+                incomingTrackRef.current = null;
                 setIncomingTrack(null);
                 setTrackTransition("idle");
                 return;
             }
 
+            incomingTrackRef.current = liveTrack;
             setIncomingTrack(liveTrack);
-            setTrackTransition("record-sleeving");
+            setTrackTransition("record-clearing");
 
             let preloadImage = null;
             let coverReady = false;
@@ -935,15 +954,23 @@ const VinylPlayerMode = (() => {
                         trackRaiseTimerRef.current = window.setTimeout(() => {
                             if (trackTransitionRevisionRef.current !== revision) return;
                             trackRaiseTimerRef.current = null;
-                            const committedTrack = liveTrackRef.current?.uri === liveTrack.uri
+                            const latestTrack = liveTrackRef.current?.uri === liveTrack.uri
                                 ? liveTrackRef.current
                                 : liveTrack;
+                            const transitionSnapshot = incomingTrackRef.current?.uri === liveTrack.uri
+                                ? incomingTrackRef.current
+                                : liveTrack;
+                            const committedTrack = {
+                                ...latestTrack,
+                                accent: transitionSnapshot.accent
+                            };
                             displayedTrackRef.current = committedTrack;
                             setDisplayedTrack(committedTrack);
                             setTrackTransition("handoff");
                             trackHandoffTimerRef.current = window.setTimeout(() => {
                                 if (trackTransitionRevisionRef.current !== revision) return;
                                 trackHandoffTimerRef.current = null;
+                                incomingTrackRef.current = null;
                                 setIncomingTrack(null);
                                 setTrackTransition("idle");
                             }, TRACK_HANDOFF_MS);
@@ -965,14 +992,19 @@ const VinylPlayerMode = (() => {
             trackSleeveTimerRef.current = window.setTimeout(() => {
                 if (trackTransitionRevisionRef.current !== revision) return;
                 trackSleeveTimerRef.current = null;
-                setTrackTransition("album-departing");
-                trackDepartureTimerRef.current = window.setTimeout(() => {
+                setTrackTransition("record-sleeving");
+                trackSleeveTimerRef.current = window.setTimeout(() => {
                     if (trackTransitionRevisionRef.current !== revision) return;
-                    trackDepartureTimerRef.current = null;
-                    departureFinished = true;
-                    beginFlight();
-                }, TRACK_ALBUM_DEPART_MS);
-            }, TRACK_RECORD_SLEEVE_MS);
+                    trackSleeveTimerRef.current = null;
+                    setTrackTransition("album-departing");
+                    trackDepartureTimerRef.current = window.setTimeout(() => {
+                        if (trackTransitionRevisionRef.current !== revision) return;
+                        trackDepartureTimerRef.current = null;
+                        departureFinished = true;
+                        beginFlight();
+                    }, TRACK_ALBUM_DEPART_MS);
+                }, TRACK_RECORD_SLEEVE_MS);
+            }, TRACK_RECORD_CLEAR_MS);
 
             trackPreloadTimerRef.current = window.setTimeout(
                 markCoverReady,
@@ -1011,8 +1043,8 @@ const VinylPlayerMode = (() => {
             clearTrackTimers();
         }, [clearTrackTimers]);
 
-        // Color extraction may finish after the track-change animation starts.
-        // Update only the matching visual snapshot instead of recoloring both LPs.
+        // Keep the visible incoming LP's label stable. A color that arrives after
+        // the record starts emerging is applied only after handoff has settled.
         useEffect(() => {
             if (!liveTrack.accent) return;
 
@@ -1020,16 +1052,27 @@ const VinylPlayerMode = (() => {
                 if (!current || current.uri !== liveTrack.uri || current.accent === liveTrack.accent) {
                     return current;
                 }
-                return { ...current, accent: liveTrack.accent };
+                if (![
+                    "record-clearing",
+                    "record-sleeving",
+                    "album-departing",
+                    "album-arriving"
+                ].includes(trackTransition)) {
+                    return current;
+                }
+                const updatedTrack = { ...current, accent: liveTrack.accent };
+                incomingTrackRef.current = updatedTrack;
+                return updatedTrack;
             });
 
+            if (trackTransition !== "idle") return;
             const shownTrack = displayedTrackRef.current;
             if (shownTrack?.uri === liveTrack.uri && shownTrack.accent !== liveTrack.accent) {
                 const updatedTrack = { ...shownTrack, accent: liveTrack.accent };
                 displayedTrackRef.current = updatedTrack;
                 setDisplayedTrack(updatedTrack);
             }
-        }, [liveTrack.uri, liveTrack.accent]);
+        }, [liveTrack.uri, liveTrack.accent, trackTransition]);
 
         const activeVinylLyric = String(activeLyric || "")
             .replace(/\s+/g, " ")
@@ -1150,7 +1193,7 @@ const VinylPlayerMode = (() => {
                     "--iv-vinyl-translation-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.translationOpacity) || 85) / 100)),
                     "--iv-vinyl-translation-spacing": `${Number(vinylSettings.translationSpacing) || 0}px`,
                     "--iv-vinyl-translation-letter-spacing": `${Number(vinylSettings.translationLetterSpacing) || 0}px`,
-                    ...(displayedTrack.accent ? { "--iv-vinyl-accent": displayedTrack.accent } : {})
+                    "--iv-vinyl-accent": displayedTrack.accent
                 },
                 coverUrl: displayedTrack.coverUrl,
                 title: displayedTrack.title,

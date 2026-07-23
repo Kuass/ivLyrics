@@ -8218,6 +8218,12 @@ html.is-lp-view-exit::view-transition-new(root) {
   }
 }
 
+@property --iv-vinyl-spin-angle {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0turn;
+}
+
 .ivlyrics-vinyl-player {
   --iv-vinyl-cover-size: 400px;
   --iv-vinyl-accent: var(--iv-vinyl-track-accent, var(--spice-button-active, #ff809d));
@@ -8230,6 +8236,7 @@ html.is-lp-view-exit::view-transition-new(root) {
   --iv-vinyl-incoming-record-clear-transform: translate3d(22%, -1%, 0) scale(1.008);
   --iv-vinyl-incoming-record-target-transform: translate3d(0, 0, 0) scale(1);
   --iv-vinyl-incoming-record-start-clip: inset(0 0 0 88%);
+  --iv-vinyl-incoming-record-clear-clip: inset(-16%);
   position: relative;
   width: calc(var(--iv-vinyl-cover-size) * 1.82);
   max-width: 100%;
@@ -8259,19 +8266,20 @@ html.is-lp-view-exit::view-transition-new(root) {
   --iv-vinyl-cover-size: min(42vw, 60svh, calc(72svh * var(--iv-vinyl-safe-scale-factor, 1)));
   width: min(calc(var(--iv-vinyl-cover-size) * 1.82), 88vw);
   max-width: 88vw;
-  filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.28));
   transition:
     width 620ms cubic-bezier(0.22, 1, 0.36, 1),
     height 620ms cubic-bezier(0.22, 1, 0.36, 1),
-    max-width 620ms cubic-bezier(0.22, 1, 0.36, 1),
-    filter 360ms ease;
+    max-width 620ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .ivlyrics-vinyl-visual-group {
+  --iv-vinyl-spin-angle: 0turn;
   position: absolute;
   z-index: 1;
   inset: 0;
   transform: translate3d(0, 0, 0);
+  animation: ivlyrics-vinyl-spin-clock 6s linear infinite;
+  animation-play-state: paused;
   transition: transform 780ms cubic-bezier(0.65, 0, 0.35, 1);
   will-change: transform;
 }
@@ -8356,7 +8364,9 @@ html.is-lp-view-exit::view-transition-new(root) {
   height: 100%;
   box-sizing: border-box;
   pointer-events: none;
-  will-change: transform, opacity, filter, clip-path;
+  backface-visibility: hidden;
+  contain: layout style;
+  will-change: transform, opacity;
 }
 
 .ivlyrics-vinyl-incoming-sleeve {
@@ -8408,8 +8418,8 @@ html.is-lp-view-exit::view-transition-new(root) {
   opacity: 0;
   transform: var(--iv-vinyl-incoming-record-start-transform);
   clip-path: var(--iv-vinyl-incoming-record-start-clip);
-  filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.12));
   scale: var(--iv-vinyl-record-scale, 1);
+  will-change: transform, opacity, clip-path;
 }
 
 .ivlyrics-vinyl-player.is-track-album-arriving .ivlyrics-vinyl-incoming-sleeve {
@@ -8423,7 +8433,6 @@ html.is-lp-view-exit::view-transition-new(root) {
 .ivlyrics-vinyl-player.is-track-record-emerging .ivlyrics-vinyl-incoming-sleeve {
   opacity: 1;
   transform: var(--iv-vinyl-flight-target-transform);
-  filter: blur(0) saturate(1);
 }
 
 .ivlyrics-vinyl-player.is-track-record-emerging .ivlyrics-vinyl-incoming-record-shell {
@@ -8434,7 +8443,6 @@ html.is-lp-view-exit::view-transition-new(root) {
 .ivlyrics-vinyl-player.is-track-handoff .ivlyrics-vinyl-incoming-sleeve {
   opacity: 1;
   transform: var(--iv-vinyl-flight-target-transform);
-  filter: blur(0) saturate(1);
 }
 
 .ivlyrics-vinyl-player.is-track-record-raised .ivlyrics-vinyl-incoming-record-shell {
@@ -8446,15 +8454,13 @@ html.is-lp-view-exit::view-transition-new(root) {
   z-index: 5;
   opacity: 1;
   transform: var(--iv-vinyl-incoming-record-target-transform);
-  clip-path: inset(0);
-  filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.22));
+  clip-path: var(--iv-vinyl-incoming-record-clear-clip);
 }
 
 @keyframes fullscreen-vinyl-cover-arrive-landscape {
   0% {
     opacity: 0;
     transform: translate3d(86vw, -38vh, 0) rotate(22deg) scale(0.56);
-    filter: blur(3px) saturate(0.82);
   }
 
   11% {
@@ -8464,13 +8470,11 @@ html.is-lp-view-exit::view-transition-new(root) {
   74% {
     opacity: 1;
     transform: translate3d(-5%, 3%, 0) rotate(-8deg) scale(1.025);
-    filter: blur(0) saturate(1.04);
   }
 
   100% {
     opacity: 1;
     transform: var(--iv-vinyl-flight-target-transform);
-    filter: blur(0) saturate(1);
   }
 }
 
@@ -8495,7 +8499,6 @@ html.is-lp-view-exit::view-transition-new(root) {
     opacity: 0;
     transform: var(--iv-vinyl-incoming-record-start-transform);
     clip-path: var(--iv-vinyl-incoming-record-start-clip);
-    filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.1));
   }
 
   10% {
@@ -8506,21 +8509,18 @@ html.is-lp-view-exit::view-transition-new(root) {
     opacity: 1;
     transform: translate3d(-54%, -0.4%, 0) scale(0.97);
     clip-path: inset(0 0 0 48%);
-    filter: drop-shadow(0 10px 9px rgba(0, 0, 0, 0.2));
   }
 
   78% {
     opacity: 1;
     transform: translate3d(19.5%, -1.4%, 0) scale(1.012);
-    clip-path: inset(0);
-    filter: drop-shadow(0 18px 14px rgba(0, 0, 0, 0.28));
+    clip-path: inset(-16% -16% -16% 0);
   }
 
   100% {
     opacity: 1;
     transform: var(--iv-vinyl-incoming-record-clear-transform);
-    clip-path: inset(0);
-    filter: drop-shadow(0 18px 14px rgba(0, 0, 0, 0.28));
+    clip-path: var(--iv-vinyl-incoming-record-clear-clip);
   }
 }
 
@@ -8528,22 +8528,19 @@ html.is-lp-view-exit::view-transition-new(root) {
   0% {
     opacity: 1;
     transform: var(--iv-vinyl-incoming-record-clear-transform);
-    clip-path: inset(0);
-    filter: drop-shadow(0 18px 14px rgba(0, 0, 0, 0.28));
+    clip-path: var(--iv-vinyl-incoming-record-clear-clip);
   }
 
   18% {
     opacity: 1;
     transform: translate3d(22%, -2.2%, 0) scale(1.014);
-    clip-path: inset(0);
-    filter: drop-shadow(0 24px 18px rgba(0, 0, 0, 0.32));
+    clip-path: var(--iv-vinyl-incoming-record-clear-clip);
   }
 
   100% {
     opacity: 1;
     transform: var(--iv-vinyl-incoming-record-target-transform);
-    clip-path: inset(0);
-    filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.22));
+    clip-path: var(--iv-vinyl-incoming-record-clear-clip);
   }
 }
 
@@ -8598,8 +8595,7 @@ html.is-lp-view-exit::view-transition-new(root) {
   border-radius: 50%;
   background: conic-gradient(from 12deg, transparent 0deg, rgba(255, 255, 255, 0.06) 14deg, transparent 32deg 103deg, rgba(255, 255, 255, 0.028) 125deg, transparent 151deg 239deg, rgba(255, 255, 255, 0.05) 260deg, transparent 285deg);
   mix-blend-mode: screen;
-  animation: ivlyrics-vinyl-spin 6s linear infinite;
-  animation-play-state: paused;
+  transform: rotate(var(--iv-vinyl-spin-angle));
   will-change: transform;
 }
 
@@ -8626,8 +8622,7 @@ html.is-lp-view-exit::view-transition-new(root) {
 }
 
 .ivlyrics-vinyl-player.is-center-rotation-enabled .ivlyrics-vinyl-label {
-  animation: ivlyrics-vinyl-label-spin 6s linear infinite;
-  animation-play-state: paused;
+  transform: translate(-50%, -50%) rotate(var(--iv-vinyl-spin-angle));
   will-change: transform;
 }
 
@@ -8636,6 +8631,7 @@ html.is-lp-view-exit::view-transition-new(root) {
   inset: 8%;
   border: max(1px, 0.12cqi) solid color-mix(in srgb, var(--iv-vinyl-accent) 52%, transparent);
   border-radius: 50%;
+  transition: border-color 420ms ease;
 }
 
 .ivlyrics-vinyl-label-title,
@@ -8668,6 +8664,7 @@ html.is-lp-view-exit::view-transition-new(root) {
   font-weight: 600;
   letter-spacing: 1.5px;
   text-transform: uppercase;
+  transition: fill 420ms ease;
 }
 
 .ivlyrics-vinyl-label-title {
@@ -8796,10 +8793,8 @@ html.is-lp-view-exit::view-transition-new(root) {
   transition: none;
 }
 
-.ivlyrics-vinyl-player.is-playing .ivlyrics-vinyl-motion,
-.ivlyrics-vinyl-player.is-pausing .ivlyrics-vinyl-motion,
-.ivlyrics-vinyl-player.is-center-rotation-enabled.is-playing .ivlyrics-vinyl-label,
-.ivlyrics-vinyl-player.is-center-rotation-enabled.is-pausing .ivlyrics-vinyl-label {
+.ivlyrics-vinyl-player.is-playing .ivlyrics-vinyl-visual-group,
+.ivlyrics-vinyl-player.is-pausing .ivlyrics-vinyl-visual-group {
   animation-play-state: running;
 }
 
@@ -8822,6 +8817,7 @@ html.is-lp-view-exit::view-transition-new(root) {
 }
 
 .ivlyrics-vinyl-player:is(
+  .is-track-record-clearing,
   .is-track-record-sleeving,
   .is-track-album-departing,
   .is-track-album-arriving,
@@ -8883,6 +8879,7 @@ html.is-lp-view-exit::view-transition-new(root) {
 }
 
 .ivlyrics-vinyl-player.tonearm-style-linear:is(
+  .is-track-record-clearing,
   .is-track-record-sleeving,
   .is-track-album-departing,
   .is-track-album-arriving,
@@ -8968,6 +8965,13 @@ html.is-lp-view-exit::view-transition-new(root) {
   filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.22));
 }
 
+.ivlyrics-vinyl-player.is-track-record-clearing .ivlyrics-vinyl-record-shell {
+  --iv-vinyl-record-duration: 180ms;
+  z-index: 4;
+  transform: translate3d(26%, -1%, 0);
+  filter: drop-shadow(0 16px 12px rgba(0, 0, 0, 0.3));
+}
+
 .ivlyrics-vinyl-player:is(
   .is-track-record-sleeving,
   .is-track-album-departing,
@@ -8984,23 +8988,21 @@ html.is-lp-view-exit::view-transition-new(root) {
   .is-track-album-departing,
   .is-track-album-arriving,
   .is-track-record-emerging,
-  .is-track-record-raised,
-  .is-track-handoff
+  .is-track-record-raised
 ) .ivlyrics-vinyl-sleeve {
   z-index: 1;
   transform: translate3d(0, 0, 0) rotate(0deg);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
-/* The old LP first moves completely behind its sleeve. Only after the pair has
-   left through the top edge may the incoming album begin its flight. */
+/* The old LP clears the sleeve while still in front. Once the two no longer
+   overlap, it can move behind the sleeve without a visible layer jump. */
 .ivlyrics-vinyl-player:is(
   .is-track-record-sleeving,
   .is-track-album-departing,
   .is-track-album-arriving,
   .is-track-record-emerging,
-  .is-track-record-raised,
-  .is-track-handoff
+  .is-track-record-raised
 ) .ivlyrics-vinyl-record-shell {
   --iv-vinyl-record-duration: 680ms;
   z-index: 0;
@@ -9016,12 +9018,34 @@ html.is-lp-view-exit::view-transition-new(root) {
 .ivlyrics-vinyl-player:is(
   .is-track-album-arriving,
   .is-track-record-emerging,
-  .is-track-record-raised,
-  .is-track-handoff
+  .is-track-record-raised
 ) .ivlyrics-vinyl-outgoing-pair {
   opacity: 0;
   transform: var(--iv-vinyl-outgoing-exit-transform);
   pointer-events: none;
+}
+
+/* The incoming layer covers this one during handoff. Put the committed player
+   directly in its final state so revealing it cannot replay the LP motion. */
+.ivlyrics-vinyl-player.is-track-handoff .ivlyrics-vinyl-outgoing-pair {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  animation: none;
+  pointer-events: none;
+}
+
+.ivlyrics-vinyl-player.is-track-handoff .ivlyrics-vinyl-sleeve,
+.ivlyrics-vinyl-player.is-track-handoff .ivlyrics-vinyl-record-shell {
+  transition: none;
+}
+
+/* The incoming LP hides the committed player during handoff. Resolve the
+   committed label color immediately so removing that cover cannot reveal an
+   in-between accent from its normal color transition. */
+.ivlyrics-vinyl-player.is-track-handoff .ivlyrics-vinyl-outgoing-pair .ivlyrics-vinyl-label,
+.ivlyrics-vinyl-player.is-track-handoff .ivlyrics-vinyl-outgoing-pair .ivlyrics-vinyl-label-ring,
+.ivlyrics-vinyl-player.is-track-handoff .ivlyrics-vinyl-outgoing-pair .ivlyrics-vinyl-label-arc-text {
+  transition: none;
 }
 
 @keyframes fullscreen-vinyl-old-pair-depart {
@@ -9181,13 +9205,19 @@ html.is-lp-view-exit::view-transition-new(root) {
   transform: translate3d(0, 0, 0);
 }
 
+.ivlyrics-vinyl-player--portrait-layout.is-track-record-clearing .ivlyrics-vinyl-record-shell {
+  --iv-vinyl-record-duration: 180ms;
+  z-index: 4;
+  transform: translate3d(0, 64%, 0);
+  filter: drop-shadow(0 16px 12px rgba(0, 0, 0, 0.3));
+}
+
 .ivlyrics-vinyl-player--portrait-layout:is(
   .is-track-record-sleeving,
   .is-track-album-departing,
   .is-track-album-arriving,
   .is-track-record-emerging,
-  .is-track-record-raised,
-  .is-track-handoff
+  .is-track-record-raised
 ) .ivlyrics-vinyl-sleeve {
   transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
 }
@@ -9197,8 +9227,7 @@ html.is-lp-view-exit::view-transition-new(root) {
   .is-track-album-departing,
   .is-track-album-arriving,
   .is-track-record-emerging,
-  .is-track-record-raised,
-  .is-track-handoff
+  .is-track-record-raised
 ) .ivlyrics-vinyl-record-shell {
   transform: translate3d(0, -40%, 0);
 }
@@ -9262,6 +9291,11 @@ html.is-lp-view-exit::view-transition-new(root) {
   transition-duration: 1ms !important;
 }
 
+.fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-visual-group {
+  --iv-vinyl-spin-angle: 0turn;
+  animation: none !important;
+}
+
 .fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-motion {
   animation: none !important;
 }
@@ -9274,7 +9308,6 @@ html.is-lp-view-exit::view-transition-new(root) {
   0% {
     opacity: 0;
     transform: translate3d(76vw, 54svh, 0) rotate(24deg) scale(0.52);
-    filter: blur(3px) saturate(0.82);
   }
 
   12% {
@@ -9284,13 +9317,11 @@ html.is-lp-view-exit::view-transition-new(root) {
   72% {
     opacity: 1;
     transform: translate3d(1%, 5%, 0) rotate(-6deg) scale(0.82);
-    filter: blur(0) saturate(1.04);
   }
 
   100% {
     opacity: 1;
     transform: var(--iv-vinyl-flight-target-transform);
-    filter: blur(0) saturate(1);
   }
 }
 
@@ -9299,7 +9330,6 @@ html.is-lp-view-exit::view-transition-new(root) {
     opacity: 0;
     transform: var(--iv-vinyl-incoming-record-start-transform);
     clip-path: var(--iv-vinyl-incoming-record-start-clip);
-    filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.1));
   }
 
   10% {
@@ -9310,21 +9340,18 @@ html.is-lp-view-exit::view-transition-new(root) {
     opacity: 1;
     transform: translate3d(0, -17%, 0) scale(0.88);
     clip-path: inset(48% 0 0 0);
-    filter: drop-shadow(0 10px 9px rgba(0, 0, 0, 0.2));
   }
 
   78% {
     opacity: 1;
     transform: translate3d(0, 42%, 0) scale(1.012);
-    clip-path: inset(0);
-    filter: drop-shadow(0 18px 14px rgba(0, 0, 0, 0.28));
+    clip-path: inset(0 -16% -16% -16%);
   }
 
   100% {
     opacity: 1;
     transform: var(--iv-vinyl-incoming-record-clear-transform);
-    clip-path: inset(0);
-    filter: drop-shadow(0 18px 14px rgba(0, 0, 0, 0.28));
+    clip-path: var(--iv-vinyl-incoming-record-clear-clip);
   }
 }
 
@@ -9332,22 +9359,19 @@ html.is-lp-view-exit::view-transition-new(root) {
   0% {
     opacity: 1;
     transform: var(--iv-vinyl-incoming-record-clear-transform);
-    clip-path: inset(0);
-    filter: drop-shadow(0 18px 14px rgba(0, 0, 0, 0.28));
+    clip-path: var(--iv-vinyl-incoming-record-clear-clip);
   }
 
   18% {
     opacity: 1;
     transform: translate3d(0, 47.5%, 0) scale(1.014);
-    clip-path: inset(0);
-    filter: drop-shadow(0 24px 18px rgba(0, 0, 0, 0.32));
+    clip-path: var(--iv-vinyl-incoming-record-clear-clip);
   }
 
   100% {
     opacity: 1;
     transform: var(--iv-vinyl-incoming-record-target-transform);
-    clip-path: inset(0);
-    filter: drop-shadow(0 10px 9px rgba(0, 0, 0, 0.24));
+    clip-path: var(--iv-vinyl-incoming-record-clear-clip);
   }
 }
 
@@ -9360,19 +9384,9 @@ html.is-lp-view-exit::view-transition-new(root) {
   max-width: 90vw;
 }
 
-@keyframes ivlyrics-vinyl-spin {
+@keyframes ivlyrics-vinyl-spin-clock {
   to {
-    transform: rotate(1turn);
-  }
-}
-
-@keyframes ivlyrics-vinyl-label-spin {
-  from {
-    transform: translate(-50%, -50%) rotate(0turn);
-  }
-
-  to {
-    transform: translate(-50%, -50%) rotate(1turn);
+    --iv-vinyl-spin-angle: 1turn;
   }
 }
 
@@ -9396,8 +9410,7 @@ html.is-lp-view-exit::view-transition-new(root) {
     transition-duration: 1ms !important;
   }
 
-  .ivlyrics-vinyl-motion,
-  .ivlyrics-vinyl-label {
+  .ivlyrics-vinyl-visual-group {
     animation-duration: 12s;
   }
 }

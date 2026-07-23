@@ -44,6 +44,23 @@ const FullscreenOverlay = (() => {
     };
 
     const QUEUE_EMPTY_GRACE_MS = 1500;
+    const PLAYER_SEEK_END_GUARD_MIN_MS = 250;
+    const PLAYER_SEEK_END_GUARD_MAX_MS = 500;
+
+    const clampSeekPositionToLiveDuration = (value, duration) => {
+        const safeDuration = Math.max(Number(duration) || 0, 0);
+        const safeValue = Math.max(Number(value) || 0, 0);
+        if (safeDuration <= 0) return safeValue;
+
+        const endGuard = Math.min(
+            safeDuration,
+            Math.max(
+                PLAYER_SEEK_END_GUARD_MIN_MS,
+                Math.min(PLAYER_SEEK_END_GUARD_MAX_MS, safeDuration * 0.02)
+            )
+        );
+        return Math.min(safeValue, Math.max(safeDuration - endGuard, 0));
+    };
 
     const getNonEmptyString = (...values) => {
         for (const value of values) {
@@ -2415,7 +2432,12 @@ const FullscreenOverlay = (() => {
                     translationSpacing: CONFIG?.visual?.["fullscreen-vinyl-translation-spacing"] ?? 0,
                     translationLetterSpacing: CONFIG?.visual?.["fullscreen-vinyl-translation-letter-spacing"] ?? 0
                 },
-                onSeek: (nextPosition) => Spicetify.Player.seek(Math.floor(nextPosition)),
+                onSeek: (nextPosition) => {
+                    window.Utils?.clearSafePlayerProgressCorrection?.();
+                    const liveDuration = Spicetify.Player.getDuration?.() || duration;
+                    const safePosition = clampSeekPositionToLiveDuration(nextPosition, liveDuration);
+                    Spicetify.Player.seek(Math.floor(safePosition));
+                },
                 onStopPlayback: () => {
                     if (Spicetify.Player?.data?.isPaused === true) return;
                     if (typeof Spicetify.Player?.pause === "function") Spicetify.Player.pause();
