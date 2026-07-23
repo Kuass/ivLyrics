@@ -4210,7 +4210,7 @@ class LyricsContainer extends react.Component {
     this.pendingStreamingPayload = null;
     this.floatingMenuCloseTimer = null;
     this._sharedPresentationKeys = new Map();
-    this._invalidatedSharedPresentations = new Map();
+    this._invalidatedSharedPresentationSnapshots = new WeakSet();
     this._culturalAnnotationResults = new Map();
     this._culturalAnnotationRequests = new Map();
     this._culturalAnnotationCacheEpoch = 0;
@@ -4926,9 +4926,7 @@ class LyricsContainer extends react.Component {
     if (!trackUri) return;
     const snapshot = window.LyricsService?.getLyricsSnapshot?.(trackUri) || null;
     if (snapshot) {
-      this._invalidatedSharedPresentations?.set(trackUri, snapshot);
-    } else {
-      this._invalidatedSharedPresentations?.delete(trackUri);
+      this._invalidatedSharedPresentationSnapshots?.add(snapshot);
     }
     this._sharedPresentationKeys?.delete(trackUri);
     window.LyricsService?.clearLyricsPresentationSnapshot?.(trackUri);
@@ -5836,7 +5834,6 @@ class LyricsContainer extends react.Component {
       ].filter(Boolean));
 
       // mode1 처리
-      // mode1 처리
       if (mode1 === "gemini_romaji" && mappedPhonetic) {
         translatedLyrics1 = mappedPhonetic;
       } else if (mode1 === "gemini_ko" && mappedTranslation) {
@@ -6645,17 +6642,10 @@ class LyricsContainer extends react.Component {
       uri,
     });
     const sharedSnapshot = window.LyricsService?.getLyricsSnapshot?.(uri);
-    const invalidatedSharedPresentation =
-      this._invalidatedSharedPresentations?.get(uri) || null;
-    if (
-      invalidatedSharedPresentation &&
-      sharedSnapshot &&
-      sharedSnapshot !== invalidatedSharedPresentation
-    ) {
-      this._invalidatedSharedPresentations.delete(uri);
-    }
+    const sharedPresentationWasInvalidated = !!sharedSnapshot &&
+      this._invalidatedSharedPresentationSnapshots?.has(sharedSnapshot);
     const sharedPresentationMatches =
-      sharedSnapshot !== invalidatedSharedPresentation &&
+      !sharedPresentationWasInvalidated &&
       sharedSnapshot?.presentationComplete === true &&
       Array.isArray(sharedSnapshot?.displayLyrics) &&
       sharedSnapshot.trackUri === uri &&

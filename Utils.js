@@ -356,7 +356,7 @@ const Utils = {
   // LRU caches for frequently used operations (최적화 #10 - LRU 캐시 적용)
   _colorCache: new LRUCache(100),
   _normalizeCache: new LRUCache(200),
-  _lastRandomCommunityVideos: new Map(),
+  _lastRandomCommunityVideos: new LRUCache(200),
 
   addQueueListener(callback) {
     Spicetify.Player.origin._events.addListener("queue_update", callback);
