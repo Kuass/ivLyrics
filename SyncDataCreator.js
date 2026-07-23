@@ -7452,7 +7452,12 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		try {
 			const exportData = attachSelectedLrclibSource(syncData);
 			assertValidSyncCreatorSyncData(exportData);
-			const fileName = `sync-${trackId}-${Date.now()}.json`;
+			const exportBaseName = [trackName, artistName]
+				.map(value => String(value || '').trim())
+				.filter(Boolean)
+				.join('-');
+			const fallbackBaseName = trackId ? `sync-${trackId}` : 'ivLyrics-sync';
+			const fileName = `${Utils.sanitizeFileName(exportBaseName, fallbackBaseName)}.json`;
 			const saveTarget = await Utils.requestSaveFileTarget(fileName, {
 				description: 'ivLyrics Sync Data',
 				mimeType: 'application/json',
@@ -7468,7 +7473,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			console.error('[SyncDataCreator] Export error:', error);
 			Toast.error(error?.message || I18n.t('syncCreator.submitError'));
 		}
-	}, [attachSelectedLrclibSource, syncData, trackId]);
+	}, [artistName, attachSelectedLrclibSource, syncData, trackId, trackName]);
 
 	// 싱크 데이터 불러오기 (JSON 파일에서)
 	const importSyncData = useCallback(() => {

@@ -1569,6 +1569,42 @@ const Utils = {
     }
   },
 
+  sanitizeFileName(value, fallback = "ivLyrics", maxBytes = 180) {
+    const clean = (input) => String(input || "")
+      .normalize("NFC")
+      .replace(/[\u0000-\u001F\u007F<>:"/\\|?*]+/g, "-")
+      .replace(/\s+/g, " ")
+      .replace(/\s*-\s*/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^[\s.-]+|[\s.-]+$/g, "");
+
+    const safeFallback = clean(fallback) || "ivLyrics";
+    let fileName = clean(value) || safeFallback;
+
+    if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(fileName)) {
+      fileName = `_${fileName}`;
+    }
+
+    const byteLimit = Math.max(1, Math.floor(Number(maxBytes) || 180));
+    let byteLength = 0;
+    let truncated = "";
+    for (const char of fileName) {
+      const codePoint = char.codePointAt(0);
+      const charBytes = codePoint <= 0x7F
+        ? 1
+        : codePoint <= 0x7FF
+          ? 2
+          : codePoint <= 0xFFFF
+            ? 3
+            : 4;
+      if (byteLength + charBytes > byteLimit) break;
+      truncated += char;
+      byteLength += charBytes;
+    }
+
+    return truncated.replace(/[\s.-]+$/g, "") || safeFallback;
+  },
+
   async requestSaveFileTarget(fileName, options = {}) {
     if (typeof window.showSaveFilePicker !== "function") {
       return { handle: null, canceled: false };
