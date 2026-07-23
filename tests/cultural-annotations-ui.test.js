@@ -10,16 +10,50 @@ test('cultural annotations are default-off and wired into lyrics rendering', () 
     const indexSource = fs.readFileSync(path.join(ROOT, 'index.js'), 'utf8');
     const pagesSource = fs.readFileSync(path.join(ROOT, 'Pages.js'), 'utf8');
     const settingsSource = fs.readFileSync(path.join(ROOT, 'Settings.js'), 'utf8');
+    const vinylSource = fs.readFileSync(path.join(ROOT, 'VinylActiveLyricRenderer.js'), 'utf8');
+    const panelSource = fs.readFileSync(path.join(ROOT, 'NowPlayingPanelLyrics.js'), 'utf8');
 
     assert.match(
         indexSource,
         /"cultural-annotations-enabled": StorageManager\.get\(\s*"ivLyrics:visual:cultural-annotations-enabled",\s*false\s*\)/
     );
+    for (const key of [
+        'cultural-annotations-font-family',
+        'cultural-annotations-font-size',
+        'cultural-annotations-font-weight',
+        'cultural-annotations-opacity',
+    ]) {
+        assert.match(indexSource, new RegExp(`"${key}"`), key);
+    }
+    assert.match(indexSource, /"cultural-annotations-font-size":\s*StorageManager\.getItem\([\s\S]*?\) \|\|\s*"14"/);
+    assert.match(indexSource, /"cultural-annotations-font-weight":\s*StorageManager\.getItem\([\s\S]*?\) \|\|\s*"300"/);
+    assert.match(indexSource, /"cultural-annotations-opacity":\s*StorageManager\.getItem\([\s\S]*?\) \|\| "60"/);
     assert.match(indexSource, /Translator\.generateCulturalAnnotations/);
     assert.match(indexSource, /applyCulturalAnnotations\(processedLyrics, this\.state\.uri\)/);
     assert.match(pagesSource, /LyricsLine-culturalNote/);
     assert.match(pagesSource, /`↳ \$\{displayedCulturalNote\}`/);
+    assert.match(pagesSource, /!shouldRenderInterlude && !singleLineScroll && renderLyricSubLine\(/);
+    assert.match(vinylSource, /singleLineScroll: true/);
+    assert.doesNotMatch(panelSource, /culturalNote|LyricsLine-culturalNote/);
     assert.match(settingsSource, /key: "cultural-annotations-enabled"/);
+
+    const aiProvidersStart = settingsSource.indexOf('const AIProvidersTab = () =>');
+    const aiProvidersEnd = settingsSource.indexOf('const LocalCacheManager = () =>');
+    const aiProvidersSource = settingsSource.slice(aiProvidersStart, aiProvidersEnd);
+    assert.match(aiProvidersSource, /key: "cultural-annotations-enabled"/);
+    assert.match(aiProvidersSource, /key: "cultural-annotations-font-family"/);
+    assert.match(aiProvidersSource, /key: "cultural-annotations-font-size"/);
+    assert.match(aiProvidersSource, /key: "cultural-annotations-font-weight"/);
+    assert.match(aiProvidersSource, /key: "cultural-annotations-opacity"/);
+    assert.equal(
+        (aiProvidersSource.match(/when: \(\) => areCulturalAnnotationsEnabled\(\)/g) || []).length,
+        4
+    );
+
+    const generalTabStart = settingsSource.indexOf('data-tab-id": "general"');
+    const appearanceTabStart = settingsSource.indexOf('data-tab-id": "appearance"');
+    const generalTabSource = settingsSource.slice(generalTabStart, appearanceTabStart);
+    assert.doesNotMatch(generalTabSource, /key: "cultural-annotations-enabled"/);
 });
 
 test('every bundled language includes cultural annotation settings and status copy', () => {
@@ -37,6 +71,11 @@ test('every bundled language includes cultural annotation settings and status co
         const language = Object.values(context.window)[0];
         assert.ok(language?.settings?.culturalAnnotations?.label, file);
         assert.ok(language?.settings?.culturalAnnotations?.desc, file);
+        assert.ok(language.settings.culturalAnnotations.desc.includes('LP'), file);
+        for (const key of ['fontFamily', 'fontSize', 'fontWeight', 'opacity']) {
+            assert.ok(language.settings.culturalAnnotations[key]?.label, `${file}: ${key} label`);
+            assert.ok(language.settings.culturalAnnotations[key]?.desc, `${file}: ${key} description`);
+        }
         assert.ok(language?.settings?.aiProviders?.supports?.culturalAnnotations, file);
         assert.ok(language?.generationStatus?.culturalAnnotations, file);
         assert.ok(language?.generationStatus?.culturalAnnotationsLoading, file);

@@ -2081,6 +2081,9 @@ const CONFIG = {
     "translation-font-family":
       StorageManager.getItem("ivLyrics:visual:translation-font-family") ||
       "Pretendard Variable",
+    "cultural-annotations-font-family":
+      StorageManager.getItem("ivLyrics:visual:cultural-annotations-font-family") ||
+      "Pretendard Variable",
     "original-font-weight":
       StorageManager.getItem("ivLyrics:visual:original-font-weight") ||
       "600",
@@ -2092,6 +2095,12 @@ const CONFIG = {
     "translation-font-size":
       StorageManager.getItem("ivLyrics:visual:translation-font-size") ||
       "22",
+    "cultural-annotations-font-weight":
+      StorageManager.getItem("ivLyrics:visual:cultural-annotations-font-weight") ||
+      "300",
+    "cultural-annotations-font-size":
+      StorageManager.getItem("ivLyrics:visual:cultural-annotations-font-size") ||
+      "14",
     "translation-spacing":
       StorageManager.getItem("ivLyrics:visual:translation-spacing") || "0",
     "phonetic-font-weight":
@@ -2135,6 +2144,8 @@ const CONFIG = {
       StorageManager.getItem("ivLyrics:visual:original-opacity") || "95",
     "translation-opacity":
       StorageManager.getItem("ivLyrics:visual:translation-opacity") || "85",
+    "cultural-annotations-opacity":
+      StorageManager.getItem("ivLyrics:visual:cultural-annotations-opacity") || "60",
     "translate:translated-lyrics-source":
       StorageManager.getItem(
         "ivLyrics:visual:translate:translated-lyrics-source"
@@ -2680,6 +2691,12 @@ CONFIG.visual["translation-font-weight"] = Number.parseInt(
 CONFIG.visual["translation-font-size"] = Number.parseInt(
   CONFIG.visual["translation-font-size"]
 );
+CONFIG.visual["cultural-annotations-font-weight"] = Number.parseInt(
+  CONFIG.visual["cultural-annotations-font-weight"]
+);
+CONFIG.visual["cultural-annotations-font-size"] = Number.parseInt(
+  CONFIG.visual["cultural-annotations-font-size"]
+);
 CONFIG.visual["text-shadow-opacity"] = Number.parseInt(
   CONFIG.visual["text-shadow-opacity"]
 );
@@ -2691,6 +2708,9 @@ CONFIG.visual["original-opacity"] = Number.parseInt(
 );
 CONFIG.visual["translation-opacity"] = Number.parseInt(
   CONFIG.visual["translation-opacity"]
+);
+CONFIG.visual["cultural-annotations-opacity"] = Number.parseInt(
+  CONFIG.visual["cultural-annotations-opacity"]
 );
 CONFIG.visual["background-brightness"] = Number.parseInt(
   CONFIG.visual["background-brightness"]
@@ -9466,6 +9486,7 @@ class LyricsContainer extends react.Component {
   addFonts(CONFIG.visual["original-font-family"]);
   addFonts(CONFIG.visual["phonetic-font-family"]);
   addFonts(CONFIG.visual["translation-font-family"]);
+  addFonts(CONFIG.visual["cultural-annotations-font-family"]);
   addFonts(CONFIG.visual["instrumental-break-label-font-family"]);
   addFonts(CONFIG.visual["fullscreen-vinyl-original-font-family"]);
   addFonts(CONFIG.visual["fullscreen-vinyl-phonetic-font-family"]);

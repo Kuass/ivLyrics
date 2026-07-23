@@ -4104,14 +4104,13 @@ div.lyrics-tabBar-headerItemLink {
   margin-top: 10px;
   margin-bottom: 0;
   color: var(--lyrics-color-inactive);
-  font-family: var(--lyrics-translation-font-family,
+  font-family: var(--lyrics-cultural-note-font-family,
       var(--lyrics-font-family, var(--font-family)));
-  font-size: max(13px, calc(var(--lyrics-translation-font-size,
-        calc(var(--lyrics-font-size) * 0.7)) * 0.86));
-  font-weight: 500;
+  font-size: var(--lyrics-cultural-note-font-size, 14px);
+  font-weight: var(--lyrics-cultural-note-font-weight, 300);
   line-height: 1.5;
   letter-spacing: 0;
-  opacity: 0.72;
+  opacity: var(--lyrics-cultural-note-opacity, 0.6);
   overflow-wrap: anywhere;
   white-space: normal;
   text-shadow: var(--lyrics-text-shadow,
@@ -4124,7 +4123,7 @@ div.lyrics-tabBar-headerItemLink {
 
 .lyrics-lyricsContainer-LyricsLine-active .lyrics-lyricsContainer-LyricsLine-culturalNote {
   color: var(--lyrics-color-active);
-  opacity: 0.82;
+  opacity: var(--lyrics-cultural-note-opacity, 0.6);
   transform: translateY(-2px);
 }
 

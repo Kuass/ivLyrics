@@ -1663,6 +1663,10 @@ const AIProvidersTab = () => {
   const [translationStyle, setTranslationStyle] = useState(
     () => window.AIAddonManager?.getTranslationStyle?.() || "natural"
   );
+  const areCulturalAnnotationsEnabled = () => {
+    const value = CONFIG.visual["cultural-annotations-enabled"];
+    return value === true || value === "true";
+  };
 
   useEffect(() => {
     let retryTimer = null;
@@ -1815,6 +1819,63 @@ const AIProvidersTab = () => {
           })
         )
       ),
+      react.createElement(OptionList, {
+        items: [
+          {
+            desc: I18n.t("settings.culturalAnnotations.label"),
+            key: "cultural-annotations-enabled",
+            info: I18n.t("settings.culturalAnnotations.desc"),
+            type: ConfigSlider,
+            defaultValue: CONFIG.visual["cultural-annotations-enabled"] ?? false,
+          },
+          {
+            desc: I18n.t("settings.culturalAnnotations.fontFamily.label"),
+            key: "cultural-annotations-font-family",
+            info: I18n.t("settings.culturalAnnotations.fontFamily.desc"),
+            type: ConfigFontSelector,
+            defaultValue: CONFIG.visual["cultural-annotations-font-family"] || "Pretendard Variable",
+            when: () => areCulturalAnnotationsEnabled(),
+          },
+          {
+            desc: I18n.t("settings.culturalAnnotations.fontSize.label"),
+            key: "cultural-annotations-font-size",
+            info: I18n.t("settings.culturalAnnotations.fontSize.desc"),
+            type: ConfigSliderRange,
+            min: 12,
+            max: 48,
+            step: 1,
+            unit: "px",
+            when: () => areCulturalAnnotationsEnabled(),
+          },
+          {
+            desc: I18n.t("settings.culturalAnnotations.fontWeight.label"),
+            key: "cultural-annotations-font-weight",
+            info: I18n.t("settings.culturalAnnotations.fontWeight.desc"),
+            type: ConfigFontWeightSlider,
+            when: () => areCulturalAnnotationsEnabled(),
+          },
+          {
+            desc: I18n.t("settings.culturalAnnotations.opacity.label"),
+            key: "cultural-annotations-opacity",
+            info: I18n.t("settings.culturalAnnotations.opacity.desc"),
+            type: ConfigSliderRange,
+            min: 20,
+            max: 100,
+            step: 1,
+            unit: "%",
+            when: () => areCulturalAnnotationsEnabled(),
+          },
+        ],
+        onChange: (name, value) => {
+          CONFIG.visual[name] = value;
+          StorageManager.saveConfig(name, value);
+          if (name.endsWith("font-family")) loadGoogleFontFamily(value);
+          lyricContainerUpdate?.();
+          window.dispatchEvent(new CustomEvent("ivLyrics", {
+            detail: { type: "config", name, value },
+          }));
+        },
+      }),
       // Provider 목록
       providers.length > 0 && react.createElement("div", { className: "lyrics-providers-list" },
         sortedProviders.map((provider, index) =>
@@ -14619,13 +14680,6 @@ const ConfigModal = ({
                   I18n.getAvailableLanguages().map(language => [language.code, language.name])
                 ),
               },
-            },
-            {
-              desc: I18n.t("settings.culturalAnnotations.label"),
-              key: "cultural-annotations-enabled",
-              info: I18n.t("settings.culturalAnnotations.desc"),
-              type: ConfigSlider,
-              defaultValue: CONFIG.visual["cultural-annotations-enabled"] ?? false,
             },
           ],
           onChange: (name, value) => {

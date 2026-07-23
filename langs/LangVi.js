@@ -145,7 +145,11 @@ window.LANG_VI = {
     },
     "culturalAnnotations": {
       "label": "Giải thích bối cảnh văn hóa",
-      "desc": "Chỉ hiển thị giải thích do AI tạo dưới những câu hát có bối cảnh văn hóa dễ bị mất khi dịch. Sử dụng ngôn ngữ đích của bản dịch."
+      "desc": "Chỉ hiển thị giải thích do AI tạo dưới những câu hát có bối cảnh văn hóa dễ bị mất khi dịch. Sử dụng ngôn ngữ đích của bản dịch. Chỉ hiển thị trên trang lời bài hát thường và toàn màn hình thường, không hiển thị trong chế độ LP hoặc Lời bài hát trong bảng.",
+      "fontFamily": { "label": "Phông chữ giải thích", "desc": "Chọn phông chữ cho phần giải thích bối cảnh văn hóa." },
+      "fontSize": { "label": "Cỡ chữ giải thích", "desc": "Điều chỉnh cỡ chữ của phần giải thích." },
+      "fontWeight": { "label": "Độ đậm chữ giải thích", "desc": "Điều chỉnh độ đậm của phần giải thích." },
+      "opacity": { "label": "Độ mờ giải thích", "desc": "Điều chỉnh độ mờ của phần giải thích." }
     },
     "alignment": {
       "label": "Căn chỉnh",

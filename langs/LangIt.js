@@ -145,7 +145,11 @@ window.LANG_IT = {
     },
     "culturalAnnotations": {
       "label": "Spiegazioni del contesto culturale",
-      "desc": "Mostra spiegazioni generate dall’IA solo sotto i versi il cui contesto culturale andrebbe perso nella traduzione. Usa la lingua di destinazione della traduzione."
+      "desc": "Mostra spiegazioni generate dall’IA solo sotto i versi il cui contesto culturale andrebbe perso nella traduzione. Usa la lingua di destinazione della traduzione. È visibile solo nella normale pagina dei testi e nella modalità schermo intero standard, non in modalità LP o nel pannello di riproduzione.",
+      "fontFamily": { "label": "Font delle spiegazioni", "desc": "Scegli il font delle spiegazioni culturali." },
+      "fontSize": { "label": "Dimensione delle spiegazioni", "desc": "Regola la dimensione del testo esplicativo." },
+      "fontWeight": { "label": "Spessore delle spiegazioni", "desc": "Regola lo spessore del testo esplicativo." },
+      "opacity": { "label": "Opacità delle spiegazioni", "desc": "Regola l’opacità del testo esplicativo." }
     },
     "alignment": {
       "label": "Allineamento",

@@ -145,7 +145,11 @@ window.LANG_ID = {
     },
     "culturalAnnotations": {
       "label": "Penjelasan konteks budaya",
-      "desc": "Menampilkan penjelasan buatan AI hanya di bawah baris lirik yang latar budayanya akan hilang dalam terjemahan. Menggunakan bahasa target terjemahan."
+      "desc": "Menampilkan penjelasan buatan AI hanya di bawah baris lirik yang latar budayanya akan hilang dalam terjemahan. Menggunakan bahasa target terjemahan. Hanya ditampilkan di halaman lirik biasa dan layar penuh biasa, bukan di mode LP atau Panel Lirik.",
+      "fontFamily": { "label": "Font penjelasan", "desc": "Pilih font untuk penjelasan konteks budaya." },
+      "fontSize": { "label": "Ukuran font penjelasan", "desc": "Atur ukuran teks penjelasan." },
+      "fontWeight": { "label": "Ketebalan font penjelasan", "desc": "Atur ketebalan teks penjelasan." },
+      "opacity": { "label": "Opasitas penjelasan", "desc": "Atur opasitas teks penjelasan." }
     },
     "alignment": {
       "label": "Perataan",

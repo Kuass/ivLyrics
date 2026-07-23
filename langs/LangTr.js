@@ -145,7 +145,11 @@ window.LANG_TR = {
     },
     "culturalAnnotations": {
       "label": "Kültürel bağlam açıklamaları",
-      "desc": "Yalnızca kültürel arka planı çeviride kaybolabilecek şarkı sözlerinin altında yapay zekâ açıklamaları gösterir. Çeviri hedef dilini kullanır."
+      "desc": "Yalnızca kültürel arka planı çeviride kaybolabilecek şarkı sözlerinin altında yapay zekâ açıklamaları gösterir. Çeviri hedef dilini kullanır. Yalnızca normal şarkı sözleri sayfasında ve standart tam ekranda gösterilir; LP modunda veya Panel Şarkı Sözleri’nde gösterilmez.",
+      "fontFamily": { "label": "Açıklama yazı tipi", "desc": "Kültürel bağlam açıklamalarının yazı tipini seçin." },
+      "fontSize": { "label": "Açıklama yazı boyutu", "desc": "Açıklama metninin boyutunu ayarlayın." },
+      "fontWeight": { "label": "Açıklama yazı kalınlığı", "desc": "Açıklama metninin kalınlığını ayarlayın." },
+      "opacity": { "label": "Açıklama opaklığı", "desc": "Açıklama metninin opaklığını ayarlayın." }
     },
     "alignment": {
       "label": "Hizalama",

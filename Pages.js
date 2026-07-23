@@ -2346,6 +2346,10 @@ const getLyricsTypographyStyleVariables = (visual = CONFIG?.visual || {}) => {
 		"--lyrics-translation-opacity": getFiniteLyricsStyleNumber(visual["translation-opacity"], 85) / 100,
 		"--lyrics-translation-spacing": `${getFiniteLyricsStyleNumber(visual["translation-spacing"], 0)}px`,
 		"--lyrics-translation-letter-spacing": `${getFiniteLyricsStyleNumber(visual["translation-letter-spacing"], 0)}px`,
+		"--lyrics-cultural-note-font-family": visual["cultural-annotations-font-family"] || visual["translation-font-family"] || baseFontFamily,
+		"--lyrics-cultural-note-font-size": `${getFiniteLyricsStyleNumber(visual["cultural-annotations-font-size"], 14)}px`,
+		"--lyrics-cultural-note-font-weight": getFiniteLyricsStyleNumber(visual["cultural-annotations-font-weight"], 300),
+		"--lyrics-cultural-note-opacity": getFiniteLyricsStyleNumber(visual["cultural-annotations-opacity"], 60) / 100,
 		"--lyrics-furigana-font-size": `${getFiniteLyricsStyleNumber(visual["furigana-font-size"], 14)}px`,
 		"--lyrics-furigana-font-weight": getFiniteLyricsStyleNumber(visual["furigana-font-weight"], 300),
 		"--lyrics-furigana-opacity": getFiniteLyricsStyleNumber(visual["furigana-opacity"], 80) / 100,
@@ -3735,7 +3739,7 @@ const LyricsLineBlock = react.memo(({
 				: null,
 			singleLineScroll
 		),
-		!shouldRenderInterlude && renderLyricSubLine(
+		!shouldRenderInterlude && !singleLineScroll && renderLyricSubLine(
 			"lyrics-lyricsContainer-LyricsLine-culturalNote",
 			displayedCulturalNote ? `↳ ${displayedCulturalNote}` : null,
 			displayedCulturalNote
