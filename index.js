@@ -4891,6 +4891,12 @@ class LyricsContainer extends react.Component {
     }
   }
 
+  invalidateSharedLyricsPresentation(trackUri) {
+    if (!trackUri) return;
+    this._sharedPresentationKeys?.delete(trackUri);
+    window.LyricsService?.clearLyricsPresentationSnapshot?.(trackUri);
+  }
+
   refreshLyricsAfterCacheEdit() {
     const trackUri = this.state.uri;
     if (trackUri) {
@@ -4906,6 +4912,7 @@ class LyricsContainer extends react.Component {
       window.Translator?.clearInflightRequests?.(trackId);
     }
 
+    this.invalidateSharedLyricsPresentation(trackUri);
     this.lastProcessedMode = null;
     this.lyricsSource(this.state, this.getCurrentMode());
   }
@@ -5833,7 +5840,9 @@ class LyricsContainer extends react.Component {
         throw new Error("Failed to map one or more generated lyric fields.");
       }
 
-      // lyricsSource를 다시 호출하여 기존 로직으로 화면 업데이트
+      // 이전 완성 스냅샷이 새 결과를 가로채지 않도록 표시 캐시만 비운다.
+      this.invalidateSharedLyricsPresentation(currentUri);
+      // lyricsSource를 다시 호출하여 기존 로직으로 화면 및 오버레이 업데이트
       this.lyricsSource(this.state, currentMode);
       Toast.success(I18n.t("notifications.translationRegenerated"));
     } catch (error) {

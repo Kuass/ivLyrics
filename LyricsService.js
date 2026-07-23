@@ -6815,13 +6815,17 @@
             return snapshot;
         },
 
-        clearLyricsSnapshot(trackUri) {
-            lyricsProviderRequestGeneration += 1;
+        clearLyricsPresentationSnapshot(trackUri) {
             if (trackUri) {
                 return lyricsPresentationSnapshots.delete(trackUri);
             }
             lyricsPresentationSnapshots.clear();
             return true;
+        },
+
+        clearLyricsSnapshot(trackUri) {
+            lyricsProviderRequestGeneration += 1;
+            return this.clearLyricsPresentationSnapshot(trackUri);
         },
 
         getTrackLanguageOverride(trackUri) {
@@ -8441,13 +8445,22 @@
             const originalText = typeof originalCandidate === 'string'
                 ? originalCandidate
                 : String(originalCandidate ?? '');
-            const pronCandidate = typeof line?.text === 'string' ? line.text : null;
-            const pronText = pronCandidate
-                && pronCandidate !== line?.originalText
-                && pronCandidate !== originalText
-                ? pronCandidate
-                : null;
-            const transText = [line?.text2, line?.translation, line?.translationText]
+            const pronText = [
+                line?.phoneticText,
+                line?.pronunciationText,
+                line?.pronText,
+                typeof line?.text === 'string' && line.text !== line?.originalText
+                    ? line.text
+                    : null
+            ]
+                .find(value => typeof value === 'string' && value.trim() && value !== originalText)
+                || null;
+            const transText = [
+                line?.text2,
+                line?.translation,
+                line?.translationText,
+                line?.transText
+            ]
                 .find(value => typeof value === 'string' && value.trim() && value !== originalText)
                 || null;
 
