@@ -67,11 +67,9 @@
             .replace(/&nbsp;|&#0*160;|&#x0*a0;/giu, ' ');
     }
 
-    function getInstrumentalBreakMarker(value, allowEmpty = false) {
+    function getInstrumentalBreakMarker(value) {
         const normalized = decodeInstrumentalBreakEntities(value).trim();
-        if (!normalized) {
-            return allowEmpty ? CANONICAL_INSTRUMENTAL_BREAK_MARKER : null;
-        }
+        if (!normalized) return null;
         if (NOTE_ONLY_INSTRUMENTAL_BREAK_PATTERN.test(normalized)) {
             return CANONICAL_INSTRUMENTAL_BREAK_MARKER;
         }
@@ -106,12 +104,8 @@
             if (!line || typeof line !== 'object') return line;
 
             const startTime = toFiniteLyricsTime(line.startTime);
-            const hasExplicitText = line.originalText !== undefined || line.text !== undefined;
             const sourceText = line.originalText !== undefined ? line.originalText : line.text;
-            const marker = getInstrumentalBreakMarker(
-                sourceText,
-                hasExplicitText && timed && startTime !== null
-            );
+            const marker = getInstrumentalBreakMarker(sourceText);
             if (!marker) return line;
 
             const nextStartTime = toFiniteLyricsTime(lines[index + 1]?.startTime);
