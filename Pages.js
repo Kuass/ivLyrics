@@ -1956,6 +1956,7 @@ const useScrollActivity = (containerRef, deps = []) => {
 		return () => {
 			container.removeEventListener("wheel", handleWheel);
 			container.removeEventListener("touchmove", handleWheel);
+			cancelSyncedLyricsScrollAnimation(container);
 			if (scrollTimeout.current) {
 				clearTimeout(scrollTimeout.current);
 				scrollTimeout.current = null;
