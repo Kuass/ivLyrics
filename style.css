@@ -1356,6 +1356,13 @@ body.ivlyrics-page-active .main-topBar-container {
   position: relative;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .lyrics-lyricsContainer-SyncedLyricsPage,
+  .lyrics-lyricsContainer-UnsyncedLyricsPage {
+    --iv-lyrics-centering-duration: 1ms;
+  }
+}
+
 .lyrics-lyricsContainer-LyricsBackground {
   background-color: var(--lyrics-color-background);
   background-image: var(--lyrics-background-noise);
@@ -1389,8 +1396,8 @@ body.ivlyrics-page-active .main-topBar-container {
   transform: translateY(calc(var(--position-index) * var(--lyrics-line-height) + var(--offset)));
   transform-origin: var(--lyrics-align-text);
   color: var(--lyrics-color-inactive);
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-  transition-duration: var(--line-shift-duration, calc(var(--animation-index) * var(--animation-tempo) + 0.3s));
+  transition-timing-function: var(--iv-lyrics-centering-ease, cubic-bezier(0.20, 0.70, 0.42, 0.96));
+  transition-duration: var(--line-shift-duration, var(--iv-lyrics-centering-duration, 820ms));
   transition-delay: var(--line-shift-delay, 0s);
   /* Skip `filter` here: blur snaps to new value when --blur-index changes instead of
      transitioning across every visible line in parallel (huge GPU spike during scroll). */
@@ -1412,7 +1419,10 @@ body.ivlyrics-page-active .main-topBar-container {
 .lyrics-lyricsContainer-LyricsContainer.highlight-mode-enabled .lyrics-lyricsContainer-SyncedScrollView .lyrics-lyricsContainer-LyricsLine {
   opacity: var(--highlight-inactive-opacity, 0.3);
   transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), color 0.3s ease;
+    transform var(--line-shift-duration, var(--iv-lyrics-centering-duration, 820ms))
+      var(--iv-lyrics-centering-ease, cubic-bezier(0.20, 0.70, 0.42, 0.96))
+      var(--line-shift-delay, 0s),
+    color 0.3s ease;
 }
 
 .lyrics-lyricsContainer-LyricsContainer.highlight-mode-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active,
@@ -1479,7 +1489,13 @@ body.ivlyrics-page-active .main-topBar-container {
   color: var(--lyrics-color-active);
   opacity: 1;
   filter: none !important;
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition:
+    transform var(--line-shift-duration, var(--iv-lyrics-centering-duration, 820ms))
+      var(--iv-lyrics-centering-ease, cubic-bezier(0.20, 0.70, 0.42, 0.96))
+      var(--line-shift-delay, 0s),
+    color 0.3s var(--iv-motion-ease-standard),
+    opacity 0.4s var(--iv-motion-ease-standard),
+    text-shadow 0.4s var(--iv-motion-ease-standard);
 }
 
 .lyrics-lyricsContainer-LyricsLine > p,
@@ -1487,7 +1503,8 @@ body.ivlyrics-page-active .main-topBar-container {
 .lyrics-lyricsContainer-LyricsLine-translation,
 .lyrics-karaoke-line {
   transition:
-    transform var(--iv-motion-duration-slow) var(--iv-motion-ease-emphasis),
+    transform var(--iv-lyrics-centering-duration, 820ms)
+      var(--iv-lyrics-centering-ease, cubic-bezier(0.20, 0.70, 0.42, 0.96)),
     opacity var(--iv-motion-duration-medium) var(--iv-motion-ease-standard),
     letter-spacing var(--iv-motion-duration-medium) var(--iv-motion-ease-standard),
     text-shadow var(--iv-motion-duration-medium) var(--iv-motion-ease-standard);
@@ -1850,8 +1867,9 @@ div.lyrics-tabBar-headerItemLink {
   .lyrics-lyricsContainer-SyncedLyrics:has(.lyrics-karaoke-part.active-vocal-row)
   > .lyrics-lyricsContainer-LyricsLine {
   transition-property: transform, color, opacity;
-  transition-duration: 520ms !important;
-  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition-duration: var(--iv-lyrics-centering-duration, 820ms) !important;
+  transition-timing-function:
+    var(--iv-lyrics-centering-ease, cubic-bezier(0.20, 0.70, 0.42, 0.96)) !important;
 }
 
 .lyrics-karaoke-part {

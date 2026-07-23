@@ -1942,6 +1942,7 @@ const useScrollActivity = (containerRef, deps = []) => {
 		if (!container) return;
 
 		const handleWheel = () => {
+			cancelSyncedLyricsScrollAnimation(container);
 			setIsScrolling(true);
 			if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
 			scrollTimeout.current = setTimeout(() => {
@@ -3054,6 +3055,104 @@ const getElementOffsetTopWithin = (element, container) => {
   return (elementRect.top - containerRect.top) + (container.scrollTop || 0);
 };
 
+const LYRICS_CENTERING_DURATION_MS = 820;
+const LYRICS_CENTERING_BEZIER = [0.20, 0.70, 0.42, 0.96];
+const syncedLyricsScrollAnimations = new WeakMap();
+
+const cubicBezierCoordinate = (t, first, second) => {
+	const inverse = 1 - t;
+	return (3 * inverse * inverse * t * first)
+		+ (3 * inverse * t * t * second)
+		+ (t * t * t);
+};
+
+const cubicBezierDerivative = (t, first, second) => {
+	const inverse = 1 - t;
+	return (3 * inverse * inverse * first)
+		+ (6 * inverse * t * (second - first))
+		+ (3 * t * t * (1 - second));
+};
+
+const getLyricsCenteringProgress = (progress) => {
+	const clamped = Math.max(0, Math.min(1, progress));
+	const [x1, y1, x2, y2] = LYRICS_CENTERING_BEZIER;
+	let parameter = clamped;
+
+	for (let iteration = 0; iteration < 5; iteration++) {
+		const difference = cubicBezierCoordinate(parameter, x1, x2) - clamped;
+		const derivative = cubicBezierDerivative(parameter, x1, x2);
+		if (Math.abs(difference) < 0.0001 || Math.abs(derivative) < 0.0001) break;
+		parameter = Math.max(0, Math.min(1, parameter - difference / derivative));
+	}
+
+	return cubicBezierCoordinate(parameter, y1, y2);
+};
+
+const cancelSyncedLyricsScrollAnimation = (container) => {
+	const animation = container ? syncedLyricsScrollAnimations.get(container) : null;
+	if (!animation) return;
+
+	animation.cancelFrame(animation.frameId);
+	syncedLyricsScrollAnimations.delete(container);
+};
+
+const prefersReducedLyricsMotion = () => (
+	CONFIG?.visual?.["reduce-motion"] === true
+	|| (
+		typeof window !== "undefined"
+		&& typeof window.matchMedia === "function"
+		&& window.matchMedia("(prefers-reduced-motion: reduce)").matches
+	)
+);
+
+const animateSyncedLyricsScroll = (container, targetTop) => {
+	cancelSyncedLyricsScrollAnimation(container);
+
+	const startTop = Number(container.scrollTop) || 0;
+	if (Math.abs(targetTop - startTop) < 0.5 || prefersReducedLyricsMotion()) {
+		container.scrollTop = targetTop;
+		return;
+	}
+
+	const now = typeof performance !== "undefined" && typeof performance.now === "function"
+		? () => performance.now()
+		: () => Date.now();
+	const requestFrame = typeof window.requestAnimationFrame === "function"
+		? window.requestAnimationFrame.bind(window)
+		: (callback) => setTimeout(() => callback(now()), 16);
+	const cancelFrame = typeof window.cancelAnimationFrame === "function"
+		? window.cancelAnimationFrame.bind(window)
+		: clearTimeout;
+	const animation = {
+		frameId: null,
+		cancelFrame,
+		startTop,
+		targetTop,
+		startTime: now(),
+	};
+
+	const frame = (timestamp) => {
+		if (syncedLyricsScrollAnimations.get(container) !== animation) return;
+
+		const elapsed = Math.max(0, timestamp - animation.startTime);
+		const progress = Math.min(1, elapsed / LYRICS_CENTERING_DURATION_MS);
+		const eased = getLyricsCenteringProgress(progress);
+		container.scrollTop = animation.startTop
+			+ ((animation.targetTop - animation.startTop) * eased);
+
+		if (progress < 1) {
+			animation.frameId = requestFrame(frame);
+			return;
+		}
+
+		container.scrollTop = animation.targetTop;
+		syncedLyricsScrollAnimations.delete(container);
+	};
+
+	syncedLyricsScrollAnimations.set(container, animation);
+	animation.frameId = requestFrame(frame);
+};
+
 const scrollSyncedContainerToActiveLine = (container, activeLine, behavior = "smooth") => {
   if (!container || !activeLine) return;
 
@@ -3065,11 +3164,17 @@ const scrollSyncedContainerToActiveLine = (container, activeLine, behavior = "sm
 	const maxScrollTop = Math.max(0, container.scrollHeight - containerHeight);
 	const nextTop = Math.max(0, Math.min(targetTop, maxScrollTop));
 
-	if (typeof container.scrollTo === "function") {
-		container.scrollTo({ top: nextTop, behavior });
+	if (behavior === "smooth") {
+		animateSyncedLyricsScroll(container, nextTop);
 		return;
 	}
 
+	if (behavior === "sync" && syncedLyricsScrollAnimations.has(container)) {
+		syncedLyricsScrollAnimations.get(container).targetTop = nextTop;
+		return;
+	}
+
+	cancelSyncedLyricsScrollAnimation(container);
 	container.scrollTop = nextTop;
 };
 
@@ -3713,22 +3818,6 @@ const shouldHideSyncedLine = ({ compact, isScrolling, animationIndex }) => {
 	);
 };
 
-const formatKaraokeLineShiftSeconds = (value) => {
-	switch (value) {
-		case 0: return "0s";
-		case 0.02: return "0.02s";
-		case 0.04: return "0.04s";
-		case 0.06: return "0.06s";
-		case 0.28: return "0.28s";
-		case 0.30000000000000004: return "0.30000000000000004s";
-		case 0.34: return "0.34s";
-		case 0.38: return "0.38s";
-		case 0.42000000000000004: return "0.42000000000000004s";
-		case 0.46: return "0.46s";
-		default: return `${value}s`;
-	}
-};
-
 const LyricsLineBlock = react.memo(({
 	className,
 	style,
@@ -4299,7 +4388,7 @@ const useSyncedLyricsEngine = ({
 			}
 			frameId = raf(() => {
 				frameId = null;
-				scrollSyncedContainerToActiveLine(containerRef.current, activeLineRef.current, "auto");
+				scrollSyncedContainerToActiveLine(containerRef.current, activeLineRef.current, "sync");
 			});
 		};
 
@@ -4359,10 +4448,8 @@ const useSyncedLyricsEngine = ({
 				"--animation-index": Math.abs(animationIndex) + 1,
 				"--line-shift-duration": isScrolling
 					? "0s"
-					: formatKaraokeLineShiftSeconds(Math.max(0.28, 0.46 - Math.min(Math.abs(animationIndex), 4) * 0.04)),
-				"--line-shift-delay": isScrolling
-					? "0s"
-					: formatKaraokeLineShiftSeconds(animationIndex > 0 ? Math.min(animationIndex, 3) * 0.02 : 0),
+					: "var(--iv-lyrics-centering-duration, 820ms)",
+				"--line-shift-delay": "0s",
 				"--blur-index": Math.min(Math.abs(animationIndex), 3),
 			};
 		});
@@ -4549,10 +4636,8 @@ const useSyncedLyricsEngine = ({
 						"--animation-index": Math.abs(virtualAnimationIndex) + 1,
 						"--line-shift-duration": isScrolling
 							? "0s"
-							: formatKaraokeLineShiftSeconds(Math.max(0.28, 0.46 - Math.min(Math.abs(virtualAnimationIndex), 4) * 0.04)),
-						"--line-shift-delay": isScrolling
-							? "0s"
-							: formatKaraokeLineShiftSeconds(virtualAnimationIndex > 0 ? Math.min(virtualAnimationIndex, 3) * 0.02 : 0),
+							: "var(--iv-lyrics-centering-duration, 820ms)",
+						"--line-shift-delay": "0s",
 						"--blur-index": 0,
 					},
 					line: activeTrailingInterludeLine,

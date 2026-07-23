@@ -8765,6 +8765,8 @@ class LyricsContainer extends react.Component {
       "--iv-motion-duration-fast": this.shouldReduceMotion() ? "1ms" : "180ms",
       "--iv-motion-duration-medium": this.shouldReduceMotion() ? "1ms" : "280ms",
       "--iv-motion-duration-slow": this.shouldReduceMotion() ? "1ms" : "420ms",
+      "--iv-lyrics-centering-duration": this.shouldReduceMotion() ? "1ms" : "820ms",
+      "--iv-lyrics-centering-ease": "cubic-bezier(0.20, 0.70, 0.42, 0.96)",
       "--iv-motion-distance-sm": this.shouldReduceMotion() ? "0px" : "10px",
       "--iv-motion-distance-md": this.shouldReduceMotion() ? "0px" : "18px",
       ...(vinylTrackAccent ? {
