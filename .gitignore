@@ -9,6 +9,3 @@ __pycache__/
 # Local test harnesses
 **/test/
 **/tests/*
-!tests/language-detection.test.js
-!tests/vinyl-track-transition.test.js
-!tests/sync-export-filename.test.js
