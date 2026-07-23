@@ -8623,7 +8623,7 @@ html.is-lp-view-exit::view-transition-new(root) {
   min-height: clamp(126px, 17svh, 188px);
 }
 
-.fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-culturalNote {
+.fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine > .lyrics-lyricsContainer-LyricsLine-culturalNote {
   width: min(92%, 900px);
   max-width: min(92%, 900px);
   margin: 7px auto 0;
