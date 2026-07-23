@@ -4668,7 +4668,7 @@ class LyricsContainer extends react.Component {
 
     const targetLang = this.getTranslationTargetLanguage();
     const sourceSignature = getTranslationSourceCacheHash(JSON.stringify(lines));
-    const schemaVersion = 3;
+    const schemaVersion = 4;
     const resultKey = `v${schemaVersion}:${sourceLang || "auto"}:${targetLang}:${sourceSignature}`;
     if (!ignoreCache && this._culturalAnnotationResults.get(uri)?.key === resultKey) {
       return Promise.resolve(this._culturalAnnotationResults.get(uri));

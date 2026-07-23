@@ -198,9 +198,15 @@ test('all shared prompt builders are exposed by AIAddonManager', () => {
         ]
     });
     assert.match(cultural, /ordinary translation cannot fully convey/i);
+    assert.match(cultural, /ALL THREE ANSWERS MUST BE YES/);
+    assert.match(cultural, /concrete fact outside the lyrics/);
     assert.match(cultural, /When uncertain, omit the annotation/);
     assert.match(cultural, /Do not infer a country or culture from the source language alone/);
     assert.match(cultural, /"Monday", "bad days", and "Not today"/);
+    assert.match(cultural, /Quotation marks alone never prove a quotation or allusion/);
+    assert.match(cultural, /"奈落の底" is an ordinary abyss\/hell metaphor/);
+    assert.match(cultural, /"バラバラの月光" is ordinary poetic imagery/);
+    assert.match(cultural, /literary interpretation, not cultural context/);
     assert.match(cultural, /exact, contiguous substring/);
     assert.match(cultural, /no more than 72 characters/);
     assert.match(cultural, /multiple annotations only when it contains multiple distinct cultural expressions/);
