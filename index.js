@@ -2030,6 +2030,10 @@ const CONFIG = {
       "ivLyrics:visual:video-background",
       false
     ),
+    "community-video-random": StorageManager.get(
+      "ivLyrics:visual:community-video-random",
+      false
+    ),
     "video-helper-enabled": StorageManager.get(
       "ivLyrics:visual:video-helper-enabled",
       false
@@ -3177,7 +3181,11 @@ const Prefetcher = {
       try {
         // 영상 배경 프리페치는 가사 유무와 무관하게 독립적으로 시작
         const prefetchPromises = [];
-        if (CONFIG.visual["video-background"] && CONFIG.visual["prefetch-video-enabled"] !== false) {
+        if (
+          CONFIG.visual["video-background"] &&
+          CONFIG.visual["prefetch-video-enabled"] !== false &&
+          CONFIG.visual["community-video-random"] !== true
+        ) {
           prefetchPromises.push(this._prefetchVideoBackground(trackInfo.uri));
         }
 
@@ -3438,6 +3446,8 @@ const Prefetcher = {
    * 영상 배경 정보 프리페치
    */
   async _prefetchVideoBackground(uri) {
+    if (CONFIG.visual["community-video-random"] === true) return null;
+
     const trackId = Utils.extractTrackId(uri);
     if (!trackId) return;
     const spotifyData = SpotifyDataHelper.extractSpotifyData(uri);
@@ -5119,6 +5129,7 @@ class LyricsContainer extends react.Component {
    */
   async loadSavedVideoForTrack(trackUri) {
     if (!trackUri) return;
+    if (CONFIG.visual["community-video-random"] === true) return;
 
     try {
       const savedVideo = await Utils.getSelectedVideo(trackUri);

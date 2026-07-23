@@ -67,6 +67,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
     const [videoInfo, setVideoInfo] = useState(null);
     const [isPlayerReady, setIsPlayerReady] = useState(false);
     const [statusMessage, setStatusMessage] = useState("");
+    const [videoLoadRevision, setVideoLoadRevision] = useState(0);
 
     const [stats, setStats] = useState({
         quality: '-',
@@ -165,6 +166,33 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         return () => clearStatusMessageTimeout();
     }, [clearStatusMessageTimeout]);
 
+    useEffect(() => {
+        const reloadCurrentTrack = (event) => {
+            const eventTrackUri =
+                event?.data?.item?.uri ||
+                Spicetify.Player?.data?.item?.uri;
+            if (eventTrackUri === trackUri) {
+                setVideoLoadRevision((revision) => revision + 1);
+            }
+        };
+        const handleRandomSettingChange = () => {
+            setVideoLoadRevision((revision) => revision + 1);
+        };
+
+        Spicetify.Player?.addEventListener?.("songchange", reloadCurrentTrack);
+        window.addEventListener(
+            "ivLyrics:communityVideoRandomChanged",
+            handleRandomSettingChange
+        );
+        return () => {
+            Spicetify.Player?.removeEventListener?.("songchange", reloadCurrentTrack);
+            window.removeEventListener(
+                "ivLyrics:communityVideoRandomChanged",
+                handleRandomSettingChange
+            );
+        };
+    }, [trackUri]);
+
     const reportVideoBackgroundStatus = useCallback((phase, details = {}) => {
         if (typeof onLoadingChange !== "function") return;
         onLoadingChange({
@@ -234,6 +262,9 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
 
     // Fetch Video Info & Manage Player Lifecycle
     useEffect(() => {
+        const useRandomCommunityVideo =
+            CONFIG?.visual?.["community-video-random"] === true;
+
         if (!trackUri) {
             setVideoInfo(null);
             setIsPlayerReady(false);
@@ -241,8 +272,15 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
             return undefined;
         }
 
-        // 외부에서 전달된 videoInfo가 있으면 fetch 스킵
-        if (externalVideoInfo && externalVideoInfo.youtubeVideoId) {
+        // 수동 선택은 일반 모드에서 우선하고, 무작위 모드에서는 새 후보를 계산
+        if (
+            !useRandomCommunityVideo &&
+            externalVideoInfo &&
+            externalVideoInfo.youtubeVideoId
+        ) {
+            setVideoInfo(externalVideoInfo);
+            setStatusMessage("");
+            setIsPlayerReady(false);
             return undefined;
         }
 
@@ -268,6 +306,26 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         // 비동기 로드 함수
         const loadVideoInfo = async () => {
             try {
+                // 무작위 모드에서는 저장/캐시된 최고 추천보다 커뮤니티 후보를 먼저 선택
+                if (trackId && useRandomCommunityVideo) {
+                    try {
+                        const randomVideo = await Utils.getRandomCommunityVideo(trackUri);
+                        if (randomVideo?.youtubeVideoId && isMounted) {
+                            videoBackgroundDebug(
+                                `[VideoBackground] Using random community video: ${randomVideo.youtubeVideoId}`
+                            );
+                            setVideoInfo(randomVideo);
+                            setStatusMessage("");
+                            return;
+                        }
+                    } catch (error) {
+                        console.warn(
+                            "[VideoBackground] Failed to select a random community video:",
+                            error
+                        );
+                    }
+                }
+
                 // 1. IndexedDB에서 사용자가 선택한 영상이 있는지 먼저 확인
                 try {
                     const savedVideo = await Utils.getSelectedVideo(trackUri);
@@ -438,7 +496,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 playerRef.current = null;
             }
         };
-    }, [trackUri, externalVideoInfo, reportVideoBackgroundStatus]);
+    }, [trackUri, externalVideoInfo, reportVideoBackgroundStatus, videoLoadRevision]);
 
     // Track-specific sync offset handling
     useEffect(() => {

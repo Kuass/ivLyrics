@@ -6553,6 +6553,92 @@ ruby rt {
   line-height: 1.45;
 }
 
+.community-video-random-setting {
+  margin: 0 0 16px;
+  padding: 2px 0 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.community-video-random-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.community-video-random-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.community-video-random-label {
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.community-video-random-description {
+  margin-top: 4px;
+  color: rgba(248, 250, 252, 0.58);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.community-video-random-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex: 0 0 44px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.community-video-random-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(248, 250, 252, 0.78);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    background 160ms ease;
+}
+
+.community-video-random-switch[aria-checked="true"] {
+  border-color: rgba(var(--spice-rgb-accent, 30, 215, 96), 0.72);
+  background: rgba(var(--spice-rgb-accent, 30, 215, 96), 0.72);
+}
+
+.community-video-random-switch[aria-checked="true"] .community-video-random-switch-thumb {
+  transform: translateX(20px);
+  background: #fff;
+}
+
+.community-video-random-switch:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(var(--spice-rgb-accent, 30, 215, 96), 0.24);
+}
+
+.community-video-random-warning {
+  margin-top: 10px;
+  padding-left: 10px;
+  border-left: 2px solid rgba(245, 158, 11, 0.42);
+  color: rgba(248, 250, 252, 0.52);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.community-video-random-setting.enabled .community-video-random-warning {
+  border-left-color: rgba(245, 158, 11, 0.82);
+  color: rgba(253, 230, 138, 0.88);
+}
+
 .community-video-list {
   display: flex;
   flex-direction: column;
@@ -6935,12 +7021,44 @@ ruby rt {
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-error,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-empty,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-local-note,
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-random-description,
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-random-warning,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-meta,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .form-hint,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .loading-title,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-submit-form label,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .confirm-dialog-message {
   color: rgba(15, 23, 42, 0.58);
+}
+
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-random-setting {
+  border-bottom-color: rgba(15, 23, 42, 0.08);
+}
+
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-random-label {
+  color: #0f172a;
+}
+
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-random-switch {
+  border-color: rgba(15, 23, 42, 0.16);
+  background: rgba(15, 23, 42, 0.08);
+}
+
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-random-switch-thumb {
+  background: rgba(15, 23, 42, 0.64);
+}
+
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-random-switch[aria-checked="true"] {
+  border-color: rgba(var(--spice-rgb-accent, 30, 215, 96), 0.72);
+  background: rgba(var(--spice-rgb-accent, 30, 215, 96), 0.72);
+}
+
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-random-switch[aria-checked="true"] .community-video-random-switch-thumb {
+  background: #fff;
+}
+
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-random-setting.enabled .community-video-random-warning {
+  color: #92400e;
 }
 
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-title .auto-badge,
@@ -15409,5 +15527,13 @@ html.is-lp-view-exit::view-transition-new(root) {
   .community-video-content,
   .ivlyrics-cache-edit-body {
     padding-inline: 14px;
+  }
+
+  .community-video-random-row {
+    align-items: flex-start;
+  }
+
+  .community-video-random-switch {
+    margin-top: 2px;
   }
 }

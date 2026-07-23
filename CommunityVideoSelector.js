@@ -670,6 +670,9 @@ const CommunityVideoSelector = ({
   const [deletingId, setDeletingId] = useState(null); // 삭제 중인 영상 ID
   const [deleteConfirmId, setDeleteConfirmId] = useState(null); // 삭제 확인 다이얼로그용
   const [deleteConfirmTitle, setDeleteConfirmTitle] = useState(""); // 삭제할 영상 제목
+  const [randomSelectionEnabled, setRandomSelectionEnabled] = useState(
+    () => CONFIG?.visual?.["community-video-random"] === true
+  );
   const titleFetchTimeout = useRef(null);
 
   // 현재 사용자 해시 ID
@@ -721,6 +724,20 @@ const CommunityVideoSelector = ({
   useEffect(() => {
     loadVideos();
   }, [loadVideos]);
+
+  const updateRandomSelection = useCallback((nextValue) => {
+    setRandomSelectionEnabled(nextValue);
+    CONFIG.visual["community-video-random"] = nextValue;
+    StorageManager.saveConfig("community-video-random", nextValue);
+    window.dispatchEvent(new CustomEvent(
+      "ivLyrics:communityVideoRandomChanged",
+      { detail: { enabled: nextValue } }
+    ));
+  }, []);
+
+  const toggleRandomSelection = useCallback(() => {
+    updateRandomSelection(!randomSelectionEnabled);
+  }, [randomSelectionEnabled, updateRandomSelection]);
 
   const resetSubmitForm = useCallback(() => {
     setShowSubmitForm(false);
@@ -922,6 +939,9 @@ const CommunityVideoSelector = ({
   };
 
   const handleApply = (video) => {
+    if (randomSelectionEnabled) {
+      updateRandomSelection(false);
+    }
     if (onVideoSelect) {
       onVideoSelect({
         youtubeVideoId: video.youtubeVideoId,
@@ -1052,6 +1072,57 @@ const CommunityVideoSelector = ({
       {
         className: "community-video-content",
       },
+      !isLocalVideoMode &&
+      react.createElement(
+        "div",
+        {
+          className: `community-video-random-setting${randomSelectionEnabled ? " enabled" : ""}`,
+        },
+        react.createElement(
+          "div",
+          { className: "community-video-random-row" },
+          react.createElement(
+            "div",
+            { className: "community-video-random-copy" },
+            react.createElement(
+              "div",
+              {
+                id: "community-video-random-label",
+                className: "community-video-random-label",
+              },
+              I18n.t("communityVideo.randomSelectionLabel")
+            ),
+            react.createElement(
+              "div",
+              { className: "community-video-random-description" },
+              I18n.t("communityVideo.randomSelectionDesc")
+            )
+          ),
+          react.createElement(
+            "button",
+            {
+              type: "button",
+              className: "community-video-random-switch",
+              role: "switch",
+              "aria-checked": randomSelectionEnabled,
+              "aria-labelledby": "community-video-random-label",
+              onClick: toggleRandomSelection,
+            },
+            react.createElement("span", {
+              className: "community-video-random-switch-thumb",
+              "aria-hidden": "true",
+            })
+          )
+        ),
+        react.createElement(
+          "div",
+          {
+            className: "community-video-random-warning",
+            role: "note",
+          },
+          I18n.t("communityVideo.randomSelectionWarning")
+        )
+      ),
       isLoading
         ? react.createElement(
           "div",
