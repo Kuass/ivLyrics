@@ -32,6 +32,8 @@ const VinylPlayerMode = (() => {
         ["paused", 2030]
     ];
 
+    const TRACK_RECORD_SLEEVE_MS = 680;
+    const TRACK_ALBUM_DEPART_MS = 480;
     const TRACK_ALBUM_ARRIVE_MS = 700;
     const TRACK_RECORD_EMERGE_MS = 720;
     const TRACK_RECORD_RAISE_MS = 360;
@@ -656,35 +658,37 @@ const VinylPlayerMode = (() => {
             "aria-label": vinylModeLabel
         },
             react.createElement("div", { className: "ivlyrics-vinyl-visual-group" },
-                react.createElement("button", {
-                    type: "button",
-                    className: "ivlyrics-vinyl-record-shell",
-                    "aria-label": playLabel,
-                    onPointerDown: (event) => event.stopPropagation(),
-                    onClick: (event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        onTogglePlayback?.();
-                    }
-                },
-                    react.createElement(VinylDisc, {
-                        title,
-                        artist,
-                        album,
-                        idPrefix: "ivlyrics-vinyl-current"
-                    })
-                ),
-                react.createElement("button", {
-                    ...interactionProps,
-                    type: "button",
-                    className: "ivlyrics-vinyl-sleeve ivlyrics-fullscreen-shared-album",
-                    "aria-label": albumLabel
-                },
-                    react.createElement("img", {
-                        src: coverUrl,
-                        alt: "",
-                        draggable: false
-                    })
+                react.createElement("div", { className: "ivlyrics-vinyl-outgoing-pair" },
+                    react.createElement("button", {
+                        type: "button",
+                        className: "ivlyrics-vinyl-record-shell",
+                        "aria-label": playLabel,
+                        onPointerDown: (event) => event.stopPropagation(),
+                        onClick: (event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            onTogglePlayback?.();
+                        }
+                    },
+                        react.createElement(VinylDisc, {
+                            title,
+                            artist,
+                            album,
+                            idPrefix: "ivlyrics-vinyl-current"
+                        })
+                    ),
+                    react.createElement("button", {
+                        ...interactionProps,
+                        type: "button",
+                        className: "ivlyrics-vinyl-sleeve ivlyrics-fullscreen-shared-album",
+                        "aria-label": albumLabel
+                    },
+                        react.createElement("img", {
+                            src: coverUrl,
+                            alt: "",
+                            draggable: false
+                        })
+                    )
                 ),
                 incomingTrack && react.createElement("span", {
                     className: "ivlyrics-vinyl-incoming-sleeve",
@@ -843,6 +847,8 @@ const VinylPlayerMode = (() => {
         const requestedTrackKeyRef = useRef("");
         const trackTransitionRevisionRef = useRef(0);
         const trackPreloadTimerRef = useRef(null);
+        const trackSleeveTimerRef = useRef(null);
+        const trackDepartureTimerRef = useRef(null);
         const trackAlbumTimerRef = useRef(null);
         const trackRecordTimerRef = useRef(null);
         const trackRaiseTimerRef = useRef(null);
@@ -852,6 +858,14 @@ const VinylPlayerMode = (() => {
             if (trackPreloadTimerRef.current) {
                 window.clearTimeout(trackPreloadTimerRef.current);
                 trackPreloadTimerRef.current = null;
+            }
+            if (trackSleeveTimerRef.current) {
+                window.clearTimeout(trackSleeveTimerRef.current);
+                trackSleeveTimerRef.current = null;
+            }
+            if (trackDepartureTimerRef.current) {
+                window.clearTimeout(trackDepartureTimerRef.current);
+                trackDepartureTimerRef.current = null;
             }
             if (trackAlbumTimerRef.current) {
                 window.clearTimeout(trackAlbumTimerRef.current);
@@ -895,17 +909,20 @@ const VinylPlayerMode = (() => {
             }
 
             setIncomingTrack(liveTrack);
-            setTrackTransition("preparing");
+            setTrackTransition("record-sleeving");
 
             let preloadImage = null;
+            let coverReady = false;
+            let departureFinished = false;
             let flightStarted = false;
             const beginFlight = () => {
-                if (flightStarted || trackTransitionRevisionRef.current !== revision) return;
+                if (
+                    flightStarted
+                    || !coverReady
+                    || !departureFinished
+                    || trackTransitionRevisionRef.current !== revision
+                ) return;
                 flightStarted = true;
-                if (trackPreloadTimerRef.current) {
-                    window.clearTimeout(trackPreloadTimerRef.current);
-                    trackPreloadTimerRef.current = null;
-                }
                 setTrackTransition("album-arriving");
                 trackAlbumTimerRef.current = window.setTimeout(() => {
                     if (trackTransitionRevisionRef.current !== revision) return;
@@ -935,20 +952,42 @@ const VinylPlayerMode = (() => {
                 }, TRACK_ALBUM_ARRIVE_MS);
             };
 
+            const markCoverReady = () => {
+                if (coverReady || trackTransitionRevisionRef.current !== revision) return;
+                coverReady = true;
+                if (trackPreloadTimerRef.current) {
+                    window.clearTimeout(trackPreloadTimerRef.current);
+                    trackPreloadTimerRef.current = null;
+                }
+                beginFlight();
+            };
+
+            trackSleeveTimerRef.current = window.setTimeout(() => {
+                if (trackTransitionRevisionRef.current !== revision) return;
+                trackSleeveTimerRef.current = null;
+                setTrackTransition("album-departing");
+                trackDepartureTimerRef.current = window.setTimeout(() => {
+                    if (trackTransitionRevisionRef.current !== revision) return;
+                    trackDepartureTimerRef.current = null;
+                    departureFinished = true;
+                    beginFlight();
+                }, TRACK_ALBUM_DEPART_MS);
+            }, TRACK_RECORD_SLEEVE_MS);
+
             trackPreloadTimerRef.current = window.setTimeout(
-                beginFlight,
+                markCoverReady,
                 TRACK_COVER_PRELOAD_MAX_MS
             );
 
             if (liveTrack.coverUrl && typeof window.Image === "function") {
                 preloadImage = new window.Image();
                 preloadImage.decoding = "async";
-                preloadImage.onload = beginFlight;
-                preloadImage.onerror = beginFlight;
+                preloadImage.onload = markCoverReady;
+                preloadImage.onerror = markCoverReady;
                 preloadImage.src = liveTrack.coverUrl;
-                if (preloadImage.complete) beginFlight();
+                if (preloadImage.complete) markCoverReady();
             } else {
-                beginFlight();
+                markCoverReady();
             }
 
             return () => {

@@ -8223,7 +8223,9 @@ html.is-lp-view-exit::view-transition-new(root) {
   --iv-vinyl-accent: var(--iv-vinyl-track-accent, var(--spice-button-active, #ff809d));
   --iv-vinyl-record-duration: 520ms;
   --iv-vinyl-record-ease: cubic-bezier(0.65, 0, 0.35, 1);
+  --iv-vinyl-sleeve-duration: 880ms;
   --iv-vinyl-flight-target-transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  --iv-vinyl-outgoing-exit-transform: translate3d(0, calc(-100% - 42svh), 0) scale(0.96);
   --iv-vinyl-incoming-record-start-transform: translate3d(-82%, 0, 0) scale(0.94);
   --iv-vinyl-incoming-record-clear-transform: translate3d(22%, -1%, 0) scale(1.008);
   --iv-vinyl-incoming-record-target-transform: translate3d(0, 0, 0) scale(1);
@@ -8274,6 +8276,15 @@ html.is-lp-view-exit::view-transition-new(root) {
   will-change: transform;
 }
 
+.ivlyrics-vinyl-outgoing-pair {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
+}
+
 .ivlyrics-vinyl-sleeve,
 .ivlyrics-vinyl-record-shell {
   position: absolute;
@@ -8300,7 +8311,7 @@ html.is-lp-view-exit::view-transition-new(root) {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   cursor: pointer;
   transition:
-    transform 880ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform var(--iv-vinyl-sleeve-duration) cubic-bezier(0.4, 0, 0.2, 1),
     box-shadow 880ms ease,
     top 620ms cubic-bezier(0.22, 1, 0.36, 1),
     left 620ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -8810,6 +8821,17 @@ html.is-lp-view-exit::view-transition-new(root) {
   transform: rotate(var(--iv-vinyl-tonearm-angle));
 }
 
+.ivlyrics-vinyl-player:is(
+  .is-track-record-sleeving,
+  .is-track-album-departing,
+  .is-track-album-arriving,
+  .is-track-record-emerging,
+  .is-track-record-raised,
+  .is-track-handoff
+) .ivlyrics-vinyl-tonearm-moving {
+  transform: rotate(-14deg);
+}
+
 .ivlyrics-vinyl-player.tonearm-style-linear .ivlyrics-vinyl-tonearm {
   left: 62%;
   width: 38%;
@@ -8858,6 +8880,17 @@ html.is-lp-view-exit::view-transition-new(root) {
 
 .ivlyrics-vinyl-player.tonearm-style-linear.is-cueing .ivlyrics-vinyl-tonearm-moving {
   transform: translateX(var(--iv-vinyl-tonearm-linear-x));
+}
+
+.ivlyrics-vinyl-player.tonearm-style-linear:is(
+  .is-track-record-sleeving,
+  .is-track-album-departing,
+  .is-track-album-arriving,
+  .is-track-record-emerging,
+  .is-track-record-raised,
+  .is-track-handoff
+) .ivlyrics-vinyl-tonearm-moving {
+  transform: translateX(var(--iv-vinyl-tonearm-linear-rest-x));
 }
 
 .ivlyrics-vinyl-player.is-cue-ready .ivlyrics-vinyl-tonearm-base-edge {
@@ -8935,24 +8968,77 @@ html.is-lp-view-exit::view-transition-new(root) {
   filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.22));
 }
 
-.ivlyrics-vinyl-player.is-track-preparing .ivlyrics-vinyl-sleeve,
-.ivlyrics-vinyl-player.is-track-album-arriving .ivlyrics-vinyl-sleeve,
-.ivlyrics-vinyl-player.is-track-record-emerging .ivlyrics-vinyl-sleeve,
-.ivlyrics-vinyl-player.is-track-record-raised .ivlyrics-vinyl-sleeve,
-.ivlyrics-vinyl-player.is-track-handoff .ivlyrics-vinyl-sleeve {
-  z-index: 1;
+.ivlyrics-vinyl-player:is(
+  .is-track-record-sleeving,
+  .is-track-album-departing,
+  .is-track-album-arriving,
+  .is-track-record-emerging,
+  .is-track-record-raised,
+  .is-track-handoff
+) {
+  --iv-vinyl-sleeve-duration: 680ms;
 }
 
-/* Keep the currently playing pair stable throughout track replacement:
-   old album (1), old LP (2), new LP (3), new album (4). After the new LP has
-   fully cleared its sleeve it rises to layer 5. Handoff then replaces the
-   hidden base pair without ever flipping the old album in front of its LP. */
-.ivlyrics-vinyl-player.is-track-preparing .ivlyrics-vinyl-record-shell,
-.ivlyrics-vinyl-player.is-track-album-arriving .ivlyrics-vinyl-record-shell,
-.ivlyrics-vinyl-player.is-track-record-emerging .ivlyrics-vinyl-record-shell,
-.ivlyrics-vinyl-player.is-track-record-raised .ivlyrics-vinyl-record-shell,
-.ivlyrics-vinyl-player.is-track-handoff .ivlyrics-vinyl-record-shell {
-  z-index: 2;
+.ivlyrics-vinyl-player:is(
+  .is-track-record-sleeving,
+  .is-track-album-departing,
+  .is-track-album-arriving,
+  .is-track-record-emerging,
+  .is-track-record-raised,
+  .is-track-handoff
+) .ivlyrics-vinyl-sleeve {
+  z-index: 1;
+  transform: translate3d(0, 0, 0) rotate(0deg);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* The old LP first moves completely behind its sleeve. Only after the pair has
+   left through the top edge may the incoming album begin its flight. */
+.ivlyrics-vinyl-player:is(
+  .is-track-record-sleeving,
+  .is-track-album-departing,
+  .is-track-album-arriving,
+  .is-track-record-emerging,
+  .is-track-record-raised,
+  .is-track-handoff
+) .ivlyrics-vinyl-record-shell {
+  --iv-vinyl-record-duration: 680ms;
+  z-index: 0;
+  transform: translate3d(-82%, 0, 0);
+  filter: none;
+}
+
+.ivlyrics-vinyl-player.is-track-album-departing .ivlyrics-vinyl-outgoing-pair {
+  animation: fullscreen-vinyl-old-pair-depart 480ms cubic-bezier(0.5, 0, 0.72, 0.3) both;
+  pointer-events: none;
+}
+
+.ivlyrics-vinyl-player:is(
+  .is-track-album-arriving,
+  .is-track-record-emerging,
+  .is-track-record-raised,
+  .is-track-handoff
+) .ivlyrics-vinyl-outgoing-pair {
+  opacity: 0;
+  transform: var(--iv-vinyl-outgoing-exit-transform);
+  pointer-events: none;
+}
+
+@keyframes fullscreen-vinyl-old-pair-depart {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  24% {
+    opacity: 1;
+    transform: translate3d(0, -7%, 0) scale(0.995);
+  }
+
+  100% {
+    opacity: 0;
+    transform: var(--iv-vinyl-outgoing-exit-transform);
+  }
 }
 
 /* Portrait LP composition: the sleeve opens above a record that drops into
@@ -9095,6 +9181,28 @@ html.is-lp-view-exit::view-transition-new(root) {
   transform: translate3d(0, 0, 0);
 }
 
+.ivlyrics-vinyl-player--portrait-layout:is(
+  .is-track-record-sleeving,
+  .is-track-album-departing,
+  .is-track-album-arriving,
+  .is-track-record-emerging,
+  .is-track-record-raised,
+  .is-track-handoff
+) .ivlyrics-vinyl-sleeve {
+  transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+}
+
+.ivlyrics-vinyl-player--portrait-layout:is(
+  .is-track-record-sleeving,
+  .is-track-album-departing,
+  .is-track-album-arriving,
+  .is-track-record-emerging,
+  .is-track-record-raised,
+  .is-track-handoff
+) .ivlyrics-vinyl-record-shell {
+  transform: translate3d(0, -40%, 0);
+}
+
 .ivlyrics-vinyl-player--portrait-layout.is-cover-turning .ivlyrics-vinyl-tonearm,
 .ivlyrics-vinyl-player--portrait-layout.is-lifting .ivlyrics-vinyl-tonearm,
 .ivlyrics-vinyl-player--portrait-layout.is-settling .ivlyrics-vinyl-tonearm,
@@ -9146,6 +9254,7 @@ html.is-lp-view-exit::view-transition-new(root) {
 }
 
 .fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-visual-group,
+.fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-outgoing-pair,
 .fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-sleeve,
 .fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-record-shell,
 .fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-tonearm,
