@@ -1094,8 +1094,7 @@ const VinylPlayerMode = (() => {
                 activeLineIndex,
                 isKara: activeLyricsKaraoke,
                 karaokeSource,
-                settingsRevision: lyricsSettingsRevision,
-                position: Math.max(Number(position) || 0, 0)
+                settingsRevision: lyricsSettingsRevision
             }
             : null;
 
@@ -1134,7 +1133,8 @@ const VinylPlayerMode = (() => {
                     karaokeSource: snapshot.karaokeSource,
                     settingsRevision: snapshot.settingsRevision,
                     positionOverride: null,
-                    motionEnabled: animationsEnabled
+                    motionEnabled: animationsEnabled,
+                    durationMs: duration
                 })
                 : snapshot.plainText);
         };

@@ -187,6 +187,7 @@ const VinylActiveLyricRenderer = (() => {
         settingsRevision = 0,
         positionOverride = null,
         motionEnabled = true,
+        durationMs = 0,
     }) => {
         const rootRef = useRef(null);
         const playbackPosition = useLyricsPlaybackPosition();
@@ -208,11 +209,14 @@ const VinylActiveLyricRenderer = (() => {
         const lineStartTime = Number(sourceLine?.startTime) || 0;
         const directLineEndTime = Number(sourceLine?.endTime);
         const nextLineStartTime = Number(lyrics[safeLineIndex + 1]?.startTime);
+        const trackDuration = Number(durationMs);
         const lineEndTime = Number.isFinite(directLineEndTime) && directLineEndTime > lineStartTime
             ? directLineEndTime
             : (Number.isFinite(nextLineStartTime) && nextLineStartTime > lineStartTime
                 ? nextLineStartTime
-                : lineStartTime);
+                : (Number.isFinite(trackDuration) && trackDuration > lineStartTime
+                    ? trackDuration
+                    : lineStartTime));
         useOverflowAutoScroll(
             rootRef,
             scrollResetKey,
