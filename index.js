@@ -4050,6 +4050,7 @@ const GENERATION_REQUEST_PILL_CONFIG = Object.freeze({
     timerKey: "culturalAnnotationsLoadingTimer",
     failureKey: "_culturalAnnotationsLoadingHadFailure",
     loadingStateKey: "isCulturalAnnotationsLoading",
+    loadingDelayMs: 0,
   }),
 });
 
@@ -5130,7 +5131,7 @@ class LyricsContainer extends react.Component {
     if (this[config.timerKey]) {
       clearTimeout(this[config.timerKey]);
     }
-    this[config.timerKey] = setTimeout(() => {
+    const showLoading = () => {
       this[config.timerKey] = null;
       if (activeTokens.size > 0 && this._isComponentMounted) {
         if (config.loadingStateKey) {
@@ -5141,7 +5142,15 @@ class LyricsContainer extends react.Component {
           this._generationRequestDetails.get(kind) || {}
         );
       }
-    }, GENERATION_PILL_TIMING.loadingDelayMs);
+    };
+    const loadingDelayMs = Number.isFinite(config.loadingDelayMs)
+      ? Math.max(0, config.loadingDelayMs)
+      : GENERATION_PILL_TIMING.loadingDelayMs;
+    if (loadingDelayMs === 0) {
+      showLoading();
+    } else {
+      this[config.timerKey] = setTimeout(showLoading, loadingDelayMs);
+    }
 
     return token;
   }
