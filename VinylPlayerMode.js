@@ -1120,7 +1120,10 @@ const VinylPlayerMode = (() => {
             const canRenderSnapshotRichly = !!ActiveLyricRenderer && renderableLyrics.length > 0;
 
             return react.createElement("div", {
-                key: `vinyl-active-lyric-current-${snapshot.trackUri}-${snapshot.activeLineIndex}`,
+                // Keep the layer mounted between lines. Remounting it for every
+                // active index restarted the entrance animation and made the LP
+                // lyric surface visibly blink between otherwise continuous rows.
+                key: `vinyl-active-lyric-current-${snapshot.trackUri}`,
                 className: "fullscreen-vinyl-active-lyric is-current",
                 dir: "auto"
             }, canRenderSnapshotRichly
