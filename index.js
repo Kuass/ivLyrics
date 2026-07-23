@@ -4181,6 +4181,7 @@ class LyricsContainer extends react.Component {
     this._sharedPresentationKeys = new Map();
     this._culturalAnnotationResults = new Map();
     this._culturalAnnotationRequests = new Map();
+    this._culturalAnnotationCacheEpoch = 0;
     this._isComponentMounted = false;
 
     // Portrait viewport detection
@@ -4230,6 +4231,7 @@ class LyricsContainer extends react.Component {
 
     // Bind regenerate translation method
     this.regenerateTranslation = this.regenerateTranslation.bind(this);
+    this.regenerateCulturalAnnotations = this.regenerateCulturalAnnotations.bind(this);
     this.handleRegenerateTranslationRequest = this.handleRegenerateTranslationRequest.bind(this);
     this.selectLyricsProviderForCurrentTrack = this.selectLyricsProviderForCurrentTrack.bind(this);
     this.selectBackgroundForCurrentTrack = this.selectBackgroundForCurrentTrack.bind(this);
@@ -4582,6 +4584,52 @@ class LyricsContainer extends react.Component {
       .map(({ lineIndex, text }) => ({ lineIndex, text }));
   }
 
+  getCurrentCulturalAnnotationLyrics() {
+    const currentMode = this.getCurrentMode();
+    if (currentMode === KARAOKE && Array.isArray(this.state.karaoke)) {
+      return this.state.karaoke;
+    }
+    if (currentMode === SYNCED && Array.isArray(this.state.synced)) {
+      return this.state.synced;
+    }
+    if (currentMode === UNSYNCED && Array.isArray(this.state.unsynced)) {
+      return this.state.unsynced;
+    }
+    return Array.isArray(this.state.currentLyrics) ? this.state.currentLyrics : [];
+  }
+
+  clearCulturalAnnotationsForTrack(uri, { updateState = false } = {}) {
+    if (!uri) return;
+
+    this._culturalAnnotationCacheEpoch += 1;
+    this._culturalAnnotationResults.delete(uri);
+    for (const requestKey of this._culturalAnnotationRequests.keys()) {
+      if (requestKey.startsWith(`${uri}:`)) {
+        this._culturalAnnotationRequests.delete(requestKey);
+      }
+    }
+    this.clearCulturalAnnotationsLoading();
+
+    if (updateState && this._isComponentMounted && this.state.uri === uri) {
+      this.setState(state => ({
+        currentLyrics: this.applyCulturalAnnotations(state.currentLyrics, uri),
+      }));
+    }
+  }
+
+  clearAllCulturalAnnotations({ updateState = false } = {}) {
+    this._culturalAnnotationCacheEpoch += 1;
+    this._culturalAnnotationResults.clear();
+    this._culturalAnnotationRequests.clear();
+    this.clearCulturalAnnotationsLoading();
+
+    if (updateState && this._isComponentMounted) {
+      this.setState(state => ({
+        currentLyrics: this.applyCulturalAnnotations(state.currentLyrics, state.uri),
+      }));
+    }
+  }
+
   applyCulturalAnnotations(lyrics, uri = this.state.uri) {
     if (!Array.isArray(lyrics)) return [];
 
@@ -4602,26 +4650,34 @@ class LyricsContainer extends react.Component {
     });
   }
 
-  requestCulturalAnnotations({ lyricsState, lyrics, sourceLang, uri }) {
+  requestCulturalAnnotations({
+    lyricsState,
+    lyrics,
+    sourceLang,
+    uri,
+    ignoreCache = false,
+    notifyOnError = true,
+  }) {
     if (!this.isCulturalAnnotationsEnabled() || !window.Translator?.generateCulturalAnnotations) {
-      return;
+      return Promise.resolve(null);
     }
 
     const lines = this.getCulturalAnnotationSourceLines(lyrics);
-    if (lines.length === 0) return;
+    if (lines.length === 0) return Promise.resolve(null);
 
     const targetLang = this.getTranslationTargetLanguage();
     const sourceSignature = getTranslationSourceCacheHash(JSON.stringify(lines));
     const resultKey = `${sourceLang || "auto"}:${targetLang}:${sourceSignature}`;
-    if (this._culturalAnnotationResults.get(uri)?.key === resultKey) {
-      return;
+    if (!ignoreCache && this._culturalAnnotationResults.get(uri)?.key === resultKey) {
+      return Promise.resolve(this._culturalAnnotationResults.get(uri));
     }
 
     const requestKey = `${uri}:${resultKey}`;
-    if (this._culturalAnnotationRequests.has(requestKey)) {
-      return;
+    if (!ignoreCache && this._culturalAnnotationRequests.has(requestKey)) {
+      return this._culturalAnnotationRequests.get(requestKey);
     }
 
+    const requestEpoch = this._culturalAnnotationCacheEpoch;
     const loadingToken = this.startCulturalAnnotationsLoading();
     let completed = false;
     const request = window.Translator.generateCulturalAnnotations({
@@ -4630,6 +4686,7 @@ class LyricsContainer extends react.Component {
       artist: lyricsState.artist || this.state.artist,
       lines,
       sourceLang: sourceLang || "auto",
+      ignoreCache,
       onProviderLoading: ({ providerId, providerName }) => {
         const providerLabel = String(providerName || providerId || "").trim();
         if (!providerLabel) return;
@@ -4639,6 +4696,9 @@ class LyricsContainer extends react.Component {
         });
       },
     }).then((result) => {
+      if (requestEpoch !== this._culturalAnnotationCacheEpoch) {
+        return null;
+      }
       const notesByIndex = new Map(
         (Array.isArray(result?.annotations) ? result.annotations : [])
           .map(annotation => [Number(annotation.lineIndex), String(annotation.note || "").trim()])
@@ -4658,19 +4718,25 @@ class LyricsContainer extends react.Component {
       }
       return result;
     }).catch((error) => {
+      if (requestEpoch !== this._culturalAnnotationCacheEpoch) {
+        return null;
+      }
       console.warn("[ivLyrics] Cultural annotation request failed:", error);
-      if (this._isComponentMounted && this.state.uri === uri) {
+      if (notifyOnError && this._isComponentMounted && this.state.uri === uri) {
         Toast.error(
           `${I18n.t("notifications.culturalAnnotationsFailed") || "문화적 배경 설명을 불러오지 못했습니다."} ${error?.message || ""}`.trim()
         );
       }
       return null;
     }).finally(() => {
-      this._culturalAnnotationRequests.delete(requestKey);
+      if (this._culturalAnnotationRequests.get(requestKey) === request) {
+        this._culturalAnnotationRequests.delete(requestKey);
+      }
       this.clearCulturalAnnotationsLoading(loadingToken, { completed });
     });
 
     this._culturalAnnotationRequests.set(requestKey, request);
+    return request;
   }
 
   getEditingBaseLyrics() {
@@ -5292,9 +5358,21 @@ class LyricsContainer extends react.Component {
 
   handleRegenerateTranslationRequest() {
     const targets = this.getRegenerationTargets();
-    if (targets.needPhonetic && targets.needTranslation && typeof openRegenerateTranslationChoiceModal === "function") {
+    const includeCulturalAnnotations = this.isCulturalAnnotationsEnabled();
+    if (
+      (includeCulturalAnnotations || (targets.needPhonetic && targets.needTranslation)) &&
+      typeof openRegenerateTranslationChoiceModal === "function"
+    ) {
       openRegenerateTranslationChoiceModal({
-        onSelect: (target) => this.regenerateTranslation(target),
+        targets,
+        includeCulturalAnnotations,
+        onSelect: (target) => {
+          if (target === "cultural-annotations") {
+            this.regenerateCulturalAnnotations();
+            return;
+          }
+          this.regenerateTranslation(target);
+        },
       });
       return;
     }
@@ -5310,6 +5388,64 @@ class LyricsContainer extends react.Component {
     }
 
     this.regenerateTranslation("all");
+  }
+
+  async regenerateCulturalAnnotations() {
+    if (!this.isCulturalAnnotationsEnabled()) return;
+
+    const lyricsState = this.state;
+    const uri = lyricsState.uri || Spicetify.Player.data?.item?.uri;
+    const trackId = Utils.extractTrackId(uri) || uri;
+    const lyrics = this.getCurrentCulturalAnnotationLyrics();
+    if (!uri || !trackId) {
+      Toast.error(I18n.t("notifications.noTrackPlaying"));
+      return;
+    }
+    if (!Array.isArray(lyrics) || lyrics.length === 0) {
+      Toast.error(I18n.t("notifications.noLyricsLoaded"));
+      return;
+    }
+
+    Toast.show(
+      I18n.t("generationStatus.culturalAnnotationsLoading") ||
+        "문화적 배경 설명을 재생성하는 중...",
+      false,
+      2000
+    );
+
+    try {
+      this.clearCulturalAnnotationsForTrack(uri, { updateState: true });
+      const cacheCleared = await LyricsCache.clearCulturalAnnotationsForTrack(trackId);
+      if (!cacheCleared) {
+        throw new Error("Failed to clear cultural annotation cache.");
+      }
+      if (!this.isCurrentLyricsUri(uri)) return;
+
+      const result = await this.requestCulturalAnnotations({
+        lyricsState,
+        lyrics,
+        sourceLang: this.provideLanguageCode(lyrics),
+        uri,
+        ignoreCache: true,
+        notifyOnError: false,
+      });
+      if (!result) {
+        throw new Error("No cultural annotation result.");
+      }
+      if (this.isCurrentLyricsUri(uri)) {
+        Toast.success(
+          I18n.t("notifications.culturalAnnotationsRegenerated") ||
+            "문화적 배경 설명이 재생성되었습니다."
+        );
+      }
+    } catch (error) {
+      if (this.isCurrentLyricsUri(uri)) {
+        Toast.error(
+          `${I18n.t("notifications.culturalAnnotationsRegenerateFailed") ||
+            "문화적 배경 설명 재생성 실패"}: ${error.message}`
+        );
+      }
+    }
   }
 
   async regenerateTranslation(target = "all") {
@@ -7966,6 +8102,7 @@ class LyricsContainer extends react.Component {
       // clearCache가 true이고 트랙 정보가 있으면 가사 캐시도 삭제
       if (clearCache && lyricsCacheId) {
         ivLyricsDebug("[ivLyrics] Clearing track cache for:", lyricsCacheId);
+        this.clearCulturalAnnotationsForTrack(trackUri);
         await LyricsCache.clearTrack(lyricsCacheId);
       }
       if (clearCache && spotifyTrackId) {
@@ -8687,7 +8824,12 @@ class LyricsContainer extends react.Component {
       ))
     );
 
-    const canRegenerateTranslation = hasLoadedGeminiTranslation;
+    const canRegenerateCulturalAnnotations =
+      this.isCulturalAnnotationsEnabled() &&
+      Array.isArray(this.state.currentLyrics) &&
+      this.state.currentLyrics.length > 0;
+    const canRegenerateTranslation =
+      hasLoadedGeminiTranslation || canRegenerateCulturalAnnotations;
     const cacheEditModal =
       this.state.isLyricsEditModalOpen &&
       react.createElement(LyricsCacheEditModal, {
@@ -9249,7 +9391,10 @@ class LyricsContainer extends react.Component {
             react.createElement(RegenerateTranslationButton, {
               onRegenerate: this.handleRegenerateTranslationRequest,
               isEnabled: canRegenerateTranslation,
-              isLoading: this.state.isTranslationLoading || this.state.isPhoneticLoading,
+              isLoading:
+                this.state.isTranslationLoading ||
+                this.state.isPhoneticLoading ||
+                this.state.isCulturalAnnotationsLoading,
             }),
             window.IvLyricsLearningMode?.StudyButton &&
             react.createElement(window.IvLyricsLearningMode.StudyButton, {

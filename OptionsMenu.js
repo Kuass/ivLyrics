@@ -2973,7 +2973,11 @@ const LyricsProviderSelectButton = react.memo(
   }
 );
 
-function openRegenerateTranslationChoiceModal({ onSelect }) {
+function openRegenerateTranslationChoiceModal({
+  onSelect,
+  targets = {},
+  includeCulturalAnnotations = false,
+}) {
   let closeModal = null;
   const makeTargetButton = (key, text, target) => ({
     desc: react.createElement(SettingRowDescription, {
@@ -2989,27 +2993,49 @@ function openRegenerateTranslationChoiceModal({ onSelect }) {
     },
   });
 
+  const targetItems = [];
+  if (targets.needPhonetic) {
+    targetItems.push(
+      makeTargetButton(
+        "regenerate-phonetic-only",
+        I18n.t("menu.regeneratePronunciationOnly"),
+        "phonetic"
+      )
+    );
+  }
+  if (targets.needTranslation) {
+    targetItems.push(
+      makeTargetButton(
+        "regenerate-translation-only",
+        I18n.t("menu.regenerateTranslationOnly"),
+        "translation"
+      )
+    );
+  }
+  if (targets.needPhonetic && targets.needTranslation) {
+    targetItems.push(
+      makeTargetButton(
+        "regenerate-both",
+        I18n.t("menu.regenerateBoth"),
+        "all"
+      )
+    );
+  }
+  if (includeCulturalAnnotations) {
+    targetItems.push(
+      makeTargetButton(
+        "regenerate-cultural-annotations",
+        I18n.t("settings.culturalAnnotations.label"),
+        "cultural-annotations"
+      )
+    );
+  }
+
   const items = [
     {
       section: I18n.t("menu.regenerateTranslationOptions"),
       subtitle: I18n.t("menu.regenerateTranslationOptionsSubtitle"),
-      items: [
-        makeTargetButton(
-          "regenerate-phonetic-only",
-          I18n.t("menu.regeneratePronunciationOnly"),
-          "phonetic"
-        ),
-        makeTargetButton(
-          "regenerate-translation-only",
-          I18n.t("menu.regenerateTranslationOnly"),
-          "translation"
-        ),
-        makeTargetButton(
-          "regenerate-both",
-          I18n.t("menu.regenerateBoth"),
-          "all"
-        ),
-      ],
+      items: targetItems,
     },
   ];
 

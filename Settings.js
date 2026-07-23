@@ -1957,6 +1957,7 @@ const LocalCacheManager = () => {
       // 메모리 캐시도 함께 초기화
       window.Translator?.clearAllMemoryCache?.();
       window.Translator?.clearAllInflightRequests?.();
+      window.lyricContainer?.clearAllCulturalAnnotations?.({ updateState: true });
 
       // CacheManager (Gemini 번역 메모리 캐시)도 함께 초기화 (window에서 접근)
       if (window.CacheManager?.clear) {
@@ -2005,6 +2006,9 @@ const LocalCacheManager = () => {
       // 번역 메모리 캐시도 함께 초기화
       window.Translator?.clearMemoryCache?.(trackId);
       window.Translator?.clearInflightRequests?.(trackId);
+      window.lyricContainer?.clearCulturalAnnotationsForTrack?.(trackUri, {
+        updateState: true,
+      });
 
       // CacheManager (Gemini 번역 메모리 캐시)도 함께 초기화 (window에서 접근)
       if (window.CacheManager?.clearByUri) {

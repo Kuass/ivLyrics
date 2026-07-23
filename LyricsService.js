@@ -1383,6 +1383,42 @@
             }
         },
 
+        async clearCulturalAnnotationsForTrack(trackId) {
+            if (!trackId) return false;
+
+            try {
+                const db = await this._openDB();
+                const trackKeyRange = this._getTrackCacheKeyRange(trackId);
+
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction('translations', 'readwrite');
+                    const store = tx.objectStore('translations');
+                    const request = store.openCursor(trackKeyRange || undefined);
+
+                    request.onsuccess = (event) => {
+                        const cursor = event.target.result;
+                        if (cursor) {
+                            const record = cursor.value;
+                            const belongsToTrack = trackKeyRange || record?.trackId === trackId;
+                            const isCulturalAnnotation =
+                                record?.type === 'cultural' ||
+                                String(record?.cacheKey || '').includes(':cultural:');
+                            if (belongsToTrack && isCulturalAnnotation) {
+                                cursor.delete();
+                            }
+                            cursor.continue();
+                        }
+                    };
+
+                    tx.oncomplete = () => resolve(true);
+                    tx.onerror = () => reject(tx.error);
+                });
+            } catch (error) {
+                console.error('[LyricsCache] clearCulturalAnnotationsForTrack error:', error);
+                return false;
+            }
+        },
+
         async getMetadata(trackId, lang) {
             try {
                 const db = await this._openDB();

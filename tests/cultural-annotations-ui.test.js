@@ -10,6 +10,8 @@ test('cultural annotations are default-off and wired into lyrics rendering', () 
     const indexSource = fs.readFileSync(path.join(ROOT, 'index.js'), 'utf8');
     const pagesSource = fs.readFileSync(path.join(ROOT, 'Pages.js'), 'utf8');
     const settingsSource = fs.readFileSync(path.join(ROOT, 'Settings.js'), 'utf8');
+    const optionsMenuSource = fs.readFileSync(path.join(ROOT, 'OptionsMenu.js'), 'utf8');
+    const lyricsServiceSource = fs.readFileSync(path.join(ROOT, 'LyricsService.js'), 'utf8');
     const vinylSource = fs.readFileSync(path.join(ROOT, 'VinylActiveLyricRenderer.js'), 'utf8');
     const panelSource = fs.readFileSync(path.join(ROOT, 'NowPlayingPanelLyrics.js'), 'utf8');
 
@@ -36,6 +38,17 @@ test('cultural annotations are default-off and wired into lyrics rendering', () 
     assert.match(vinylSource, /singleLineScroll: true/);
     assert.doesNotMatch(panelSource, /culturalNote|LyricsLine-culturalNote/);
     assert.match(settingsSource, /key: "cultural-annotations-enabled"/);
+    assert.match(optionsMenuSource, /regenerate-cultural-annotations/);
+    assert.match(optionsMenuSource, /settings\.culturalAnnotations\.label/);
+    assert.match(indexSource, /async regenerateCulturalAnnotations\(\)/);
+    assert.match(indexSource, /ignoreCache: true/);
+    assert.match(indexSource, /clearCulturalAnnotationsForTrack\(trackUri\)/);
+    assert.match(indexSource, /requestEpoch !== this\._culturalAnnotationCacheEpoch/);
+    assert.match(indexSource, /this\._culturalAnnotationRequests\.get\(requestKey\) === request/);
+    assert.match(settingsSource, /clearAllCulturalAnnotations/);
+    assert.match(settingsSource, /clearCulturalAnnotationsForTrack/);
+    assert.match(lyricsServiceSource, /async clearCulturalAnnotationsForTrack\(trackId\)/);
+    assert.match(lyricsServiceSource, /record\?\.type === 'cultural'/);
 
     const aiProvidersStart = settingsSource.indexOf('const AIProvidersTab = () =>');
     const aiProvidersEnd = settingsSource.indexOf('const LocalCacheManager = () =>');
@@ -80,5 +93,8 @@ test('every bundled language includes cultural annotation settings and status co
         assert.ok(language?.generationStatus?.culturalAnnotations, file);
         assert.ok(language?.generationStatus?.culturalAnnotationsLoading, file);
         assert.ok(language?.notifications?.culturalAnnotationsFailed, file);
+        assert.ok(language?.notifications?.culturalAnnotationsRegenerated, file);
+        assert.ok(language?.notifications?.culturalAnnotationsRegenerateFailed, file);
+        assert.ok(language?.menu?.regenerateTranslationOptionsSubtitle, file);
     }
 });
