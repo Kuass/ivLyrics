@@ -8064,11 +8064,19 @@ class LyricsContainer extends react.Component {
     }
 
     // Check for updates when app starts
-    setTimeout(() => {
-      Utils.showUpdateNotificationIfAvailable().catch((error) => {
-        // Error ignored
-      });
-    }, 3000); // Delay to avoid interfering with app startup
+    if (!window.__ivLyricsUpdateCheckStarted && !window.__ivLyricsUpdateCheckTimer) {
+      window.__ivLyricsUpdateCheckPending = true;
+      window.__ivLyricsUpdateCheckTimer = setTimeout(() => {
+        window.__ivLyricsUpdateCheckTimer = null;
+        Utils.showUpdateNotificationIfAvailable().catch((error) => {
+          // Error ignored
+        }).finally(() => {
+          window.__ivLyricsUpdateCheckStarted = true;
+          window.__ivLyricsUpdateCheckPending = false;
+          window.dispatchEvent(new CustomEvent("ivLyrics:update-check-complete"));
+        });
+      }, 3000); // Delay to avoid interfering with app startup
+    }
 
     // Initialize enhanced cache system only once
     if (!CacheManager._initialized) {
@@ -9053,8 +9061,7 @@ class LyricsContainer extends react.Component {
       window.ivLyrics_updateInfo?.available
       ? react.createElement(UpdateBanner, {
         updateInfo: window.ivLyrics_updateInfo,
-        onDismiss: () =>
-          Utils.dismissUpdate(window.ivLyrics_updateInfo.latestVersion),
+        onDismiss: () => Utils.dismissUpdate(window.ivLyrics_updateInfo?.latestVersion),
       })
       : null;
     const updateBannerDOM = updateBannerContent ? ensureReactDOM() : null;

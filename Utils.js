@@ -1499,6 +1499,9 @@ const Utils = {
             latestVersion: updateInfo.latestVersion,
             releaseUrl: `https://github.com/ivLis-Studio/ivLyrics/releases/tag/v${updateInfo.latestVersion}`,
           };
+          window.dispatchEvent(new CustomEvent("ivLyrics:update-dialog-state", {
+            detail: { open: true }
+          }));
 
           window.__ivLyricsDebugLog?.(
             "[ivLyrics] Update banner info stored:",
@@ -1537,9 +1540,14 @@ const Utils = {
    * Dismiss update notification
    */
   dismissUpdate(version) {
-    const updateKey = `ivLyrics:update-dismissed:${version}`;
-    StorageManager.setItem(updateKey, "dismissed");
+    if (version) {
+      const updateKey = `ivLyrics:update-dismissed:${version}`;
+      StorageManager.setItem(updateKey, "dismissed");
+    }
     window.ivLyrics_updateInfo = null;
+    window.dispatchEvent(new CustomEvent("ivLyrics:update-dialog-state", {
+      detail: { open: false }
+    }));
 
     // Trigger re-render
     if (window.lyricContainer) {

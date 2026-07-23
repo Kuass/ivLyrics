@@ -589,9 +589,40 @@ const NoticeModal = ({ notices, onClose }) => {
     );
 };
 
+const waitForStartupUpdateDialog = async () => {
+    if (window.__ivLyricsUpdateCheckPending) {
+        await new Promise((resolve) => {
+            const handleComplete = () => {
+                window.removeEventListener("ivLyrics:update-check-complete", handleComplete);
+                resolve();
+            };
+            window.addEventListener("ivLyrics:update-check-complete", handleComplete);
+            if (!window.__ivLyricsUpdateCheckPending) {
+                handleComplete();
+            }
+        });
+    }
+
+    if (!window.ivLyrics_updateInfo?.available) return;
+
+    await new Promise((resolve) => {
+        const handleDialogState = (event) => {
+            if (event?.detail?.open !== false) return;
+            window.removeEventListener("ivLyrics:update-dialog-state", handleDialogState);
+            resolve();
+        };
+        window.addEventListener("ivLyrics:update-dialog-state", handleDialogState);
+        if (!window.ivLyrics_updateInfo?.available) {
+            window.removeEventListener("ivLyrics:update-dialog-state", handleDialogState);
+            resolve();
+        }
+    });
+};
+
 // 공지사항 표시 함수 (앱 시작 시 호출)
 const showNoticeIfNeeded = async () => {
     try {
+        await waitForStartupUpdateDialog();
         const notices = await NoticeSystem.getUnseenNotices();
 
         if (notices.length === 0) {
