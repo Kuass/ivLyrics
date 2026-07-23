@@ -7797,7 +7797,7 @@
             lines,
             sourceLang = 'auto',
             provider = null,
-            schemaVersion = 2,
+            schemaVersion = 3,
             ignoreCache = false,
             onProviderLoading = null
         }) {

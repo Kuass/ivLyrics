@@ -525,9 +525,10 @@ OUTPUT CONTRACT:
 - Return ONLY valid JSON, without Markdown or code fences.
 - Return sparse annotations only. An empty annotations array is a correct result when no cultural explanation is needed.
 - Use only lineIndex values present in the input.
-- Each annotated line may appear at most once.
+- A line may have multiple annotations only when it contains multiple distinct cultural expressions that each independently require explanation.
+- Return one annotation per distinct expression. Do not return duplicate or overlapping annotations for the same cultural fact.
 - expression must be an exact, contiguous substring of that input line.
-- Do not add footnote numbers. The app numbers annotations in lyric order.
+- Do not add footnote numbers. The app numbers annotations from 1 within each lyric line.
 - Put the short display-ready explanation in note without repeating expression.
 
 Output shape:
@@ -572,28 +573,34 @@ ${JSON.stringify(payload)}`;
             return `${safeClip.replace(/[,:;，：；\s]+$/u, '')}…`;
         };
 
-        const seenIndexes = new Set();
+        const seenExpressions = new Set();
         const annotations = [];
         for (const item of result.annotations) {
             const lineIndex = Number(item?.lineIndex);
             const expression = String(item?.expression ?? '').trim();
             const note = compactNote(item?.note);
             const lineText = lineTextByIndex.get(lineIndex);
+            const expressionKey = `${lineIndex}\u0000${expression}`;
             if (
                 !Number.isInteger(lineIndex) ||
                 !lineText ||
                 !expression ||
                 !lineText.includes(expression) ||
                 !note ||
-                seenIndexes.has(lineIndex)
+                seenExpressions.has(expressionKey)
             ) {
                 continue;
             }
-            seenIndexes.add(lineIndex);
+            seenExpressions.add(expressionKey);
             annotations.push({ lineIndex, expression, note });
         }
 
-        annotations.sort((a, b) => a.lineIndex - b.lineIndex);
+        annotations.sort((a, b) => {
+            if (a.lineIndex !== b.lineIndex) return a.lineIndex - b.lineIndex;
+            const lineText = lineTextByIndex.get(a.lineIndex) || '';
+            const expressionOffset = lineText.indexOf(a.expression) - lineText.indexOf(b.expression);
+            return expressionOffset || a.expression.localeCompare(b.expression);
+        });
         return { annotations, provider: providerId || result.provider || null };
     }
 

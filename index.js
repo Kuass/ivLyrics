@@ -4668,7 +4668,7 @@ class LyricsContainer extends react.Component {
 
     const targetLang = this.getTranslationTargetLanguage();
     const sourceSignature = getTranslationSourceCacheHash(JSON.stringify(lines));
-    const schemaVersion = 2;
+    const schemaVersion = 3;
     const resultKey = `v${schemaVersion}:${sourceLang || "auto"}:${targetLang}:${sourceSignature}`;
     if (!ignoreCache && this._culturalAnnotationResults.get(uri)?.key === resultKey) {
       return Promise.resolve(this._culturalAnnotationResults.get(uri));
@@ -4709,22 +4709,21 @@ class LyricsContainer extends react.Component {
       if (requestEpoch !== this._culturalAnnotationCacheEpoch) {
         return null;
       }
-      const notesByIndex = new Map(
-        (Array.isArray(result?.annotations) ? result.annotations : [])
-          .map((annotation, annotationIndex) => [
-            Number(annotation.lineIndex),
-            {
-              marker: annotationIndex + 1,
-              expression: String(annotation.expression || "").trim(),
-              note: String(annotation.note || "").trim(),
-            },
-          ])
-          .filter(([lineIndex, annotation]) =>
-            Number.isInteger(lineIndex) &&
-            annotation.expression &&
-            annotation.note
-          )
-      );
+      const notesByIndex = new Map();
+      for (const annotation of Array.isArray(result?.annotations) ? result.annotations : []) {
+        const lineIndex = Number(annotation.lineIndex);
+        const expression = String(annotation.expression || "").trim();
+        const note = String(annotation.note || "").trim();
+        if (!Number.isInteger(lineIndex) || !expression || !note) continue;
+
+        const lineAnnotations = notesByIndex.get(lineIndex) || [];
+        lineAnnotations.push({
+          marker: lineAnnotations.length + 1,
+          expression,
+          note,
+        });
+        notesByIndex.set(lineIndex, lineAnnotations);
+      }
       this._culturalAnnotationResults.set(uri, {
         key: resultKey,
         notesByIndex,
