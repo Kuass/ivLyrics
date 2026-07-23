@@ -30,7 +30,8 @@
             metadata: true,
             tmi: true,
             lyricsStudy: true,
-            characterPronunciation: true
+            characterPronunciation: true,
+            culturalAnnotations: true
         },
         models: [] // Dynamic from API
     };
@@ -774,6 +775,17 @@
             const prompt = params.lyricsStudyPrompt;
             if (!prompt) {
                 throw new Error('[Perplexity] Central lyrics study prompt is unavailable.');
+            }
+            return await callPerplexityAPI(prompt);
+        },
+
+        async generateCulturalAnnotations(params) {
+            if (!Array.isArray(params?.lines) || params.lines.length === 0) {
+                throw new Error('No lyrics lines provided');
+            }
+            const prompt = params.culturalAnnotationsPrompt;
+            if (!prompt) {
+                throw new Error('[Perplexity] Central cultural annotations prompt is unavailable.');
             }
             return await callPerplexityAPI(prompt);
         }

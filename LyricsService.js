@@ -1113,6 +1113,7 @@
             lyrics: 7,
             translation: 30,
             phonetic: 30,
+            cultural: 30,
             metadata: 30,
             sync: 7,
             youtube: 7,
@@ -1311,6 +1312,73 @@
                 return true;
             } catch (error) {
                 console.error('[LyricsCache] setTranslation error:', error);
+                return false;
+            }
+        },
+
+        _getCulturalAnnotationsKey(trackId, targetLang, sourceLang, provider, sourceHash) {
+            return `${trackId}:${targetLang}:cultural:${sourceLang || 'auto'}:${provider || 'auto'}:${sourceHash || 'unknown'}`;
+        },
+
+        async getCulturalAnnotations(trackId, targetLang, sourceLang, provider, sourceHash) {
+            try {
+                const db = await this._openDB();
+                const tx = db.transaction('translations', 'readonly');
+                const store = tx.objectStore('translations');
+                const cacheKey = this._getCulturalAnnotationsKey(
+                    trackId,
+                    targetLang,
+                    sourceLang,
+                    provider,
+                    sourceHash
+                );
+                const result = await new Promise((resolve, reject) => {
+                    const request = store.get(cacheKey);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+
+                if (result && !this._isExpired(result.cachedAt, 'cultural')) {
+                    return result.data;
+                }
+                return null;
+            } catch (error) {
+                console.error('[LyricsCache] getCulturalAnnotations error:', error);
+                return null;
+            }
+        },
+
+        async setCulturalAnnotations(trackId, targetLang, sourceLang, provider, sourceHash, data) {
+            try {
+                const db = await this._openDB();
+                const tx = db.transaction('translations', 'readwrite');
+                const store = tx.objectStore('translations');
+                const cacheKey = this._getCulturalAnnotationsKey(
+                    trackId,
+                    targetLang,
+                    sourceLang,
+                    provider,
+                    sourceHash
+                );
+                store.put({
+                    cacheKey,
+                    trackId,
+                    lang: targetLang,
+                    sourceLang,
+                    provider,
+                    sourceHash,
+                    type: 'cultural',
+                    data,
+                    cachedAt: Date.now()
+                });
+
+                await new Promise((resolve, reject) => {
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                });
+                return true;
+            } catch (error) {
+                console.error('[LyricsCache] setCulturalAnnotations error:', error);
                 return false;
             }
         },
@@ -7684,6 +7752,96 @@
         static clearMetadataCache() {
             this._metadataCache.clear();
             this._metadataInflightRequests.clear();
+        }
+
+        static async generateCulturalAnnotations({
+            trackId,
+            title,
+            artist,
+            lines,
+            sourceLang = 'auto',
+            provider = null,
+            ignoreCache = false,
+            onProviderLoading = null
+        }) {
+            const normalizedLines = (Array.isArray(lines) ? lines : [])
+                .map((line, fallbackIndex) => ({
+                    lineIndex: Number.isInteger(Number(line?.lineIndex ?? line?.index))
+                        ? Number(line?.lineIndex ?? line?.index)
+                        : fallbackIndex,
+                    text: String(line?.text ?? '')
+                }));
+            if (normalizedLines.length === 0 || normalizedLines.every(line => !line.text.trim())) {
+                return { annotations: [], provider: null };
+            }
+
+            let finalTrackId = trackId;
+            if (!finalTrackId) {
+                finalTrackId = Utils.extractTrackId(Spicetify.Player.data?.item?.uri);
+            }
+            if (!finalTrackId) {
+                throw new Error('No track ID available');
+            }
+            if (!window.AIAddonManager) {
+                throw new Error(getTranslatorErrorMessage("translator.noProviderConfigured", "AI 제공자가 설정되지 않았습니다. 설정에서 AI 제공자를 선택해주세요."));
+            }
+
+            const targetLang = getTranslationTargetLanguage();
+            const sourceHash = getLyricsTextCacheHash(JSON.stringify(normalizedLines));
+            const availableProviderIds = provider
+                ? [provider]
+                : window.AIAddonManager
+                    .getEnabledProvidersFor('culturalAnnotations')
+                    .map(addon => addon.id);
+
+            if (!ignoreCache) {
+                for (const providerId of availableProviderIds) {
+                    const cached = await LyricsCache.getCulturalAnnotations(
+                        finalTrackId,
+                        targetLang,
+                        sourceLang,
+                        providerId,
+                        sourceHash
+                    );
+                    if (cached && Array.isArray(cached.annotations)) {
+                        return cached;
+                    }
+                }
+            }
+
+            const requestKey = `${finalTrackId}:cultural:${sourceLang}:${targetLang}:${provider || 'auto'}:${sourceHash}`;
+            if (!ignoreCache && _translatorInflightRequests.has(requestKey)) {
+                return _translatorInflightRequests.get(requestKey);
+            }
+
+            const request = (async () => {
+                const result = await window.AIAddonManager.generateCulturalAnnotations({
+                    trackId: finalTrackId,
+                    title,
+                    artist,
+                    sourceLang,
+                    targetLang,
+                    lines: normalizedLines,
+                    provider,
+                    onProviderLoading
+                });
+                if (result && Array.isArray(result.annotations)) {
+                    await LyricsCache.setCulturalAnnotations(
+                        finalTrackId,
+                        targetLang,
+                        sourceLang,
+                        result.provider || provider,
+                        sourceHash,
+                        result
+                    ).catch(() => { });
+                }
+                return result;
+            })().finally(() => {
+                _translatorInflightRequests.delete(requestKey);
+            });
+
+            _translatorInflightRequests.set(requestKey, request);
+            return request;
         }
 
         constructor(lang, isUsingNetease = false) {

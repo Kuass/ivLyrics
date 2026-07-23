@@ -31,7 +31,8 @@
             metadata: true,     // 메타데이터 번역
             tmi: true,          // TMI 생성
             lyricsStudy: true,  // 학습 모드 생성
-            characterPronunciation: true
+            characterPronunciation: true,
+            culturalAnnotations: true
         },
         // 하드코딩된 모델 목록 (fallback용)
         // models: [
@@ -1089,6 +1090,17 @@
             const prompt = params.lyricsStudyPrompt;
             if (!prompt) {
                 throw new Error('[OpenAI ChatGPT] Central lyrics study prompt is unavailable.');
+            }
+            return await callChatGPTAPI(prompt);
+        },
+
+        async generateCulturalAnnotations(params) {
+            if (!Array.isArray(params?.lines) || params.lines.length === 0) {
+                throw new Error('No lyrics lines provided');
+            }
+            const prompt = params.culturalAnnotationsPrompt;
+            if (!prompt) {
+                throw new Error('[OpenAI ChatGPT] Central cultural annotations prompt is unavailable.');
             }
             return await callChatGPTAPI(prompt);
         }

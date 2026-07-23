@@ -27,7 +27,8 @@
         METADATA: 'metadata',      // 메타데이터 번역
         TMI: 'tmi',                // TMI 생성
         LYRICS_STUDY: 'lyricsStudy', // 가사 기반 학습 모드 생성
-        CHARACTER_PRONUNCIATION: 'characterPronunciation' // 문자별 발음
+        CHARACTER_PRONUNCIATION: 'characterPronunciation', // 문자별 발음
+        CULTURAL_ANNOTATIONS: 'culturalAnnotations' // 번역만으로 전달되지 않는 문화적 배경 설명
     };
 
     const TRANSLATION_STYLES = Object.freeze({
@@ -470,6 +471,98 @@ Input lines:
 ${JSON.stringify(payload)}`;
     }
 
+    function buildCulturalAnnotationsPrompt({ sourceLang = 'auto', targetLang = 'ko', lines = [] } = {}) {
+        const targetLangInfo = getProviderPromptLanguageInfo(targetLang || 'ko');
+        const payload = (Array.isArray(lines) ? lines : [])
+            .map((line, fallbackIndex) => ({
+                lineIndex: Number.isInteger(Number(line?.lineIndex ?? line?.index))
+                    ? Number(line?.lineIndex ?? line?.index)
+                    : fallbackIndex,
+                text: String(line?.text ?? '')
+            }));
+
+        return `You analyze song lyrics for cultural context that ordinary translation cannot fully convey.
+
+Input source language code: ${sourceLang || 'auto'}
+Explanation language: ${targetLangInfo.name} (${targetLangInfo.native})
+
+GOAL:
+Identify only expressions whose meaning depends on cultural background that a reader from another culture is likely to miss. This is not a translation, vocabulary, grammar, slang, or general lyric explanation task.
+
+ANNOTATE ONLY WHEN SEPARATE CULTURAL KNOWLEDGE IS REQUIRED:
+- country- or region-specific school life and education systems
+- traditional or widely known local children's games
+- local customs involving broadcasting, transport, housing, festivals, or daily life
+- historical, religious, or social institutions and their cultural implications
+- clear quotations or parodies from films, television, animation, comics, games, literature, advertising, or songs
+- expressions with a special established meaning in a particular culture
+- cases where translation conveys the surface meaning but loses an important cultural implication
+
+DO NOT ANNOTATE:
+- ordinary words or sentences
+- onomatopoeia or mimetic words that translate naturally
+- ordinary metaphors, exaggeration, slang, or colloquial speech
+- expressions understandable from context
+- anything adequately conveyed by literal or natural translation
+- grammar or word formation unless it is directly necessary for the cultural explanation
+
+STRICT JUDGMENT RULES:
+- When uncertain, omit the annotation. Accuracy matters more than quantity.
+- Mention a quotation or parody only when the evidence is strong. Do not speculate.
+- Do not infer a country or culture from the source language alone. Use internal textual evidence. If the culture is unclear, omit it.
+- Explain a repeated cultural expression in detail only at its first occurrence.
+- Do not translate the full lyrics.
+- Every note must be written naturally in ${targetLangInfo.native}.
+- When explaining an original expression, include its natural ${targetLangInfo.native} translation in this exact conceptual format: 「original expression」(natural translation). Use locally natural quotation marks if 「」 is inappropriate.
+- Keep each note concise but complete, normally one or two sentences.
+
+OUTPUT CONTRACT:
+- Return ONLY valid JSON, without Markdown or code fences.
+- Return sparse annotations only. An empty annotations array is a correct result when no cultural explanation is needed.
+- Use only lineIndex values present in the input.
+- Each annotated line may appear at most once.
+- Put the complete display-ready explanation in note. Do not prefix note with ↳; the app adds it.
+
+Output shape:
+{
+  "annotations": [
+    {
+      "lineIndex": 0,
+      "note": "Explanation in ${targetLangInfo.native}, including 「original expression」(natural translation)."
+    }
+  ]
+}
+
+Input lines:
+${JSON.stringify(payload)}`;
+    }
+
+    function normalizeCulturalAnnotationsResult(result, lines, providerId) {
+        const validIndexes = new Set(
+            (Array.isArray(lines) ? lines : [])
+                .map((line, fallbackIndex) => Number(line?.lineIndex ?? line?.index ?? fallbackIndex))
+                .filter(Number.isInteger)
+        );
+        if (!result || !Array.isArray(result.annotations)) {
+            throw new Error(`[AIAddonManager] Provider ${providerId || 'unknown'} returned an invalid cultural annotations result`);
+        }
+
+        const seenIndexes = new Set();
+        const annotations = [];
+        for (const item of result.annotations) {
+            const lineIndex = Number(item?.lineIndex);
+            const note = String(item?.note ?? '').trim();
+            if (!Number.isInteger(lineIndex) || !validIndexes.has(lineIndex) || !note || seenIndexes.has(lineIndex)) {
+                continue;
+            }
+            seenIndexes.add(lineIndex);
+            annotations.push({ lineIndex, note });
+        }
+
+        annotations.sort((a, b) => a.lineIndex - b.lineIndex);
+        return { annotations, provider: providerId || result.provider || null };
+    }
+
     // ============================================
     // AIAddonManager Class
     // ============================================
@@ -580,6 +673,10 @@ ${normalizedText}
 
         buildLyricsStudyPrompt(params = {}) {
             return buildLyricsStudyPrompt(params);
+        }
+
+        buildCulturalAnnotationsPrompt(params = {}) {
+            return buildCulturalAnnotationsPrompt(params);
         }
 
         // ============================================
@@ -693,7 +790,7 @@ ${normalizedText}
          * - author: string (제작자)
          * - description: string | { en: string, ko: string, ... } (설명)
          * - version: string (버전)
-         * - supports: { translate: boolean, metadata: boolean, tmi: boolean, lyricsStudy: boolean, characterPronunciation: boolean } (지원 기능)
+         * - supports: { translate: boolean, metadata: boolean, tmi: boolean, lyricsStudy: boolean, characterPronunciation: boolean, culturalAnnotations: boolean } (지원 기능)
          * 
          * 필수 메서드:
          * - getSettingsUI(): React.Component (설정 UI)
@@ -704,6 +801,7 @@ ${normalizedText}
          * - generateTMI(params): Promise<Object> (supports.tmi = true인 경우)
          * - generateLyricsStudy(params): Promise<Object> (supports.lyricsStudy = true인 경우)
          * - generateCharacterPronunciation(params): Promise<Object> (supports.characterPronunciation = true인 경우)
+         * - generateCulturalAnnotations(params): Promise<Object> (supports.culturalAnnotations = true인 경우)
          */
         register(addon) {
             if (!addon || !addon.id) {
@@ -727,7 +825,8 @@ ${normalizedText}
                     metadata: typeof addon.translateMetadata === 'function',
                     tmi: typeof addon.generateTMI === 'function',
                     lyricsStudy: typeof addon.generateLyricsStudy === 'function',
-                    characterPronunciation: typeof addon.generateCharacterPronunciation === 'function'
+                    characterPronunciation: typeof addon.generateCharacterPronunciation === 'function',
+                    culturalAnnotations: typeof addon.generateCulturalAnnotations === 'function'
                 };
             }
 
@@ -742,7 +841,7 @@ ${normalizedText}
 
             this._addons.set(addon.id, addon);
             window.__ivLyricsDebugLog?.(`[AIAddonManager] Registered addon: ${addon.id} (${addon.name})`);
-            window.__ivLyricsDebugLog?.(`[AIAddonManager] Supports: translate=${addon.supports.translate}, metadata=${addon.supports.metadata}, tmi=${addon.supports.tmi}, lyricsStudy=${addon.supports.lyricsStudy}, characterPronunciation=${addon.supports.characterPronunciation}`);
+            window.__ivLyricsDebugLog?.(`[AIAddonManager] Supports: translate=${addon.supports.translate}, metadata=${addon.supports.metadata}, tmi=${addon.supports.tmi}, lyricsStudy=${addon.supports.lyricsStudy}, characterPronunciation=${addon.supports.characterPronunciation}, culturalAnnotations=${addon.supports.culturalAnnotations}`);
 
             // 이미 초기화 완료된 경우, 새 Addon도 초기화
             if (this._initialized && typeof addon.init === 'function') {
@@ -784,7 +883,7 @@ ${normalizedText}
             }
 
             // 기능 메서드 중 최소 하나는 있어야 함
-            const featureMethods = ['translateLyrics', 'translateMetadata', 'generateTMI', 'generateLyricsStudy', 'generateCharacterPronunciation'];
+            const featureMethods = ['translateLyrics', 'translateMetadata', 'generateTMI', 'generateLyricsStudy', 'generateCharacterPronunciation', 'generateCulturalAnnotations'];
             const hasAnyFeature = featureMethods.some(m => typeof addon[m] === 'function');
             if (!hasAnyFeature) {
                 errors.push(`Must implement at least one of: ${featureMethods.join(', ')}`);
@@ -950,7 +1049,7 @@ ${normalizedText}
 
         /**
          * 특정 기능을 지원하는 활성화된 Provider 목록 (순서대로)
-         * @param {'translate'|'metadata'|'tmi'|'lyricsStudy'|'characterPronunciation'} capability - 기능 유형
+         * @param {'translate'|'metadata'|'tmi'|'lyricsStudy'|'characterPronunciation'|'culturalAnnotations'} capability - 기능 유형
          * @returns {Object[]}
          */
         getEnabledProvidersFor(capability) {
@@ -1885,6 +1984,65 @@ ${normalizedText}
 
             const errorMsg = lastError?.message || this._t('aiProviders.allProvidersFailed', 'All AI providers failed to process the request.');
             this.emit('ai:request:error', { type: 'lyricsStudy', error: errorMsg });
+            throw new Error(errorMsg);
+        }
+
+        /**
+         * 번역만으로 전달되지 않는 줄별 문화적 배경 설명 생성
+         * @param {Object} params - { trackId, title, artist, targetLang, sourceLang, lines, provider, onProviderLoading }
+         * @returns {Promise<{annotations: Array<{lineIndex: number, note: string}>, provider: string|null}>}
+         */
+        async generateCulturalAnnotations(params) {
+            let providers = this.getEnabledProvidersFor('culturalAnnotations');
+            if (params?.provider) {
+                providers = providers.filter(addon => addon.id === params.provider);
+            }
+
+            if (providers.length === 0) {
+                console.warn('[AIAddonManager] No cultural annotation providers enabled');
+                throw new Error(this._t('aiProviders.noEnabledProviders', 'No AI providers enabled. Please enable at least one provider in settings.'));
+            }
+
+            this.emit('ai:request:start', {
+                type: 'culturalAnnotations',
+                providers: providers.map(provider => provider.id),
+                params: { ...params, lines: '[...]' }
+            });
+
+            let lastError = null;
+            for (const addon of providers) {
+                if (typeof addon.generateCulturalAnnotations !== 'function') continue;
+
+                try {
+                    if (typeof params?.onProviderLoading === 'function') {
+                        params.onProviderLoading({
+                            providerId: addon.id,
+                            providerName: addon.name || addon.id
+                        });
+                    }
+                    window.__ivLyricsDebugLog?.(`[AIAddonManager] Trying cultural annotations provider: ${addon.id}`);
+                    const result = normalizeCulturalAnnotationsResult(
+                        await addon.generateCulturalAnnotations({
+                            ...params,
+                            culturalAnnotationsPrompt: this.buildCulturalAnnotationsPrompt({
+                                ...params,
+                                providerId: addon.id
+                            })
+                        }),
+                        params?.lines,
+                        addon.id
+                    );
+
+                    this.emit('ai:request:success', { type: 'culturalAnnotations', provider: addon.id });
+                    return result;
+                } catch (error) {
+                    console.warn(`[AIAddonManager] Provider ${addon.id} failed for generateCulturalAnnotations:`, error.message);
+                    lastError = error;
+                }
+            }
+
+            const errorMsg = lastError?.message || this._t('aiProviders.allProvidersFailed', 'All AI providers failed to process the request.');
+            this.emit('ai:request:error', { type: 'culturalAnnotations', error: errorMsg });
             throw new Error(errorMsg);
         }
 

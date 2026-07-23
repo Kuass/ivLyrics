@@ -31,7 +31,8 @@
             metadata: true,     // 메타데이터 번역
             tmi: true,
             lyricsStudy: true,
-            characterPronunciation: true
+            characterPronunciation: true,
+            culturalAnnotations: true
         },
         models: [] // API에서 동적으로 로드
     };
@@ -1041,6 +1042,17 @@
             const prompt = params.lyricsStudyPrompt;
             if (!prompt) {
                 throw new Error('[Pollinations.ai] Central lyrics study prompt is unavailable.');
+            }
+            return await callPollinationsAPI(prompt);
+        },
+
+        async generateCulturalAnnotations(params) {
+            if (!Array.isArray(params?.lines) || params.lines.length === 0) {
+                throw new Error('No lyrics lines provided');
+            }
+            const prompt = params.culturalAnnotationsPrompt;
+            if (!prompt) {
+                throw new Error('[Pollinations] Central cultural annotations prompt is unavailable.');
             }
             return await callPollinationsAPI(prompt);
         }

@@ -60,7 +60,8 @@ function createCapturingProvider(captures) {
             metadata: true,
             tmi: true,
             lyricsStudy: true,
-            characterPronunciation: true
+            characterPronunciation: true,
+            culturalAnnotations: true
         },
         getSettingsUI() {},
         async translateLyrics(params) {
@@ -81,6 +82,16 @@ function createCapturingProvider(captures) {
         async generateLyricsStudy(params) {
             captures.study = params;
             return {};
+        },
+        async generateCulturalAnnotations(params) {
+            captures.cultural = params;
+            return {
+                annotations: [
+                    { lineIndex: 2, note: '두 번째 문화 설명' },
+                    { lineIndex: 99, note: '잘못된 줄' },
+                    { lineIndex: 2, note: '중복 설명' }
+                ]
+            };
         },
         async generateCharacterPronunciation(params) {
             captures.character.push(params);
@@ -176,6 +187,20 @@ test('all shared prompt builders are exposed by AIAddonManager', () => {
     });
     assert.match(study, /Target explanation language: Korean \(한국어\)/);
     assert.match(study, /\"text\":\"hello\"/);
+
+    const cultural = manager.buildCulturalAnnotationsPrompt({
+        sourceLang: 'ja',
+        targetLang: 'ko',
+        lines: [
+            { lineIndex: 2, text: '缶蹴り' },
+            { lineIndex: 5, text: '普通の文' }
+        ]
+    });
+    assert.match(cultural, /ordinary translation cannot fully convey/i);
+    assert.match(cultural, /When uncertain, omit the annotation/);
+    assert.match(cultural, /Do not infer a country or culture from the source language alone/);
+    assert.match(cultural, /\"lineIndex\":2,\"text\":\"缶蹴り\"/);
+    assert.match(cultural, /Korean \(한국어\)/);
 });
 
 test('manager injects central prompts into every provider capability', async () => {
@@ -185,6 +210,7 @@ test('manager injects central prompts into every provider capability', async () 
         metadata: null,
         tmi: null,
         study: null,
+        cultural: null,
         character: []
     };
     const provider = createCapturingProvider(captures);
@@ -210,6 +236,14 @@ test('manager injects central prompts into every provider capability', async () 
         targetLang: 'ko',
         lines: [{ index: 0, text: 'hello' }]
     });
+    const culturalResult = await manager.generateCulturalAnnotations({
+        sourceLang: 'ja',
+        targetLang: 'ko',
+        lines: [
+            { lineIndex: 2, text: '缶蹴り' },
+            { lineIndex: 5, text: '普通の文' }
+        ]
+    });
     await manager.generateCharacterPronunciation({
         lines: ['ab'],
         lang: 'ko',
@@ -224,6 +258,14 @@ test('manager injects central prompts into every provider capability', async () 
     assert.match(captures.metadata.metadataPrompt, /translatedTitle/);
     assert.match(captures.tmi.tmiPrompt, /music knowledge expert/);
     assert.match(captures.study.lyricsStudyPrompt, /language learning tutor/);
+    assert.match(captures.cultural.culturalAnnotationsPrompt, /sparse annotations only/i);
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(culturalResult)),
+        {
+            annotations: [{ lineIndex: 2, note: '두 번째 문화 설명' }],
+            provider: 'test-provider'
+        }
+    );
     assert.match(captures.character[0].characterPronunciationPrompt, /pronunciation aligner/);
 });
 
@@ -238,5 +280,6 @@ test('built-in providers contain transport code but no prompt builders or langua
         assert.match(source, /metadataPrompt/, file);
         assert.match(source, /tmiPrompt/, file);
         assert.match(source, /lyricsStudyPrompt/, file);
+        assert.match(source, /culturalAnnotationsPrompt/, file);
     }
 });
