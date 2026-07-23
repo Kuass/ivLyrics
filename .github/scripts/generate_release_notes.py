@@ -86,20 +86,77 @@ def commit_subjects(log_text):
     return subjects or ["Prepare the ivLyrics release."]
 
 
+def parse_commit_subject(subject):
+    match = re.match(
+        r"^(?P<type>build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)"
+        r"(?:\([^)]+\))?!?:\s*",
+        subject,
+        re.IGNORECASE,
+    )
+    if not match:
+        return "", subject.strip()
+    return match.group("type").lower(), subject[match.end() :].strip()
+
+
+def fallback_release_title(entries):
+    summary = " ".join(text.lower() for _, text in entries)
+    topics = []
+    if re.search(
+        r"\blyrics?\b|\btranslation\b|\bpronunciation\b|\bcultural\b|paxsenix|instrumental",
+        summary,
+    ):
+        topics.append("Lyrics")
+    if re.search(
+        r"\bplayback\b|\bnow playing\b|\bvinyl\b|\blp\b|\bplayer\b|\bvideo background\b",
+        summary,
+    ):
+        topics.append("Playback")
+    if re.search(r"\bui\b|\bdialog\b|\bnotice\b|\bpopup\b|\bsettings?\b", summary):
+        topics.append("UI")
+
+    if len(topics) == 1:
+        return f"{topics[0]} Improvements and Fixes"
+    if len(topics) == 2:
+        return f"{topics[0]} and {topics[1]} Improvements"
+    if len(topics) > 2:
+        return f"{', '.join(topics[:-1])}, and {topics[-1]} Improvements"
+    return "ivLyrics Improvements and Fixes"
+
+
 def fallback_content(version, log_text):
     subjects = commit_subjects(log_text)
-    title = re.sub(r"[-_]+", " ", subjects[0]).strip() or "Release"
+    entries = [parse_commit_subject(subject) for subject in subjects]
+    highlights = [
+        text
+        for commit_type in ("feat", "perf", "refactor", "")
+        for entry_type, text in entries
+        if entry_type == commit_type and text
+    ][:6]
+    fixes = [
+        text
+        for entry_type, text in entries
+        if entry_type in {"fix", "revert"} and text
+    ][:6]
+    if not highlights:
+        highlights = fixes[:6] or [text for _, text in entries if text][:6]
+    if not fixes:
+        fixes = [
+            text
+            for entry_type, text in entries
+            if entry_type not in {"feat", "perf", "refactor"} and text
+        ][:6]
+
     return {
-        "title": title,
+        "title": fallback_release_title(entries),
         "ko": {
             "summary": f"ivLyrics {version} 릴리스입니다.",
-            "highlights": subjects[:6],
-            "fixes": subjects[6:12] or ["릴리스 버전 정보와 배포 절차를 갱신했습니다."],
+            "highlights": highlights,
+            "fixes": fixes or ["릴리스 버전 정보와 배포 절차를 갱신했습니다."],
         },
         "en": {
             "summary": f"This is the ivLyrics {version} release.",
-            "highlights": subjects[:6],
-            "fixes": subjects[6:12] or ["Updated release version metadata and publishing workflow."],
+            "highlights": highlights,
+            "fixes": fixes or ["Updated release version metadata and publishing workflow."],
         },
     }
 
