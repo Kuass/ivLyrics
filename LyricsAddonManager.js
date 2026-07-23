@@ -53,9 +53,128 @@
         'spotify-audio-analysis',
         'line-timing-pseudo'
     ]);
+    const CANONICAL_INSTRUMENTAL_BREAK_MARKER = '♪';
+    const NOTE_ONLY_INSTRUMENTAL_BREAK_PATTERN = /^[\s\u00A0\u200B-\u200D\uFEFF♩♪♫♬♭♮♯🎵🎶🎼]+$/u;
 
     function hasLyricsContent(lines) {
         return Array.isArray(lines) && lines.length > 0;
+    }
+
+    function decodeInstrumentalBreakEntities(value) {
+        return String(value ?? '')
+            .replace(/&lt;|&#0*60;|&#x0*3c;/giu, '<')
+            .replace(/&gt;|&#0*62;|&#x0*3e;/giu, '>')
+            .replace(/&nbsp;|&#0*160;|&#x0*a0;/giu, ' ');
+    }
+
+    function getInstrumentalBreakMarker(value, allowEmpty = false) {
+        const normalized = decodeInstrumentalBreakEntities(value).trim();
+        if (!normalized) {
+            return allowEmpty ? CANONICAL_INSTRUMENTAL_BREAK_MARKER : null;
+        }
+        if (NOTE_ONLY_INSTRUMENTAL_BREAK_PATTERN.test(normalized)) {
+            return CANONICAL_INSTRUMENTAL_BREAK_MARKER;
+        }
+
+        const wrapped = normalized.match(/^[<＜〈《]\s*(.*?)\s*[>＞〉》]$/u);
+        if (!wrapped) return null;
+
+        const label = wrapped[1].normalize('NFKC').trim();
+        return NOTE_ONLY_INSTRUMENTAL_BREAK_PATTERN.test(label)
+            ? CANONICAL_INSTRUMENTAL_BREAK_MARKER
+            : null;
+    }
+
+    function toFiniteLyricsTime(value) {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
+    }
+
+    function getLyricsDurationMs(info) {
+        for (const value of [info?.durationMs, info?.duration_ms, info?.duration]) {
+            const duration = toFiniteLyricsTime(value);
+            if (duration !== null && duration > 0) return duration;
+        }
+        return null;
+    }
+
+    function normalizeInstrumentalBreakLines(lines, durationMs, timed) {
+        if (!Array.isArray(lines)) return { lines, changed: false };
+
+        let changed = false;
+        const normalizedLines = lines.map((line, index) => {
+            if (!line || typeof line !== 'object') return line;
+
+            const startTime = toFiniteLyricsTime(line.startTime);
+            const hasExplicitText = line.originalText !== undefined || line.text !== undefined;
+            const sourceText = line.originalText !== undefined ? line.originalText : line.text;
+            const marker = getInstrumentalBreakMarker(
+                sourceText,
+                hasExplicitText && timed && startTime !== null
+            );
+            if (!marker) return line;
+
+            const nextStartTime = toFiniteLyricsTime(lines[index + 1]?.startTime);
+            const directEndTime = toFiniteLyricsTime(line.endTime);
+            const resolvedEndTime = timed && startTime !== null
+                ? (
+                    directEndTime !== null && directEndTime > startTime
+                        ? directEndTime
+                        : (nextStartTime !== null && nextStartTime > startTime
+                            ? nextStartTime
+                            : (durationMs !== null && durationMs > startTime ? durationMs : null))
+                )
+                : null;
+            const textChanged = line.text !== marker
+                || (line.originalText !== undefined && line.originalText !== marker);
+            const endTimeChanged = resolvedEndTime !== null && line.endTime !== resolvedEndTime;
+            if (!textChanged && !endTimeChanged) return line;
+
+            changed = true;
+            const normalizedLine = {
+                ...line,
+                text: marker
+            };
+            if (line.originalText !== undefined) {
+                normalizedLine.originalText = marker;
+            }
+            if (resolvedEndTime !== null) {
+                normalizedLine.endTime = resolvedEndTime;
+            }
+            return normalizedLine;
+        });
+
+        return {
+            lines: changed ? normalizedLines : lines,
+            changed
+        };
+    }
+
+    function normalizeProviderInstrumentalBreaks(result, info = {}) {
+        if (!result || typeof result !== 'object') {
+            return { result, changed: false };
+        }
+
+        const durationMs = getLyricsDurationMs(info);
+        const normalizedResult = { ...result };
+        let changed = false;
+
+        for (const type of [LYRICS_TYPES.KARAOKE, LYRICS_TYPES.SYNCED, LYRICS_TYPES.UNSYNCED]) {
+            const normalized = normalizeInstrumentalBreakLines(
+                result[type],
+                durationMs,
+                type !== LYRICS_TYPES.UNSYNCED
+            );
+            if (normalized.changed) {
+                normalizedResult[type] = normalized.lines;
+                changed = true;
+            }
+        }
+
+        return {
+            result: changed ? normalizedResult : result,
+            changed
+        };
     }
 
     function getLyricsAddonIdForSyncProvider(providerValue) {
@@ -816,6 +935,7 @@
             let providerFetched = false;
             let syncDataAppliedThisCall = false;
             let pseudoKaraokeChanged = false;
+            let instrumentalBreaksNormalized = false;
             const debugTiming = window.AddonDebug?.isEnabled();
             if (debugTiming) {
                 window.AddonDebug.time('lyrics', `provider:${provider.id}`);
@@ -856,6 +976,10 @@
                 window.__ivLyricsDebugLog?.(`[LyricsAddonManager] Provider ${provider.id} returned error:`, result?.error);
                 return null;
             }
+
+            const normalizedInstrumentalBreaks = normalizeProviderInstrumentalBreaks(result, info);
+            result = normalizedInstrumentalBreaks.result;
+            instrumentalBreaksNormalized = normalizedInstrumentalBreaks.changed;
 
             // Cached timing data intentionally contains anonymous contributor
             // placeholders. Rehydrate only the current identity metadata from
@@ -1015,7 +1139,8 @@
 
             const shouldUpdateCache = (!cacheHit && providerFetched)
                 || syncDataAppliedThisCall
-                || pseudoKaraokeChanged;
+                || pseudoKaraokeChanged
+                || instrumentalBreaksNormalized;
             if (
                 (hasKaraoke || hasSynced || hasUnsynced)
                 && lyricsCacheId
@@ -1267,7 +1392,8 @@
             }
 
             try {
-                return await provider.getLyrics(info);
+                const result = await provider.getLyrics(info);
+                return normalizeProviderInstrumentalBreaks(result, info).result;
             } catch (e) {
                 console.error(`[LyricsAddonManager] Provider ${providerId} failed:`, e);
                 return { error: e.message, uri: info.uri };
