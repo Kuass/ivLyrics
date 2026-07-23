@@ -6910,6 +6910,12 @@ class LyricsContainer extends react.Component {
 
     if (mode1Active && mode2Active) {
       // 두 개 모드 모두 활성화: 각각 완료되는 즉시 업데이트 (Progressive Loading)
+      // 두 결과가 이미 캐시된 경우에는 동일한 완성 이벤트를 두 번 발행하지 않는다.
+      if (lyricsMode1 && lyricsMode2) {
+        updateCombinedLyrics();
+        return;
+      }
+
       // 캐시된 결과가 있으면 재사용, 없으면 새로 요청
       const promise1 = lyricsMode1
         ? Promise.resolve(lyricsMode1)
