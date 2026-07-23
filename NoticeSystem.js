@@ -24,6 +24,8 @@ moduleState.initialized = true;
 // React 및 hooks를 lazy하게 가져오기 (Spicetify가 준비된 후에만 접근)
 const getNoticeReact = () => Spicetify.React;
 const getNoticeUseState = () => Spicetify.React?.useState;
+const getNoticeUseEffect = () => Spicetify.React?.useEffect;
+const getNoticeUseRef = () => Spicetify.React?.useRef;
 
 const NOTICE_STORAGE_KEY = "ivLyrics:recent-notice";
 const NOTICE_URL = "https://ivlis.kr/ivLyrics/notice/";
@@ -40,6 +42,92 @@ const sanitizeNoticeUrl = (url) => {
     } catch {
         return null;
     }
+};
+
+const getNoticeUiTheme = () => {
+    try {
+        const storedTheme =
+            window.ivLyricsStoragePersistence?.getItem?.("ivLyrics:settings-ui-theme") ??
+            localStorage.getItem("ivLyrics:settings-ui-theme");
+        return storedTheme === "light" ? "light" : "dark";
+    } catch {
+        return "dark";
+    }
+};
+
+const NOTICE_ICON_SHAPES = {
+    info: [
+        ["circle", { cx: 12, cy: 12, r: 9 }],
+        ["path", { d: "M12 11v5" }],
+        ["path", { d: "M12 8h.01" }],
+    ],
+    update: [
+        ["path", { d: "M20 6v5h-5" }],
+        ["path", { d: "M4 18v-5h5" }],
+        ["path", { d: "M6.1 9a7 7 0 0 1 11.7-2.6L20 11" }],
+        ["path", { d: "M4 13l2.2 4.6A7 7 0 0 0 17.9 15" }],
+    ],
+    warning: [
+        ["path", { d: "M10.3 3.7 2.5 17.2A2 2 0 0 0 4.2 20h15.6a2 2 0 0 0 1.7-2.8L13.7 3.7a2 2 0 0 0-3.4 0Z" }],
+        ["path", { d: "M12 9v4" }],
+        ["path", { d: "M12 17h.01" }],
+    ],
+    celebration: [
+        ["path", { d: "m3 21 3.8-10.5 6.7 6.7L3 21Z" }],
+        ["path", { d: "m8 14 5-5" }],
+        ["path", { d: "M14 4h.01" }],
+        ["path", { d: "M18 8h.01" }],
+        ["path", { d: "M18 3l.4 1.5L20 5l-1.6.5L18 7l-.4-1.5L16 5l1.6-.5L18 3Z" }],
+        ["path", { d: "M15 13l.4 1.5 1.6.5-1.6.5L15 17l-.4-1.5L13 15l1.6-.5L15 13Z" }],
+    ],
+    close: [
+        ["path", { d: "m18 6-12 12" }],
+        ["path", { d: "m6 6 12 12" }],
+    ],
+    external: [
+        ["path", { d: "M15 3h6v6" }],
+        ["path", { d: "m10 14 11-11" }],
+        ["path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }],
+    ],
+    dismissAll: [
+        ["circle", { cx: 12, cy: 12, r: 9 }],
+        ["path", { d: "m15 9-6 6" }],
+        ["path", { d: "m9 9 6 6" }],
+    ],
+    next: [
+        ["path", { d: "m9 18 6-6-6-6" }],
+    ],
+    confirm: [
+        ["path", { d: "m5 12 4 4L19 6" }],
+    ],
+    lock: [
+        ["rect", { x: 5, y: 10, width: 14, height: 10, rx: 2 }],
+        ["path", { d: "M8 10V7a4 4 0 0 1 8 0v3" }],
+    ],
+};
+
+const createNoticeIcon = (name, size = 20) => {
+    const react = getNoticeReact();
+    const shapes = NOTICE_ICON_SHAPES[name] || NOTICE_ICON_SHAPES.info;
+
+    return react.createElement(
+        "svg",
+        {
+            width: size,
+            height: size,
+            viewBox: "0 0 24 24",
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: 2,
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            "aria-hidden": "true",
+            focusable: "false",
+        },
+        shapes.map(([element, props], index) =>
+            react.createElement(element, { ...props, key: `${name}-${index}` })
+        )
+    );
 };
 
 /**
@@ -260,39 +348,34 @@ const NoticeSystem = (() => {
 // NoticeModal 컴포넌트
 const NoticeModal = ({ notices, onClose }) => {
     const [currentIndex, setCurrentIndex] = getNoticeUseState()(0);
+    const modalRef = getNoticeUseRef()(null);
+    const previouslyFocusedRef = getNoticeUseRef()(document.activeElement);
     const currentNotice = notices[currentIndex];
     const safeButtons = Array.isArray(currentNotice?.buttons)
-        ? currentNotice.buttons.filter((btn) => sanitizeNoticeUrl(btn?.url))
+        ? currentNotice.buttons
+            .map((button) => ({
+                ...button,
+                href: sanitizeNoticeUrl(button?.url),
+            }))
+            .filter((button) => button.href)
         : [];
 
     if (!currentNotice) return null;
 
     // 실제 닫기 가능 여부 계산 (min_version 고려)
     const isDismissible = calculateDismissible(currentNotice);
-
-    // 아이콘 SVG 매핑
-    const iconSVGs = {
-        info: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>',
-        update: '<path d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.53-9.11-.02-12.58s9.14-3.47 12.65 0L21 3v7.12zM12.5 8v4.25l3.5 2.08-.72 1.21L11 13V8h1.5z"/>',
-        warning: '<path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>',
-        celebration: '<path d="M2 22l14-5-9-9-5 14zm10.1-10.1l-.7-.7 7.07-7.07.71.71-7.08 7.06z"/><circle cx="17" cy="8" r="2"/><circle cx="8" cy="17" r="2"/>',
-    };
-
-    // 우선순위별 색상
-    const priorityColors = {
-        urgent: { bg: "rgba(239, 68, 68, 0.15)", border: "rgba(239, 68, 68, 0.4)", accent: "#ef4444" },
-        high: { bg: "rgba(251, 191, 36, 0.15)", border: "rgba(251, 191, 36, 0.4)", accent: "#fbbf24" },
-        normal: { bg: "rgba(29, 185, 84, 0.15)", border: "rgba(29, 185, 84, 0.4)", accent: "#1db954" },
-    };
-
-    const colors = priorityColors[currentNotice.priority] || priorityColors.normal;
+    const priority = ["urgent", "high", "normal"].includes(currentNotice.priority)
+        ? currentNotice.priority
+        : "normal";
+    const canDismissAll =
+        notices.length > 1 && notices.every((notice) => calculateDismissible(notice));
 
     const handleClose = () => {
         // 현재 공지 날짜로 저장
         NoticeSystem.dismissNotice(currentNotice.date);
 
         if (currentIndex < notices.length - 1) {
-            setCurrentIndex(currentIndex + 1);
+            setCurrentIndex((index) => index + 1);
         } else {
             onClose();
         }
@@ -303,22 +386,67 @@ const NoticeModal = ({ notices, onClose }) => {
         onClose();
     };
 
+    getNoticeUseEffect()(() => {
+        const modal = modalRef.current;
+        if (!modal) return undefined;
+
+        const getFocusableElements = () => Array.from(modal.querySelectorAll(
+            'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+        )).filter((element) => !element.hidden && element.getAttribute("aria-hidden") !== "true");
+
+        const handleKeydown = (event) => {
+            if (event.key === "Escape" && isDismissible) {
+                event.preventDefault();
+                handleClose();
+                return;
+            }
+
+            if (event.key !== "Tab") return;
+
+            const focusable = getFocusableElements();
+            if (!focusable.length) {
+                event.preventDefault();
+                modal.focus();
+                return;
+            }
+
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && (document.activeElement === first || document.activeElement === modal)) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === modal) {
+                event.preventDefault();
+                first.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        };
+
+        document.addEventListener("keydown", handleKeydown);
+        window.requestAnimationFrame(() => {
+            modal.focus();
+        });
+
+        return () => document.removeEventListener("keydown", handleKeydown);
+    }, [currentIndex, isDismissible]);
+
+    getNoticeUseEffect()(() => () => {
+        const previouslyFocused = previouslyFocusedRef.current;
+        if (previouslyFocused instanceof HTMLElement && document.contains(previouslyFocused)) {
+            previouslyFocused.focus();
+        }
+    }, []);
+
+    const react = getNoticeReact();
+    const closeLabel = window.I18n?.t("settingsUi.close") || "Close";
+
     return getNoticeReact().createElement(
         "div",
         {
             className: "notice-modal-overlay",
-            style: {
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0, 0, 0, 0.7)",
-                backdropFilter: "blur(8px)",
-                WebkitBackdropFilter: "blur(8px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 99999,
-                animation: "fadeIn 0.3s ease",
-            },
+            "data-ui-theme": getNoticeUiTheme(),
             onClick: (e) => {
                 if (e.target === e.currentTarget && isDismissible) {
                     handleClose();
@@ -329,223 +457,131 @@ const NoticeModal = ({ notices, onClose }) => {
             "div",
             {
                 className: "notice-modal",
-                style: {
-                    background: "rgba(24, 24, 24, 0.95)",
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: "16px",
-                    padding: "28px",
-                    maxWidth: "480px",
-                    width: "90%",
-                    boxShadow: `0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px ${colors.accent}22`,
-                    animation: "slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
-                    position: "relative",
-                    overflow: "hidden",
-                },
+                ref: modalRef,
+                role: "dialog",
+                "aria-modal": "true",
+                "aria-labelledby": "ivlyrics-notice-title",
+                "aria-describedby": "ivlyrics-notice-content",
+                "data-priority": priority,
+                tabIndex: -1,
             },
-            // 배경 글로우 효과
-            getNoticeReact().createElement("div", {
-                style: {
-                    position: "absolute",
-                    top: "-50%",
-                    right: "-30%",
-                    width: "200px",
-                    height: "200px",
-                    borderRadius: "50%",
-                    background: `radial-gradient(circle, ${colors.accent}20 0%, transparent 70%)`,
-                    pointerEvents: "none",
-                },
-            }),
-            // 공지 카운터 (여러 개일 때)
-            notices.length > 1 &&
-            getNoticeReact().createElement(
+            react.createElement(
                 "div",
-                {
-                    style: {
-                        position: "absolute",
-                        top: "16px",
-                        right: "16px",
-                        fontSize: "12px",
-                        color: "rgba(255, 255, 255, 0.5)",
-                        fontWeight: "500",
-                    },
-                },
-                `${currentIndex + 1} / ${notices.length}`
-            ),
-            // 아이콘
-            getNoticeReact().createElement(
-                "div",
-                {
-                    style: {
-                        width: "52px",
-                        height: "52px",
-                        borderRadius: "14px",
-                        background: colors.bg,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        marginBottom: "20px",
-                    },
-                },
-                getNoticeReact().createElement("svg", {
-                    width: 28,
-                    height: 28,
-                    viewBox: "0 0 24 24",
-                    fill: colors.accent,
-                    dangerouslySetInnerHTML: { __html: iconSVGs[currentNotice.icon] || iconSVGs.info },
-                })
-            ),
-            // 제목
-            getNoticeReact().createElement(
-                "h2",
-                {
-                    style: {
-                        fontSize: "20px",
-                        fontWeight: "700",
-                        color: "#ffffff",
-                        marginBottom: "12px",
-                        lineHeight: "1.3",
-                    },
-                },
-                currentNotice.title
-            ),
-            // 날짜
-            getNoticeReact().createElement(
-                "div",
-                {
-                    style: {
-                        fontSize: "12px",
-                        color: "rgba(255, 255, 255, 0.4)",
-                        marginBottom: "16px",
-                    },
-                },
-                currentNotice.date
-            ),
-            // 내용
-            getNoticeReact().createElement(
-                "div",
-                {
-                    style: {
-                        fontSize: "14px",
-                        color: "rgba(255, 255, 255, 0.8)",
-                        lineHeight: "1.7",
-                        marginBottom: "24px",
-                        whiteSpace: "pre-wrap",
-                    },
-                },
-                currentNotice.content
-            ),
-            // 버튼 영역
-            getNoticeReact().createElement(
-                "div",
-                {
-                    style: {
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "10px",
-                    },
-                },
-                // URL 버튼들
-                safeButtons.length > 0 &&
-                getNoticeReact().createElement(
+                { className: "notice-modal__header" },
+                react.createElement(
                     "div",
-                    {
-                        style: {
-                            display: "flex",
-                            gap: "10px",
-                            flexWrap: "wrap",
-                        },
-                    },
-                    safeButtons.map((btn, idx) =>
-                        getNoticeReact().createElement(
-                            "a",
-                            {
-                                key: idx,
-                                href: sanitizeNoticeUrl(btn.url),
-                                target: "_blank",
-                                rel: "noopener noreferrer",
-                                style: {
-                                    flex: 1,
-                                    minWidth: "120px",
-                                    padding: "12px 20px",
-                                    background: idx === 0 ? colors.accent : "rgba(255, 255, 255, 0.08)",
-                                    color: idx === 0 ? "#000" : "rgba(255, 255, 255, 0.9)",
-                                    border: idx === 0 ? "none" : "1px solid rgba(255, 255, 255, 0.15)",
-                                    borderRadius: "10px",
-                                    fontSize: "14px",
-                                    fontWeight: "600",
-                                    textAlign: "center",
-                                    textDecoration: "none",
-                                    cursor: "pointer",
-                                    transition: "all 0.2s ease",
-                                },
-                            },
-                            btn.label
+                    { className: "notice-modal__icon" },
+                    createNoticeIcon(currentNotice.icon, 22)
+                ),
+                react.createElement(
+                    "div",
+                    { className: "notice-modal__heading" },
+                    react.createElement(
+                        "h2",
+                        { id: "ivlyrics-notice-title" },
+                        currentNotice.title
+                    ),
+                    react.createElement(
+                        "div",
+                        { className: "notice-modal__meta" },
+                        react.createElement("time", { dateTime: currentNotice.date }, currentNotice.date),
+                        notices.length > 1 &&
+                        react.createElement(
+                            "span",
+                            { className: "notice-modal__counter" },
+                            `${currentIndex + 1} / ${notices.length}`
                         )
                     )
                 ),
-                // 닫기 버튼
-                getNoticeReact().createElement(
+                isDismissible &&
+                react.createElement(
+                    "button",
+                    {
+                        type: "button",
+                        className: "notice-modal__close",
+                        onClick: handleClose,
+                        title: closeLabel,
+                        "aria-label": closeLabel,
+                    },
+                    createNoticeIcon("close", 18)
+                )
+            ),
+            react.createElement(
+                "div",
+                { className: "notice-modal__body" },
+                react.createElement(
                     "div",
                     {
-                        style: {
-                            display: "flex",
-                            gap: "10px",
-                            marginTop: notices.length > 1 ? "6px" : "0",
-                        },
+                        id: "ivlyrics-notice-content",
+                        className: "notice-modal__content",
                     },
-                    // 모두 닫기 (여러 개일 때)
-                    notices.length > 1 &&
-                    getNoticeReact().createElement(
-                        "button",
-                        {
-                            onClick: handleDismissAll,
-                            style: {
-                                flex: 1,
-                                padding: "12px 20px",
-                                background: "transparent",
-                                color: "rgba(255, 255, 255, 0.5)",
-                                border: "none",
-                                borderRadius: "10px",
-                                fontSize: "13px",
-                                fontWeight: "500",
-                                cursor: "pointer",
-                                transition: "all 0.2s ease",
+                    currentNotice.content
+                ),
+                safeButtons.length > 0 &&
+                react.createElement(
+                    "div",
+                    {
+                        className: "notice-modal__links",
+                        "aria-label": currentNotice.title,
+                    },
+                    safeButtons.map((button, index) =>
+                        react.createElement(
+                            "a",
+                            {
+                                key: `${button.href}-${index}`,
+                                href: button.href,
+                                target: "_blank",
+                                rel: "noopener noreferrer",
+                                className: `notice-modal__link${index === 0 ? " is-primary" : ""}`,
                             },
-                        },
-                        (window.I18n?.t("notice.dismissAll") || "Dismiss All")
-                    ),
-                    // 확인/다음
-                    getNoticeReact().createElement(
-                        "button",
-                        {
-                            onClick: handleClose,
-                            disabled: !isDismissible,
-                            style: {
-                                flex: 1,
-                                padding: "12px 20px",
-                                background:
-                                    safeButtons.length > 0
-                                        ? "rgba(255, 255, 255, 0.08)"
-                                        : colors.accent,
-                                color:
-                                    safeButtons.length > 0
-                                        ? "rgba(255, 255, 255, 0.9)"
-                                        : "#000",
-                                border:
-                                    safeButtons.length > 0
-                                        ? "1px solid rgba(255, 255, 255, 0.15)"
-                                        : "none",
-                                borderRadius: "10px",
-                                fontSize: "14px",
-                                fontWeight: "600",
-                                cursor: !isDismissible ? "not-allowed" : "pointer",
-                                opacity: !isDismissible ? 0.5 : 1,
-                                transition: "all 0.2s ease",
-                            },
-                        },
+                            react.createElement("span", null, button.label),
+                            createNoticeIcon("external", 15)
+                        )
+                    )
+                )
+            ),
+            react.createElement(
+                "div",
+                { className: "notice-modal__footer" },
+                canDismissAll &&
+                react.createElement(
+                    "button",
+                    {
+                        type: "button",
+                        className: "notice-modal__button notice-modal__button--secondary",
+                        onClick: handleDismissAll,
+                    },
+                    createNoticeIcon("dismissAll", 16),
+                    react.createElement(
+                        "span",
+                        null,
+                        window.I18n?.t("notice.dismissAll") || "Dismiss All"
+                    )
+                ),
+                react.createElement("span", { className: "notice-modal__footer-spacer" }),
+                react.createElement(
+                    "button",
+                    {
+                        type: "button",
+                        className: "notice-modal__button notice-modal__button--primary",
+                        onClick: handleClose,
+                        disabled: !isDismissible,
+                        "data-notice-primary": "true",
+                    },
+                    react.createElement(
+                        "span",
+                        null,
                         currentIndex < notices.length - 1
                             ? (window.I18n?.t("notice.next") || "Next")
                             : (window.I18n?.t("notice.confirm") || "OK")
+                    ),
+                    createNoticeIcon(
+                        !isDismissible
+                            ? "lock"
+                            : currentIndex < notices.length - 1
+                                ? "next"
+                                : "confirm",
+                        16
                     )
                 )
             )
@@ -604,15 +640,15 @@ const showNoticeIfNeeded = async () => {
 const noticeStyles = document.createElement("style");
 noticeStyles.id = "ivLyrics-notice-styles";
 noticeStyles.textContent = `
-@keyframes fadeIn {
+@keyframes ivlyrics-notice-overlay-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-@keyframes slideUp {
+@keyframes ivlyrics-notice-dialog-in {
   from {
     opacity: 0;
-    transform: translateY(20px) scale(0.98);
+    transform: translateY(14px) scale(0.985);
   }
   to {
     opacity: 1;
@@ -620,13 +656,393 @@ noticeStyles.textContent = `
   }
 }
 
-.notice-modal a:hover {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
+.notice-modal-overlay {
+  --notice-accent-rgb: var(--spice-rgb-accent, 30, 215, 96);
+  --notice-shell: rgba(15, 18, 21, 0.94);
+  --notice-surface: rgba(var(--spice-rgb-text, 255, 255, 255), 0.035);
+  --notice-surface-hover: rgba(var(--spice-rgb-text, 255, 255, 255), 0.075);
+  --notice-border: rgba(var(--spice-rgb-text, 255, 255, 255), 0.11);
+  --notice-border-strong: rgba(var(--spice-rgb-text, 255, 255, 255), 0.17);
+  --notice-divider: rgba(var(--spice-rgb-text, 255, 255, 255), 0.1);
+  --notice-text: #fff;
+  --notice-text-secondary: rgba(255, 255, 255, 0.7);
+  --notice-text-muted: rgba(255, 255, 255, 0.46);
+  position: fixed;
+  inset: 0;
+  z-index: var(--iv-layer-modal, 2147483647);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.46);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: ivlyrics-notice-overlay-in 180ms ease both;
 }
 
-.notice-modal button:hover:not(:disabled) {
-  filter: brightness(1.1);
+.notice-modal-overlay[data-ui-theme="light"] {
+  --notice-shell: rgba(248, 250, 252, 0.95);
+  --notice-surface: rgba(15, 23, 42, 0.035);
+  --notice-surface-hover: rgba(15, 23, 42, 0.07);
+  --notice-border: rgba(15, 23, 42, 0.1);
+  --notice-border-strong: rgba(15, 23, 42, 0.16);
+  --notice-divider: rgba(15, 23, 42, 0.09);
+  --notice-text: #111827;
+  --notice-text-secondary: rgba(17, 24, 39, 0.72);
+  --notice-text-muted: rgba(17, 24, 39, 0.5);
+}
+
+.notice-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(640px, calc(100vw - 48px));
+  max-height: min(760px, calc(100dvh - 48px));
+  overflow: hidden;
+  color: var(--notice-text);
+  background: var(--notice-shell);
+  border: 1px solid var(--notice-border);
+  border-radius: 24px;
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  outline: none;
+  animation: ivlyrics-notice-dialog-in 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.notice-modal[data-priority="high"] {
+  --notice-accent-rgb: 245, 158, 11;
+}
+
+.notice-modal[data-priority="urgent"] {
+  --notice-accent-rgb: 239, 68, 68;
+}
+
+.notice-modal::before {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 24px;
+  left: 24px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: rgb(var(--notice-accent-rgb));
+  content: "";
+}
+
+.notice-modal__header {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 36px;
+  gap: 14px;
+  align-items: start;
+  padding: 24px;
+  border-bottom: 1px solid var(--notice-divider);
+}
+
+.notice-modal__icon {
+  display: flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  color: rgb(var(--notice-accent-rgb));
+  background: rgba(var(--notice-accent-rgb), 0.12);
+  border: 1px solid rgba(var(--notice-accent-rgb), 0.2);
+  border-radius: 10px;
+}
+
+.notice-modal__heading {
+  min-width: 0;
+}
+
+.notice-modal__heading h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--notice-text);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.notice-modal__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+  min-height: 22px;
+  margin-top: 7px;
+  color: var(--notice-text-muted);
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+.notice-modal__counter {
+  padding: 2px 7px;
+  color: var(--notice-text-secondary);
+  background: var(--notice-surface);
+  border: 1px solid var(--notice-border);
+  border-radius: 999px;
+}
+
+.notice-modal__close {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--notice-text-secondary);
+  background: var(--notice-surface);
+  border: 1px solid var(--notice-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.notice-modal__close:hover {
+  color: var(--notice-text);
+  background: var(--notice-surface-hover);
+  border-color: var(--notice-border-strong);
+}
+
+.notice-modal__body {
+  min-height: 0;
+  padding: 22px 24px 24px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-color: var(--notice-border-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.notice-modal__body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.notice-modal__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notice-modal__body::-webkit-scrollbar-thumb {
+  background: var(--notice-border-strong);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.notice-modal__content {
+  overflow-wrap: anywhere;
+  color: var(--notice-text-secondary);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.7;
+  letter-spacing: 0;
+  white-space: pre-wrap;
+}
+
+.notice-modal__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.notice-modal .notice-modal__link {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 14px;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  color: var(--notice-text-secondary);
+  background: var(--notice-surface);
+  border: 1px solid var(--notice-border);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: center;
+  text-decoration: none;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.notice-modal .notice-modal__link.is-primary {
+  color: rgb(var(--notice-accent-rgb));
+  background: rgba(var(--notice-accent-rgb), 0.11);
+  border-color: rgba(var(--notice-accent-rgb), 0.24);
+}
+
+.notice-modal .notice-modal__link:hover {
+  color: var(--notice-text);
+  background: var(--notice-surface-hover);
+  border-color: var(--notice-border-strong);
+}
+
+.notice-modal .notice-modal__link.is-primary:hover {
+  color: rgb(var(--notice-accent-rgb));
+  background: rgba(var(--notice-accent-rgb), 0.16);
+  border-color: rgba(var(--notice-accent-rgb), 0.34);
+}
+
+.notice-modal__footer {
+  display: flex;
+  min-height: 68px;
+  padding: 14px 18px;
+  gap: 10px;
+  align-items: center;
+  background: var(--notice-surface);
+  border-top: 1px solid var(--notice-divider);
+}
+
+.notice-modal__footer-spacer {
+  flex: 1 1 auto;
+}
+
+.notice-modal__button {
+  display: inline-flex;
+  min-height: 40px;
+  padding: 0 16px;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease,
+    opacity 160ms ease;
+}
+
+.notice-modal__button--secondary {
+  color: var(--notice-text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.notice-modal__button--secondary:hover {
+  color: var(--notice-text);
+  background: var(--notice-surface-hover);
+  border-color: var(--notice-border);
+}
+
+.notice-modal__button--primary {
+  min-width: 108px;
+  color: #07130b;
+  background: rgb(var(--notice-accent-rgb));
+  border: 1px solid rgb(var(--notice-accent-rgb));
+}
+
+.notice-modal__button--primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.notice-modal__button:disabled {
+  color: var(--notice-text-muted);
+  background: var(--notice-surface);
+  border-color: var(--notice-border);
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.notice-modal :is(a, button):focus-visible {
+  outline: 2px solid rgb(var(--notice-accent-rgb));
+  outline-offset: 2px;
+}
+
+@media (max-width: 650px) {
+  .notice-modal-overlay {
+    padding: 8px;
+  }
+
+  .notice-modal {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    border-radius: 18px;
+  }
+
+  .notice-modal::before {
+    right: 18px;
+    left: 18px;
+  }
+
+  .notice-modal__header {
+    grid-template-columns: 38px minmax(0, 1fr) 34px;
+    gap: 11px;
+    padding: 20px 18px;
+  }
+
+  .notice-modal__icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .notice-modal__heading h2 {
+    font-size: 18px;
+  }
+
+  .notice-modal__close {
+    width: 34px;
+    height: 34px;
+  }
+
+  .notice-modal__body {
+    padding: 18px;
+  }
+
+  .notice-modal__link {
+    flex: 1 1 120px;
+  }
+
+  .notice-modal__footer {
+    min-height: 64px;
+    padding: 12px;
+  }
+
+  .notice-modal__button {
+    min-height: 40px;
+    padding: 0 14px;
+  }
+}
+
+@media (max-width: 420px) {
+  .notice-modal__footer {
+    flex-wrap: wrap;
+  }
+
+  .notice-modal__footer-spacer {
+    display: none;
+  }
+
+  .notice-modal__button {
+    flex: 1 1 140px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notice-modal-overlay,
+  .notice-modal {
+    animation: none;
+  }
+
+  .notice-modal :is(a, button) {
+    transition: none;
+  }
 }
 `;
 if (!document.getElementById("ivLyrics-notice-styles")) {
