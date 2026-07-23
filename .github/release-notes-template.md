@@ -9,21 +9,13 @@
 ### 요약
 {ko_summary}
 
-### 주요 변경
-{ko_highlights}
-
-### 개선 및 수정
-{ko_fixes}
+{ko_sections}
 
 ## English
 
 ### Summary
 {en_summary}
 
-### Highlights
-{en_highlights}
-
-### Improvements and Fixes
-{en_fixes}
+{en_sections}
 
 **Full Changelog**: {compare_url}
