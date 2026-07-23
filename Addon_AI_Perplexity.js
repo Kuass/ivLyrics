@@ -95,35 +95,6 @@
     }
 
     // ============================================
-    // Language Data
-    // ============================================
-
-    const LANGUAGE_DATA = {
-        'ko': { name: 'Korean', native: '한국어' },
-        'en': { name: 'English', native: 'English' },
-        'zh-CN': { name: 'Simplified Chinese', native: '简体中文' },
-        'zh-TW': { name: 'Traditional Chinese', native: '繁體中文' },
-        'ja': { name: 'Japanese', native: '日本語' },
-        'hi': { name: 'Hindi', native: 'हिन्दी' },
-        'es': { name: 'Spanish', native: 'Español' },
-        'fr': { name: 'French', native: 'Français' },
-        'ar': { name: 'Arabic', native: 'العربية' },
-        'fa': { name: 'Persian', native: 'فارسی' },
-        'de': { name: 'German', native: 'Deutsch' },
-        'ru': { name: 'Russian', native: 'Русский' },
-        'sv': { name: 'Swedish', native: 'Svenska' },
-        'pt': { name: 'Portuguese', native: 'Português' },
-        'bn': { name: 'Bengali', native: 'বাংলা' },
-        'cs': { name: 'Czech', native: 'Čeština' },
-        'it': { name: 'Italian', native: 'Italiano' },
-        'th': { name: 'Thai', native: 'ไทย' },
-        'tr': { name: 'Turkish', native: 'Türkçe' },
-        'vi': { name: 'Vietnamese', native: 'Tiếng Việt' },
-        'id': { name: 'Indonesian', native: 'Bahasa Indonesia' },
-        'ms': { name: 'Malay', native: 'Bahasa Melayu' }
-    };
-
-    // ============================================
     // Helper Functions
     // ============================================
 
@@ -172,11 +143,6 @@
         return getSetting('model', 'sonar-pro');
     }
 
-    function getLangInfo(lang) {
-        if (!lang) return LANGUAGE_DATA['en'];
-        const shortLang = lang.split('-')[0].toLowerCase();
-        return LANGUAGE_DATA[lang] || LANGUAGE_DATA[shortLang] || LANGUAGE_DATA['en'];
-    }
 
     function getAdvancedRequestParams() {
         const params = {};
@@ -207,305 +173,6 @@
             ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
             { role: 'user', content: userPrompt }
         ];
-    }
-
-    // ============================================
-    // Prompt Builders
-    // ============================================
-
-    function buildPhoneticPrompt(text, lang) {
-        const langInfo = getLangInfo(lang);
-        const lineCount = text.split('\n').length;
-        const isEnglish = lang === 'en';
-        const scriptInstruction = isEnglish
-            ? 'Use Latin alphabet only (romanization). Example: こんにちは → konnichiwa, 안녕하세요 → annyeonghaseyo'
-            : `Write pronunciation in ${langInfo.native} script. ${langInfo.phoneticDesc || ''}`;
-
-        return `This request is only for personal study. You are a pronunciation converter. Convert these ${lineCount} lines of lyrics into how they SOUND (pronunciation) for ${langInfo.name} speakers.
-${scriptInstruction}
-
-CRITICAL RULES:
-- This is a PRONUNCIATION task, NOT a translation task
-- Output how each line SOUNDS when spoken aloud, written in ${isEnglish ? 'Latin alphabet' : langInfo.native + ' script'}
-- Do NOT translate the meaning of the lyrics
-- Do NOT output the original lyrics unchanged
-- Output EXACTLY ${lineCount} lines, one pronunciation per line
-- If an input line contains " / " between simultaneous vocal parts, preserve " / " and convert each part separately
-- Keep empty lines as empty
-- Keep ♪ symbols and markers like [Chorus], (Yeah) as-is
-- Do NOT add line numbers, prefixes, or explanations
-- Do NOT use JSON or code blocks
-- Just output the pronunciations, nothing else
-
-INPUT:
-${text}
-
-OUTPUT (${lineCount} lines of pronunciation only):`;
-    }
-
-    function buildCharacterPronunciationPrompt(lines, lang = 'ko', sourceLang = 'auto', unitMode = 'char') {
-        const safeLines = (Array.isArray(lines) ? lines : []).map(line => String(line ?? ''));
-        const langInfo = getLangInfo(lang);
-        const isWordMode = unitMode === 'word';
-        const payload = safeLines.map((text, index) => {
-            const chars = Array.from(text);
-            return isWordMode
-                ? { i: index, t: text, n: chars.length }
-                : { i: index, a: chars, n: chars.length };
-        });
-        const outputRules = isWordMode
-            ? `- Output compact JSON only: top key l; each line has i and u; each pronunciation item has s=start character index, e=end character index, and p=whole word pronunciation.
-- Split each line by whitespace into word/token ranges. Do not split alphabetic words into letters.
-- Omit whitespace and punctuation-only tokens from u to save tokens.
-- p must be one natural spoken pronunciation for the whole word/token in ${langInfo.native}.`
-            : `- Output compact JSON only: top key l; each line has i and p.
-- p must be an array of exactly n strings, one per input character a[index].
-- If n is 12, p must contain exactly 12 strings. An array with 11 or 13 strings is invalid even if the pronunciation sounds correct.
-- Use an empty string for characters with no separate pronunciation. Do not omit array slots.
-- Each p[index] must be short and readable in ${langInfo.native}.`;
-        const alignmentRules = isWordMode
-            ? `- For alphabetic and whitespace-separated languages, convert each whole word to spoken pronunciation once. Do not assign syllables to individual letters.
-- Example: English "hello" should be one unit like {"s":0,"e":4,"p":"??"}, not h=?/e=?/l=?.
-- For contractions, liaison, vowel reduction, doubled consonants, and connected-speech effects, prefer natural sung pronunciation over literal spelling.`
-            : `- For alphabetic languages, do not spell letters one by one. Convert words to spoken pronunciation first, then place that sound into the matching source character slots.
-- For digraphs or combined letters (sh, ch, th, ph, qu, ll, etc.), put the combined sound in one source character slot and leave helper slots empty if needed.
-- For silent letters, use an empty string in that source character slot.
-- For contractions, liaison, vowel reduction, doubled consonants, and other connected-speech effects, prefer natural sung pronunciation over literal spelling.`;
-        const outputShape = isWordMode
-            ? '{"l":[{"i":0,"u":[{"s":0,"e":4,"p":"??"}]}]}'
-            : '{"l":[{"i":0,"p":["?"]}]}';
-
-        return `You are a multilingual lyrics pronunciation aligner for karaoke sync editing.
-
-Task:
-- Read each full lyric line first, infer the natural pronunciation in context for the input source language (${sourceLang}), then align that sound back onto the original lyric text for karaoke timing.
-- Return ${isWordMode ? 'word-level' : 'character-level'} pronunciation hints in ${langInfo.name} (${langInfo.native}), not a meaning translation.
-- Do NOT pronounce each character in isolation. The output must sound natural when the character hints are read in sequence.
-
-Rules:
-- Return ONLY valid JSON. No markdown, no code fences, no explanations.
-- The first response character must be { and the last response character must be }. Never wrap JSON in markdown fences.
-- Preserve every line index.
-- Input uses compact keys: i=line index and n=character count. In character mode, a is the exact source character array and output p must align to a by array position. In word mode, t is the line text.
-- In character mode, never output c or index-numbered pronunciation items. Output p as exactly n strings. p[k] is the pronunciation for source character a[k], and may contain multiple target syllables or be empty.
-${outputRules}
-${alignmentRules}
-- For syllabic scripts, align by natural syllable sound while keeping exactly one p array slot per source character.
-- For logographic scripts such as hanzi/kanji/hanja, infer the common reading from the word and put each source character's reading in that character's p slot. If a character has no separate sound, use an empty string.
-- For mixed writing systems, keep pronounced suffix/helper characters aligned to their own source characters. Do not hide a following character's sound inside the previous base character.
-- For Japanese specifically, handle kanji, okurigana, small kana, and sound changes naturally:
-  - Never shift readings after small kana or ん. Each p array slot is tied to the exact original source character at the same array position.
-  - In character mode, keep timing alignment per source character. Do not merge ordinary kana/okurigana into the previous kanji.
-  - For okurigana, put its spoken sound on that kana. Example: 高く => 高=타카, く=쿠; 急ぎ => 急=이소, ぎ=기; 懐かしい => 懐=나츠, か=카, し=시, い=이.
-  - Do not compress several source characters into one p slot. Example for a=["耐","え","難","い"]: p=["타","에","가타","이"], not ["타에","","가","타이"].
-  - small っ should be a geminated consonant or brief stop, not つ. Example: のって => の=노, っ=ㅅ, て=데.
-  - small ゃ/ゅ/ょ should combine with the previous kana; leave the small kana itself empty/omitted unless the target writing system truly needs a separate mark.
-  - ん should use the context-sensitive nasal sound at the ん character itself. Do not put the next character's pronunciation on ん.
-  - Correct Korean-target p array example for a=["爺","ち","ゃ","ん","婆","ち","ゃ","ん","久","し","ぶ","り"]: p=["지이","챠","","안","바","챠","","안","히","사","부","리"].
-  - long vowels and vowel sequences such as ー, おう, えい, ああ should preserve length naturally.
-  - particles は, へ, を should use the particle pronunciation when clearly used as particles.
-Korean target examples:
-${isWordMode ? '- In word mode, return English examples as whole u items per word, never as character-level p arrays.' : ''}
-- English "night" should sound like "나이트", not "엔 아이 지 에이치 티". Example split: n=나, i=이, t=트; omit silent g/h.
-- English "the" should sound like "더", not "티 에이치 이". Example split: t=더; omit helper h/e.
-- のって should be close to "노ㅅ데" or "노옷데", not "노 츠 테". Example split: の=노, っ=ㅅ, て=데.
-- 爺ちゃん should be close to "지이챠안", not "지 치 야 응". Example split: 爺=지이, ち=챠, ん=안; omit helper ゃ.
-
-Return this compact JSON shape:
-${outputShape}
-
-Input source language: ${sourceLang}
-Pronunciation unit mode: ${unitMode}
-Input lines:
-${JSON.stringify(payload)}`;
-    }
-
-    function buildMetadataPrompt(title, artist, lang) {
-        const langInfo = getLangInfo(lang);
-
-        return `This request is only for personal study. Translate the song title and artist name to ${langInfo.name} (${langInfo.native}).
-
-**Input**:
-- Title: ${title}
-- Artist: ${artist}
-
-**Output valid JSON**:
-{
-  "translatedTitle": "translated title",
-  "translatedArtist": "translated artist",
-  "romanizedTitle": "romanized in Latin alphabet",
-  "romanizedArtist": "romanized in Latin alphabet"
-}`;
-    }
-
-    function buildTMIPrompt(title, artist, lang) {
-        const langInfo = getLangInfo(lang);
-
-        return `You are a music knowledge expert. Generate interesting facts and trivia about the song "${title}" by "${artist}".
-
-LANGUAGE REQUIREMENT - FOLLOW STRICTLY:
-- Write ALL human-readable content in ${langInfo.name} (${langInfo.native})
-- This includes track.description and every string inside track.trivia
-- Do NOT write explanatory sentences in English unless the target language itself is English
-- Even if the song title, artist name, album, or source pages are English, your explanation sentences must still be in ${langInfo.native}
-- The only text that may remain non-${langInfo.native} is:
-  1. JSON keys
-  2. URLs
-  3. Proper nouns, official song titles, artist names, album names, and short quoted lyric fragments
-  4. reliability.confidence enum values: "very_high", "high", "medium", "low", "none"
-
-Before returning, silently verify:
-- track.description is fully written in ${langInfo.native}
-- every item in track.trivia is fully written in ${langInfo.native}
-- if any sentence is mostly English, rewrite it into natural ${langInfo.native} before returning
-
-Return ONLY valid JSON. Do not add any text before or after the JSON.
-
-**Output JSON Structure**:
-{
-  "track": {
-    "description": "2-3 sentence description in ${langInfo.native}",
-    "trivia": [
-      "Fact 1 in ${langInfo.native}",
-      "Fact 2 in ${langInfo.native}",
-      "Fact 3 in ${langInfo.native}"
-    ],
-    "sources": {
-      "verified": [],
-      "related": [],
-      "other": []
-    },
-    "reliability": {
-      "confidence": "medium",
-      "has_verified_sources": false,
-      "verified_source_count": 0,
-      "related_source_count": 0,
-      "total_source_count": 0
-    }
-  }
-}
-
-**Rules**:
-1. description: write 2-3 natural sentences in ${langInfo.native}
-2. trivia: include 3-5 concise facts, each written in ${langInfo.native}
-3. Prefer natural ${langInfo.native} wording, not mixed-language fragments
-4. Be accurate - if you're not sure about a fact, mark confidence as "low"
-5. Do NOT use markdown code blocks
-6. Do NOT add any explanation outside the JSON`;
-    }
-
-    function buildLyricsStudyPrompt({ title, artist, targetLang, sourceLang = 'auto', lines = [], category = 'lines', difficulty = 'normal', chunkIndex = 1, chunkTotal = 1 }) {
-        const langInfo = getLangInfo(targetLang || 'ko');
-        const normalizedDifficulty = ['easy', 'normal', 'hard', 'native'].includes(String(difficulty || '').toLowerCase()) ? String(difficulty || '').toLowerCase() : 'normal';
-        const difficultyMap = {
-            easy: {
-                label: 'Easy',
-                guidance: 'Assume a beginner or lower-intermediate learner. Use short explanations, define common words, avoid jargon, and make quiz distractors clearly distinguishable.'
-            },
-            normal: {
-                label: 'Normal',
-                guidance: 'Assume an intermediate learner. Balance natural meaning, useful grammar, vocabulary nuance, and practical examples.'
-            },
-            hard: {
-                label: 'Hard',
-                guidance: 'Assume an advanced learner. Include finer nuance, grammar contrasts, register, collocation, and more challenging quiz distractors.'
-            },
-            native: {
-                label: 'Native-level',
-                guidance: 'Assume a near-native learner. Explain subtle tone, implication, idiom, literary compression, rhythm, and natural alternatives without simplifying too much.'
-            }
-        };
-        const difficultyInfo = difficultyMap[normalizedDifficulty] || difficultyMap.normal;
-        const pronunciationGuide = [
-            `Use one pronunciation style across every chunk: IPA-style phonetic transcription in Latin/IPA symbols.`,
-            `Wrap it in /.../ for phonemic pronunciation or [...] for close phonetic detail.`,
-            `Do not write pronunciation in the target language script, and do not use ad-hoc syllable romanization.`,
-            `For example, write "like ships in the night" as "/laɪk ʃɪps ɪn ðə naɪt/", not "라이크 쉽스 인 나이트" and not "lie-ku ships in nightu".`,
-            `For Japanese lyrics, keep kana/furigana only in "reading"; use IPA-style Latin/IPA symbols in "pronunciation".`
-        ].join(" ");
-        const payload = lines.map((line) => ({
-            index: Number(line.index),
-            text: String(line.text || '')
-        })).filter((line) => Number.isFinite(line.index) && line.text.trim());
-        const normalizedCategory = ['summary', 'lines', 'expressions', 'quiz'].includes(category) ? category : 'lines';
-        const categoryRules = {
-            summary: `Create only a compact learning-focused song summary. Explain the emotional situation, speaker attitude, and 2-3 language-learning takeaways. Do not create line notes, expressions, or quiz items.`,
-            lines: `Create line-level learning cards for every provided lyric line. Keep each explanation short but specific. Include reading and pronunciation when useful. Include 1-2 grammar/pattern notes for each line that has a reusable structure; each note must explain how the pattern works in this lyric.`,
-            expressions: `Create only 1-2 vocabulary expansion cards from words or short phrases that actually appear in the provided lyrics. Prefer practical items where learners benefit from alternatives, related words, or forms such as tense, base form, past participle, polite/casual form, particles, or collocations. Do not list many key phrases.`,
-            quiz: `Create only 2-4 choice-based quiz items from the provided lyrics. Mix formats using the type field: meaning, blank, usage, rewrite, and grammar. Include fill-in-the-blank items where the question contains ____ and the choices are candidate words or short phrases. Include practical transfer items that ask how a lyric expression would be used or rephrased in everyday conversation, work email, meeting, or other non-lyric context. Do not make every question a literal lyric translation. Distractors must be plausible. Each question must include a lineIndex and should show the actual lyric phrase instead of referring to a line number. Include reading and pronunciation if the question quotes a lyric.`
-        };
-        const outputShapes = {
-            summary: `{
-  "summary": "2-3 sentence learning-focused summary in ${langInfo.native}"
-}`,
-            lines: `{
-  "lines": [
-    {
-      "index": 0,
-      "reading": "hiragana/kana reading if the lyric is Japanese; otherwise optional reading aid",
-      "pronunciation": "IPA-style pronunciation if useful, e.g. /laɪk ʃɪps/; no local-script or ad-hoc romanization",
-      "translation": "natural meaning in ${langInfo.native}",
-      "explanation": "line-level explanation in ${langInfo.native}",
-      "grammar": [{ "pattern": "reusable structure or grammar point", "explanation": "how it works in this lyric in ${langInfo.native}", "note": "short nuance or usage note in ${langInfo.native}" }],
-      "vocabulary": [{ "term": "word", "reading": "hiragana/kana reading if Japanese", "pronunciation": "IPA-style pronunciation if useful", "meaning": "meaning in ${langInfo.native}", "note": "optional note in ${langInfo.native}" }]
-    }
-  ]
-}`,
-            expressions: `{
-  "keyExpressions": [
-    { "expression": "word or short phrase from the lyric", "reading": "hiragana/kana reading if Japanese", "pronunciation": "IPA-style pronunciation if useful", "meaning": "meaning in ${langInfo.native}", "note": "practical learner note in ${langInfo.native}", "alternatives": ["substitutable expression"], "forms": ["base/past/past participle or other useful forms"], "relatedWords": ["similar or related word"], "lineIndexes": [0] }
-  ]
-}`,
-            quiz: `{
-  "quiz": [
-    { "type": "meaning|blank|usage|rewrite|grammar", "question": "question in ${langInfo.native}; for blank type include ____ where the missing word/phrase goes", "choices": ["A", "B", "C", "D"], "answerIndex": 0, "explanation": "why in ${langInfo.native}", "lineIndex": 0, "reading": "optional", "pronunciation": "optional" }
-  ]
-}`
-        };
-
-        return `You are a language learning tutor inside a lyrics app. Build one category of a compact study pack from the provided song lyrics.
-
-Target explanation language: ${langInfo.name} (${langInfo.native})
-Detected/source language: ${sourceLang}
-Song: ${title || ''}
-Artist: ${artist || ''}
-Category: ${normalizedCategory}
-Difficulty: ${difficultyInfo.label}
-Difficulty guidance: ${difficultyInfo.guidance}
-Chunk: ${chunkIndex}/${chunkTotal}
-
-Rules:
-- Return ONLY valid JSON. No markdown, no code fences, no extra text.
-- Write every human-readable explanation, meaning, question, and quiz explanation in ${langInfo.native}.
-- Match the selected difficulty. Easy should be simpler and more scaffolded; hard/native-level should include deeper nuance and more demanding quiz distractors.
-- Keep original lyric fragments short. Do not quote long lyric passages.
-- Preserve original line indexes exactly.
-- Do not refer to "line 3", "3rd line", "N번째 줄", or similar labels. Show the actual lyric phrase when a specific lyric matters.
-- ${pronunciationGuide}
-- Add "pronunciation" only when it helps; when present, it must follow the pronunciation style above.
-- If the source lyric is Japanese or contains kanji, add "reading" as hiragana/kana reading. Do not put an explanation in "reading"; only the reading text.
-- Explain useful vocabulary, grammar, idioms, tone, and natural meaning.
-- Use the "grammar" array for reusable patterns, particles, verb forms, sentence endings, tense/aspect, omitted subjects, or word order. Do not leave grammar as only a label; include a concrete explanation tied to the lyric.
-- Avoid generic filler such as "this is poetic" unless you explain the exact language cue. Prefer one practical learner insight over broad textbook summaries.
-- When a word or phrase has nuance, explain the contrast with the literal meaning or a more common alternative.
-- For the expressions category, output expansion cards, not a long list of key phrases. Base each item on a lyric word or short phrase and include alternatives/forms/relatedWords only when useful.
-- For quiz items, vary answerIndex. Do not place every correct answer at choices[0].
-- For quiz items, vary the type field. Do not make all items meaning questions; use blank, usage, rewrite, and grammar when the lyric supports them.
-- For blank type, put ____ directly in the question and make choices short words or phrases that fit the blank.
-- For blank type, include enough context in the question itself because the full original lyric line may be hidden while the learner answers.
-- For quiz items, include some practical transfer questions when possible: how to say the idea naturally in everyday speech, how to soften it, or how to adapt it for workplace/formal writing.
-- Repeated lyric phrases should produce at most one quiz item across the whole pack. If the same sentence or chorus line appears again, skip it and choose a different lyric phrase.
-- If a line is too simple, keep its explanation short.
-- Generate only the requested category. Omit unrelated top-level keys.
-
-Task:
-${categoryRules[normalizedCategory]}
-
-Output JSON shape:
-${outputShapes[normalizedCategory]}
-
-Input lines:
-${JSON.stringify(payload)}`;
     }
 
     // ============================================
@@ -1025,22 +692,15 @@ ${JSON.stringify(payload)}`;
             }
         },
 
-        async translateLyrics({ text, lang, wantSmartPhonetic, translationPrompt, translationStyle, onLine, onStreamReset }) {
+        async translateLyrics({ text, lang, wantSmartPhonetic, translationPrompt, phoneticPrompt, onLine, onStreamReset }) {
             if (!text?.trim()) {
                 throw new Error('No text provided');
             }
 
             const sourceLines = String(text).replace(/\r\n?/g, '\n').split('\n');
-            const normalizedText = sourceLines.join('\n');
-            const prompt = wantSmartPhonetic
-                ? buildPhoneticPrompt(normalizedText, lang)
-                : (translationPrompt || window.AIAddonManager?.buildLyricsTranslationPrompt?.({
-                    text: normalizedText,
-                    lang,
-                    translationStyle
-                }));
+            const prompt = wantSmartPhonetic ? phoneticPrompt : translationPrompt;
             if (!prompt) {
-                throw new Error('[Perplexity] Central lyrics translation prompt is unavailable.');
+                throw new Error('[Perplexity] Central lyrics prompt is unavailable.');
             }
             const parseLines = rawResponse => parseTextLines(rawResponse, sourceLines);
 
@@ -1055,12 +715,15 @@ ${JSON.stringify(payload)}`;
             }
         },
 
-        async generateCharacterPronunciation({ lines, lang = 'ko', sourceLang = 'auto', unitMode = 'char' }) {
+        async generateCharacterPronunciation({ lines, characterPronunciationPrompt }) {
             if (!Array.isArray(lines) || lines.length === 0) {
                 throw new Error('No lines provided');
             }
 
-            const prompt = buildCharacterPronunciationPrompt(lines, lang, sourceLang, unitMode);
+            const prompt = characterPronunciationPrompt;
+            if (!prompt) {
+                throw new Error('[Perplexity] Central character pronunciation prompt is unavailable.');
+            }
             const result = await callPerplexityAPI(prompt);
             if (!result || !(Array.isArray(result.l) || Array.isArray(result.lines))) {
                 throw new Error('Invalid character pronunciation response');
@@ -1068,12 +731,15 @@ ${JSON.stringify(payload)}`;
             return result;
         },
 
-        async translateMetadata({ title, artist, lang }) {
+        async translateMetadata({ title, artist, metadataPrompt }) {
             if (!title || !artist) {
                 throw new Error('Title and artist are required');
             }
 
-            const prompt = buildMetadataPrompt(title, artist, lang);
+            const prompt = metadataPrompt;
+            if (!prompt) {
+                throw new Error('[Perplexity] Central metadata translation prompt is unavailable.');
+            }
             const result = await callPerplexityAPI(prompt);
 
             return {
@@ -1088,12 +754,15 @@ ${JSON.stringify(payload)}`;
             };
         },
 
-        async generateTMI({ title, artist, lang }) {
+        async generateTMI({ title, artist, tmiPrompt }) {
             if (!title || !artist) {
                 throw new Error('Title and artist are required');
             }
 
-            const prompt = buildTMIPrompt(title, artist, lang);
+            const prompt = tmiPrompt;
+            if (!prompt) {
+                throw new Error('[Perplexity] Central TMI prompt is unavailable.');
+            }
             return await callPerplexityAPI(prompt);
         },
 
@@ -1102,7 +771,10 @@ ${JSON.stringify(payload)}`;
                 throw new Error('No lyrics lines provided');
             }
 
-            const prompt = buildLyricsStudyPrompt(params);
+            const prompt = params.lyricsStudyPrompt;
+            if (!prompt) {
+                throw new Error('[Perplexity] Central lyrics study prompt is unavailable.');
+            }
             return await callPerplexityAPI(prompt);
         }
     };
