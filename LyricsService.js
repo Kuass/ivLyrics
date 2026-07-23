@@ -288,6 +288,36 @@
         return Number.isFinite(num) && num > 0 ? num : 0;
     };
 
+    const isSpotifyAutomixPlayback = () => {
+        const itemMetadata = Spicetify.Player?.data?.item?.metadata || {};
+        const contextMetadata = Spicetify.Player?.data?.context?.metadata || {};
+        const itemProductType = String(itemMetadata.agentic_product_type || "").trim().toLowerCase();
+        const contextProductType = String(contextMetadata.agentic_product_type || "").trim().toLowerCase();
+        const itemAutomixMode = String(itemMetadata["audio.automix_mode"] || "").trim().toLowerCase();
+        const contextAutomixMode = String(contextMetadata["automix.mode"] || "").trim().toLowerCase();
+        const lexiconSetType = String(contextMetadata.lexicon_set_type || "").trim().toLowerCase();
+        const mixerEnabled = String(contextMetadata.mixer_enabled || "").trim().toLowerCase();
+
+        return (
+            itemProductType === "dj" ||
+            contextProductType === "dj" ||
+            lexiconSetType === "your_dj" ||
+            (itemAutomixMode && itemAutomixMode !== "off" && itemAutomixMode !== "none") ||
+            (contextAutomixMode && contextAutomixMode !== "off" && contextAutomixMode !== "none") ||
+            mixerEnabled === "true"
+        );
+    };
+
+    const getSongChangeProgressCorrection = (rawProgress) => {
+        if (isSpotifyAutomixPlayback()) {
+            return 0;
+        }
+
+        return rawProgress >= IVLYRICS_PROGRESS_CORRECTION_THRESHOLD_MS
+            ? rawProgress
+            : 0;
+    };
+
     const ensurePlaybackProgressGuard = () => {
         if (window[IVLYRICS_PROGRESS_GUARD_KEY]) {
             return window[IVLYRICS_PROGRESS_GUARD_KEY];
@@ -320,10 +350,7 @@
 
                 this.currentUri = uri;
                 this.songChangeAt = now;
-                this.correctionMs =
-                    rawProgress >= IVLYRICS_PROGRESS_CORRECTION_THRESHOLD_MS
-                        ? rawProgress
-                        : 0;
+                this.correctionMs = getSongChangeProgressCorrection(rawProgress);
                 this.lastRawProgress = rawProgress;
                 this.lastAdjustedProgress = Math.max(0, rawProgress - this.correctionMs);
                 this.lastSampleAt = now;
@@ -352,10 +379,7 @@
                 if (uri !== this.currentUri) {
                     this.currentUri = uri;
                     this.songChangeAt = now;
-                    this.correctionMs =
-                        rawProgress >= IVLYRICS_PROGRESS_CORRECTION_THRESHOLD_MS
-                            ? rawProgress
-                            : 0;
+                    this.correctionMs = getSongChangeProgressCorrection(rawProgress);
                     this.lastRawProgress = rawProgress;
                     this.lastAdjustedProgress = Math.max(0, rawProgress - this.correctionMs);
                     this.lastSampleAt = now;
