@@ -1808,8 +1808,8 @@ window.LANG_KO = {
   },
   "generationStatus": {
     "complete": "완료!",
-    "culturalAnnotations": "문화적 배경 설명",
-    "culturalAnnotationsLoading": "문화적 배경을 분석하는 중..."
+    "culturalAnnotations": "문화적 설명",
+    "culturalAnnotationsLoading": "문화적 설명을 생성하는 중..."
   },
   "videoBackground": {
     "loading": "동영상 정보를 불러오는 중...",

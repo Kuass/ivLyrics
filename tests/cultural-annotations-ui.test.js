@@ -31,6 +31,8 @@ test('cultural annotations are default-off and wired into lyrics rendering', () 
     assert.match(indexSource, /"cultural-annotations-font-weight":\s*StorageManager\.getItem\([\s\S]*?\) \|\|\s*"300"/);
     assert.match(indexSource, /"cultural-annotations-opacity":\s*StorageManager\.getItem\([\s\S]*?\) \|\| "60"/);
     assert.match(indexSource, /Translator\.generateCulturalAnnotations/);
+    assert.match(indexSource, /startCulturalAnnotationsLoading\(\{\s*label: culturalAnnotationLabel,\s*description: culturalAnnotationLoadingDescription,/);
+    assert.doesNotMatch(indexSource, /label:\s*providerLabel/);
     assert.match(indexSource, /applyCulturalAnnotations\(processedLyrics, this\.state\.uri\)/);
     assert.match(pagesSource, /LyricsLine-culturalNote/);
     assert.match(pagesSource, /lyrics-cultural-marker/);
@@ -101,4 +103,19 @@ test('every bundled language includes cultural annotation settings and status co
         assert.ok(language?.notifications?.culturalAnnotationsRegenerateFailed, file);
         assert.ok(language?.menu?.regenerateTranslationOptionsSubtitle, file);
     }
+});
+
+test('Korean cultural annotation loading copy uses the generation pill label', () => {
+    const context = { window: {} };
+    vm.runInNewContext(
+        fs.readFileSync(path.join(ROOT, 'langs', 'LangKo.js'), 'utf8'),
+        context,
+        { filename: 'LangKo.js' }
+    );
+
+    assert.equal(context.window.LANG_KO.generationStatus.culturalAnnotations, '문화적 설명');
+    assert.equal(
+        context.window.LANG_KO.generationStatus.culturalAnnotationsLoading,
+        '문화적 설명을 생성하는 중...'
+    );
 });

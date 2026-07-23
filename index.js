@@ -4679,7 +4679,15 @@ class LyricsContainer extends react.Component {
     }
 
     const requestEpoch = this._culturalAnnotationCacheEpoch;
-    const loadingToken = this.startCulturalAnnotationsLoading();
+    const culturalAnnotationLabel =
+      I18n.t("generationStatus.culturalAnnotations") || "문화적 설명";
+    const culturalAnnotationLoadingDescription =
+      I18n.t("generationStatus.culturalAnnotationsLoading") ||
+      "문화적 설명을 생성하는 중...";
+    const loadingToken = this.startCulturalAnnotationsLoading({
+      label: culturalAnnotationLabel,
+      description: culturalAnnotationLoadingDescription,
+    });
     let completed = false;
     const request = window.Translator.generateCulturalAnnotations({
       trackId: Utils.extractTrackId(uri) || uri,
@@ -4693,8 +4701,7 @@ class LyricsContainer extends react.Component {
         const providerLabel = String(providerName || providerId || "").trim();
         if (!providerLabel) return;
         this.updateGenerationRequestLoading("cultural-annotations", {
-          label: providerLabel,
-          description: `${I18n.t("generationStatus.culturalAnnotationsLoading") || "문화적 배경을 분석하는 중..."}: ${providerLabel}`,
+          description: `${culturalAnnotationLoadingDescription}: ${providerLabel}`,
         });
       },
     }).then((result) => {
@@ -5248,8 +5255,8 @@ class LyricsContainer extends react.Component {
     this.clearGenerationRequestLoading("translation", token, options);
   }
 
-  startCulturalAnnotationsLoading() {
-    return this.startGenerationRequestLoading("cultural-annotations");
+  startCulturalAnnotationsLoading(details = {}) {
+    return this.startGenerationRequestLoading("cultural-annotations", details);
   }
 
   clearCulturalAnnotationsLoading(token = null, options = {}) {
@@ -9110,8 +9117,8 @@ class LyricsContainer extends react.Component {
       },
       {
         key: "cultural-annotations",
-        label: I18n.t("generationStatus.culturalAnnotations") || "문화적 배경 설명",
-        description: I18n.t("generationStatus.culturalAnnotationsLoading") || "문화적 배경을 분석하는 중...",
+        label: I18n.t("generationStatus.culturalAnnotations") || "문화적 설명",
+        description: I18n.t("generationStatus.culturalAnnotationsLoading") || "문화적 설명을 생성하는 중...",
       },
       {
         key: "video-background",
