@@ -282,41 +282,10 @@
     const IVLYRICS_PROGRESS_GUARD_KEY = "__ivLyricsPlaybackProgressGuard";
     const IVLYRICS_PROGRESS_CORRECTION_THRESHOLD_MS = 350;
     const IVLYRICS_PROGRESS_DISCONTINUITY_THRESHOLD_MS = 1500;
-    const IVLYRICS_AUTOMIX_HANDOFF_WINDOW_MS = 15000;
 
     const clampPlayerProgress = (value) => {
         const num = Number(value);
         return Number.isFinite(num) && num > 0 ? num : 0;
-    };
-
-    const parsePlaybackMetadataMs = (value) => {
-        const num = Number(value);
-        return Number.isFinite(num) && num > 0 ? num : 0;
-    };
-
-    const getCurrentAutomixPlaybackState = () => {
-        const itemMetadata = Spicetify.Player?.data?.item?.metadata || {};
-        const contextMetadata = Spicetify.Player?.data?.context?.metadata || {};
-        const itemProductType = String(itemMetadata.agentic_product_type || "").trim().toLowerCase();
-        const contextProductType = String(contextMetadata.agentic_product_type || "").trim().toLowerCase();
-        const itemAutomixMode = String(itemMetadata["audio.automix_mode"] || "").trim().toLowerCase();
-        const contextAutomixMode = String(contextMetadata["automix.mode"] || "").trim().toLowerCase();
-        const lexiconSetType = String(contextMetadata.lexicon_set_type || "").trim().toLowerCase();
-        const mixerEnabled = String(contextMetadata.mixer_enabled || "").trim().toLowerCase();
-        const enabled =
-            itemProductType === "dj" ||
-            contextProductType === "dj" ||
-            lexiconSetType === "your_dj" ||
-            (itemAutomixMode && itemAutomixMode !== "off" && itemAutomixMode !== "none") ||
-            (contextAutomixMode && contextAutomixMode !== "off" && contextAutomixMode !== "none") ||
-            mixerEnabled === "true";
-
-        return {
-            enabled,
-            fadeInStartMs: parsePlaybackMetadataMs(itemMetadata["audio.fade_in_start_time"]),
-            fadeInCueMs: parsePlaybackMetadataMs(itemMetadata["automix.fade_in_cuepoint.position"]),
-            fadeOverlapMs: parsePlaybackMetadataMs(itemMetadata["audio.fade_overlap"])
-        };
     };
 
     const ensurePlaybackProgressGuard = () => {
@@ -331,73 +300,33 @@
             songChangeAt: 0,
             lastRawProgress: 0,
             lastAdjustedProgress: 0,
-            lastLyricsProgress: 0,
             lastSampleAt: 0,
-            lastPaused: true,
-            automixHandoffPending: false,
-            automixTargetOffsetMs: 0,
-            lyricsTimelineOffsetMs: 0,
-            currentAutomixFadeOverlapMs: 0,
             applyCurrentState() {
                 const uri = Spicetify.Player?.data?.item?.uri || "";
                 const rawProgress = clampPlayerProgress(Spicetify.Player?.getProgress?.());
                 const now = performance.now();
-                const automixState = getCurrentAutomixPlaybackState();
-                const lyricsTimelineOffsetMs = automixState.enabled
-                    ? Math.max(automixState.fadeInStartMs, automixState.fadeInCueMs)
-                    : 0;
 
                 this.currentUri = uri;
                 this.songChangeAt = now;
                 this.correctionMs = 0;
                 this.lastRawProgress = rawProgress;
                 this.lastAdjustedProgress = rawProgress;
-                this.lastLyricsProgress = rawProgress + lyricsTimelineOffsetMs;
                 this.lastSampleAt = now;
-                this.lastPaused = Spicetify.Player?.data?.isPaused === true;
-                this.automixHandoffPending = false;
-                this.automixTargetOffsetMs = lyricsTimelineOffsetMs;
-                this.lyricsTimelineOffsetMs = lyricsTimelineOffsetMs;
-                this.currentAutomixFadeOverlapMs = automixState.fadeOverlapMs;
             },
             applySongChangeState() {
-                const previousUri = this.currentUri;
-                const previousFadeOverlapMs = this.currentAutomixFadeOverlapMs;
                 const uri = Spicetify.Player?.data?.item?.uri || "";
                 const rawProgress = clampPlayerProgress(Spicetify.Player?.getProgress?.());
                 const now = performance.now();
-                const automixState = getCurrentAutomixPlaybackState();
-                const automixTargetOffsetMs = automixState.enabled
-                    ? Math.max(
-                        automixState.fadeInCueMs,
-                        automixState.fadeInStartMs + previousFadeOverlapMs
-                    )
-                    : 0;
-                const followsDjMediaSegment = previousUri.startsWith("spotify:media:");
-                const handoffPending =
-                    automixState.enabled &&
-                    !followsDjMediaSegment &&
-                    automixTargetOffsetMs > automixState.fadeInStartMs;
-                const lyricsTimelineOffsetMs = handoffPending
-                    ? automixState.fadeInStartMs
-                    : automixTargetOffsetMs;
 
                 this.currentUri = uri;
                 this.songChangeAt = now;
                 this.correctionMs =
-                    !automixState.enabled &&
                     rawProgress >= IVLYRICS_PROGRESS_CORRECTION_THRESHOLD_MS
                         ? rawProgress
                         : 0;
                 this.lastRawProgress = rawProgress;
                 this.lastAdjustedProgress = Math.max(0, rawProgress - this.correctionMs);
-                this.lastLyricsProgress = this.lastAdjustedProgress + lyricsTimelineOffsetMs;
                 this.lastSampleAt = now;
-                this.lastPaused = Spicetify.Player?.data?.isPaused === true;
-                this.automixHandoffPending = handoffPending;
-                this.automixTargetOffsetMs = automixTargetOffsetMs;
-                this.lyricsTimelineOffsetMs = lyricsTimelineOffsetMs;
-                this.currentAutomixFadeOverlapMs = automixState.fadeOverlapMs;
             },
             ensureInitialized() {
                 if (this.initialized || typeof Spicetify.Player?.addEventListener !== "function") {
@@ -413,7 +342,7 @@
             clearCorrection() {
                 this.correctionMs = 0;
             },
-            getAdjustedProgress(forLyrics = false) {
+            getAdjustedProgress() {
                 this.ensureInitialized();
 
                 const uri = Spicetify.Player?.data?.item?.uri || "";
@@ -421,59 +350,31 @@
                 const now = performance.now();
 
                 if (uri !== this.currentUri) {
-                    this.applySongChangeState();
-                    return forLyrics ? this.lastLyricsProgress : this.lastAdjustedProgress;
+                    this.currentUri = uri;
+                    this.songChangeAt = now;
+                    this.correctionMs =
+                        rawProgress >= IVLYRICS_PROGRESS_CORRECTION_THRESHOLD_MS
+                            ? rawProgress
+                            : 0;
+                    this.lastRawProgress = rawProgress;
+                    this.lastAdjustedProgress = Math.max(0, rawProgress - this.correctionMs);
+                    this.lastSampleAt = now;
+                    return this.lastAdjustedProgress;
                 }
 
-                const paused = Spicetify.Player?.data?.isPaused === true;
                 if (this.lastSampleAt > 0) {
                     const elapsedMs = Math.max(0, now - this.lastSampleAt);
-                    const expectedElapsedMs = !paused && !this.lastPaused ? elapsedMs : 0;
-                    const driftMs = rawProgress - this.lastRawProgress - expectedElapsedMs;
-                    const withinAutomixHandoff =
-                        this.automixHandoffPending &&
-                        now - this.songChangeAt <= IVLYRICS_AUTOMIX_HANDOFF_WINDOW_MS;
-
-                    if (
-                        withinAutomixHandoff &&
-                        driftMs <= -IVLYRICS_PROGRESS_DISCONTINUITY_THRESHOLD_MS
-                    ) {
-                        const continuityOffsetMs = Math.max(
-                            0,
-                            this.lastLyricsProgress + expectedElapsedMs - rawProgress
-                        );
-                        this.correctionMs = 0;
-                        this.lyricsTimelineOffsetMs = Math.max(
-                            this.automixTargetOffsetMs,
-                            continuityOffsetMs
-                        );
-                        this.automixHandoffPending = false;
-                    } else if (Math.abs(driftMs) >= IVLYRICS_PROGRESS_DISCONTINUITY_THRESHOLD_MS) {
+                    const driftMs = rawProgress - this.lastRawProgress - elapsedMs;
+                    if (Math.abs(driftMs) >= IVLYRICS_PROGRESS_DISCONTINUITY_THRESHOLD_MS) {
                         this.clearCorrection();
                     }
                 }
 
-                if (
-                    this.automixHandoffPending &&
-                    now - this.songChangeAt > IVLYRICS_AUTOMIX_HANDOFF_WINDOW_MS
-                ) {
-                    this.lyricsTimelineOffsetMs = Math.max(
-                        this.lyricsTimelineOffsetMs,
-                        this.automixTargetOffsetMs
-                    );
-                    this.automixHandoffPending = false;
-                }
-
                 const adjustedProgress = Math.max(0, rawProgress - this.correctionMs);
-                const lyricsProgress = Math.max(0, adjustedProgress + this.lyricsTimelineOffsetMs);
-                const automixState = getCurrentAutomixPlaybackState();
                 this.lastRawProgress = rawProgress;
                 this.lastAdjustedProgress = adjustedProgress;
-                this.lastLyricsProgress = lyricsProgress;
                 this.lastSampleAt = now;
-                this.lastPaused = paused;
-                this.currentAutomixFadeOverlapMs = automixState.fadeOverlapMs;
-                return forLyrics ? lyricsProgress : adjustedProgress;
+                return adjustedProgress;
             }
         };
 
@@ -495,10 +396,6 @@
 
         getSafePlayerProgress() {
             return ensurePlaybackProgressGuard().getAdjustedProgress();
-        },
-
-        getLyricsPlayerProgress() {
-            return ensurePlaybackProgressGuard().getAdjustedProgress(true);
         },
 
         clearSafePlayerProgressCorrection() {
@@ -9122,10 +9019,9 @@
 
                 this._isSendingProgress = true;
                 try {
-                    const playbackPosition = Utils.getSafePlayerProgress() || 0;
-                    const position = Utils.getLyricsPlayerProgress() || 0;
+                    const position = Utils.getSafePlayerProgress() || 0;
                     const duration = Spicetify.Player.getDuration() || 0;
-                    const remaining = (duration - playbackPosition) / 1000;
+                    const remaining = (duration - position) / 1000;
 
                     // 현재 트랙 정보 (트랙 변경 감지용)
                     let currentTrack = null;
@@ -9803,10 +9699,9 @@
 
                     this._isSendingProgress = true;
                     try {
-                        const playbackPosition = Utils.getSafePlayerProgress() || 0;
-                        const position = Utils.getLyricsPlayerProgress() || 0;
+                        const position = Utils.getSafePlayerProgress() || 0;
                         const duration = Spicetify.Player.getDuration() || 0;
-                        const remaining = (duration - playbackPosition) / 1000;
+                        const remaining = (duration - position) / 1000;
 
                         let currentTrack = null;
                         const currentUri = Spicetify.Player.data?.item?.uri;

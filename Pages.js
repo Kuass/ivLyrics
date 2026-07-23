@@ -1908,8 +1908,7 @@ const getTrackPositionFPS = () => {
 const getPositionQuantizeMs = () => Math.max(1, Math.round(1000 / getTrackPositionFPS()));
 
 const getCurrentLyricsPlaybackPosition = (trackOffset = 0, globalOffset = getGlobalSyncOffsetValue()) => {
-	const newPos = window.Utils?.getLyricsPlayerProgress?.()
-		?? window.Utils?.getSafePlayerProgress?.()
+	const newPos = window.Utils?.getSafePlayerProgress?.()
 		?? (Spicetify.Player?.getProgress?.() || 0);
 	const delay = CONFIG.visual.delay + trackOffset + globalOffset;
 	const quantizeMs = getPositionQuantizeMs();
