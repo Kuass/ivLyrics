@@ -222,7 +222,6 @@ const calculateDismissible = (notice) => {
 };
 
 const NoticeSystem = (() => {
-    let cachedNotices = null;
     let isFetching = false;
     let fetchPromise = null;
 
@@ -264,7 +263,6 @@ const NoticeSystem = (() => {
                 }
 
                 const data = await response.json();
-                cachedNotices = data;
                 return data;
         } catch (error) {
             console.error("[NoticeSystem] Failed to fetch notices:", error);
