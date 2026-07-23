@@ -8229,6 +8229,32 @@ html.is-lp-view-exit::view-transition-new(root) {
   line-height: 1.35;
 }
 
+.fullscreen-vinyl-overlay.has-cultural-annotation .fullscreen-vinyl-lyric-stage {
+  min-height: clamp(126px, 17svh, 188px);
+}
+
+.fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-culturalNote {
+  width: min(92%, 900px);
+  max-width: min(92%, 900px);
+  margin: 7px auto 0;
+  overflow: visible;
+  color: var(--lyrics-color-active, var(--spice-text, #fff));
+  font-family: var(--iv-vinyl-cultural-note-font-family, 'Pretendard Variable'), Pretendard, sans-serif !important;
+  font-size: var(--iv-vinyl-cultural-note-font-size, 12px) !important;
+  font-weight: var(--iv-vinyl-cultural-note-font-weight, 300) !important;
+  line-height: 1.4;
+  text-align: center !important;
+  text-overflow: clip;
+  white-space: normal;
+  opacity: var(--iv-vinyl-cultural-note-opacity, 0.6) !important;
+  transform: none;
+}
+
+.fullscreen-vinyl-active-lyric .lyrics-cultural-marker {
+  font-size: 0.42em;
+  opacity: 0.76;
+}
+
 .fullscreen-vinyl-active-lyric .lyrics-karaoke-line,
 .fullscreen-vinyl-active-lyric .lyrics-karaoke-stack,
 .fullscreen-vinyl-active-lyric .lyrics-karaoke-part {

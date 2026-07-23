@@ -145,7 +145,7 @@ window.LANG_CS = {
     },
     "culturalAnnotations": {
       "label": "Vysvětlení kulturního kontextu",
-      "desc": "Zobrazí vysvětlení vytvořené AI pouze pod řádky, u nichž by se kulturní kontext v překladu ztratil. Použije cílový jazyk překladu. Zobrazuje se jen na běžné stránce textu a v běžném zobrazení na celou obrazovku, nikoli v režimu LP ani v panelu právě přehrávané skladby.",
+      "desc": "Zobrazí vysvětlení vytvořené AI pouze pod řádky, u nichž by se kulturní kontext v překladu ztratil. Použije cílový jazyk překladu. Zobrazuje se na běžné stránce textu, v běžném zobrazení na celou obrazovku a v režimu LP, nikoli v panelu právě přehrávané skladby.",
       "fontFamily": { "label": "Písmo vysvětlení", "desc": "Vyberte písmo pro kulturní vysvětlení." },
       "fontSize": { "label": "Velikost písma vysvětlení", "desc": "Nastavte velikost textu vysvětlení." },
       "fontWeight": { "label": "Tloušťka písma vysvětlení", "desc": "Nastavte tloušťku textu vysvětlení." },

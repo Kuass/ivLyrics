@@ -145,7 +145,7 @@ window.LANG_DE = {
     },
     "culturalAnnotations": {
       "label": "Kulturellen Kontext erklären",
-      "desc": "Zeigt KI-Erklärungen nur unter Liedzeilen, deren kultureller Hintergrund bei einer Übersetzung verloren ginge. Verwendet die Zielsprache der Übersetzung. Wird nur auf der normalen Liedtextseite und im regulären Vollbild angezeigt, nicht im LP-Modus oder im „Aktueller Titel“-Panel.",
+      "desc": "Zeigt KI-Erklärungen nur unter Liedzeilen, deren kultureller Hintergrund bei einer Übersetzung verloren ginge. Verwendet die Zielsprache der Übersetzung. Wird auf der normalen Liedtextseite, im regulären Vollbild und im LP-Modus angezeigt, nicht im „Aktueller Titel“-Panel.",
       "fontFamily": { "label": "Schriftart der Erklärung", "desc": "Schriftart für kulturelle Erklärungen auswählen." },
       "fontSize": { "label": "Schriftgröße der Erklärung", "desc": "Größe des Erklärungstextes einstellen." },
       "fontWeight": { "label": "Schriftstärke der Erklärung", "desc": "Stärke des Erklärungstextes einstellen." },

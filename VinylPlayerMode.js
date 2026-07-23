@@ -1104,6 +1104,11 @@ const VinylPlayerMode = (() => {
         // record stay on displayedTrack until their replacement animation ends.
         const displayedLyric = liveLyricSnapshot;
         const hasVisibleLyric = lyricsEnabled && !!displayedLyric;
+        const displayedSourceLine = displayedLyric?.lyrics?.[displayedLyric.activeLineIndex];
+        const hasVisibleCulturalAnnotation =
+            Array.isArray(displayedSourceLine?.culturalNote)
+                ? displayedSourceLine.culturalNote.length > 0
+                : !!displayedSourceLine?.culturalNote;
 
         const renderLyricLayer = (snapshot) => {
             if (!snapshot) return null;
@@ -1139,7 +1144,8 @@ const VinylPlayerMode = (() => {
                 animationsEnabled ? "" : "is-motion-disabled",
                 transitionClass,
                 lyricsEnabled ? "has-lyric-slot" : "",
-                hasVisibleLyric ? "has-active-lyric" : ""
+                hasVisibleLyric ? "has-active-lyric" : "",
+                hasVisibleCulturalAnnotation ? "has-cultural-annotation" : ""
             ].filter(Boolean).join(" "),
             role: "dialog",
             "aria-modal": "true",
@@ -1161,7 +1167,11 @@ const VinylPlayerMode = (() => {
                 "--iv-vinyl-translation-font-weight": Number(vinylSettings.translationFontWeight) || 300,
                 "--iv-vinyl-translation-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.translationOpacity) || 85) / 100)),
                 "--iv-vinyl-translation-spacing": `${Number(vinylSettings.translationSpacing) || 0}px`,
-                "--iv-vinyl-translation-letter-spacing": `${Number(vinylSettings.translationLetterSpacing) || 0}px`
+                "--iv-vinyl-translation-letter-spacing": `${Number(vinylSettings.translationLetterSpacing) || 0}px`,
+                "--iv-vinyl-cultural-note-font-family": `'${String(vinylSettings.culturalFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
+                "--iv-vinyl-cultural-note-font-size": `${Number(vinylSettings.culturalFontSize) || 12}px`,
+                "--iv-vinyl-cultural-note-font-weight": Number(vinylSettings.culturalFontWeight) || 300,
+                "--iv-vinyl-cultural-note-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.culturalOpacity) || 60) / 100))
             }
         },
             react.createElement(VinylPlayer, {
@@ -1193,6 +1203,10 @@ const VinylPlayerMode = (() => {
                     "--iv-vinyl-translation-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.translationOpacity) || 85) / 100)),
                     "--iv-vinyl-translation-spacing": `${Number(vinylSettings.translationSpacing) || 0}px`,
                     "--iv-vinyl-translation-letter-spacing": `${Number(vinylSettings.translationLetterSpacing) || 0}px`,
+                    "--iv-vinyl-cultural-note-font-family": `'${String(vinylSettings.culturalFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
+                    "--iv-vinyl-cultural-note-font-size": `${Number(vinylSettings.culturalFontSize) || 12}px`,
+                    "--iv-vinyl-cultural-note-font-weight": Number(vinylSettings.culturalFontWeight) || 300,
+                    "--iv-vinyl-cultural-note-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.culturalOpacity) || 60) / 100)),
                     "--iv-vinyl-accent": displayedTrack.accent
                 },
                 coverUrl: displayedTrack.coverUrl,

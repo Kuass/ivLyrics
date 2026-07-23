@@ -145,7 +145,7 @@ window.LANG_FR = {
     },
     "culturalAnnotations": {
       "label": "Explications du contexte culturel",
-      "desc": "Affiche des explications générées par IA uniquement sous les lignes dont le contexte culturel serait perdu à la traduction. Utilise la langue cible de traduction. Visible uniquement sur la page de paroles normale et en plein écran standard, pas en mode LP ni dans le panneau de lecture.",
+      "desc": "Affiche des explications générées par IA uniquement sous les lignes dont le contexte culturel serait perdu à la traduction. Utilise la langue cible de traduction. Visible sur la page de paroles normale, en plein écran standard et en mode LP, mais pas dans le panneau de lecture.",
       "fontFamily": { "label": "Police des explications", "desc": "Choisissez la police des explications culturelles." },
       "fontSize": { "label": "Taille des explications", "desc": "Réglez la taille du texte explicatif." },
       "fontWeight": { "label": "Graisse des explications", "desc": "Réglez la graisse du texte explicatif." },

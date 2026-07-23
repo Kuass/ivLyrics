@@ -145,7 +145,7 @@ window.LANG_MS = {
     },
     "culturalAnnotations": {
       "label": "Penjelasan konteks budaya",
-      "desc": "Memaparkan penjelasan janaan AI hanya di bawah baris lirik yang latar budayanya akan hilang dalam terjemahan. Menggunakan bahasa sasaran terjemahan. Hanya dipaparkan pada halaman lirik biasa dan skrin penuh biasa, bukan dalam mod LP atau Panel Lirik.",
+      "desc": "Memaparkan penjelasan janaan AI hanya di bawah baris lirik yang latar budayanya akan hilang dalam terjemahan. Menggunakan bahasa sasaran terjemahan. Dipaparkan pada halaman lirik biasa, skrin penuh biasa dan mod LP, tetapi bukan dalam Panel Lirik.",
       "fontFamily": { "label": "Fon penjelasan", "desc": "Pilih fon untuk penjelasan konteks budaya." },
       "fontSize": { "label": "Saiz fon penjelasan", "desc": "Laraskan saiz teks penjelasan." },
       "fontWeight": { "label": "Ketebalan fon penjelasan", "desc": "Laraskan ketebalan teks penjelasan." },

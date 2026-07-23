@@ -145,7 +145,7 @@ window.LANG_SV = {
     },
     "culturalAnnotations": {
       "label": "Förklaringar av kulturell kontext",
-      "desc": "Visar AI-genererade förklaringar endast under textrader vars kulturella bakgrund annars skulle gå förlorad i översättningen. Använder översättningens målspråk. Visas bara på den vanliga textsidan och i vanligt helskärmsläge, inte i LP-läge eller paneltexter.",
+      "desc": "Visar AI-genererade förklaringar endast under textrader vars kulturella bakgrund annars skulle gå förlorad i översättningen. Använder översättningens målspråk. Visas på den vanliga textsidan, i vanligt helskärmsläge och i LP-läge, men inte i paneltexter.",
       "fontFamily": { "label": "Förklaringens typsnitt", "desc": "Välj typsnitt för förklaringar av kulturell kontext." },
       "fontSize": { "label": "Förklaringens textstorlek", "desc": "Justera storleken på förklaringstexten." },
       "fontWeight": { "label": "Förklaringens teckenvikt", "desc": "Justera vikten på förklaringstexten." },

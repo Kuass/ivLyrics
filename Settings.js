@@ -1667,6 +1667,7 @@ const AIProvidersTab = () => {
     const value = CONFIG.visual["cultural-annotations-enabled"];
     return value === true || value === "true";
   };
+  const vinylModeLabel = I18n.t("vinyl.mode") || "LP";
 
   useEffect(() => {
     let retryTimer = null;
@@ -1858,6 +1859,43 @@ const AIProvidersTab = () => {
             desc: I18n.t("settings.culturalAnnotations.opacity.label"),
             key: "cultural-annotations-opacity",
             info: I18n.t("settings.culturalAnnotations.opacity.desc"),
+            type: ConfigSliderRange,
+            min: 20,
+            max: 100,
+            step: 1,
+            unit: "%",
+            when: () => areCulturalAnnotationsEnabled(),
+          },
+          {
+            desc: `${vinylModeLabel} · ${I18n.t("settings.culturalAnnotations.fontFamily.label")}`,
+            key: "cultural-annotations-vinyl-font-family",
+            info: `${vinylModeLabel}: ${I18n.t("settings.culturalAnnotations.fontFamily.desc")}`,
+            type: ConfigFontSelector,
+            defaultValue: CONFIG.visual["cultural-annotations-vinyl-font-family"] || "Pretendard Variable",
+            when: () => areCulturalAnnotationsEnabled(),
+          },
+          {
+            desc: `${vinylModeLabel} · ${I18n.t("settings.culturalAnnotations.fontSize.label")}`,
+            key: "cultural-annotations-vinyl-font-size",
+            info: `${vinylModeLabel}: ${I18n.t("settings.culturalAnnotations.fontSize.desc")}`,
+            type: ConfigSliderRange,
+            min: 10,
+            max: 32,
+            step: 1,
+            unit: "px",
+            when: () => areCulturalAnnotationsEnabled(),
+          },
+          {
+            desc: `${vinylModeLabel} · ${I18n.t("settings.culturalAnnotations.fontWeight.label")}`,
+            key: "cultural-annotations-vinyl-font-weight",
+            info: `${vinylModeLabel}: ${I18n.t("settings.culturalAnnotations.fontWeight.desc")}`,
+            type: ConfigFontWeightSlider,
+            when: () => areCulturalAnnotationsEnabled(),
+          },
+          {
+            desc: `${vinylModeLabel} · ${I18n.t("settings.culturalAnnotations.opacity.label")}`,
+            key: "cultural-annotations-vinyl-opacity",
+            info: `${vinylModeLabel}: ${I18n.t("settings.culturalAnnotations.opacity.desc")}`,
             type: ConfigSliderRange,
             min: 20,
             max: 100,

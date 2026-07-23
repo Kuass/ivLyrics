@@ -2430,7 +2430,11 @@ const FullscreenOverlay = (() => {
                     translationFontWeight: CONFIG?.visual?.["fullscreen-vinyl-translation-font-weight"] ?? 300,
                     translationOpacity: CONFIG?.visual?.["fullscreen-vinyl-translation-opacity"] ?? 85,
                     translationSpacing: CONFIG?.visual?.["fullscreen-vinyl-translation-spacing"] ?? 0,
-                    translationLetterSpacing: CONFIG?.visual?.["fullscreen-vinyl-translation-letter-spacing"] ?? 0
+                    translationLetterSpacing: CONFIG?.visual?.["fullscreen-vinyl-translation-letter-spacing"] ?? 0,
+                    culturalFontFamily: CONFIG?.visual?.["cultural-annotations-vinyl-font-family"] || "Pretendard Variable",
+                    culturalFontSize: CONFIG?.visual?.["cultural-annotations-vinyl-font-size"] ?? 12,
+                    culturalFontWeight: CONFIG?.visual?.["cultural-annotations-vinyl-font-weight"] ?? 300,
+                    culturalOpacity: CONFIG?.visual?.["cultural-annotations-vinyl-opacity"] ?? 60
                 },
                 onSeek: (nextPosition) => {
                     window.Utils?.clearSafePlayerProgressCorrection?.();

@@ -3764,9 +3764,9 @@ const LyricsLineBlock = react.memo(({
 		originalText,
 		text2: subText2,
   });
-	const displayedCulturalAnnotations = singleLineScroll
-		? []
-		: normalizeDisplayedCulturalAnnotations(culturalNote || mainLine?.culturalNote);
+	const displayedCulturalAnnotations = normalizeDisplayedCulturalAnnotations(
+		culturalNote || mainLine?.culturalNote
+	);
 	const culturalAnnotationsByTarget = {
 		main: [],
 		sub: [],
@@ -3888,7 +3888,7 @@ const LyricsLineBlock = react.memo(({
 			singleLineScroll,
 			culturalAnnotationsByTarget.sub2
 		),
-		!shouldRenderInterlude && !singleLineScroll &&
+		!shouldRenderInterlude &&
 			displayedCulturalAnnotations.map((annotation) => {
 				const noteText = `${annotation.marker}. ${annotation.note}`;
 				return renderLyricSubLine(

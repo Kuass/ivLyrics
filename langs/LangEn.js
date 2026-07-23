@@ -145,7 +145,7 @@ window.LANG_EN = {
     },
     "culturalAnnotations": {
       "label": "Cultural context explanations",
-      "desc": "Show AI-generated explanations only under lyric lines whose cultural background would otherwise be lost in translation. Uses the translation target language. Shown only on the normal lyrics page and regular fullscreen, not in LP mode or Panel Lyrics.",
+      "desc": "Show AI-generated explanations only under lyric lines whose cultural background would otherwise be lost in translation. Uses the translation target language. Shown on the normal lyrics page, regular fullscreen, and LP mode, but not in Panel Lyrics.",
       "fontFamily": { "label": "Explanation font", "desc": "Choose the font used for cultural context explanations." },
       "fontSize": { "label": "Explanation font size", "desc": "Adjust the size of the explanation text." },
       "fontWeight": { "label": "Explanation font weight", "desc": "Adjust the weight of the explanation text." },

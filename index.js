@@ -2084,6 +2084,9 @@ const CONFIG = {
     "cultural-annotations-font-family":
       StorageManager.getItem("ivLyrics:visual:cultural-annotations-font-family") ||
       "Pretendard Variable",
+    "cultural-annotations-vinyl-font-family":
+      StorageManager.getItem("ivLyrics:visual:cultural-annotations-vinyl-font-family") ||
+      "Pretendard Variable",
     "original-font-weight":
       StorageManager.getItem("ivLyrics:visual:original-font-weight") ||
       "600",
@@ -2101,6 +2104,12 @@ const CONFIG = {
     "cultural-annotations-font-size":
       StorageManager.getItem("ivLyrics:visual:cultural-annotations-font-size") ||
       "14",
+    "cultural-annotations-vinyl-font-weight":
+      StorageManager.getItem("ivLyrics:visual:cultural-annotations-vinyl-font-weight") ||
+      "300",
+    "cultural-annotations-vinyl-font-size":
+      StorageManager.getItem("ivLyrics:visual:cultural-annotations-vinyl-font-size") ||
+      "12",
     "translation-spacing":
       StorageManager.getItem("ivLyrics:visual:translation-spacing") || "0",
     "phonetic-font-weight":
@@ -2146,6 +2155,8 @@ const CONFIG = {
       StorageManager.getItem("ivLyrics:visual:translation-opacity") || "85",
     "cultural-annotations-opacity":
       StorageManager.getItem("ivLyrics:visual:cultural-annotations-opacity") || "60",
+    "cultural-annotations-vinyl-opacity":
+      StorageManager.getItem("ivLyrics:visual:cultural-annotations-vinyl-opacity") || "60",
     "translate:translated-lyrics-source":
       StorageManager.getItem(
         "ivLyrics:visual:translate:translated-lyrics-source"
@@ -2697,6 +2708,12 @@ CONFIG.visual["cultural-annotations-font-weight"] = Number.parseInt(
 CONFIG.visual["cultural-annotations-font-size"] = Number.parseInt(
   CONFIG.visual["cultural-annotations-font-size"]
 );
+CONFIG.visual["cultural-annotations-vinyl-font-weight"] = Number.parseInt(
+  CONFIG.visual["cultural-annotations-vinyl-font-weight"]
+);
+CONFIG.visual["cultural-annotations-vinyl-font-size"] = Number.parseInt(
+  CONFIG.visual["cultural-annotations-vinyl-font-size"]
+);
 CONFIG.visual["text-shadow-opacity"] = Number.parseInt(
   CONFIG.visual["text-shadow-opacity"]
 );
@@ -2711,6 +2728,9 @@ CONFIG.visual["translation-opacity"] = Number.parseInt(
 );
 CONFIG.visual["cultural-annotations-opacity"] = Number.parseInt(
   CONFIG.visual["cultural-annotations-opacity"]
+);
+CONFIG.visual["cultural-annotations-vinyl-opacity"] = Number.parseInt(
+  CONFIG.visual["cultural-annotations-vinyl-opacity"]
 );
 CONFIG.visual["background-brightness"] = Number.parseInt(
   CONFIG.visual["background-brightness"]
@@ -9669,6 +9689,7 @@ class LyricsContainer extends react.Component {
   addFonts(CONFIG.visual["phonetic-font-family"]);
   addFonts(CONFIG.visual["translation-font-family"]);
   addFonts(CONFIG.visual["cultural-annotations-font-family"]);
+  addFonts(CONFIG.visual["cultural-annotations-vinyl-font-family"]);
   addFonts(CONFIG.visual["instrumental-break-label-font-family"]);
   addFonts(CONFIG.visual["fullscreen-vinyl-original-font-family"]);
   addFonts(CONFIG.visual["fullscreen-vinyl-phonetic-font-family"]);
