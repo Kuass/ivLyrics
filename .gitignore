@@ -9,6 +9,4 @@ __pycache__/
 # Local test harnesses
 **/test/
 **/tests/*
-!tests/paxsenix-entity-decoding.test.js
-!tests/windows-updater-paths.test.ps1
-!tests/windows-spicetify-utf8-wrapper.test.js
+!tests/language-detection.test.js
