@@ -501,7 +501,13 @@ def ai_release_content(version, tag, previous, commits, stat_text):
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        timeout_seconds = int(os.environ.get("AI_TIMEOUT_SECONDS", "300"))
+    except ValueError:
+        timeout_seconds = 300
+    timeout_seconds = max(60, min(timeout_seconds, 900))
+
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             data = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace").strip()
@@ -586,9 +592,18 @@ def main():
     current_ref = resolve_ref(tag)
     stat_text = git_diff_stat(previous, current_ref)
     commits = release_commits(previous, current_ref)
-    content = ai_release_content(
-        version, tag, previous, commits, stat_text
-    ) or fallback_content(version, commits)
+    content = ai_release_content(version, tag, previous, commits, stat_text)
+    require_ai = os.environ.get("RELEASE_NOTES_REQUIRE_AI", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    if not content and require_ai:
+        raise RuntimeError(
+            "AI release-note generation did not return complete bilingual notes; "
+            "the release was stopped instead of publishing fallback statistics."
+        )
+    content = content or fallback_content(version, commits)
     title = normalize_title(content.get("title"))
     release_title = f"{version} - {title}"
     notes = render_notes(version, tag, previous, content)
