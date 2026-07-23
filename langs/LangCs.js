@@ -143,6 +143,10 @@ window.LANG_CS = {
         "auto": "Podle jazyka rozhraní"
       }
     },
+    "culturalAnnotations": {
+      "label": "Vysvětlení kulturního kontextu",
+      "desc": "Zobrazí vysvětlení vytvořené AI pouze pod řádky, u nichž by se kulturní kontext v překladu ztratil. Použije cílový jazyk překladu."
+    },
     "alignment": {
       "label": "Zarovnání",
       "desc": "Vyberte zarovnání textu písně",
@@ -445,7 +449,8 @@ window.LANG_CS = {
         "metadata": "Metadata",
         "tmi": "TMI",
         "lyricsStudy": "Učení",
-        "characterPronunciation": "Výslovnost znaků"
+        "characterPronunciation": "Výslovnost znaků",
+        "culturalAnnotations": "Kulturní kontext"
       },
       "noEnabledProviders": "Nejsou povoleni žádní poskytovatelé AI. Povolte v nastavení alespoň jednoho poskytovatele.",
       "allProvidersFailed": "Všem poskytovatelům AI se nepodařilo požadavek zpracovat.",
@@ -726,6 +731,7 @@ window.LANG_CS = {
     "button": "Upravit uloženou výslovnost / překlad"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "Vysvětlení kulturního kontextu se nepodařilo načíst.",
     "languageChanged": "Jazyk se změnil. Bude aplikováno po obnovení.",
     "settingsSaved": "Nastavení uloženo",
     "settingsReset": "Nastavení resetováno",
@@ -1795,7 +1801,9 @@ window.LANG_CS = {
     "label": "Lyrics Plus"
   },
   "generationStatus": {
-    "complete": "Hotovo!"
+    "complete": "Hotovo!",
+    "culturalAnnotations": "Vysvětlení kulturního kontextu",
+    "culturalAnnotationsLoading": "Analyzuje se kulturní kontext..."
   },
   "videoBackground": {
     "loading": "Načítání informací o videu...",

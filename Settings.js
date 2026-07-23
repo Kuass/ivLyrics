@@ -1213,6 +1213,9 @@ const AddonSettingsCard = ({ addon, isEnabled, onToggle, isExpanded, onExpandTog
     if (addon.supports?.characterPronunciation) {
       badges.push(react.createElement("span", { key: "characterPronunciation", className: "support-badge karaoke" }, I18n.t("settings.aiProviders.supports.characterPronunciation") || "글자 발음"));
     }
+    if (addon.supports?.culturalAnnotations) {
+      badges.push(react.createElement("span", { key: "culturalAnnotations", className: "support-badge unsynced" }, I18n.t("settings.aiProviders.supports.culturalAnnotations") || "문화 설명"));
+    }
     return badges;
   };
 
@@ -14616,6 +14619,13 @@ const ConfigModal = ({
                   I18n.getAvailableLanguages().map(language => [language.code, language.name])
                 ),
               },
+            },
+            {
+              desc: I18n.t("settings.culturalAnnotations.label"),
+              key: "cultural-annotations-enabled",
+              info: I18n.t("settings.culturalAnnotations.desc"),
+              type: ConfigSlider,
+              defaultValue: CONFIG.visual["cultural-annotations-enabled"] ?? false,
             },
           ],
           onChange: (name, value) => {

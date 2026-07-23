@@ -143,6 +143,10 @@ window.LANG_FA = {
         "auto": "خودکار"
       }
     },
+    "culturalAnnotations": {
+      "label": "توضیح زمینه فرهنگی",
+      "desc": "فقط زیر سطرهایی که پیش‌زمینه فرهنگی آن‌ها در ترجمه از بین می‌رود، توضیح تولیدشده با هوش مصنوعی نمایش می‌دهد. از زبان مقصد ترجمه استفاده می‌کند."
+    },
     "alignment": {
       "label": "تراز بندی",
       "desc": "موقعیت تراز متن آهنگ را انتخاب کنید",
@@ -445,7 +449,8 @@ window.LANG_FA = {
         "metadata": "متادیتا",
         "tmi": "TMI",
         "lyricsStudy": "یادگیری",
-        "characterPronunciation": "تلفظ حرف‌به‌حرف"
+        "characterPronunciation": "تلفظ حرف‌به‌حرف",
+        "culturalAnnotations": "زمینه فرهنگی"
       },
       "noEnabledProviders": "هیچ ارائه دهنده هوش مصنوعی فعال نیست. لطفاً حداقل یک ارائه دهنده را در تنظیمات فعال کنید.",
       "allProvidersFailed": "همه ارائه دهندگان هوش مصنوعی در پردازش درخواست ناموفق بودند.",
@@ -726,6 +731,7 @@ window.LANG_FA = {
     "button": "ویرایش آوانویسی / ترجمه ذخیره‌شده"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "توضیح زمینه فرهنگی بارگیری نشد.",
     "languageChanged": "زبان تغییر کرد. پس از رفرش اعمال می‌شود.",
     "settingsSaved": "تنظیمات ذخیره شد",
     "settingsReset": "تنظیمات بازنشانی شد",
@@ -1795,7 +1801,9 @@ window.LANG_FA = {
     "label": "متن آهنگ پلاس"
   },
   "generationStatus": {
-    "complete": "انجام شد!"
+    "complete": "انجام شد!",
+    "culturalAnnotations": "توضیح زمینه فرهنگی",
+    "culturalAnnotationsLoading": "در حال تحلیل زمینه فرهنگی..."
   },
   "videoBackground": {
     "loading": "در حال بارگذاری اطلاعات ویدیو...",

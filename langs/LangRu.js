@@ -143,6 +143,10 @@ window.LANG_RU = {
         "auto": "Авто"
       }
     },
+    "culturalAnnotations": {
+      "label": "Пояснения культурного контекста",
+      "desc": "Показывает пояснения от ИИ только под строками, культурный фон которых теряется при переводе. Использует целевой язык перевода."
+    },
     "alignment": {
       "label": "Выравнивание",
       "desc": "Выберите положение текста песни",
@@ -445,7 +449,8 @@ window.LANG_RU = {
         "metadata": "Метаданные",
         "tmi": "TMI",
         "lyricsStudy": "Обучение",
-        "characterPronunciation": "Произношение по символам"
+        "characterPronunciation": "Произношение по символам",
+        "culturalAnnotations": "Культурный контекст"
       },
       "noEnabledProviders": "AI-провайдеры не включены. Пожалуйста, включите хотя бы одного провайдера в настройках.",
       "allProvidersFailed": "Все AI-провайдеры не смогли обработать запрос.",
@@ -726,6 +731,7 @@ window.LANG_RU = {
     "button": "Редактировать сохраненные произношение / перевод"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "Не удалось загрузить пояснения культурного контекста.",
     "languageChanged": "Язык изменен. Обновите страницу для применения.",
     "settingsSaved": "Настройки сохранены",
     "settingsReset": "Настройки сброшены",
@@ -1795,7 +1801,9 @@ window.LANG_RU = {
     "label": "Текст Плюс"
   },
   "generationStatus": {
-    "complete": "Готово!"
+    "complete": "Готово!",
+    "culturalAnnotations": "Пояснения культурного контекста",
+    "culturalAnnotationsLoading": "Анализируется культурный контекст..."
   },
   "videoBackground": {
     "loading": "Загрузка информации о видео...",

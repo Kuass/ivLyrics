@@ -2145,6 +2145,10 @@ const CONFIG = {
     "translate:target-language":
       StorageManager.getItem("ivLyrics:visual:translate:target-language") ||
       "auto",
+    "cultural-annotations-enabled": StorageManager.get(
+      "ivLyrics:visual:cultural-annotations-enabled",
+      false
+    ),
     "translate:detect-language-override":
       StorageManager.getItem(
         "ivLyrics:visual:translate:detect-language-override"
@@ -4020,6 +4024,13 @@ const GENERATION_REQUEST_PILL_CONFIG = Object.freeze({
     failureKey: "_translationLoadingHadFailure",
     loadingStateKey: "isTranslationLoading",
   }),
+  "cultural-annotations": Object.freeze({
+    tokensKey: "_activeCulturalAnnotationsLoadingTokens",
+    sequenceKey: "_culturalAnnotationsLoadingSeq",
+    timerKey: "culturalAnnotationsLoadingTimer",
+    failureKey: "_culturalAnnotationsLoadingHadFailure",
+    loadingStateKey: "isCulturalAnnotationsLoading",
+  }),
 });
 
 class LyricsContainer extends react.Component {
@@ -4066,10 +4077,12 @@ class LyricsContainer extends react.Component {
       language: null,
       isPhoneticLoading: false,
       isTranslationLoading: false,
+      isCulturalAnnotationsLoading: false,
       generationPills: {
         lyrics: { phase: "idle", revision: 0 },
         translation: { phase: "idle", revision: 0 },
         pronunciation: { phase: "idle", revision: 0 },
+        "cultural-annotations": { phase: "idle", revision: 0 },
         "video-background": { phase: "idle", revision: 0 },
       },
       currentLyricIndex: 0,
@@ -4122,15 +4135,19 @@ class LyricsContainer extends react.Component {
     this.lyricsLoadingTimer = null;
     this.phoneticLoadingTimer = null;
     this.translationLoadingTimer = null;
+    this.culturalAnnotationsLoadingTimer = null;
     this._lyricsLoadingSeq = 0;
     this._phoneticLoadingSeq = 0;
     this._translationLoadingSeq = 0;
+    this._culturalAnnotationsLoadingSeq = 0;
     this._activeLyricsLoadingTokens = new Set();
     this._activePhoneticLoadingTokens = new Set();
     this._activeTranslationLoadingTokens = new Set();
+    this._activeCulturalAnnotationsLoadingTokens = new Set();
     this._lyricsLoadingHadFailure = false;
     this._phoneticLoadingHadFailure = false;
     this._translationLoadingHadFailure = false;
+    this._culturalAnnotationsLoadingHadFailure = false;
     this._generationPillTimers = new Map();
     this._generationPillRevisions = new Map();
     this._generationRequestDetails = new Map();
@@ -4142,6 +4159,8 @@ class LyricsContainer extends react.Component {
     this.pendingStreamingPayload = null;
     this.floatingMenuCloseTimer = null;
     this._sharedPresentationKeys = new Map();
+    this._culturalAnnotationResults = new Map();
+    this._culturalAnnotationRequests = new Map();
     this._isComponentMounted = false;
 
     // Portrait viewport detection
@@ -4533,6 +4552,107 @@ class LyricsContainer extends react.Component {
     );
   }
 
+  isCulturalAnnotationsEnabled() {
+    const value = CONFIG.visual["cultural-annotations-enabled"];
+    return value === true || value === "true";
+  }
+
+  getCulturalAnnotationSourceLines(lyrics) {
+    return buildTranslationLineRequests(lyrics, { splitVocalParts: false })
+      .map(({ lineIndex, text }) => ({ lineIndex, text }));
+  }
+
+  applyCulturalAnnotations(lyrics, uri = this.state.uri) {
+    if (!Array.isArray(lyrics)) return [];
+
+    const result = this.isCulturalAnnotationsEnabled()
+      ? this._culturalAnnotationResults.get(uri)
+      : null;
+    const notesByIndex = result?.notesByIndex || null;
+
+    return lyrics.map((line, index) => {
+      if (!line || typeof line !== "object") return line;
+      const note = notesByIndex?.get(index) || null;
+      if (note) {
+        return line.culturalNote === note ? line : { ...line, culturalNote: note };
+      }
+      if (!line.culturalNote) return line;
+      const { culturalNote: _ignoredCulturalNote, ...lineWithoutCulturalNote } = line;
+      return lineWithoutCulturalNote;
+    });
+  }
+
+  requestCulturalAnnotations({ lyricsState, lyrics, sourceLang, uri }) {
+    if (!this.isCulturalAnnotationsEnabled() || !window.Translator?.generateCulturalAnnotations) {
+      return;
+    }
+
+    const lines = this.getCulturalAnnotationSourceLines(lyrics);
+    if (lines.length === 0) return;
+
+    const targetLang = this.getTranslationTargetLanguage();
+    const sourceSignature = getTranslationSourceCacheHash(JSON.stringify(lines));
+    const resultKey = `${sourceLang || "auto"}:${targetLang}:${sourceSignature}`;
+    if (this._culturalAnnotationResults.get(uri)?.key === resultKey) {
+      return;
+    }
+
+    const requestKey = `${uri}:${resultKey}`;
+    if (this._culturalAnnotationRequests.has(requestKey)) {
+      return;
+    }
+
+    const loadingToken = this.startCulturalAnnotationsLoading();
+    let completed = false;
+    const request = window.Translator.generateCulturalAnnotations({
+      trackId: Utils.extractTrackId(uri) || uri,
+      title: lyricsState.title || this.state.title,
+      artist: lyricsState.artist || this.state.artist,
+      lines,
+      sourceLang: sourceLang || "auto",
+      onProviderLoading: ({ providerId, providerName }) => {
+        const providerLabel = String(providerName || providerId || "").trim();
+        if (!providerLabel) return;
+        this.updateGenerationRequestLoading("cultural-annotations", {
+          label: providerLabel,
+          description: `${I18n.t("generationStatus.culturalAnnotationsLoading") || "문화적 배경을 분석하는 중..."}: ${providerLabel}`,
+        });
+      },
+    }).then((result) => {
+      const notesByIndex = new Map(
+        (Array.isArray(result?.annotations) ? result.annotations : [])
+          .map(annotation => [Number(annotation.lineIndex), String(annotation.note || "").trim()])
+          .filter(([lineIndex, note]) => Number.isInteger(lineIndex) && note)
+      );
+      this._culturalAnnotationResults.set(uri, {
+        key: resultKey,
+        notesByIndex,
+        provider: result?.provider || null,
+      });
+      completed = true;
+
+      if (this._isComponentMounted && this.state.uri === uri) {
+        this.setState(state => ({
+          currentLyrics: this.applyCulturalAnnotations(state.currentLyrics, uri),
+        }));
+      }
+      return result;
+    }).catch((error) => {
+      console.warn("[ivLyrics] Cultural annotation request failed:", error);
+      if (this._isComponentMounted && this.state.uri === uri) {
+        Toast.error(
+          `${I18n.t("notifications.culturalAnnotationsFailed") || "문화적 배경 설명을 불러오지 못했습니다."} ${error?.message || ""}`.trim()
+        );
+      }
+      return null;
+    }).finally(() => {
+      this._culturalAnnotationRequests.delete(requestKey);
+      this.clearCulturalAnnotationsLoading(loadingToken, { completed });
+    });
+
+    this._culturalAnnotationRequests.set(requestKey, request);
+  }
+
   getEditingBaseLyrics() {
     const currentMode = this.getCurrentMode();
 
@@ -4828,6 +4948,7 @@ class LyricsContainer extends react.Component {
     this.clearLyricsLoading();
     this.clearPhoneticLoading();
     this.clearTranslationLoading();
+    this.clearCulturalAnnotationsLoading();
   }
 
   getLoadingLyricsState(info, requestSeq) {
@@ -5026,6 +5147,14 @@ class LyricsContainer extends react.Component {
 
   clearTranslationLoading(token = null, options = {}) {
     this.clearGenerationRequestLoading("translation", token, options);
+  }
+
+  startCulturalAnnotationsLoading() {
+    return this.startGenerationRequestLoading("cultural-annotations");
+  }
+
+  clearCulturalAnnotationsLoading(token = null, options = {}) {
+    this.clearGenerationRequestLoading("cultural-annotations", token, options);
   }
 
   applyStreamingTranslation({
@@ -6278,6 +6407,12 @@ class LyricsContainer extends react.Component {
     this.displayMode2 = displayMode2;
 
     const { uri } = lyricsState; // Capture the URI for this specific request
+    this.requestCulturalAnnotations({
+      lyricsState,
+      lyrics,
+      sourceLang: originalLanguage,
+      uri,
+    });
     const sharedSnapshot = window.LyricsService?.getLyricsSnapshot?.(uri);
     const sharedPresentationMatches = sharedSnapshot?.presentationComplete === true &&
       Array.isArray(sharedSnapshot?.displayLyrics) &&
@@ -6296,7 +6431,9 @@ class LyricsContainer extends react.Component {
         `${lyricsState.provider || ''}:${displayMode1 || 'none'}:${displayMode2 || 'none'}:${getSyncDataRendererCacheVersion(lyricsState)}`
       );
       if (this.state.currentLyrics !== sharedSnapshot.displayLyrics) {
-        this.setState({ currentLyrics: sharedSnapshot.displayLyrics });
+        this.setState({
+          currentLyrics: this.applyCulturalAnnotations(sharedSnapshot.displayLyrics, uri),
+        });
       }
       return;
     }
@@ -6857,7 +6994,7 @@ class LyricsContainer extends react.Component {
       return safeLine;
     });
 
-    return processedLyrics;
+    return this.applyCulturalAnnotations(processedLyrics, this.state.uri);
   }
 
   getGeminiTranslation(lyricsState, lyrics, mode, onProgress = null) {
@@ -8118,8 +8255,9 @@ class LyricsContainer extends react.Component {
     this.clearLyricsLoading();
     this.clearPhoneticLoading();
     this.clearTranslationLoading();
+    this.clearCulturalAnnotationsLoading();
     this.clearVideoBackgroundLoadingDelay();
-    ["lyrics", "translation", "pronunciation", "video-background"].forEach((kind) => {
+    ["lyrics", "translation", "pronunciation", "cultural-annotations", "video-background"].forEach((kind) => {
       this.clearGenerationPillTimers(kind);
     });
     this._visibleGenerationPills.clear();
@@ -8465,8 +8603,11 @@ class LyricsContainer extends react.Component {
 
     const displayMode1 = CONFIG.visual[`translation-mode:${modeKey}`];
     const displayMode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
+    const culturalAnnotationsMode = this.isCulturalAnnotationsEnabled()
+      ? `culture-${this.getTranslationTargetLanguage()}`
+      : "culture-off";
     const currentModeKey = `${mode}_${displayMode1 || "none"}_${displayMode2 || "none"
-      }`;
+      }_${culturalAnnotationsMode}`;
 
     // Only call lyricsSource on state/mode/translation changes, not every render
     if (
@@ -8791,6 +8932,11 @@ class LyricsContainer extends react.Component {
         key: "pronunciation",
         label: I18n.t("menu.pronunciation") || I18n.t("notifications.requestingPronunciation"),
         description: I18n.t("notifications.requestingPronunciation"),
+      },
+      {
+        key: "cultural-annotations",
+        label: I18n.t("generationStatus.culturalAnnotations") || "문화적 배경 설명",
+        description: I18n.t("generationStatus.culturalAnnotationsLoading") || "문화적 배경을 분석하는 중...",
       },
       {
         key: "video-background",

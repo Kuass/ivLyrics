@@ -2103,7 +2103,7 @@ const buildLyricDisplayState = (isKara, line, text, originalText, text2) => {
 		mainText,
 		subText,
 		subText2,
-		hasSubLine: !!subText || !!subText2,
+		hasSubLine: !!subText || !!subText2 || !!line?.culturalNote,
 		originalText,
 	};
 };
@@ -3632,6 +3632,7 @@ const LyricsLineBlock = react.memo(({
 	subText2CopyText = null,
 	subText2CopySuccessKey = "notifications.secondTranslationCopied",
 	subText2CopyFailureKey = "notifications.secondTranslationCopyFailed",
+	culturalNote = null,
 	singleLineScroll = false,
 }) => {
 	const mainLine = line || (typeof mainText === "object" ? mainText : {
@@ -3639,6 +3640,7 @@ const LyricsLineBlock = react.memo(({
 		originalText,
 		text2: subText2,
   });
+	const displayedCulturalNote = culturalNote || mainLine?.culturalNote || null;
   const hasParallelKaraokeRows = isKara && hasKaraokeVocalRows(mainLine);
   const interludeInfo = mainLine?.interludeInfo || getInterludeInfo(mainLine);
 	const shouldRenderInterlude = interludeInfo.isInterlude;
@@ -3732,6 +3734,18 @@ const LyricsLineBlock = react.memo(({
 				? createCopyHandler(subText2CopyText, subText2CopySuccessKey, subText2CopyFailureKey)
 				: null,
 			singleLineScroll
+		),
+		!shouldRenderInterlude && renderLyricSubLine(
+			"lyrics-lyricsContainer-LyricsLine-culturalNote",
+			displayedCulturalNote ? `↳ ${displayedCulturalNote}` : null,
+			displayedCulturalNote
+				? createCopyHandler(
+					displayedCulturalNote,
+					"notifications.translationCopied",
+					"notifications.translationCopyFailed"
+				)
+				: null,
+			false
 		)
 	);
 });
@@ -3760,6 +3774,7 @@ const renderLyricsItems = ({ items, isKara, position = 0, activeLineRef = null, 
 			mainText: item.mainText,
 			subText: item.subText,
 			subText2: item.subText2,
+			culturalNote: item.culturalNote,
 			originalText: item.originalText,
 			isKara,
 			line: item.line,
@@ -3831,6 +3846,7 @@ const SyncedLyricsScrollView = react.memo(({
 				mainText,
 				subText,
 				subText2,
+				culturalNote: renderLine?.culturalNote,
 				originalText,
 				isKara,
 				line: renderLine,
@@ -5588,6 +5604,7 @@ const UnsyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, co
 			mainText: lineText,
 			subText: belowMode ? subText : null,
 			subText2: showMode2 ? showMode2Translation : null,
+			culturalNote: line?.culturalNote || null,
 			mainCopyText: Utils.formatLyricLineToCopy(
 				lineText,
 				belowMode ? subText : null,
@@ -5619,6 +5636,7 @@ const UnsyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, co
 				mainText: item.mainText,
 				subText: item.subText,
 				subText2: item.subText2,
+				culturalNote: item.culturalNote,
 				originalText: item.originalText,
 				mainCopyText: item.mainCopyText,
 				subCopyText: item.subCopyText,

@@ -143,6 +143,10 @@ window.LANG_ZH_TW = {
         "auto": "自動"
       }
     },
+    "culturalAnnotations": {
+      "label": "文化背景說明",
+      "desc": "僅在翻譯難以傳達文化背景的歌詞行下方顯示 AI 產生的說明。使用翻譯目標語言。"
+    },
     "alignment": {
       "label": "對齊方式",
       "desc": "選擇歌詞文字的對齊位置",
@@ -445,7 +449,8 @@ window.LANG_ZH_TW = {
         "metadata": "元數據",
         "tmi": "TMI",
         "lyricsStudy": "學習",
-        "characterPronunciation": "逐字發音"
+        "characterPronunciation": "逐字發音",
+        "culturalAnnotations": "文化背景"
       },
       "noEnabledProviders": "未啟用 AI 提供商。請在設置中至少啟用一個提供商。",
       "allProvidersFailed": "所有 AI 提供商都無法處理該請求。",
@@ -726,6 +731,7 @@ window.LANG_ZH_TW = {
     "button": "編輯已儲存的發音 / 翻譯歌詞"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "無法載入文化背景說明。",
     "languageChanged": "語言已變更，將在重新整理後生效。",
     "settingsSaved": "設定已儲存",
     "settingsReset": "設定已重置",
@@ -1795,7 +1801,9 @@ window.LANG_ZH_TW = {
     "label": "歌詞 Plus"
   },
   "generationStatus": {
-    "complete": "完成！"
+    "complete": "完成！",
+    "culturalAnnotations": "文化背景說明",
+    "culturalAnnotationsLoading": "正在分析文化背景..."
   },
   "videoBackground": {
     "loading": "正在載入影片資訊...",

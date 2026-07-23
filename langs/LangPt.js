@@ -143,6 +143,10 @@ window.LANG_PT = {
         "auto": "Automático"
       }
     },
+    "culturalAnnotations": {
+      "label": "Explicações de contexto cultural",
+      "desc": "Mostra explicações geradas por IA apenas sob os versos cujo contexto cultural se perderia na tradução. Usa o idioma de destino da tradução."
+    },
     "alignment": {
       "label": "Alinhamento",
       "desc": "Selecione a posição de alinhamento do texto da letra",
@@ -445,7 +449,8 @@ window.LANG_PT = {
         "metadata": "Metadados",
         "tmi": "TMI",
         "lyricsStudy": "Aprendizagem",
-        "characterPronunciation": "Pronúncia por caractere"
+        "characterPronunciation": "Pronúncia por caractere",
+        "culturalAnnotations": "Contexto cultural"
       },
       "noEnabledProviders": "Nenhum provedor de IA habilitado. Por favor, habilite pelo menos um nas configurações.",
       "allProvidersFailed": "Todos os provedores de IA falharam ao processar a solicitação.",
@@ -726,6 +731,7 @@ window.LANG_PT = {
     "button": "Editar pronúncia / tradução em cache"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "Não foi possível carregar as explicações de contexto cultural.",
     "languageChanged": "Idioma alterado. Será aplicado após a atualização da página.",
     "settingsSaved": "Configurações salvas",
     "settingsReset": "Configurações redefinidas",
@@ -1795,7 +1801,9 @@ window.LANG_PT = {
     "label": "Letra Plus"
   },
   "generationStatus": {
-    "complete": "Concluído!"
+    "complete": "Concluído!",
+    "culturalAnnotations": "Explicações de contexto cultural",
+    "culturalAnnotationsLoading": "Analisando o contexto cultural..."
   },
   "videoBackground": {
     "loading": "Carregando informações do vídeo...",

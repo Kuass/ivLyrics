@@ -143,6 +143,10 @@ window.LANG_SV = {
         "auto": "Samma"
       }
     },
+    "culturalAnnotations": {
+      "label": "Förklaringar av kulturell kontext",
+      "desc": "Visar AI-genererade förklaringar endast under textrader vars kulturella bakgrund annars skulle gå förlorad i översättningen. Använder översättningens målspråk."
+    },
     "alignment": {
       "label": "Justering",
       "desc": "Välj justering av sångtexten",
@@ -445,7 +449,8 @@ window.LANG_SV = {
         "metadata": "Metadata",
         "tmi": "TMI",
         "lyricsStudy": "Inlärning",
-        "characterPronunciation": "Teckenuttal"
+        "characterPronunciation": "Teckenuttal",
+        "culturalAnnotations": "Kulturell kontext"
       },
       "noEnabledProviders": "Inga AI-leverantörer aktiverade. Aktivera minst en leverantör i inställningarna.",
       "allProvidersFailed": "Alla AI-leverantörer kunde inte behandla begäran.",
@@ -726,6 +731,7 @@ window.LANG_SV = {
     "button": "Redigera cachade uttal/översättning"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "Det gick inte att läsa in förklaringarna av kulturell kontext.",
     "languageChanged": "Språket har ändrats. Kommer att appliceras efter uppdatering.",
     "settingsSaved": "Inställningar sparade",
     "settingsReset": "Inställningar återställs",
@@ -1795,7 +1801,9 @@ window.LANG_SV = {
     "label": "Lyrics Plus"
   },
   "generationStatus": {
-    "complete": "Klart!"
+    "complete": "Klart!",
+    "culturalAnnotations": "Förklaringar av kulturell kontext",
+    "culturalAnnotationsLoading": "Analyserar kulturell kontext..."
   },
   "videoBackground": {
     "loading": "Laddar videoinformation...",

@@ -143,6 +143,10 @@ window.LANG_JA = {
         "auto": "自動"
       }
     },
+    "culturalAnnotations": {
+      "label": "文化的背景の解説",
+      "desc": "翻訳だけでは伝わりにくい文化的背景がある歌詞の行にのみ、AIによる解説を表示します。翻訳先の言語を使用します。"
+    },
     "alignment": {
       "label": "配置",
       "desc": "歌詞テキストの表示位置を選択してください",
@@ -445,7 +449,8 @@ window.LANG_JA = {
         "metadata": "メタデータ",
         "tmi": "TMI",
         "lyricsStudy": "学習",
-        "characterPronunciation": "文字発音"
+        "characterPronunciation": "文字発音",
+        "culturalAnnotations": "文化的背景"
       },
       "noEnabledProviders": "有効なAIプロバイダーがありません。設定で少なくとも1つのプロバイダーを有効にしてください。",
       "allProvidersFailed": "すべてのAIプロバイダーの要求に失败しました。",
@@ -726,6 +731,7 @@ window.LANG_JA = {
     "button": "保存された発音 / 翻訳歌詞を編集"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "文化的背景の解説を読み込めませんでした。",
     "languageChanged": "言語が変更されました。再読み込み後に適用されます。",
     "settingsSaved": "設定が保存されました",
     "settingsReset": "設定が初期化されました",
@@ -1795,7 +1801,9 @@ window.LANG_JA = {
     "label": "歌詞プラス"
   },
   "generationStatus": {
-    "complete": "完了！"
+    "complete": "完了！",
+    "culturalAnnotations": "文化的背景の解説",
+    "culturalAnnotationsLoading": "文化的背景を分析中..."
   },
   "videoBackground": {
     "loading": "動画情報を読み込み中...",

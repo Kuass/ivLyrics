@@ -143,6 +143,10 @@ window.LANG_BN = {
         "auto": "স্বয়ংক্রিয়"
       }
     },
+    "culturalAnnotations": {
+      "label": "সাংস্কৃতিক প্রেক্ষাপটের ব্যাখ্যা",
+      "desc": "অনুবাদে সাংস্কৃতিক পটভূমি হারিয়ে গেলে শুধু সেই গানের লাইনের নিচে AI-তৈরি ব্যাখ্যা দেখায়। অনুবাদের লক্ষ্য ভাষা ব্যবহার করে।"
+    },
     "alignment": {
       "label": "বিন্যাস পদ্ধতি",
       "desc": "লিরিক্স টেক্সটের অবস্থান নির্বাচন করুন",
@@ -445,7 +449,8 @@ window.LANG_BN = {
         "metadata": "মেটাডেটা",
         "tmi": "TMI",
         "lyricsStudy": "শেখা",
-        "characterPronunciation": "অক্ষরভিত্তিক উচ্চারণ"
+        "characterPronunciation": "অক্ষরভিত্তিক উচ্চারণ",
+        "culturalAnnotations": "সাংস্কৃতিক প্রেক্ষাপট"
       },
       "noEnabledProviders": "কোনো AI প্রদানকারী সক্রিয় নেই। দয়া করে সেটিংসে অন্তত একটি প্রদানকারী সক্রিয় করুন।",
       "allProvidersFailed": "সমস্ত AI প্রদানকারী অনুরোধ প্রক্রিয়া করতে ব্যর্থ হয়েছে।",
@@ -726,6 +731,7 @@ window.LANG_BN = {
     "button": "সংরক্ষিত উচ্চারণ / অনুবাদ লিরিক্স সম্পাদনা"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "সাংস্কৃতিক প্রেক্ষাপটের ব্যাখ্যা লোড করা যায়নি।",
     "languageChanged": "ভাষা পরিবর্তন করা হয়েছে। রিফ্রেশ করার পর এটি কার্যকর হবে।",
     "settingsSaved": "সেটিংস সংরক্ষিত হয়েছে",
     "settingsReset": "সেটিংস রিসেট করা হয়েছে",
@@ -1795,7 +1801,9 @@ window.LANG_BN = {
     "label": "লিরিক্স প্লাস"
   },
   "generationStatus": {
-    "complete": "সম্পন্ন!"
+    "complete": "সম্পন্ন!",
+    "culturalAnnotations": "সাংস্কৃতিক প্রেক্ষাপটের ব্যাখ্যা",
+    "culturalAnnotationsLoading": "সাংস্কৃতিক প্রেক্ষাপট বিশ্লেষণ করা হচ্ছে..."
   },
   "videoBackground": {
     "loading": "ভিডিও তথ্য লোড হচ্ছে...",

@@ -143,6 +143,10 @@ window.LANG_VI = {
         "auto": "Tự động"
       }
     },
+    "culturalAnnotations": {
+      "label": "Giải thích bối cảnh văn hóa",
+      "desc": "Chỉ hiển thị giải thích do AI tạo dưới những câu hát có bối cảnh văn hóa dễ bị mất khi dịch. Sử dụng ngôn ngữ đích của bản dịch."
+    },
     "alignment": {
       "label": "Căn chỉnh",
       "desc": "Chọn vị trí căn chỉnh cho văn bản lời bài hát",
@@ -445,7 +449,8 @@ window.LANG_VI = {
         "metadata": "Siêu dữ liệu",
         "tmi": "TMI",
         "lyricsStudy": "Học tập",
-        "characterPronunciation": "Phát âm từng ký tự"
+        "characterPronunciation": "Phát âm từng ký tự",
+        "culturalAnnotations": "Bối cảnh văn hóa"
       },
       "noEnabledProviders": "Không có nhà cung cấp AI nào được bật. Vui lòng bật ít nhất một nhà cung cấp trong cài đặt.",
       "allProvidersFailed": "Tất cả các nhà cung cấp AI đã thất bại khi xử lý yêu cầu.",
@@ -726,6 +731,7 @@ window.LANG_VI = {
     "button": "Chỉnh sửa phiên âm / bản dịch đã lưu"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "Không thể tải phần giải thích bối cảnh văn hóa.",
     "languageChanged": "Ngôn ngữ đã thay đổi. Sẽ áp dụng sau khi tải lại trang.",
     "settingsSaved": "Đã lưu cài đặt",
     "settingsReset": "Đã đặt lại cài đặt",
@@ -1795,7 +1801,9 @@ window.LANG_VI = {
     "label": "Lyrics Plus"
   },
   "generationStatus": {
-    "complete": "Hoàn tất!"
+    "complete": "Hoàn tất!",
+    "culturalAnnotations": "Giải thích bối cảnh văn hóa",
+    "culturalAnnotationsLoading": "Đang phân tích bối cảnh văn hóa..."
   },
   "videoBackground": {
     "loading": "Đang tải thông tin video...",

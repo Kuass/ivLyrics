@@ -143,6 +143,10 @@ window.LANG_ZH_CN = {
         "auto": "自动"
       }
     },
+    "culturalAnnotations": {
+      "label": "文化背景说明",
+      "desc": "仅在翻译难以传达文化背景的歌词行下方显示 AI 生成的说明。使用翻译目标语言。"
+    },
     "alignment": {
       "label": "对齐方式",
       "desc": "选择歌词文本的对齐位置",
@@ -445,7 +449,8 @@ window.LANG_ZH_CN = {
         "metadata": "元数据",
         "tmi": "TMI",
         "lyricsStudy": "学习",
-        "characterPronunciation": "逐字发音"
+        "characterPronunciation": "逐字发音",
+        "culturalAnnotations": "文化背景"
       },
       "noEnabledProviders": "未启用 AI 提供商。请在设置中至少启用一个提供商。",
       "allProvidersFailed": "所有 AI 提供商都无法处理该请求。",
@@ -726,6 +731,7 @@ window.LANG_ZH_CN = {
     "button": "编辑已保存的发音 / 翻译歌词"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "无法加载文化背景说明。",
     "languageChanged": "语言已更改。刷新页面后生效。",
     "settingsSaved": "设置已保存",
     "settingsReset": "设置已重置",
@@ -1795,7 +1801,9 @@ window.LANG_ZH_CN = {
     "label": "歌词 Plus"
   },
   "generationStatus": {
-    "complete": "完成！"
+    "complete": "完成！",
+    "culturalAnnotations": "文化背景说明",
+    "culturalAnnotationsLoading": "正在分析文化背景..."
   },
   "videoBackground": {
     "loading": "正在加载视频信息...",

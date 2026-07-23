@@ -143,6 +143,10 @@ window.LANG_DE = {
         "auto": "Automatisch"
       }
     },
+    "culturalAnnotations": {
+      "label": "Kulturellen Kontext erklären",
+      "desc": "Zeigt KI-Erklärungen nur unter Liedzeilen, deren kultureller Hintergrund bei einer Übersetzung verloren ginge. Verwendet die Zielsprache der Übersetzung."
+    },
     "alignment": {
       "label": "Ausrichtung",
       "desc": "Wählen Sie die Ausrichtung des Songtextes",
@@ -445,7 +449,8 @@ window.LANG_DE = {
         "metadata": "Metadaten",
         "tmi": "TMI",
         "lyricsStudy": "Lernen",
-        "characterPronunciation": "Zeichen-Aussprache"
+        "characterPronunciation": "Zeichen-Aussprache",
+        "culturalAnnotations": "Kultureller Kontext"
       },
       "noEnabledProviders": "Keine KI-Anbieter aktiviert. Bitte aktiviere mindestens einen Anbieter in den Einstellungen.",
       "allProvidersFailed": "Alle KI-Anbieter konnten die Anfrage nicht verarbeiten.",
@@ -726,6 +731,7 @@ window.LANG_DE = {
     "button": "Gespeicherte Aussprache / Übersetzung bearbeiten"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "Die Erklärung zum kulturellen Kontext konnte nicht geladen werden.",
     "languageChanged": "Sprache geändert. Wird nach dem Aktualisieren wirksam.",
     "settingsSaved": "Einstellungen gespeichert",
     "settingsReset": "Einstellungen zurückgesetzt",
@@ -1795,7 +1801,9 @@ window.LANG_DE = {
     "label": "Lyrics Plus"
   },
   "generationStatus": {
-    "complete": "Fertig!"
+    "complete": "Fertig!",
+    "culturalAnnotations": "Kulturellen Kontext erklären",
+    "culturalAnnotationsLoading": "Kultureller Kontext wird analysiert..."
   },
   "videoBackground": {
     "loading": "Lade Videoinformationen...",

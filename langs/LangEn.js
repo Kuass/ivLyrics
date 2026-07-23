@@ -143,6 +143,10 @@ window.LANG_EN = {
         "auto": "Same"
       }
     },
+    "culturalAnnotations": {
+      "label": "Cultural context explanations",
+      "desc": "Show AI-generated explanations only under lyric lines whose cultural background would otherwise be lost in translation. Uses the translation target language."
+    },
     "alignment": {
       "label": "Alignment",
       "desc": "Select the alignment of the lyrics text",
@@ -445,7 +449,8 @@ window.LANG_EN = {
         "metadata": "Metadata",
         "tmi": "TMI",
         "lyricsStudy": "Learning",
-        "characterPronunciation": "Character pronunciation"
+        "characterPronunciation": "Character pronunciation",
+        "culturalAnnotations": "Cultural context"
       },
       "noEnabledProviders": "No AI providers enabled. Please enable at least one provider in settings.",
       "allProvidersFailed": "All AI providers failed to process the request.",
@@ -726,6 +731,7 @@ window.LANG_EN = {
     "button": "Edit cached pronunciation / translation"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "Could not load the cultural context explanations.",
     "languageChanged": "Language changed. Will be applied after refresh.",
     "settingsSaved": "Settings saved",
     "settingsReset": "Settings reset",
@@ -1795,7 +1801,9 @@ window.LANG_EN = {
     "label": "Lyrics Plus"
   },
   "generationStatus": {
-    "complete": "Done!"
+    "complete": "Done!",
+    "culturalAnnotations": "Cultural context explanations",
+    "culturalAnnotationsLoading": "Analyzing cultural context..."
   },
   "videoBackground": {
     "loading": "Loading video info...",

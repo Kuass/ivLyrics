@@ -143,6 +143,10 @@ window.LANG_AR = {
         "auto": "تلقائي"
       }
     },
+    "culturalAnnotations": {
+      "label": "شرح السياق الثقافي",
+      "desc": "يعرض شرحاً مولداً بالذكاء الاصطناعي أسفل أسطر الكلمات فقط عندما تضيع الخلفية الثقافية في الترجمة. يستخدم لغة الترجمة المستهدفة."
+    },
     "alignment": {
       "label": "المحاذاة",
       "desc": "اختر مكان محاذاة نص الكلمات",
@@ -445,7 +449,8 @@ window.LANG_AR = {
         "metadata": "البيانات الوصفية",
         "tmi": "TMI",
         "lyricsStudy": "التعلّم",
-        "characterPronunciation": "نطق كل حرف"
+        "characterPronunciation": "نطق كل حرف",
+        "culturalAnnotations": "السياق الثقافي"
       },
       "noEnabledProviders": "لم يتم تفعيل أي موفر AI. يرجى تفعيل موفر واحد على الأقل في الإعدادات.",
       "allProvidersFailed": "فشل جميع موفري AI في معالجة الطلب.",
@@ -726,6 +731,7 @@ window.LANG_AR = {
     "button": "تعديل كلمات النطق / الترجمة المحفوظة"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "تعذر تحميل شرح السياق الثقافي.",
     "languageChanged": "تم تغيير اللغة. سيتم التطبيق بعد التحديث.",
     "settingsSaved": "تم حفظ الإعدادات",
     "settingsReset": "تم إعادة تعيين الإعدادات",
@@ -1795,7 +1801,9 @@ window.LANG_AR = {
     "label": "كلمات بلس"
   },
   "generationStatus": {
-    "complete": "تم!"
+    "complete": "تم!",
+    "culturalAnnotations": "شرح السياق الثقافي",
+    "culturalAnnotationsLoading": "جارٍ تحليل السياق الثقافي..."
   },
   "videoBackground": {
     "loading": "جارٍ تحميل معلومات الفيديو...",

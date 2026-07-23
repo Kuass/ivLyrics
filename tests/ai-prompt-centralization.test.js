@@ -269,6 +269,36 @@ test('manager injects central prompts into every provider capability', async () 
     assert.match(captures.character[0].characterPronunciationPrompt, /pronunciation aligner/);
 });
 
+test('an empty cultural annotation list is a valid provider result', async () => {
+    const manager = loadManager();
+    const captures = {
+        lyrics: [],
+        metadata: null,
+        tmi: null,
+        study: null,
+        cultural: null,
+        character: []
+    };
+    const provider = createCapturingProvider(captures);
+    provider.generateCulturalAnnotations = async (params) => {
+        captures.cultural = params;
+        return { annotations: [] };
+    };
+
+    assert.equal(manager.register(provider), true);
+    manager.setProviderEnabled(provider.id, true);
+    const result = await manager.generateCulturalAnnotations({
+        sourceLang: 'en',
+        targetLang: 'ko',
+        lines: [{ lineIndex: 0, text: 'An ordinary lyric line' }]
+    });
+
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(result)),
+        { annotations: [], provider: 'test-provider' }
+    );
+});
+
 test('built-in providers contain transport code but no prompt builders or language tables', () => {
     for (const file of PROVIDER_FILES) {
         const source = fs.readFileSync(path.join(ROOT, file), 'utf8');

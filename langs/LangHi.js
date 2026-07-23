@@ -143,6 +143,10 @@ window.LANG_HI = {
         "auto": "स्वचालित"
       }
     },
+    "culturalAnnotations": {
+      "label": "सांस्कृतिक संदर्भ की व्याख्या",
+      "desc": "केवल उन गीत पंक्तियों के नीचे AI से बनी व्याख्या दिखाता है जिनकी सांस्कृतिक पृष्ठभूमि अनुवाद में खो सकती है। अनुवाद की लक्षित भाषा का उपयोग करता है।"
+    },
     "alignment": {
       "label": "संरेखण",
       "desc": "लिरिक्स टेक्स्ट का स्थान चुनें",
@@ -445,7 +449,8 @@ window.LANG_HI = {
         "metadata": "मेटाडेटा",
         "tmi": "TMI",
         "lyricsStudy": "सीखना",
-        "characterPronunciation": "प्रति-अक्षर उच्चारण"
+        "characterPronunciation": "प्रति-अक्षर उच्चारण",
+        "culturalAnnotations": "सांस्कृतिक संदर्भ"
       },
       "noEnabledProviders": "कोई AI प्रदाता सक्षम नहीं है। कृपया सेटिंग्स में कम से कम एक प्रदाता सक्षम करें।",
       "allProvidersFailed": "सभी AI प्रदाता अनुरोध को संसाधित करने में विफल रहेा",
@@ -726,6 +731,7 @@ window.LANG_HI = {
     "button": "सहेजे गए उच्चारण / अनुवाद गीत संपादित करें"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "सांस्कृतिक संदर्भ की व्याख्या लोड नहीं हो सकी।",
     "languageChanged": "भाषा बदल दी गई है। रीफ्रेश करने के बाद लागू होगी।",
     "settingsSaved": "सेटिंग्स सहेजी गईं",
     "settingsReset": "सेटिंग्स रीसेट की गईं",
@@ -1795,7 +1801,9 @@ window.LANG_HI = {
     "label": "लिरिक्स प्लस"
   },
   "generationStatus": {
-    "complete": "पूर्ण!"
+    "complete": "पूर्ण!",
+    "culturalAnnotations": "सांस्कृतिक संदर्भ की व्याख्या",
+    "culturalAnnotationsLoading": "सांस्कृतिक संदर्भ का विश्लेषण हो रहा है..."
   },
   "videoBackground": {
     "loading": "वीडियो जानकारी लोड हो रही है...",

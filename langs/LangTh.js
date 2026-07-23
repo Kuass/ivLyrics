@@ -143,6 +143,10 @@ window.LANG_TH = {
         "auto": "อัตโนมัติ"
       }
     },
+    "culturalAnnotations": {
+      "label": "คำอธิบายบริบททางวัฒนธรรม",
+      "desc": "แสดงคำอธิบายที่สร้างโดย AI เฉพาะใต้บรรทัดเนื้อเพลงที่ภูมิหลังทางวัฒนธรรมอาจสูญหายในการแปล โดยใช้ภาษาเป้าหมายของการแปล"
+    },
     "alignment": {
       "label": "การจัดเรียง",
       "desc": "เลือกตำแหน่งการจัดเรียงของเนื้อเพลง",
@@ -445,7 +449,8 @@ window.LANG_TH = {
         "metadata": "เมทาดาตา",
         "tmi": "TMI",
         "lyricsStudy": "การเรียนรู้",
-        "characterPronunciation": "การออกเสียงรายอักขระ"
+        "characterPronunciation": "การออกเสียงรายอักขระ",
+        "culturalAnnotations": "บริบททางวัฒนธรรม"
       },
       "noEnabledProviders": "ไม่ได้เปิดใช้งานผู้ให้บริการ AI โปรดเปิดใช้งานอย่างน้อยหนึ่งรายในการตั้งค่า",
       "allProvidersFailed": "ผู้ให้บริการ AI ทั้งหมดล้มเหลวในการร้องขอ",
@@ -726,6 +731,7 @@ window.LANG_TH = {
     "button": "แก้ไขคำอ่าน / คำแปลที่บันทึกไว้"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "ไม่สามารถโหลดคำอธิบายบริบททางวัฒนธรรมได้",
     "languageChanged": "เปลี่ยนภาษาแล้ว จะมีผลหลังจากรีเฟรช",
     "settingsSaved": "บันทึกการตั้งค่าแล้ว",
     "settingsReset": "รีเซ็ตการตั้งค่าแล้ว",
@@ -1795,7 +1801,9 @@ window.LANG_TH = {
     "label": "เนื้อเพลง Plus"
   },
   "generationStatus": {
-    "complete": "เสร็จแล้ว!"
+    "complete": "เสร็จแล้ว!",
+    "culturalAnnotations": "คำอธิบายบริบททางวัฒนธรรม",
+    "culturalAnnotationsLoading": "กำลังวิเคราะห์บริบททางวัฒนธรรม..."
   },
   "videoBackground": {
     "loading": "กำลังโหลดข้อมูลวิดีโอ...",

@@ -143,6 +143,10 @@ window.LANG_TR = {
         "auto": "Aynı"
       }
     },
+    "culturalAnnotations": {
+      "label": "Kültürel bağlam açıklamaları",
+      "desc": "Yalnızca kültürel arka planı çeviride kaybolabilecek şarkı sözlerinin altında yapay zekâ açıklamaları gösterir. Çeviri hedef dilini kullanır."
+    },
     "alignment": {
       "label": "Hizalama",
       "desc": "Söz metninin hizalamasını seçin",
@@ -445,7 +449,8 @@ window.LANG_TR = {
         "metadata": "Meta Veri",
         "tmi": "Bilgi (TMI)",
         "lyricsStudy": "Öğrenme",
-        "characterPronunciation": "Karakter okunuşu"
+        "characterPronunciation": "Karakter okunuşu",
+        "culturalAnnotations": "Kültürel bağlam"
       },
       "noEnabledProviders": "Etkin YZ sağlayıcısı yok. Lütfen ayarlardan en az bir sağlayıcıyı etkinleştirin.",
       "allProvidersFailed": "Tüm YZ sağlayıcıları isteği işlemekte başarısız oldu.",
@@ -726,6 +731,7 @@ window.LANG_TR = {
     "button": "Önbellekteki okunuşu / çeviriyi düzenle"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "Kültürel bağlam açıklamaları yüklenemedi.",
     "languageChanged": "Dil değiştirildi. Yenilemeden sonra uygulanacak.",
     "settingsSaved": "Ayarlar kaydedildi",
     "settingsReset": "Ayarlar sıfırlandı",
@@ -1795,7 +1801,9 @@ window.LANG_TR = {
     "label": "ivLyrics"
   },
   "generationStatus": {
-    "complete": "Tamamlandı!"
+    "complete": "Tamamlandı!",
+    "culturalAnnotations": "Kültürel bağlam açıklamaları",
+    "culturalAnnotationsLoading": "Kültürel bağlam analiz ediliyor..."
   },
   "videoBackground": {
     "loading": "Video bilgileri yükleniyor...",

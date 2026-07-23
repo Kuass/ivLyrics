@@ -143,6 +143,10 @@ window.LANG_KO = {
         "auto": "인터페이스 언어와 동일"
       }
     },
+    "culturalAnnotations": {
+      "label": "문화적 배경 설명",
+      "desc": "번역만으로 이해하기 어려운 문화적 배경이 있는 가사 줄 아래에만 AI 설명을 표시합니다. 번역 대상 언어를 사용합니다."
+    },
     "alignment": {
       "label": "정렬 방식",
       "desc": "가사 텍스트의 정렬 위치를 선택하세요",
@@ -445,7 +449,8 @@ window.LANG_KO = {
         "metadata": "메타데이터",
         "tmi": "TMI",
         "lyricsStudy": "학습",
-        "characterPronunciation": "글자 발음"
+        "characterPronunciation": "글자 발음",
+        "culturalAnnotations": "문화적 배경"
       },
       "noEnabledProviders": "활성화된 AI 제공자가 없습니다. 설정에서 최소 하나 이상의 제공자를 활성화해주세요.",
       "allProvidersFailed": "모든 AI 제공자가 요청에 실패했습니다.",
@@ -726,6 +731,7 @@ window.LANG_KO = {
     "button": "저장된 발음 / 번역 가사 수정"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "문화적 배경 설명을 불러오지 못했습니다.",
     "languageChanged": "언어가 변경되었습니다. 새로고침 후 적용됩니다.",
     "settingsSaved": "설정이 저장되었습니다",
     "settingsReset": "설정이 초기화되었습니다",
@@ -1795,7 +1801,9 @@ window.LANG_KO = {
     "label": "가사 플러스"
   },
   "generationStatus": {
-    "complete": "완료!"
+    "complete": "완료!",
+    "culturalAnnotations": "문화적 배경 설명",
+    "culturalAnnotationsLoading": "문화적 배경을 분석하는 중..."
   },
   "videoBackground": {
     "loading": "동영상 정보를 불러오는 중...",

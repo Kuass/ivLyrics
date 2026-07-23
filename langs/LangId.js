@@ -143,6 +143,10 @@ window.LANG_ID = {
         "auto": "Otomatis"
       }
     },
+    "culturalAnnotations": {
+      "label": "Penjelasan konteks budaya",
+      "desc": "Menampilkan penjelasan buatan AI hanya di bawah baris lirik yang latar budayanya akan hilang dalam terjemahan. Menggunakan bahasa target terjemahan."
+    },
     "alignment": {
       "label": "Perataan",
       "desc": "Pilih posisi perataan teks lirik",
@@ -445,7 +449,8 @@ window.LANG_ID = {
         "metadata": "Metadata",
         "tmi": "TMI",
         "lyricsStudy": "Belajar",
-        "characterPronunciation": "Pelafalan per karakter"
+        "characterPronunciation": "Pelafalan per karakter",
+        "culturalAnnotations": "Konteks budaya"
       },
       "noEnabledProviders": "Tidak ada penyedia AI yang diaktifkan. Harap aktifkan setidaknya satu penyedia di pengaturan.",
       "allProvidersFailed": "Semua penyedia AI gagal memproses permintaan.",
@@ -726,6 +731,7 @@ window.LANG_ID = {
     "button": "Edit pelafalan / terjemahan yang disimpan"
   },
   "notifications": {
+    "culturalAnnotationsFailed": "Penjelasan konteks budaya tidak dapat dimuat.",
     "languageChanged": "Bahasa diubah. Akan diterapkan setelah penyegaran.",
     "settingsSaved": "Pengaturan disimpan",
     "settingsReset": "Pengaturan diatur ulang",
@@ -1795,7 +1801,9 @@ window.LANG_ID = {
     "label": "Lirik Plus"
   },
   "generationStatus": {
-    "complete": "Selesai!"
+    "complete": "Selesai!",
+    "culturalAnnotations": "Penjelasan konteks budaya",
+    "culturalAnnotationsLoading": "Menganalisis konteks budaya..."
   },
   "videoBackground": {
     "loading": "Memuat info video...",
