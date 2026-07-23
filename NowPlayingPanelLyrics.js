@@ -78,6 +78,8 @@
     const DEFAULT_FONT_SCALE = 100; // 폰트 크기 배율 (50% ~ 200%)
     const DEFAULT_FONT_FAMILY = "Pretendard Variable";
     const DEFAULT_PANEL_WIDTH = 280;
+    const PANEL_LINE_TRANSITION_DURATION_MS = 820;
+    const PANEL_LINE_TRANSITION_EASING = "cubic-bezier(0.20, 0.70, 0.42, 0.96)";
 
     const getPanelTrackId = (uri) => {
         if (!uri) return null;
@@ -172,6 +174,8 @@
   --ivlyrics-panel-original-size: ${originalSize}px;
   --ivlyrics-panel-phonetic-size: ${phoneticSize}px;
   --ivlyrics-panel-translation-size: ${translationSize}px;
+  --ivlyrics-panel-line-transition-duration: ${PANEL_LINE_TRANSITION_DURATION_MS}ms;
+  --ivlyrics-panel-line-transition-easing: ${PANEL_LINE_TRANSITION_EASING};
 }
 
 /* ivLyrics 페이지에서는 패널 가사 숨기기 (중복 방지) */
@@ -376,7 +380,9 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   flex-direction: column !important;
   gap: var(--ivlyrics-panel-line-stack-gap, 10px) !important;
   transform: translateY(var(--ivlyrics-panel-stack-y, 0px)) !important;
-  transition: transform 520ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition:
+    transform var(--ivlyrics-panel-line-transition-duration, 820ms)
+      var(--ivlyrics-panel-line-transition-easing, cubic-bezier(0.20, 0.70, 0.42, 0.96)) !important;
   will-change: transform !important;
 }
 
@@ -385,6 +391,16 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   width: 100% !important;
   min-height: 0 !important;
   overflow: visible !important;
+}
+
+.ivlyrics-panel-lyrics-section.motion-reduced .ivlyrics-panel-lines-stack {
+  transition-duration: 1ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ivlyrics-panel-lines-stack {
+    transition-duration: 1ms !important;
+  }
 }
 
 .ivlyrics-panel-line-cell .ivlyrics-panel-line {
@@ -1646,6 +1662,14 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         }
         return getStorageValue(`ivLyrics:visual:${name}`, defaultValue);
     };
+
+    const isPanelMotionReduced = () => (
+        getVisualSetting("reduce-motion", false) === true ||
+        (
+            typeof window.matchMedia === "function" &&
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        )
+    );
 
     const translatePanelText = (key, fallback) => {
         try {
@@ -3193,6 +3217,57 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             prevProps.line === nextProps.line;
     });
 
+    const getPanelStackTranslateY = (wrapper) => {
+        const stack = wrapper?.querySelector('.ivlyrics-panel-lines-stack');
+        const currentCell = wrapper?.querySelector('.ivlyrics-panel-line-cell.current');
+        if (!stack || !currentCell) return null;
+
+        const wrapperCenter = wrapper.clientHeight / 2;
+        const anchorStack = currentCell.querySelector('[data-panel-vocal-anchor-position]');
+        const anchorPosition = Number(anchorStack?.getAttribute('data-panel-vocal-anchor-position'));
+        const anchorRowCount = Number(anchorStack?.getAttribute('data-panel-vocal-row-count'));
+        let currentCenter = currentCell.offsetTop + (currentCell.offsetHeight / 2);
+
+        if (anchorStack && Number.isFinite(anchorPosition) && Number.isFinite(anchorRowCount) && anchorRowCount > 0) {
+            const rows = Array.from(anchorStack.querySelectorAll('[data-panel-vocal-row-index]'));
+            const rowByIndex = new Map(rows.map((row) => [
+                Number(row.getAttribute('data-panel-vocal-row-index')),
+                row
+            ]));
+            const lowerIndex = Math.max(0, Math.min(anchorRowCount - 1, Math.floor(anchorPosition)));
+            const upperIndex = Math.max(0, Math.min(anchorRowCount - 1, Math.ceil(anchorPosition)));
+            const lowerRow = rowByIndex.get(lowerIndex);
+            const upperRow = rowByIndex.get(upperIndex) || lowerRow;
+
+            if (lowerRow && upperRow) {
+                const cellRect = currentCell.getBoundingClientRect();
+                const rowCenter = (row) => {
+                    const rect = row.getBoundingClientRect();
+                    return rect.top - cellRect.top + rect.height / 2;
+                };
+                const lowerCenter = rowCenter(lowerRow);
+                const upperCenter = rowCenter(upperRow);
+                const progress = Math.max(0, Math.min(1, anchorPosition - lowerIndex));
+                currentCenter = currentCell.offsetTop + lowerCenter + (upperCenter - lowerCenter) * progress;
+            }
+        } else {
+            const currentAnchor = currentCell.querySelector('.ivlyrics-panel-current-anchor');
+            if (currentAnchor) {
+                currentCenter = currentCell.offsetTop + currentAnchor.offsetTop + (currentAnchor.offsetHeight / 2);
+            }
+        }
+
+        return Math.round(wrapperCenter - currentCenter);
+    };
+
+    const updatePanelStackPosition = (wrapper) => {
+        const stack = wrapper?.querySelector('.ivlyrics-panel-lines-stack');
+        const translateY = getPanelStackTranslateY(wrapper);
+        if (!stack || translateY === null) return null;
+        stack.style.setProperty('--ivlyrics-panel-stack-y', `${translateY}px`);
+        return translateY;
+    };
+
     // ============================================
     // 패널 가사 메인 컴포넌트
     // ============================================
@@ -3220,9 +3295,12 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const [fontScale, setFontScale] = useState(parseInt(getStorageValue(FONT_SCALE_KEY, DEFAULT_FONT_SCALE), 10));
         const [instrumentalBreakRevision, setInstrumentalBreakRevision] = useState(0);
         const [textEffectRevision, setTextEffectRevision] = useState(0);
+        const [, setMotionRevision] = useState(0);
         const [isPlaybackPaused, setIsPlaybackPaused] = useState(getPlaybackPaused);
         const containerRef = useRef(null);
         const scrollRef = useRef(null);
+        const pendingLineTransitionRef = useRef(null);
+        const lineTransitionAnimationsRef = useRef(new Map());
         const lastTrackUri = useRef(
             hasCompleteInitialPresentation
                 ? initialTrackUri
@@ -3235,6 +3313,25 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
 
         const isActiveLoad = useCallback((loadSeq, trackUri) => {
             return loadSeqRef.current === loadSeq && Spicetify.Player.data?.item?.uri === trackUri;
+        }, []);
+
+        const capturePanelLineTransition = useCallback(() => {
+            if (isPanelMotionReduced()) {
+                pendingLineTransitionRef.current = null;
+                return;
+            }
+
+            const wrapper = scrollRef.current;
+            if (!wrapper) {
+                pendingLineTransitionRef.current = null;
+                return;
+            }
+
+            const positions = new Map();
+            wrapper.querySelectorAll('.ivlyrics-panel-line-cell[data-panel-line-key]').forEach((cell) => {
+                positions.set(cell.getAttribute('data-panel-line-key'), cell.getBoundingClientRect().top);
+            });
+            pendingLineTransitionRef.current = positions.size > 0 ? { positions } : null;
         }, []);
 
         const loadTrackOffset = useCallback(async (trackUri) => {
@@ -3733,6 +3830,9 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     event.detail?.name === 'sync-data-custom-speaker-colors-enabled') {
                     setTextEffectRevision((revision) => revision + 1);
                 }
+                if (event.detail?.name === 'reduce-motion') {
+                    setMotionRevision((revision) => revision + 1);
+                }
                 if (event.detail?.name === 'prefer-sync-data-provider' ||
                     event.detail?.name === 'prefer-lyrics-type-over-provider-order') {
                     const currentUri = Spicetify.Player.data?.item?.uri;
@@ -4219,13 +4319,19 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     adjustedPosition < trailingInterludeInfo.endTime
                     ? getTrailingKaraokeInterludeKey(newIndex, trailingInterludeInfo)
                     : null;
+                const lineChanged = newIndex !== lastIndex;
+                const trailingInterludeChanged = nextTrailingInterludeKey !== lastTrailingInterludeKey;
+
+                if (lineChanged || trailingInterludeChanged) {
+                    capturePanelLineTransition();
+                }
 
                 // 라인이 변경될 때만 상태 업데이트 (리렌더링 최소화)
-                if (newIndex !== lastIndex) {
+                if (lineChanged) {
                     lastIndex = newIndex;
                     setCurrentIndex(newIndex);
                 }
-                if (nextTrailingInterludeKey !== lastTrailingInterludeKey) {
+                if (trailingInterludeChanged) {
                     lastTrailingInterludeKey = nextTrailingInterludeKey;
                     setActiveTrailingInterludeKey(nextTrailingInterludeKey);
                 }
@@ -4248,7 +4354,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 // 전역 변수 정리
                 window._ivLyricsPanelCurrentTime = 0;
             };
-        }, [lyrics, isEnabled, trackOffset, globalOffset, karaokeSource, pseudoKaraokeAdvanceMs, autoInstrumentalBreakEnabled]); // currentIndex 의존성 제거
+        }, [lyrics, isEnabled, trackOffset, globalOffset, karaokeSource, pseudoKaraokeAdvanceMs, autoInstrumentalBreakEnabled, capturePanelLineTransition]); // currentIndex 의존성 제거
 
         // 스크롤 애니메이션 비활성화 - Now Playing 탭 스크롤 문제 방지
         // useEffect(() => {
@@ -4390,7 +4496,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const panelBgType = getStorageValue(BG_TYPE_KEY, DEFAULT_BG_TYPE);
         const usesBlurGradientPanelBg = panelBgType === 'album' || panelBgType === 'gradient';
         const usesTransparentPanelBg = panelBgType === 'transparent';
-        const sectionClassName = `${PANEL_SECTION_CLASS}${isPlaybackPaused ? " playback-paused" : ""}${usesBlurGradientPanelBg ? " blur-gradient-bg" : ""}${usesTransparentPanelBg ? " transparent-bg" : ""}`;
+        const reducePanelMotion = isPanelMotionReduced();
+        const sectionClassName = `${PANEL_SECTION_CLASS}${isPlaybackPaused ? " playback-paused" : ""}${usesBlurGradientPanelBg ? " blur-gradient-bg" : ""}${usesTransparentPanelBg ? " transparent-bg" : ""}${reducePanelMotion ? " motion-reduced" : ""}`;
         const panelBackgroundLayer = usesBlurGradientPanelBg
             ? react.createElement("div", {
                 className: "ivlyrics-panel-bg-gradient",
@@ -4404,6 +4511,87 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             : null;
         const activeVisibleIndex = visibleLines.findIndex((visLine) => visLine.isActive);
         const currentVisibleIndex = activeVisibleIndex >= 0 ? activeVisibleIndex : Math.floor(visibleLines.length / 2);
+        useLayoutEffect(() => {
+            const pendingTransition = pendingLineTransitionRef.current;
+            pendingLineTransitionRef.current = null;
+            if (!pendingTransition) return undefined;
+
+            const wrapper = scrollRef.current;
+            const stack = wrapper?.querySelector('.ivlyrics-panel-lines-stack');
+            if (!wrapper || !stack) return undefined;
+
+            lineTransitionAnimationsRef.current.forEach((animation) => animation.cancel());
+            lineTransitionAnimationsRef.current.clear();
+
+            // The visible window drops one row as the next one enters. Position
+            // the new window first, then visually continue each shared row from
+            // its exact pre-update location instead of letting the layout snap.
+            stack.style.setProperty('transition', 'none', 'important');
+            updatePanelStackPosition(wrapper);
+            void stack.offsetHeight;
+
+            if (!reducePanelMotion) {
+                wrapper.querySelectorAll('.ivlyrics-panel-line-cell[data-panel-line-key]').forEach((cell) => {
+                    const lineKey = cell.getAttribute('data-panel-line-key');
+                    const previousTop = pendingTransition.positions.get(lineKey);
+                    if (!Number.isFinite(previousTop) || typeof cell.animate !== 'function') return;
+
+                    const nextTop = cell.getBoundingClientRect().top;
+                    const deltaY = previousTop - nextTop;
+                    if (Math.abs(deltaY) < 0.5) return;
+
+                    const animation = cell.animate([
+                        { transform: `translate3d(0, ${deltaY}px, 0)` },
+                        { transform: 'translate3d(0, 0, 0)' }
+                    ], {
+                        duration: PANEL_LINE_TRANSITION_DURATION_MS,
+                        easing: PANEL_LINE_TRANSITION_EASING,
+                        fill: 'both'
+                    });
+                    lineTransitionAnimationsRef.current.set(lineKey, animation);
+                    animation.onfinish = () => {
+                        if (lineTransitionAnimationsRef.current.get(lineKey) !== animation) return;
+                        lineTransitionAnimationsRef.current.delete(lineKey);
+                        animation.cancel();
+                    };
+                    animation.oncancel = () => {
+                        if (lineTransitionAnimationsRef.current.get(lineKey) === animation) {
+                            lineTransitionAnimationsRef.current.delete(lineKey);
+                        }
+                    };
+                });
+            }
+
+            const restoreTransitionFrame = requestAnimationFrame(() => {
+                stack.style.removeProperty('transition');
+            });
+
+            return () => {
+                cancelAnimationFrame(restoreTransitionFrame);
+                stack.style.removeProperty('transition');
+            };
+        }, [
+            visibleLines,
+            currentVisibleIndex,
+            fontScale,
+            panelLineSlotHeight,
+            instrumentalBreakRevision,
+            textEffectRevision,
+            reducePanelMotion
+        ]);
+
+        useEffect(() => {
+            if (!reducePanelMotion) return;
+            pendingLineTransitionRef.current = null;
+            lineTransitionAnimationsRef.current.forEach((animation) => animation.cancel());
+            lineTransitionAnimationsRef.current.clear();
+        }, [reducePanelMotion]);
+
+        useEffect(() => () => {
+            lineTransitionAnimationsRef.current.forEach((animation) => animation.cancel());
+            lineTransitionAnimationsRef.current.clear();
+        }, []);
+
         useEffect(() => {
             const wrapper = scrollRef.current;
             if (!wrapper) return undefined;
@@ -4412,44 +4600,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             let lastAnchorLayoutKey = null;
             const updateStackPosition = () => {
                 frameId = null;
-                const stack = wrapper.querySelector('.ivlyrics-panel-lines-stack');
-                const currentCell = wrapper.querySelector('.ivlyrics-panel-line-cell.current');
-                if (!stack || !currentCell) return;
-
-                const wrapperCenter = wrapper.clientHeight / 2;
-                const anchorStack = currentCell.querySelector('[data-panel-vocal-anchor-position]');
-                const anchorPosition = Number(anchorStack?.getAttribute('data-panel-vocal-anchor-position'));
-                const anchorRowCount = Number(anchorStack?.getAttribute('data-panel-vocal-row-count'));
-                let currentCenter = currentCell.offsetTop + (currentCell.offsetHeight / 2);
-                if (anchorStack && Number.isFinite(anchorPosition) && Number.isFinite(anchorRowCount) && anchorRowCount > 0) {
-                    const rows = Array.from(anchorStack.querySelectorAll('[data-panel-vocal-row-index]'));
-                    const rowByIndex = new Map(rows.map((row) => [
-                        Number(row.getAttribute('data-panel-vocal-row-index')),
-                        row
-                    ]));
-                    const lowerIndex = Math.max(0, Math.min(anchorRowCount - 1, Math.floor(anchorPosition)));
-                    const upperIndex = Math.max(0, Math.min(anchorRowCount - 1, Math.ceil(anchorPosition)));
-                    const lowerRow = rowByIndex.get(lowerIndex);
-                    const upperRow = rowByIndex.get(upperIndex) || lowerRow;
-                    if (lowerRow && upperRow) {
-                        const cellRect = currentCell.getBoundingClientRect();
-                        const rowCenter = (row) => {
-                            const rect = row.getBoundingClientRect();
-                            return rect.top - cellRect.top + rect.height / 2;
-                        };
-                        const lowerCenter = rowCenter(lowerRow);
-                        const upperCenter = rowCenter(upperRow);
-                        const progress = Math.max(0, Math.min(1, anchorPosition - lowerIndex));
-                        currentCenter = currentCell.offsetTop + lowerCenter + (upperCenter - lowerCenter) * progress;
-                    }
-                } else {
-                    const currentAnchor = currentCell.querySelector('.ivlyrics-panel-current-anchor');
-                    if (currentAnchor) {
-                        currentCenter = currentCell.offsetTop + currentAnchor.offsetTop + (currentAnchor.offsetHeight / 2);
-                    }
-                }
-                const translateY = Math.round(wrapperCenter - currentCenter);
-                stack.style.setProperty('--ivlyrics-panel-stack-y', `${translateY}px`);
+                updatePanelStackPosition(wrapper);
             };
             const scheduleUpdate = () => {
                 if (frameId !== null) {
@@ -4552,7 +4703,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     visibleLines.map((visLine) =>
                         react.createElement("div", {
                             key: `cell-${visLine.index}`,
-                            className: `ivlyrics-panel-line-cell${visLine.isActive ? " current ivlyrics-panel-current-line" : ""}`
+                            className: `ivlyrics-panel-line-cell${visLine.isActive ? " current ivlyrics-panel-current-line" : ""}`,
+                            "data-panel-line-key": String(visLine.index)
                         },
                             renderVisibleLine(visLine, "stack")
                         )
