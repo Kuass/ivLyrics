@@ -33,8 +33,12 @@ test('cultural annotations are default-off and wired into lyrics rendering', () 
     assert.match(indexSource, /Translator\.generateCulturalAnnotations/);
     assert.match(indexSource, /applyCulturalAnnotations\(processedLyrics, this\.state\.uri\)/);
     assert.match(pagesSource, /LyricsLine-culturalNote/);
-    assert.match(pagesSource, /`↳ \$\{displayedCulturalNote\}`/);
+    assert.match(pagesSource, /lyrics-cultural-marker/);
+    assert.match(pagesSource, /`\$\{displayedCulturalAnnotation\.marker\}\. \$\{displayedCulturalAnnotation\.note\}`/);
+    assert.doesNotMatch(pagesSource, /`↳ \$\{displayedCulturalNote\}`/);
     assert.match(pagesSource, /!shouldRenderInterlude && !singleLineScroll && renderLyricSubLine\(/);
+    assert.match(indexSource, /const schemaVersion = 2/);
+    assert.match(lyricsServiceSource, /schemaVersion = 2/);
     assert.match(vinylSource, /singleLineScroll: true/);
     assert.doesNotMatch(panelSource, /culturalNote|LyricsLine-culturalNote/);
     assert.match(settingsSource, /key: "cultural-annotations-enabled"/);

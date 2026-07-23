@@ -1974,7 +1974,97 @@ const useScrollActivity = (containerRef, deps = []) => {
 	return { isScrolling, handleContainerClick };
 };
 
-const renderLyricSubLine = (className, text, onContextMenu = null, singleLineScroll = false) => {
+const normalizeDisplayedCulturalAnnotation = (value) => {
+	if (!value) return null;
+	if (typeof value === "string") {
+		const note = value.trim();
+		return note ? { marker: 1, expression: "", note } : null;
+	}
+
+	const marker = Number(value.marker);
+	const expression = String(value.expression || "").trim();
+	const note = String(value.note || "").trim();
+	if (!Number.isInteger(marker) || marker < 1 || !note) return null;
+	return { marker, expression, note };
+};
+
+const getRubySourceText = (value) => String(value || "")
+	.replace(/<rt>[\s\S]*?<\/rt>/gi, "")
+	.replace(/<rp>[\s\S]*?<\/rp>/gi, "")
+	.replace(/<\/?ruby>/gi, "");
+
+const getCulturalMarkerHTML = (marker) =>
+	`<sup class="lyrics-cultural-marker">[${marker}]</sup>`;
+
+const renderAnnotatedLyricHTML = (text, annotation) => {
+	const normalizedText = String(text || "");
+	const html = Utils.rubyTextToHTML(normalizedText);
+	if (!annotation) return html;
+
+	const expression = annotation.expression;
+	const sourceText = getRubySourceText(normalizedText);
+	const expressionStart = expression ? sourceText.indexOf(expression) : -1;
+	if (expressionStart < 0) {
+		return `${html}${getCulturalMarkerHTML(annotation.marker)}`;
+	}
+
+	const sourceEnd = expressionStart + expression.length;
+	let sourceOffset = 0;
+	let rawOffset = normalizedText.length;
+	let skipUntil = "";
+	for (let index = 0; index < normalizedText.length; index += 1) {
+		const remaining = normalizedText.slice(index).toLowerCase();
+		if (skipUntil) {
+			const closingIndex = remaining.indexOf(skipUntil);
+			if (closingIndex < 0) break;
+			index += closingIndex + skipUntil.length - 1;
+			skipUntil = "";
+			continue;
+		}
+		if (remaining.startsWith("<rt>")) {
+			skipUntil = "</rt>";
+			index += 3;
+			continue;
+		}
+		if (remaining.startsWith("<rp>")) {
+			skipUntil = "</rp>";
+			index += 3;
+			continue;
+		}
+		if (normalizedText[index] === "<") {
+			const tagEnd = normalizedText.indexOf(">", index);
+			if (tagEnd >= 0) {
+				index = tagEnd;
+				continue;
+			}
+		}
+
+		sourceOffset += 1;
+		if (sourceOffset === sourceEnd) {
+			rawOffset = index + 1;
+			break;
+		}
+	}
+
+	const openRubyIndex = normalizedText.lastIndexOf("<ruby>", rawOffset);
+	const closedRubyIndex = normalizedText.lastIndexOf("</ruby>", rawOffset);
+	if (openRubyIndex > closedRubyIndex) {
+		const rubyEnd = normalizedText.indexOf("</ruby>", rawOffset);
+		if (rubyEnd >= 0) rawOffset = rubyEnd + "</ruby>".length;
+	}
+
+	const markerToken = `\uE000iv-cultural-${annotation.marker}\uE001`;
+	const markedText = `${normalizedText.slice(0, rawOffset)}${markerToken}${normalizedText.slice(rawOffset)}`;
+	return Utils.rubyTextToHTML(markedText).replace(markerToken, getCulturalMarkerHTML(annotation.marker));
+};
+
+const renderLyricSubLine = (
+	className,
+	text,
+	onContextMenu = null,
+	singleLineScroll = false,
+	culturalAnnotation = null
+) => {
 	if (!text) return null;
 	const props = {
 		className: `${className}${singleLineScroll ? " ivlyrics-vinyl-lyric-scroll-viewport" : ""}`,
@@ -1985,7 +2075,7 @@ const renderLyricSubLine = (className, text, onContextMenu = null, singleLineScr
 	}
 
 	if (typeof text === "string" && text) {
-		const html = Utils.rubyTextToHTML(text);
+		const html = renderAnnotatedLyricHTML(text, culturalAnnotation);
 		if (!singleLineScroll) {
 			props.dangerouslySetInnerHTML = { __html: html };
 			return react.createElement("p", props);
@@ -2026,6 +2116,7 @@ const renderLyricMainContent = ({
   activeGlobalCharIndex = -1,
   subText = null,
   subText2 = null,
+  culturalAnnotation = null,
 }) => {
   if (isKara) {
           return react.createElement(KaraokeLine, {
@@ -2041,6 +2132,7 @@ const renderLyricMainContent = ({
                   activeGlobalCharIndex,
                   phonetic: subText,
                   translation: subText2,
+                  culturalAnnotation,
           });
   }
 
@@ -3644,7 +3736,22 @@ const LyricsLineBlock = react.memo(({
 		originalText,
 		text2: subText2,
   });
-	const displayedCulturalNote = culturalNote || mainLine?.culturalNote || null;
+	const displayedCulturalAnnotation = singleLineScroll
+		? null
+		: normalizeDisplayedCulturalAnnotation(culturalNote || mainLine?.culturalNote);
+	const expressionMatches = (text) =>
+		typeof text === "string" &&
+		displayedCulturalAnnotation?.expression &&
+		getRubySourceText(text).includes(displayedCulturalAnnotation.expression);
+	const culturalMarkerTarget = !displayedCulturalAnnotation || isKara
+		? null
+		: expressionMatches(mainText)
+			? "main"
+			: expressionMatches(subText)
+				? "sub"
+				: expressionMatches(subText2)
+					? "sub2"
+					: "main";
   const hasParallelKaraokeRows = isKara && hasKaraokeVocalRows(mainLine);
   const interludeInfo = mainLine?.interludeInfo || getInterludeInfo(mainLine);
 	const shouldRenderInterlude = interludeInfo.isInterlude;
@@ -3662,7 +3769,10 @@ const LyricsLineBlock = react.memo(({
 	};
 
 	const mainHtml = !shouldRenderInterlude && typeof mainText === "string" && !isKara && mainText
-		? Utils.rubyTextToHTML(mainText)
+		? renderAnnotatedLyricHTML(
+			mainText,
+			culturalMarkerTarget === "main" ? displayedCulturalAnnotation : null
+		)
 		: null;
 
 	if (shouldRenderInterlude) {
@@ -3697,6 +3807,7 @@ const LyricsLineBlock = react.memo(({
 			activeGlobalCharIndex,
 			subText,
 			subText2,
+			culturalAnnotation: displayedCulturalAnnotation,
 		});
 	const renderedMainContent = singleLineScroll && !shouldRenderInterlude
 		? react.createElement(
@@ -3729,7 +3840,8 @@ const LyricsLineBlock = react.memo(({
 			subCopyText
 				? createCopyHandler(subCopyText, subCopySuccessKey, subCopyFailureKey)
 				: null,
-			singleLineScroll
+			singleLineScroll,
+			culturalMarkerTarget === "sub" ? displayedCulturalAnnotation : null
 		),
 		!shouldRenderInterlude && !hasParallelKaraokeRows && renderLyricSubLine(
 			"lyrics-lyricsContainer-LyricsLine-translation",
@@ -3737,14 +3849,17 @@ const LyricsLineBlock = react.memo(({
 			subText2CopyText
 				? createCopyHandler(subText2CopyText, subText2CopySuccessKey, subText2CopyFailureKey)
 				: null,
-			singleLineScroll
+			singleLineScroll,
+			culturalMarkerTarget === "sub2" ? displayedCulturalAnnotation : null
 		),
 		!shouldRenderInterlude && !singleLineScroll && renderLyricSubLine(
 			"lyrics-lyricsContainer-LyricsLine-culturalNote",
-			displayedCulturalNote ? `↳ ${displayedCulturalNote}` : null,
-			displayedCulturalNote
+			displayedCulturalAnnotation
+				? `${displayedCulturalAnnotation.marker}. ${displayedCulturalAnnotation.note}`
+				: null,
+			displayedCulturalAnnotation
 				? createCopyHandler(
-					displayedCulturalNote,
+					`${displayedCulturalAnnotation.marker}. ${displayedCulturalAnnotation.note}`,
 					"notifications.translationCopied",
 					"notifications.translationCopyFailed"
 				)
@@ -4966,7 +5081,7 @@ const getKaraokeBounceValues = (position, isActive, startTime, endTime, attenuat
 	};
 };
 
-const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0, globalCharOffset = 0, activeGlobalCharIndex = -1, phonetic = null, translation = null, furiganaMapOverride = null }) => {
+const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0, globalCharOffset = 0, activeGlobalCharIndex = -1, phonetic = null, translation = null, furiganaMapOverride = null, culturalAnnotation = null }) => {
   if (!line) {
           return "";
   }
@@ -4993,9 +5108,18 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
           const rowPhonetics = splitLineByVocalRowShape(phonetic, vocalRows);
           const rowTranslations = splitLineByVocalRowShape(translation, vocalRows);
           const hasRowPhoneticSubline = vocalRows.some((row, rowIndex) => row.phonetic || rowPhonetics[rowIndex]);
-          const hasRowTranslationSubline = vocalRows.some((row, rowIndex) => row.translation || rowTranslations[rowIndex]);
+		const hasRowTranslationSubline = vocalRows.some((row, rowIndex) => row.translation || rowTranslations[rowIndex]);
 		const stackPhonetic = !hasRowPhoneticSubline && typeof phonetic === "string" ? phonetic.trim() : "";
 		const stackTranslation = !hasRowTranslationSubline && typeof translation === "string" ? translation.trim() : "";
+		const matchingCulturalRowIndex = culturalAnnotation
+			? vocalRowRenderData.findIndex(({ line: rowLine }) =>
+				culturalAnnotation.expression &&
+				getCopyableText(rowLine.originalText || rowLine.text).includes(culturalAnnotation.expression)
+			)
+			: -1;
+		const culturalRowIndex = culturalAnnotation
+			? (matchingCulturalRowIndex >= 0 ? matchingCulturalRowIndex : vocalRows.length - 1)
+			: -1;
           let rowGlobalCharOffset = globalCharOffset;
           const stackChildren = vocalRows.map((row, rowIndex) => {
                   const rowRenderData = vocalRowRenderData[rowIndex];
@@ -5014,6 +5138,7 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 			const rowActiveGlobalCharIndex = rowActiveCharIndex >= 0 ? currentOffset + rowActiveCharIndex : -1;
 			const rowPhonetic = row.phonetic || rowPhonetics[rowIndex] || "";
 			const rowTranslation = row.translation || rowTranslations[rowIndex] || "";
+			const rowCulturalAnnotation = rowIndex === culturalRowIndex ? culturalAnnotation : null;
 
 			return react.createElement(
                           "span",
@@ -5030,6 +5155,7 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 					settingsRevision,
 					globalCharOffset: currentOffset,
 					activeGlobalCharIndex: rowActiveGlobalCharIndex,
+					culturalAnnotation: rowCulturalAnnotation,
 				}),
 				rowPhonetic && react.createElement(
 					"span",
@@ -5106,6 +5232,21 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 		};
 	}, [line, furiganaEnabled, furiganaReady, detectedLanguage, furiganaMapOverride]);
 	const isComplete = isActive && position >= endTime;
+	const culturalMarkerCharIndex = (() => {
+		const expression = culturalAnnotation?.expression;
+		if (!expression || timedChars.length === 0) return -1;
+		const timedText = timedChars.map(charInfo => String(charInfo?.char || "")).join("");
+		const expressionStart = timedText.indexOf(expression);
+		if (expressionStart < 0) return -1;
+
+		const expressionEnd = expressionStart + expression.length;
+		let textOffset = 0;
+		for (let index = 0; index < timedChars.length; index += 1) {
+			textOffset += String(timedChars[index]?.char || "").length;
+			if (textOffset >= expressionEnd) return index;
+		}
+		return -1;
+	})();
 
 	const charElements = useTextRun ? [] : timedChars.map((charInfo, index) => {
 		const fillRatio = getKaraokeCharFill(
@@ -5153,19 +5294,32 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 		);
 		const reading = furiganaMap.get(index);
 
-		if (!reading) {
-			return charNode;
+		const renderedCharNode = reading
+			? react.createElement(
+				"ruby",
+				{
+					className: `lyrics-karaoke-ruby lyrics-karaoke-ruby--${charState}`,
+					style: karaokeStyle,
+					key: `karaoke-ruby-${index}`,
+				},
+				charNode,
+				react.createElement("rt", null, reading)
+			)
+			: charNode;
+
+		if (index !== culturalMarkerCharIndex) {
+			return renderedCharNode;
 		}
 
 		return react.createElement(
-			"ruby",
-			{
-				className: `lyrics-karaoke-ruby lyrics-karaoke-ruby--${charState}`,
-				style: karaokeStyle,
-				key: `karaoke-ruby-${index}`,
-			},
-			charNode,
-			react.createElement("rt", null, reading)
+			react.Fragment,
+			{ key: `karaoke-cultural-marker-${index}` },
+			renderedCharNode,
+			react.createElement(
+				"sup",
+				{ className: "lyrics-cultural-marker" },
+				`[${culturalAnnotation.marker}]`
+			)
 		);
 	});
 	const lineChildren = useTextRun
@@ -5188,7 +5342,14 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 			className: `lyrics-karaoke-line${wrapByWord || useTextRun ? " has-word-wrap" : ""}${useTextRun ? " is-text-run" : ""}${textDirection === "rtl" ? " is-rtl" : ""}${isActive ? " is-active" : ""}${isComplete ? " is-complete" : ""}`,
 			dir: useTextRun ? (textDirection === "rtl" ? "ltr" : textDirection) : undefined,
 		},
-		lineChildren
+		lineChildren,
+		culturalAnnotation && (useTextRun || culturalMarkerCharIndex < 0)
+			? react.createElement(
+				"sup",
+				{ className: "lyrics-cultural-marker" },
+				`[${culturalAnnotation.marker}]`
+			)
+			: null
 	);
 });
 

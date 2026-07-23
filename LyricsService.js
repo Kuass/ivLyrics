@@ -7797,6 +7797,7 @@
             lines,
             sourceLang = 'auto',
             provider = null,
+            schemaVersion = 2,
             ignoreCache = false,
             onProviderLoading = null
         }) {
@@ -7823,7 +7824,10 @@
             }
 
             const targetLang = getTranslationTargetLanguage();
-            const sourceHash = getLyricsTextCacheHash(JSON.stringify(normalizedLines));
+            const sourceHash = getLyricsTextCacheHash(JSON.stringify({
+                schemaVersion,
+                lines: normalizedLines
+            }));
             const availableProviderIds = provider
                 ? [provider]
                 : window.AIAddonManager

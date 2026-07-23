@@ -87,9 +87,9 @@ function createCapturingProvider(captures) {
             captures.cultural = params;
             return {
                 annotations: [
-                    { lineIndex: 2, note: '두 번째 문화 설명' },
-                    { lineIndex: 99, note: '잘못된 줄' },
-                    { lineIndex: 2, note: '중복 설명' }
+                    { lineIndex: 2, expression: '缶蹴り', note: '깡통을 이용하는 일본의 술래잡기다.' },
+                    { lineIndex: 99, expression: '없는 표현', note: '잘못된 줄' },
+                    { lineIndex: 2, expression: '缶蹴り', note: '중복 설명' }
                 ]
             };
         },
@@ -199,6 +199,9 @@ test('all shared prompt builders are exposed by AIAddonManager', () => {
     assert.match(cultural, /ordinary translation cannot fully convey/i);
     assert.match(cultural, /When uncertain, omit the annotation/);
     assert.match(cultural, /Do not infer a country or culture from the source language alone/);
+    assert.match(cultural, /"Monday", "bad days", and "Not today"/);
+    assert.match(cultural, /exact, contiguous substring/);
+    assert.match(cultural, /no more than 72 characters/);
     assert.match(cultural, /\"lineIndex\":2,\"text\":\"缶蹴り\"/);
     assert.match(cultural, /Korean \(한국어\)/);
 });
@@ -262,7 +265,11 @@ test('manager injects central prompts into every provider capability', async () 
     assert.deepEqual(
         JSON.parse(JSON.stringify(culturalResult)),
         {
-            annotations: [{ lineIndex: 2, note: '두 번째 문화 설명' }],
+            annotations: [{
+                lineIndex: 2,
+                expression: '缶蹴り',
+                note: '깡통을 이용하는 일본의 술래잡기다.'
+            }],
             provider: 'test-provider'
         }
     );
@@ -297,6 +304,48 @@ test('an empty cultural annotation list is a valid provider result', async () =>
         JSON.parse(JSON.stringify(result)),
         { annotations: [], provider: 'test-provider' }
     );
+});
+
+test('cultural annotations reject unmatched expressions and compact long notes', async () => {
+    const manager = loadManager();
+    const captures = {
+        lyrics: [],
+        metadata: null,
+        tmi: null,
+        study: null,
+        cultural: null,
+        character: []
+    };
+    const provider = createCapturingProvider(captures);
+    provider.generateCulturalAnnotations = async () => ({
+        annotations: [
+            {
+                lineIndex: 0,
+                expression: '缶蹴り',
+                note: '일본에서 깡통을 이용해 진행하는 어린이 술래잡기 놀이로, 술래가 깡통을 지키는 동안 다른 아이들은 숨고 잡힌 아이를 구할 수도 있다.'
+            },
+            {
+                lineIndex: 1,
+                expression: '원문에 없음',
+                note: '표시되면 안 되는 설명'
+            }
+        ]
+    });
+
+    assert.equal(manager.register(provider), true);
+    manager.setProviderEnabled(provider.id, true);
+    const result = await manager.generateCulturalAnnotations({
+        sourceLang: 'ja',
+        targetLang: 'ko',
+        lines: [
+            { lineIndex: 0, text: '缶蹴りをしよう' },
+            { lineIndex: 1, text: '普通の文' }
+        ]
+    });
+
+    assert.equal(result.annotations.length, 1);
+    assert.equal(result.annotations[0].expression, '缶蹴り');
+    assert.ok(Array.from(result.annotations[0].note).length <= 72);
 });
 
 test('built-in providers contain transport code but no prompt builders or language tables', () => {

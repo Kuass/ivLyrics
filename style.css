@@ -4099,6 +4099,22 @@ div.lyrics-tabBar-headerItemLink {
 }
 
 /* Sparse AI-generated cultural context shown only on annotated lyric lines. */
+.lyrics-cultural-marker {
+  display: inline;
+  margin-inline-start: 0.12em;
+  color: currentColor;
+  font-family: var(--lyrics-font-family, var(--font-family));
+  font-size: 0.38em;
+  font-weight: 500;
+  line-height: 0;
+  letter-spacing: 0;
+  vertical-align: super;
+  opacity: 0.72;
+  -webkit-text-fill-color: currentColor;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+
 .lyrics-lyricsContainer-LyricsLine-culturalNote {
   max-width: min(56rem, 100%);
   margin-top: 10px;

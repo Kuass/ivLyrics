@@ -507,28 +507,36 @@ DO NOT ANNOTATE:
 - grammar or word formation unless it is directly necessary for the cultural explanation
 
 STRICT JUDGMENT RULES:
-- When uncertain, omit the annotation. Accuracy matters more than quantity.
+- Apply a strict foreign-reader test: after a competent natural translation, would an ordinary reader still miss a concrete culture-specific referent or implication? If not, omit it.
+- Require high confidence and specific evidence. When uncertain, omit the annotation. Zero annotations is preferable to a weak one.
+- Do not treat code-switching, the use of English in J-pop or K-pop, common weekday phrases, ordinary pop-song conventions, familiar emotional clichés, or universal wordplay as cultural knowledge.
+- Expressions such as "Monday", "bad days", and "Not today" are ordinary language and MUST NOT be annotated without an unmistakable reference to a specific work, custom, institution, or historical event.
+- A phrase merely being common in songs, anime, television, or everyday speech is not enough. There must be a specific cultural fact that translation alone cannot carry.
 - Mention a quotation or parody only when the evidence is strong. Do not speculate.
 - Do not infer a country or culture from the source language alone. Use internal textual evidence. If the culture is unclear, omit it.
 - Explain a repeated cultural expression in detail only at its first occurrence.
 - Do not translate the full lyrics.
 - Every note must be written naturally in ${targetLangInfo.native}.
-- When explaining an original expression, include its natural ${targetLangInfo.native} translation in this exact conceptual format: 「original expression」(natural translation). Use locally natural quotation marks if 「」 is inappropriate.
-- Keep each note concise but complete, normally one or two sentences.
+- Return expression as the shortest exact substring copied from the input line that should receive the footnote marker.
+- Do not repeat or quote expression in note. Give only the missing cultural fact, including a natural ${targetLangInfo.native} meaning when it is needed.
+- Keep note to one short sentence and no more than 72 characters. Remove scene-setting, hedging, and conclusions.
 
 OUTPUT CONTRACT:
 - Return ONLY valid JSON, without Markdown or code fences.
 - Return sparse annotations only. An empty annotations array is a correct result when no cultural explanation is needed.
 - Use only lineIndex values present in the input.
 - Each annotated line may appear at most once.
-- Put the complete display-ready explanation in note. Do not prefix note with ↳; the app adds it.
+- expression must be an exact, contiguous substring of that input line.
+- Do not add footnote numbers. The app numbers annotations in lyric order.
+- Put the short display-ready explanation in note without repeating expression.
 
 Output shape:
 {
   "annotations": [
     {
       "lineIndex": 0,
-      "note": "Explanation in ${targetLangInfo.native}, including 「original expression」(natural translation)."
+      "expression": "exact source substring",
+      "note": "One short cultural fact in ${targetLangInfo.native}."
     }
   ]
 }
@@ -538,25 +546,51 @@ ${JSON.stringify(payload)}`;
     }
 
     function normalizeCulturalAnnotationsResult(result, lines, providerId) {
-        const validIndexes = new Set(
+        const lineTextByIndex = new Map(
             (Array.isArray(lines) ? lines : [])
-                .map((line, fallbackIndex) => Number(line?.lineIndex ?? line?.index ?? fallbackIndex))
-                .filter(Number.isInteger)
+                .map((line, fallbackIndex) => [
+                    Number(line?.lineIndex ?? line?.index ?? fallbackIndex),
+                    String(line?.text ?? '')
+                ])
+                .filter(([lineIndex]) => Number.isInteger(lineIndex))
         );
         if (!result || !Array.isArray(result.annotations)) {
             throw new Error(`[AIAddonManager] Provider ${providerId || 'unknown'} returned an invalid cultural annotations result`);
         }
 
+        const compactNote = (value) => {
+            const normalized = String(value ?? '').replace(/\s+/g, ' ').trim();
+            if (!normalized) return '';
+
+            const firstSentence = normalized.match(/^.*?[.!?。！？](?=\s|$)/u)?.[0] || normalized;
+            const characters = Array.from(firstSentence);
+            if (characters.length <= 72) return firstSentence;
+
+            const clipped = characters.slice(0, 71).join('');
+            const lastSpace = clipped.lastIndexOf(' ');
+            const safeClip = lastSpace >= 36 ? clipped.slice(0, lastSpace) : clipped;
+            return `${safeClip.replace(/[,:;，：；\s]+$/u, '')}…`;
+        };
+
         const seenIndexes = new Set();
         const annotations = [];
         for (const item of result.annotations) {
             const lineIndex = Number(item?.lineIndex);
-            const note = String(item?.note ?? '').trim();
-            if (!Number.isInteger(lineIndex) || !validIndexes.has(lineIndex) || !note || seenIndexes.has(lineIndex)) {
+            const expression = String(item?.expression ?? '').trim();
+            const note = compactNote(item?.note);
+            const lineText = lineTextByIndex.get(lineIndex);
+            if (
+                !Number.isInteger(lineIndex) ||
+                !lineText ||
+                !expression ||
+                !lineText.includes(expression) ||
+                !note ||
+                seenIndexes.has(lineIndex)
+            ) {
                 continue;
             }
             seenIndexes.add(lineIndex);
-            annotations.push({ lineIndex, note });
+            annotations.push({ lineIndex, expression, note });
         }
 
         annotations.sort((a, b) => a.lineIndex - b.lineIndex);
@@ -1990,7 +2024,7 @@ ${normalizedText}
         /**
          * 번역만으로 전달되지 않는 줄별 문화적 배경 설명 생성
          * @param {Object} params - { trackId, title, artist, targetLang, sourceLang, lines, provider, onProviderLoading }
-         * @returns {Promise<{annotations: Array<{lineIndex: number, note: string}>, provider: string|null}>}
+         * @returns {Promise<{annotations: Array<{lineIndex: number, expression: string, note: string}>, provider: string|null}>}
          */
         async generateCulturalAnnotations(params) {
             let providers = this.getEnabledProvidersFor('culturalAnnotations');

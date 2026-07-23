@@ -4667,7 +4667,8 @@ class LyricsContainer extends react.Component {
 
     const targetLang = this.getTranslationTargetLanguage();
     const sourceSignature = getTranslationSourceCacheHash(JSON.stringify(lines));
-    const resultKey = `${sourceLang || "auto"}:${targetLang}:${sourceSignature}`;
+    const schemaVersion = 2;
+    const resultKey = `v${schemaVersion}:${sourceLang || "auto"}:${targetLang}:${sourceSignature}`;
     if (!ignoreCache && this._culturalAnnotationResults.get(uri)?.key === resultKey) {
       return Promise.resolve(this._culturalAnnotationResults.get(uri));
     }
@@ -4686,6 +4687,7 @@ class LyricsContainer extends react.Component {
       artist: lyricsState.artist || this.state.artist,
       lines,
       sourceLang: sourceLang || "auto",
+      schemaVersion,
       ignoreCache,
       onProviderLoading: ({ providerId, providerName }) => {
         const providerLabel = String(providerName || providerId || "").trim();
@@ -4701,8 +4703,19 @@ class LyricsContainer extends react.Component {
       }
       const notesByIndex = new Map(
         (Array.isArray(result?.annotations) ? result.annotations : [])
-          .map(annotation => [Number(annotation.lineIndex), String(annotation.note || "").trim()])
-          .filter(([lineIndex, note]) => Number.isInteger(lineIndex) && note)
+          .map((annotation, annotationIndex) => [
+            Number(annotation.lineIndex),
+            {
+              marker: annotationIndex + 1,
+              expression: String(annotation.expression || "").trim(),
+              note: String(annotation.note || "").trim(),
+            },
+          ])
+          .filter(([lineIndex, annotation]) =>
+            Number.isInteger(lineIndex) &&
+            annotation.expression &&
+            annotation.note
+          )
       );
       this._culturalAnnotationResults.set(uri, {
         key: resultKey,
