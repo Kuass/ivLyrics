@@ -4200,6 +4200,7 @@ class LyricsContainer extends react.Component {
     this.pendingStreamingPayload = null;
     this.floatingMenuCloseTimer = null;
     this._sharedPresentationKeys = new Map();
+    this._invalidatedSharedPresentations = new Map();
     this._culturalAnnotationResults = new Map();
     this._culturalAnnotationRequests = new Map();
     this._culturalAnnotationCacheEpoch = 0;
@@ -4913,6 +4914,12 @@ class LyricsContainer extends react.Component {
 
   invalidateSharedLyricsPresentation(trackUri) {
     if (!trackUri) return;
+    const snapshot = window.LyricsService?.getLyricsSnapshot?.(trackUri) || null;
+    if (snapshot) {
+      this._invalidatedSharedPresentations?.set(trackUri, snapshot);
+    } else {
+      this._invalidatedSharedPresentations?.delete(trackUri);
+    }
     this._sharedPresentationKeys?.delete(trackUri);
     window.LyricsService?.clearLyricsPresentationSnapshot?.(trackUri);
   }
@@ -6627,7 +6634,18 @@ class LyricsContainer extends react.Component {
       uri,
     });
     const sharedSnapshot = window.LyricsService?.getLyricsSnapshot?.(uri);
-    const sharedPresentationMatches = sharedSnapshot?.presentationComplete === true &&
+    const invalidatedSharedPresentation =
+      this._invalidatedSharedPresentations?.get(uri) || null;
+    if (
+      invalidatedSharedPresentation &&
+      sharedSnapshot &&
+      sharedSnapshot !== invalidatedSharedPresentation
+    ) {
+      this._invalidatedSharedPresentations.delete(uri);
+    }
+    const sharedPresentationMatches =
+      sharedSnapshot !== invalidatedSharedPresentation &&
+      sharedSnapshot?.presentationComplete === true &&
       Array.isArray(sharedSnapshot?.displayLyrics) &&
       sharedSnapshot.trackUri === uri &&
       (sharedSnapshot.provider || '') === (lyricsState.provider || '') &&
