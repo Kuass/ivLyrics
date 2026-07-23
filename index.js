@@ -5634,6 +5634,8 @@ class LyricsContainer extends react.Component {
       this._dmResults[currentUri].lastMode2 = mode2;
       this._dmResults[currentUri].lastProvider = currentProvider;
       this._dmResults[currentUri].lastRendererVersion = getSyncDataRendererCacheVersion(lyricsState);
+      this._dmResults[currentUri].lastLyricsShapeSignature =
+        getLyricsProcessingShapeSignature(originalLyrics);
 
       const mapResultLinesToLyrics = (linesInput, targetField) => {
         return mapTranslationLinesToLyrics(originalLyrics, linesInput, { targetField });
