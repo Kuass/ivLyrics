@@ -7,50 +7,51 @@ const VinylActiveLyricRenderer = (() => {
     const { useLayoutEffect, useMemo, useRef } = react;
     const primitives = window.ivLyricsLyricRendererPrimitives;
 
-    const SCROLL_EDGE_HOLD_MS = 1050;
-    const SCROLL_MIN_MOVE_MS = 1800;
-    const SCROLL_MAX_MOVE_MS = 5600;
-    const SCROLL_SPEED_PX_PER_SECOND = 46;
+    // Match the mobile LP lyric surface: hold, traverse once, then hold.
+    const SCROLL_START_HOLD_PROGRESS = 0.3;
+    const SCROLL_MOVE_PROGRESS = 0.4;
     const SCROLL_OVERFLOW_THRESHOLD_PX = 1;
-    const SCROLL_EASING = "cubic-bezier(0.333333, 0, 0.666667, 1)";
 
-    const getScrollMotion = (travelValue, direction = "ltr") => {
-        const travel = Math.max(0, Number(travelValue) || 0);
-        const moveDurationMs = Math.min(
-            SCROLL_MAX_MOVE_MS,
-            Math.max(
-                SCROLL_MIN_MOVE_MS,
-                Math.round((travel / SCROLL_SPEED_PX_PER_SECOND) * 1000)
-            )
-        );
-        const durationMs = (SCROLL_EDGE_HOLD_MS + moveDurationMs) * 2;
-        const endOffset = direction === "rtl" ? travel : -travel;
-        const firstHoldOffset = SCROLL_EDGE_HOLD_MS / durationMs;
-        const farEdgeOffset = (SCROLL_EDGE_HOLD_MS + moveDurationMs) / durationMs;
-        const secondHoldOffset = (SCROLL_EDGE_HOLD_MS * 2 + moveDurationMs) / durationMs;
-        const startTransform = "translate3d(0px, 0, 0)";
-        const endTransform = `translate3d(${endOffset}px, 0, 0)`;
+    const getLineScrollProgress = (positionValue, startTimeValue, endTimeValue) => {
+        const position = Number(positionValue);
+        const startTime = Number(startTimeValue);
+        const endTime = Number(endTimeValue);
+        if (!Number.isFinite(position)
+            || !Number.isFinite(startTime)
+            || !Number.isFinite(endTime)
+            || endTime <= startTime) {
+            return 0;
+        }
 
-        return {
-            travel,
-            moveDurationMs,
-            durationMs,
-            keyframes: [
-                { transform: startTransform, offset: 0 },
-                { transform: startTransform, offset: firstHoldOffset, easing: SCROLL_EASING },
-                { transform: endTransform, offset: farEdgeOffset },
-                { transform: endTransform, offset: secondHoldOffset, easing: SCROLL_EASING },
-                { transform: startTransform, offset: 1 },
-            ],
-        };
+        const lineProgress = Math.min(1, Math.max(0, (position - startTime) / (endTime - startTime)));
+        if (lineProgress <= SCROLL_START_HOLD_PROGRESS) return 0;
+        if (lineProgress >= SCROLL_START_HOLD_PROGRESS + SCROLL_MOVE_PROGRESS) return 1;
+        return (lineProgress - SCROLL_START_HOLD_PROGRESS) / SCROLL_MOVE_PROGRESS;
     };
 
-    const useOverflowAutoScroll = (rootRef, resetKey, motionEnabled) => {
+    const getScrollTransform = (travelValue, direction, progressValue) => {
+        const travel = Math.max(0, Number(travelValue) || 0);
+        const progress = Math.min(1, Math.max(0, Number(progressValue) || 0));
+        const offset = (direction === "rtl" ? travel : -travel) * progress;
+        return `translate3d(${offset.toFixed(3)}px, 0, 0)`;
+    };
+
+    const useOverflowAutoScroll = (
+        rootRef,
+        resetKey,
+        motionEnabled,
+        position,
+        lineStartTime,
+        lineEndTime
+    ) => {
+        const scrollEntriesRef = useRef(new Map());
+        const progressRef = useRef(0);
+        progressRef.current = getLineScrollProgress(position, lineStartTime, lineEndTime);
+
         useLayoutEffect(() => {
             const root = rootRef.current;
             if (!root) return undefined;
 
-            const animations = new Map();
             const motionPreference = typeof window.matchMedia === "function"
                 ? window.matchMedia("(prefers-reduced-motion: reduce)")
                 : null;
@@ -59,17 +60,19 @@ const VinylActiveLyricRenderer = (() => {
             let measureFrame = null;
             let disposed = false;
 
-            const clearAnimations = () => {
-                animations.forEach((animation) => animation.cancel());
-                animations.clear();
+            const clearScrollEntries = () => {
+                scrollEntriesRef.current.forEach((_, content) => {
+                    content.style.transform = "";
+                });
+                scrollEntriesRef.current.clear();
             };
 
             const measure = () => {
                 measureFrame = null;
                 if (disposed || !root.isConnected) return;
 
-                clearAnimations();
-                const reduceMotion = !motionEnabled || motionPreference?.matches === true;
+                clearScrollEntries();
+                const canMove = motionEnabled && motionPreference?.matches !== true;
                 const viewports = root.querySelectorAll(".ivlyrics-vinyl-lyric-scroll-viewport");
 
                 viewports.forEach((viewport) => {
@@ -95,18 +98,17 @@ const VinylActiveLyricRenderer = (() => {
                     );
                     const travel = Math.max(0, Math.ceil(paddedContentWidth - viewportWidth));
 
-                    if (reduceMotion || travel <= SCROLL_OVERFLOW_THRESHOLD_PX || typeof content.animate !== "function") {
+                    if (travel <= SCROLL_OVERFLOW_THRESHOLD_PX) {
                         return;
                     }
 
                     const direction = window.getComputedStyle(viewport).direction === "rtl" ? "rtl" : "ltr";
-                    const motion = getScrollMotion(travel, direction);
-                    const animation = content.animate(motion.keyframes, {
-                        duration: motion.durationMs,
-                        iterations: Infinity,
-                        easing: "linear",
-                    });
-                    animations.set(content, animation);
+                    scrollEntriesRef.current.set(content, { travel, direction, canMove });
+                    content.style.transform = getScrollTransform(
+                        travel,
+                        direction,
+                        canMove ? progressRef.current : 0
+                    );
                 });
             };
 
@@ -136,7 +138,7 @@ const VinylActiveLyricRenderer = (() => {
             return () => {
                 disposed = true;
                 if (measureFrame !== null) window.cancelAnimationFrame(measureFrame);
-                clearAnimations();
+                clearScrollEntries();
                 resizeObserver?.disconnect();
                 mutationObserver?.disconnect();
                 if (!resizeObserver) window.removeEventListener("resize", scheduleMeasure);
@@ -144,6 +146,16 @@ const VinylActiveLyricRenderer = (() => {
                 document.fonts?.removeEventListener?.("loadingdone", scheduleMeasure);
             };
         }, [rootRef, resetKey, motionEnabled]);
+
+        useLayoutEffect(() => {
+            scrollEntriesRef.current.forEach(({ travel, direction, canMove }, content) => {
+                content.style.transform = getScrollTransform(
+                    travel,
+                    direction,
+                    canMove ? progressRef.current : 0
+                );
+            });
+        }, [position, lineStartTime, lineEndTime, motionEnabled]);
     };
 
     if (!primitives) {
@@ -193,7 +205,22 @@ const VinylActiveLyricRenderer = (() => {
         );
         const sourceLine = Array.isArray(lyrics) ? lyrics[safeLineIndex] : null;
         const scrollResetKey = `${safeLineIndex}:${sourceLine?.startTime || 0}:${isKara ? 1 : 0}:${settingsRevision}`;
-        useOverflowAutoScroll(rootRef, scrollResetKey, motionEnabled);
+        const lineStartTime = Number(sourceLine?.startTime) || 0;
+        const directLineEndTime = Number(sourceLine?.endTime);
+        const nextLineStartTime = Number(lyrics[safeLineIndex + 1]?.startTime);
+        const lineEndTime = Number.isFinite(directLineEndTime) && directLineEndTime > lineStartTime
+            ? directLineEndTime
+            : (Number.isFinite(nextLineStartTime) && nextLineStartTime > lineStartTime
+                ? nextLineStartTime
+                : lineStartTime);
+        useOverflowAutoScroll(
+            rootRef,
+            scrollResetKey,
+            motionEnabled,
+            position,
+            lineStartTime,
+            lineEndTime
+        );
         const globalCharTimeline = useMemo(
             () => isKara && Array.isArray(lyrics) ? prepareGlobalCharTimeline(lyrics) : null,
             [lyrics, isKara]
