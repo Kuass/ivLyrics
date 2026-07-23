@@ -730,216 +730,237 @@ const hasInstrumentalMarker = (lyrics = []) => {
   return false;
 };
 
-// Update Banner Component - Fluent Design Style
+const getUpdateBannerTheme = () => {
+  try {
+    const storedTheme =
+      window.ivLyricsStoragePersistence?.getItem?.("ivLyrics:settings-ui-theme") ??
+      localStorage.getItem("ivLyrics:settings-ui-theme");
+    return storedTheme === "light" ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+};
+
+const UPDATE_BANNER_ICON_SHAPES = {
+  update: [
+    ["path", { d: "M20 6v5h-5" }],
+    ["path", { d: "M4 18v-5h5" }],
+    ["path", { d: "M6.1 9a7 7 0 0 1 11.7-2.6L20 11" }],
+    ["path", { d: "M4 13l2.2 4.6A7 7 0 0 0 17.9 15" }],
+  ],
+  close: [
+    ["path", { d: "m18 6-12 12" }],
+    ["path", { d: "m6 6 12 12" }],
+  ],
+  arrow: [
+    ["path", { d: "M5 12h14" }],
+    ["path", { d: "m13 6 6 6-6 6" }],
+  ],
+  external: [
+    ["path", { d: "M15 3h6v6" }],
+    ["path", { d: "m10 14 11-11" }],
+    ["path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }],
+  ],
+  notes: [
+    ["path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" }],
+    ["path", { d: "M14 2v6h6" }],
+    ["path", { d: "M8 13h8" }],
+    ["path", { d: "M8 17h6" }],
+  ],
+};
+
+const createUpdateBannerIcon = (name, size = 20) => {
+  const shapes = UPDATE_BANNER_ICON_SHAPES[name] || UPDATE_BANNER_ICON_SHAPES.update;
+
+  return react.createElement(
+    "svg",
+    {
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 2,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      "aria-hidden": "true",
+      focusable: "false",
+    },
+    shapes.map(([element, props], index) =>
+      react.createElement(element, { ...props, key: `${name}-${index}` })
+    )
+  );
+};
+
+const formatUpdateVersion = (version) => {
+  const value = String(version || "").trim();
+  if (!value) return "-";
+  return value.toLowerCase().startsWith("v") ? value : `v${value}`;
+};
+
+// Update notification dialog
 const UpdateBanner = ({ updateInfo, onDismiss }) => {
   const updatePageUrl = "https://lyrics.ivl.is/update";
+  const modalRef = react.useRef(null);
+  const previouslyFocusedRef = react.useRef(document.activeElement);
+  const onDismissRef = react.useRef(onDismiss);
+  onDismissRef.current = onDismiss;
 
-  const linkBaseStyle = {
-    minHeight: "44px",
-    padding: "0 18px",
-    borderRadius: "12px",
-    textDecoration: "none",
-    fontSize: "14px",
-    fontWeight: "700",
-    letterSpacing: "-0.01em",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), background 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
-  };
+  react.useEffect(() => {
+    const modal = modalRef.current;
+    if (!modal) return undefined;
+
+    const getFocusableElements = () => Array.from(modal.querySelectorAll(
+      'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+    )).filter((element) => !element.hidden && element.getAttribute("aria-hidden") !== "true");
+
+    const handleKeydown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onDismissRef.current?.();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const focusable = getFocusableElements();
+      if (!focusable.length) {
+        event.preventDefault();
+        modal.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === modal)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === modal) {
+        event.preventDefault();
+        first.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeydown);
+    window.requestAnimationFrame(() => modal.focus());
+
+    return () => {
+      document.removeEventListener("keydown", handleKeydown);
+      const previouslyFocused = previouslyFocusedRef.current;
+      if (previouslyFocused instanceof HTMLElement && document.contains(previouslyFocused)) {
+        previouslyFocused.focus();
+      }
+    };
+  }, []);
+
+  const closeLabel = I18n.t("settingsUi.close") || "Close";
+  const currentVersion = formatUpdateVersion(updateInfo.currentVersion);
+  const latestVersion = formatUpdateVersion(updateInfo.latestVersion);
 
   return react.createElement(
     "div",
     {
       className: "ivLyrics-update-banner",
-      onClick: onDismiss,
-      style: {
-        position: "fixed",
-        inset: 0,
-        zIndex: "var(--iv-layer-update-banner, 10000)",
-        display: "grid",
-        placeItems: "center",
-        padding: "24px",
-        background: "rgba(8, 10, 16, 0.42)",
-        backdropFilter: "blur(22px) saturate(140%)",
-        WebkitBackdropFilter: "blur(22px) saturate(140%)",
-        animation: "ivlyricsSoftFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
-      },
+      "data-ui-theme": getUpdateBannerTheme(),
+      onClick: () => onDismissRef.current?.(),
     },
     react.createElement(
       "div",
       {
+        className: "ivlyrics-update-dialog",
+        ref: modalRef,
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-labelledby": "ivlyrics-update-title",
+        "aria-describedby": "ivlyrics-update-description",
+        tabIndex: -1,
         onClick: (event) => event.stopPropagation(),
-        style: {
-          width: "min(430px, 100%)",
-          position: "relative",
-          padding: "26px",
-          borderRadius: "22px",
-          background: "rgba(18, 22, 30, 0.9)",
-          border: "1px solid rgba(255, 255, 255, 0.14)",
-          boxShadow:
-            "0 24px 80px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.08)",
-          color: "rgba(255, 255, 255, 0.94)",
-          overflow: "hidden",
-          animation: "ivlyricsSoftRiseIn 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
-        },
       },
       react.createElement(
         "div",
-        {
-          style: {
-            position: "absolute",
-            inset: 0,
-            pointerEvents: "none",
-            background:
-              "linear-gradient(135deg, rgba(74, 222, 128, 0.16), transparent 38%), radial-gradient(circle at 82% 0%, rgba(56, 189, 248, 0.18), transparent 32%)",
+        { className: "ivlyrics-update-dialog__header" },
+        react.createElement(
+          "div",
+          { className: "ivlyrics-update-dialog__icon" },
+          createUpdateBannerIcon("update", 22)
+        ),
+        react.createElement(
+          "div",
+          { className: "ivlyrics-update-dialog__heading" },
+          react.createElement(
+            "h2",
+            { id: "ivlyrics-update-title" },
+            I18n.t("notifications.updateAvailable")
+          ),
+          react.createElement(
+            "div",
+            {
+              className: "ivlyrics-update-dialog__versions",
+            },
+            react.createElement("span", null, currentVersion),
+            createUpdateBannerIcon("arrow", 14),
+            react.createElement("strong", null, latestVersion)
+          )
+        ),
+        react.createElement(
+          "button",
+          {
+            type: "button",
+            className: "ivlyrics-update-dialog__close",
+            onClick: () => onDismissRef.current?.(),
+            title: closeLabel,
+            "aria-label": closeLabel,
           },
-        }
-      ),
-      react.createElement(
-        "button",
-        {
-          onClick: onDismiss,
-          className: "lyrics-update-button-close",
-          style: {
-            position: "absolute",
-            top: "14px",
-            right: "14px",
-            width: "34px",
-            height: "34px",
-            borderRadius: "50%",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            background: "rgba(255, 255, 255, 0.08)",
-            color: "rgba(255, 255, 255, 0.68)",
-            cursor: "pointer",
-            fontSize: "20px",
-            lineHeight: "1",
-            display: "grid",
-            placeItems: "center",
-            zIndex: 1,
-          },
-        },
-        "×"
+          createUpdateBannerIcon("close", 18)
+        )
       ),
       react.createElement(
         "div",
-        { style: { position: "relative", zIndex: 1 } },
+        { className: "ivlyrics-update-dialog__body" },
         react.createElement(
-          "div",
+          "p",
           {
-            style: {
-              width: "48px",
-              height: "48px",
-              borderRadius: "16px",
-              display: "grid",
-              placeItems: "center",
-              marginBottom: "18px",
-              background: "rgba(74, 222, 128, 0.16)",
-              border: "1px solid rgba(74, 222, 128, 0.28)",
-              color: "rgba(220, 252, 231, 0.96)",
-            },
-          },
-          react.createElement("svg", {
-            width: 24,
-            height: 24,
-            viewBox: "0 0 24 24",
-            fill: "none",
-            stroke: "currentColor",
-            strokeWidth: 2,
-            strokeLinecap: "round",
-            strokeLinejoin: "round",
-            dangerouslySetInnerHTML: {
-              __html:
-                '<path d="M21 12a9 9 0 1 1-2.64-6.36"></path><path d="M21 3v6h-6"></path><path d="M12 7v5l3 2"></path>',
-            },
-          })
-        ),
-        react.createElement(
-          "div",
-          {
-            style: {
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "5px 9px",
-              borderRadius: "999px",
-              background: "rgba(255, 255, 255, 0.08)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              color: "rgba(255, 255, 255, 0.66)",
-              fontSize: "12px",
-              fontWeight: "700",
-              marginBottom: "12px",
-            },
-          },
-          `${updateInfo.currentVersion} → ${updateInfo.latestVersion}`
-        ),
-        react.createElement(
-          "div",
-          {
-            style: {
-              fontSize: "24px",
-              fontWeight: "800",
-              lineHeight: "1.18",
-              letterSpacing: "-0.01em",
-              marginBottom: "10px",
-            },
-          },
-          I18n.t("notifications.updateAvailable")
-        ),
-        react.createElement(
-          "div",
-          {
-            style: {
-              fontSize: "14px",
-              color: "rgba(255, 255, 255, 0.66)",
-              lineHeight: "1.6",
-              marginBottom: "22px",
-            },
+            id: "ivlyrics-update-description",
+            className: "ivlyrics-update-dialog__description",
           },
           I18n.t("settingsAdvanced.aboutTab.update.protocol.info")
+        )
+      ),
+      react.createElement(
+        "div",
+        { className: "ivlyrics-update-dialog__footer" },
+        react.createElement(
+          "a",
+          {
+            href: updateInfo.releaseUrl,
+            target: "_blank",
+            rel: "noopener noreferrer",
+            className: "ivlyrics-update-dialog__button ivlyrics-update-dialog__button--secondary",
+          },
+          createUpdateBannerIcon("notes", 16),
+          react.createElement("span", null, I18n.t("update.releaseNotes"))
         ),
         react.createElement(
-          "div",
+          "span",
+          { className: "ivlyrics-update-dialog__footer-spacer" }
+        ),
+        react.createElement(
+          "a",
           {
-            style: {
-              display: "grid",
-              gridTemplateColumns: "1fr",
-              gap: "10px",
-            },
+            href: updatePageUrl,
+            target: "_blank",
+            rel: "noopener noreferrer",
+            className: "ivlyrics-update-dialog__button ivlyrics-update-dialog__button--primary",
           },
           react.createElement(
-            "a",
-            {
-              href: updatePageUrl,
-              target: "_blank",
-              rel: "noopener noreferrer",
-              className: "lyrics-update-button-primary",
-              style: {
-                ...linkBaseStyle,
-                width: "100%",
-                background: "rgba(74, 222, 128, 0.94)",
-                border: "1px solid rgba(187, 247, 208, 0.48)",
-                color: "#07130b",
-              },
-            },
+            "span",
+            null,
             I18n.t("settingsAdvanced.aboutTab.update.protocol.button")
           ),
-          react.createElement(
-            "a",
-            {
-              href: updateInfo.releaseUrl,
-              target: "_blank",
-              rel: "noopener noreferrer",
-              style: {
-                ...linkBaseStyle,
-                width: "100%",
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                color: "rgba(255, 255, 255, 0.82)",
-              },
-            },
-            I18n.t("update.releaseNotes")
-          )
+          createUpdateBannerIcon("external", 16)
         )
       )
     )
@@ -9024,13 +9045,21 @@ class LyricsContainer extends react.Component {
     const topBarContent = null;
 
     // Update banner component
-    const updateBanner = !isSyncCreatorActive && window.ivLyrics_updateInfo?.available
+    const updateBannerContent =
+      !isSyncCreatorActive &&
+      !this.state.isFullscreen &&
+      window.ivLyrics_updateInfo?.available
       ? react.createElement(UpdateBanner, {
         updateInfo: window.ivLyrics_updateInfo,
         onDismiss: () =>
           Utils.dismissUpdate(window.ivLyrics_updateInfo.latestVersion),
       })
       : null;
+    const updateBannerDOM = updateBannerContent ? ensureReactDOM() : null;
+    const updateBanner =
+      updateBannerContent && updateBannerDOM?.createPortal
+        ? updateBannerDOM.createPortal(updateBannerContent, document.body)
+        : updateBannerContent;
 
     const hasLyrics = !!(this.state.karaoke || this.state.synced || this.state.unsynced);
     const isTwoColumn = CONFIG.visual["fullscreen-two-column"] !== false;
