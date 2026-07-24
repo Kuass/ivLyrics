@@ -2435,6 +2435,14 @@ const getFiniteLyricsStyleNumber = (value, fallback) => {
 // Container geometry and playback transforms stay local to each surface, but every
 // glyph, ruby and auxiliary-line metric comes from this shared variable set.
 const getLyricsTypographyStyleVariables = (visual = CONFIG?.visual || {}) => {
+	const alignment = ["left", "center", "right"].includes(visual.alignment)
+		? visual.alignment
+		: "center";
+	const culturalNoteMargins = alignment === "left"
+		? { left: "0", right: "auto" }
+		: alignment === "right"
+			? { left: "auto", right: "0" }
+			: { left: "auto", right: "auto" };
 	const baseFontFamily = visual["font-family"] || "var(--font-family)";
 	const shadowColor = visual["text-shadow-color"] || "#000000";
 	const shadowOpacity = getFiniteLyricsStyleNumber(visual["text-shadow-opacity"], 50);
@@ -2448,7 +2456,7 @@ const getLyricsTypographyStyleVariables = (visual = CONFIG?.visual || {}) => {
 		: "none";
 
 	return {
-		"--lyrics-align-text": visual.alignment || "center",
+		"--lyrics-align-text": alignment,
 		"--lyrics-font-size": `${getFiniteLyricsStyleNumber(visual["font-size"], 32)}px`,
 		"--lyrics-font-family": baseFontFamily,
 		"--lyrics-original-font-family": visual["original-font-family"] || baseFontFamily,
@@ -2472,6 +2480,8 @@ const getLyricsTypographyStyleVariables = (visual = CONFIG?.visual || {}) => {
 		"--lyrics-cultural-note-font-size": `${getFiniteLyricsStyleNumber(visual["cultural-annotations-font-size"], 14)}px`,
 		"--lyrics-cultural-note-font-weight": getFiniteLyricsStyleNumber(visual["cultural-annotations-font-weight"], 300),
 		"--lyrics-cultural-note-opacity": getFiniteLyricsStyleNumber(visual["cultural-annotations-opacity"], 60) / 100,
+		"--lyrics-cultural-note-margin-left": culturalNoteMargins.left,
+		"--lyrics-cultural-note-margin-right": culturalNoteMargins.right,
 		"--lyrics-furigana-font-size": `${getFiniteLyricsStyleNumber(visual["furigana-font-size"], 14)}px`,
 		"--lyrics-furigana-font-weight": getFiniteLyricsStyleNumber(visual["furigana-font-weight"], 300),
 		"--lyrics-furigana-opacity": getFiniteLyricsStyleNumber(visual["furigana-opacity"], 80) / 100,
