@@ -1875,7 +1875,7 @@ body.ivlyrics-page-active .main-topBar-container {
   margin-top: 16px;
 }
 
-.lyrics-lyricsContainer-UnsyncedLyricsPage .lyrics-lyricsContainer-LyricsLine>p {
+.lyrics-lyricsContainer-UnsyncedLyricsPage .lyrics-lyricsContainer-LyricsLine>p:not(.lyrics-lyricsContainer-LyricsLine-culturalNote) {
   display: block;
   margin: 0;
   padding: 0;
