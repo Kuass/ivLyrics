@@ -1144,6 +1144,10 @@ window.LANG_KO = {
         "label": "전체화면 버튼 교체",
         "info": "Spotify의 기본 전체화면 버튼을 ivLyrics 전체화면으로 교체합니다"
       },
+      "quickSyncControls": {
+        "label": "빠른 싱크 조절 표시",
+        "info": "가사 페이지와 전체 화면 모드의 왼쪽 아래에 현재 곡 싱크 오프셋 조절 UI를 표시합니다. 숨기면 우측 메뉴의 싱크 조절에서 계속 사용할 수 있습니다."
+      },
       "fullscreenShortcut": {
         "label": "전체화면 단축키",
         "desc": "가사 전체화면 모드를 위한 키보드 단축키"
@@ -1799,6 +1803,8 @@ window.LANG_KO = {
     "feedbackNegativeSuccess": "피드백 감사합니다. 개선하겠습니다!",
     "feedbackFailed": "피드백 제출에 실패했습니다",
     "autoSubmitEnabled": "⚡ 자동 제출이 활성화되어 있습니다",
+    "trackTitle": "현재 곡 싱크",
+    "trackInfo": "현재 재생 중인 곡에만 적용됩니다.",
     "globalTitle": "전역 싱크",
     "globalInfo": "이 기기에서만 모든 곡에 적용됩니다. 커뮤니티에는 절대 제출되지 않습니다.",
     "communityUnavailableLocal": "Spotify trackId가 없는 로컬 곡은 커뮤니티 오프셋을 등록할 수 없습니다."

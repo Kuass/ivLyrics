@@ -1144,6 +1144,10 @@ window.LANG_SV = {
         "label": "Byt ut helskärmsknapp",
         "info": "Ersätter Spotifys standard helskärmsknapp med ivLyrics helskärm"
       },
+      "quickSyncControls": {
+        "label": "Visa snabbkontroller för spårsynkronisering",
+        "info": "Visar kontroller för spårspecifik synkoffset längst ned till vänster på sidor med sångtexter och i helskärmsläge. När de är dolda finns de fortfarande under ”Justera synkronisering av texter” i menyn till höger."
+      },
       "fullscreenShortcut": {
         "label": "Fullskärmsgenväg",
         "desc": "Kortkommando för sångtexter i helskärmsläge"
@@ -1799,6 +1803,8 @@ window.LANG_SV = {
     "feedbackNegativeSuccess": "Tack för feedbacken. Vi ska förbättra oss!",
     "feedbackFailed": "Det gick inte att skicka feedback",
     "autoSubmitEnabled": "⚡ Automatisk inlämning är aktiverad",
+    "trackTitle": "Synkronisering av aktuellt spår",
+    "trackInfo": "Gäller endast spåret som spelas just nu.",
     "globalTitle": "Global synk",
     "globalInfo": "Gäller alla låtar endast på den här enheten. Skickas aldrig till communityn.",
     "communityUnavailableLocal": "Community-offsets kan inte skickas för lokala spår utan Spotify trackId."

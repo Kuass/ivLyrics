@@ -1144,6 +1144,10 @@ window.LANG_JA = {
         "label": "フルスクリーンボタンの置き換え",
         "info": "Spotifyのデフォルト全画面ボタンをivLyricsのフルスクリーンに置き換えます"
       },
+      "quickSyncControls": {
+        "label": "曲ごとのクイック同期コントロールを表示",
+        "info": "歌詞ページとフルスクリーンモードの左下に、曲ごとの同期オフセット調整を表示します。非表示にしても、右側メニューの「歌詞の同期調整」から利用できます。"
+      },
       "fullscreenShortcut": {
         "label": "フルスクリーンショートカット",
         "desc": "歌詞フルスクリーンモードのためのキーボードショートカット"
@@ -1799,6 +1803,8 @@ window.LANG_JA = {
     "feedbackNegativeSuccess": "フィードバックありがとうございます。改善します！",
     "feedbackFailed": "フィードバックの提出に失敗しました",
     "autoSubmitEnabled": "⚡ 自動提出が有効になっています",
+    "trackTitle": "現在の曲の同期",
+    "trackInfo": "現在再生中の曲にのみ適用されます。",
     "globalTitle": "グローバル同期",
     "globalInfo": "このデバイス上のすべての曲にのみ適用されます。コミュニティには送信されません。",
     "communityUnavailableLocal": "Spotify trackId がないローカルトラックでは、コミュニティオフセットを送信できません。"

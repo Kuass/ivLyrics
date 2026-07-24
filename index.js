@@ -2476,6 +2476,10 @@ const CONFIG = {
     ),
     "global-sync-offset":
       Number(StorageManager.getItem("ivLyrics:visual:global-sync-offset")) || 0,
+    "quick-sync-controls-enabled": StorageManager.get(
+      "ivLyrics:visual:quick-sync-controls-enabled",
+      true
+    ),
     "fullscreen-key":
       StorageManager.getItem("ivLyrics:visual:fullscreen-key") || "f12",
     "synced-compact": StorageManager.get("ivLyrics:visual:synced-compact"),
@@ -9393,11 +9397,15 @@ class LyricsContainer extends react.Component {
     const hasTrackSyncLyrics =
       (mode === KARAOKE && Array.isArray(this.state.karaoke) && this.state.karaoke.length > 0) ||
       (mode === SYNCED && Array.isArray(this.state.synced) && this.state.synced.length > 0);
-    const trackSyncAdjustPill = hasTrackSyncLyrics &&
+    const canAdjustTrackSync = hasTrackSyncLyrics &&
       !this.state.showMarketplace &&
       !shouldHideFullscreenLyrics &&
       !isSyncCreatorActive &&
-      renderTrackUri &&
+      Boolean(renderTrackUri);
+    const quickSyncControlsEnabled =
+      CONFIG.visual["quick-sync-controls-enabled"] !== false;
+    const trackSyncAdjustPill = canAdjustTrackSync &&
+      quickSyncControlsEnabled &&
       typeof TrackSyncAdjustPill !== "undefined"
       ? react.createElement(TrackSyncAdjustPill, { trackUri: renderTrackUri })
       : null;
@@ -9603,7 +9611,11 @@ class LyricsContainer extends react.Component {
               className: "lyrics-floating-menu-group",
               "data-group": "playback",
             },
-            react.createElement(SyncAdjustButtonFluent),
+            react.createElement(SyncAdjustButtonFluent, {
+              trackUri: renderTrackUri,
+              includeTrackOffset:
+                canAdjustTrackSync && !quickSyncControlsEnabled,
+            }),
             react.createElement(CommunityVideoButton, {
               trackUri: this.currentTrackUri,
               enabled: effectiveBackgroundMode === "video-background",

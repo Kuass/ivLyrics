@@ -1144,6 +1144,10 @@ window.LANG_IT = {
         "label": "Sostituisci pulsante schermo intero",
         "info": "Sostituisce il pulsante schermo intero predefinito di Spotify con ivLyrics"
       },
+      "quickSyncControls": {
+        "label": "Mostra i controlli rapidi di sincronizzazione della traccia",
+        "info": "Mostra i controlli dell’offset di sincronizzazione specifico per la traccia in basso a sinistra nelle pagine dei testi e in modalità schermo intero. Se nascosti, restano disponibili in «Regola sync testi» nel menu a destra."
+      },
       "fullscreenShortcut": {
         "label": "Scorciatoia schermo intero",
         "desc": "Scorciatoia da tastiera per la modalità schermo intero"
@@ -1799,6 +1803,8 @@ window.LANG_IT = {
     "feedbackNegativeSuccess": "Grazie. Miglioreremo!",
     "feedbackFailed": "Invio feedback fallito",
     "autoSubmitEnabled": "⚡ Invio automatico attivo",
+    "trackTitle": "Sincronizzazione traccia corrente",
+    "trackInfo": "Si applica solo alla traccia in riproduzione.",
     "globalTitle": "Sincronizzazione globale",
     "globalInfo": "Si applica a tutti i brani solo su questo dispositivo. Non viene mai inviata alla community.",
     "communityUnavailableLocal": "Non è possibile inviare offset della community per brani locali senza Spotify trackId."

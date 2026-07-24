@@ -1144,6 +1144,10 @@ window.LANG_ZH_TW = {
         "label": "替換全螢幕按鈕",
         "info": "將 Spotify 預設的全螢幕按鈕替換為 ivLyrics 全螢幕"
       },
+      "quickSyncControls": {
+        "label": "顯示曲目快速同步控制項",
+        "info": "在歌詞頁面與全螢幕模式左下角顯示目前曲目的同步偏移控制項。隱藏後，仍可透過右側選單中的「歌詞同步調整」使用。"
+      },
       "fullscreenShortcut": {
         "label": "全螢幕快速鍵",
         "desc": "進入歌詞全螢幕模式的鍵盤快速鍵"
@@ -1799,6 +1803,8 @@ window.LANG_ZH_TW = {
     "feedbackNegativeSuccess": "感謝您的回饋。我們會改進！",
     "feedbackFailed": "回饋提交失敗",
     "autoSubmitEnabled": "⚡ 自動提交已啟用",
+    "trackTitle": "目前曲目同步",
+    "trackInfo": "僅套用於目前播放的曲目。",
     "globalTitle": "全域同步",
     "globalInfo": "只會在此裝置上套用到所有歌曲，絕不會提交到社群。",
     "communityUnavailableLocal": "沒有 Spotify trackId 的本機曲目無法提交社群偏移。"

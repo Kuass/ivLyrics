@@ -1144,6 +1144,10 @@ window.LANG_CS = {
         "label": "Nahradit tlačítko celé obrazovky",
         "info": "Nahrazuje výchozí tlačítko celé obrazovky Spotify tlačítkem ivLyrics na celou obrazovku"
       },
+      "quickSyncControls": {
+        "label": "Zobrazit rychlé ovládání synchronizace skladby",
+        "info": "Zobrazí ovládání posunu synchronizace pro konkrétní skladbu v levém dolním rohu stránek s texty a režimu celé obrazovky. Po skrytí zůstane dostupné v nabídce vpravo pod položkou „Upravit synchronizaci textů“."
+      },
       "fullscreenShortcut": {
         "label": "Zkratka na celou obrazovku",
         "desc": "Klávesová zkratka pro celoobrazovkový režim textů"
@@ -1799,6 +1803,8 @@ window.LANG_CS = {
     "feedbackNegativeSuccess": "Děkuji za zpětnou vazbu. Polepšíme se!",
     "feedbackFailed": "Odeslání zpětné vazby se nezdařilo",
     "autoSubmitEnabled": "⚡ Automatické odeslání je povoleno",
+    "trackTitle": "Synchronizace aktuální skladby",
+    "trackInfo": "Platí pouze pro právě přehrávanou skladbu.",
     "globalTitle": "Globální synchronizace",
     "globalInfo": "Platí pouze pro každou skladbu na tomto zařízení. Nikdy se nepředkládá komunitě.",
     "communityUnavailableLocal": "Komunitní offsety nelze odeslat pro místní stopy bez Spotify trackId."

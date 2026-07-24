@@ -1144,6 +1144,10 @@ window.LANG_PT = {
         "label": "Substituir Botão de Tela Cheia",
         "info": "Substitui o botão de tela cheia padrão do Spotify pelo ivLyrics"
       },
+      "quickSyncControls": {
+        "label": "Exibir controles rápidos de sincronização da faixa",
+        "info": "Exibe os controles de offset de sincronização específicos da faixa no canto inferior esquerdo das páginas de letras e do modo de tela cheia. Quando ocultos, continuam disponíveis em «Ajustar Sincronização da Letra» no menu à direita."
+      },
       "fullscreenShortcut": {
         "label": "Atalho de Tela Cheia",
         "desc": "Atalho de teclado para o modo de tela cheia de letras"
@@ -1799,6 +1803,8 @@ window.LANG_PT = {
     "feedbackNegativeSuccess": "Obrigado. Vamos melhorar!",
     "feedbackFailed": "Falha ao enviar feedback",
     "autoSubmitEnabled": "⚡ Envio automático ativado",
+    "trackTitle": "Sincronização da Faixa Atual",
+    "trackInfo": "Aplica-se apenas à faixa em reprodução.",
     "globalTitle": "Sincronização global",
     "globalInfo": "Aplica-se a todas as músicas apenas neste dispositivo. Nunca é enviada à comunidade.",
     "communityUnavailableLocal": "Offsets da comunidade não podem ser enviados para faixas locais sem Spotify trackId."

@@ -1144,6 +1144,10 @@ window.LANG_EN = {
         "label": "Replace Fullscreen Button",
         "info": "Replaces Spotify's default fullscreen button with ivLyrics fullscreen"
       },
+      "quickSyncControls": {
+        "label": "Show quick track sync controls",
+        "info": "Show track-specific sync offset controls in the lower-left corner of lyrics pages and fullscreen mode. When hidden, they remain available under Adjust Lyrics Sync in the right-side menu."
+      },
       "fullscreenShortcut": {
         "label": "Fullscreen Shortcut",
         "desc": "Keyboard shortcut for lyrics fullscreen mode"
@@ -1799,6 +1803,8 @@ window.LANG_EN = {
     "feedbackNegativeSuccess": "Thanks for the feedback. We'll improve!",
     "feedbackFailed": "Failed to submit feedback",
     "autoSubmitEnabled": "⚡ Auto-submit is enabled",
+    "trackTitle": "Current Track Sync",
+    "trackInfo": "Applies only to the currently playing track.",
     "globalTitle": "Global Sync",
     "globalInfo": "Applies to every song on this device only. It is never submitted to the community.",
     "communityUnavailableLocal": "Community offsets cannot be submitted for local tracks without a Spotify trackId."

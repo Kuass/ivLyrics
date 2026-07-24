@@ -6480,6 +6480,18 @@ const ConfigModal = ({
     {
       section: I18n.t("tabs.behavior"),
       sectionKey: "lyrics",
+      settingKey: "quick-sync-controls-enabled",
+      name: I18n.t("settingsAdvanced.playback.quickSyncControls.label"),
+      desc: I18n.t("settingsAdvanced.playback.quickSyncControls.info"),
+      i18nKeys: [
+        "tabs.behavior",
+        "settingsAdvanced.playback.quickSyncControls.label",
+        "settingsAdvanced.playback.quickSyncControls.info",
+      ]
+    },
+    {
+      section: I18n.t("tabs.behavior"),
+      sectionKey: "lyrics",
       settingKey: "sync-creator-settings",
       name: getSettingsText("settings.syncCreatorSettings.title", "Sync Creator Settings"),
       desc: getSettingsText("settings.syncCreatorSettings.subtitle", "Configure Sync Creator keyboard behavior and recording shortcuts."),
@@ -15813,6 +15825,13 @@ const ConfigModal = ({
               key: "fullscreen-button",
               info: I18n.t("settingsAdvanced.playback.replaceFullscreenButton.info") || "Replaces Spotify's default fullscreen button with ivLyrics fullscreen",
               type: ConfigSlider,
+            },
+            {
+              desc: I18n.t("settingsAdvanced.playback.quickSyncControls.label"),
+              key: "quick-sync-controls-enabled",
+              info: I18n.t("settingsAdvanced.playback.quickSyncControls.info"),
+              type: ConfigSlider,
+              defaultValue: CONFIG.visual["quick-sync-controls-enabled"] ?? true,
             },
           ],
           onChange: (name, value) => {

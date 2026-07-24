@@ -1144,6 +1144,10 @@ window.LANG_MS = {
         "label": "Ganti Butang Skrin Penuh",
         "info": "Gantikan butang skrin penuh lalai Spotify dengan skrin penuh ivLyrics"
       },
+      "quickSyncControls": {
+        "label": "Tunjukkan kawalan pantas penyegerakan trek",
+        "info": "Menunjukkan kawalan ofset penyegerakan khusus trek di sudut kiri bawah halaman lirik dan mod skrin penuh. Apabila disembunyikan, kawalan ini masih tersedia di bawah «Laraskan Lirik Senada» dalam menu sebelah kanan."
+      },
       "fullscreenShortcut": {
         "label": "Pintasan Skrin Penuh",
         "desc": "Pintasan papan kekunci untuk menogol mod skrin penuh lirik"
@@ -1799,6 +1803,8 @@ window.LANG_MS = {
     "feedbackNegativeSuccess": "Terima kasih atas maklum balas anda. Kami akan memperbaikinya!",
     "feedbackFailed": "Gagal menyerahkan maklum balas",
     "autoSubmitEnabled": "⚡ Penyerahan automatik diaktifkan",
+    "trackTitle": "Penyegerakan Trek Semasa",
+    "trackInfo": "Digunakan pada trek yang sedang dimainkan sahaja.",
     "globalTitle": "Segerak Global",
     "globalInfo": "Digunakan pada semua lagu hanya pada peranti ini. Tidak akan dihantar kepada komuniti.",
     "communityUnavailableLocal": "Ofset komuniti tidak boleh dihantar untuk lagu setempat tanpa Spotify trackId."

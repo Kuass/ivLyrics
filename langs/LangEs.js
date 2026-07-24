@@ -1144,6 +1144,10 @@ window.LANG_ES = {
         "label": "Reemplazar botón pantalla completa",
         "info": "Reemplaza el botón de pantalla completa predeterminado con ivLyrics"
       },
+      "quickSyncControls": {
+        "label": "Mostrar controles rápidos de sincronización de pista",
+        "info": "Muestra los controles de desfase de sincronización específicos de la pista en la esquina inferior izquierda de las páginas de letras y el modo de pantalla completa. Si se ocultan, siguen disponibles en «Ajustar sincronización de letras», en el menú derecho."
+      },
       "fullscreenShortcut": {
         "label": "Atajo de pantalla completa",
         "desc": "Atajo de teclado para el modo de pantalla completa de letras"
@@ -1799,6 +1803,8 @@ window.LANG_ES = {
     "feedbackNegativeSuccess": "Gracias. ¡Mejoraremos!",
     "feedbackFailed": "Error al enviar feedback",
     "autoSubmitEnabled": "⚡ Envío automático activado",
+    "trackTitle": "Sincronización de la pista actual",
+    "trackInfo": "Se aplica solo a la pista en reproducción.",
     "globalTitle": "Sincronización global",
     "globalInfo": "Se aplica a todas las canciones solo en este dispositivo. Nunca se envía a la comunidad.",
     "communityUnavailableLocal": "No se pueden enviar offsets de la comunidad para pistas locales sin Spotify trackId."

@@ -1144,6 +1144,10 @@ window.LANG_DE = {
         "label": "Vollbild-Button ersetzen",
         "info": "Ersetzt den Standard-Spotify-Vollbild-Button durch ivLyrics"
       },
+      "quickSyncControls": {
+        "label": "Schnelle Steuerelemente für Track-Sync anzeigen",
+        "info": "Zeigt die Steuerelemente für den trackspezifischen Sync-Offset unten links auf Songtextseiten und im Vollbildmodus an. Wenn ausgeblendet, bleiben sie im rechten Menü unter „Songtext-Sync anpassen“ verfügbar."
+      },
       "fullscreenShortcut": {
         "label": "Vollbild-Kurzbefehl",
         "desc": "Tastaturkürzel für den Songtext-Vollbildmodus"
@@ -1799,6 +1803,8 @@ window.LANG_DE = {
     "feedbackNegativeSuccess": "Danke, wir werden es verbessern!",
     "feedbackFailed": "Feedback fehlgeschlagen",
     "autoSubmitEnabled": "⚡ Automatisches Senden aktiviert",
+    "trackTitle": "Sync des aktuellen Tracks",
+    "trackInfo": "Gilt nur für den aktuell wiedergegebenen Track.",
     "globalTitle": "Globale Synchronisierung",
     "globalInfo": "Gilt nur auf diesem Gerät für alle Songs. Wird niemals an die Community gesendet.",
     "communityUnavailableLocal": "Community-Offsets können für lokale Titel ohne Spotify trackId nicht übermittelt werden."

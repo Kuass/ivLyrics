@@ -833,6 +833,39 @@ function ensureFluentModalStyles() {
   min-width: 0;
 }
 
+.lyrics-sync-adjust-track-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lyrics-sync-adjust-track-section .lyrics-track-sync-pill {
+  position: static;
+  left: auto;
+  bottom: auto;
+  z-index: auto;
+  align-self: stretch;
+  justify-content: center;
+  width: 100%;
+  max-width: none;
+}
+
+.lyrics-sync-adjust-track-section .lyrics-track-sync-controls {
+  justify-content: center;
+  width: 100%;
+}
+
+.lyrics-sync-adjust-track-section .lyrics-track-sync-step {
+  flex: 1 1 0;
+  padding-inline: 4px;
+}
+
+.lyrics-sync-adjust-track-section .lyrics-track-sync-value {
+  flex: 1.25 1 0;
+  min-width: 54px;
+  padding-inline: 5px;
+}
+
 .lyrics-sync-adjust-global-section {
   display: flex;
   flex-direction: column;
@@ -3436,7 +3469,10 @@ const TrackSyncAdjustPill = react.memo(({ trackUri }) => {
   );
 });
 
-const SyncAdjustButtonFluent = react.memo(() => {
+const SyncAdjustButtonFluent = react.memo(({
+  trackUri = null,
+  includeTrackOffset = false,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [globalOffset, setGlobalOffset] = useState(() => Utils.getGlobalSyncOffset?.() || 0);
   const [panelPosition, setPanelPosition] = useState(null);
@@ -3445,6 +3481,39 @@ const SyncAdjustButtonFluent = react.memo(() => {
   const globalSliderRef = useRef(null);
   const previousFocusRef = useRef(null);
   const reactDom = window.Spicetify?.ReactDOM ?? window.ReactDOM ?? null;
+  const hasTrackOffsetControls = Boolean(
+    includeTrackOffset &&
+    trackUri &&
+    typeof TrackSyncAdjustPill !== "undefined"
+  );
+  const updatePanelPosition = react.useCallback(() => {
+    if (window.innerWidth <= 840) {
+      setPanelPosition(null);
+      return;
+    }
+
+    const triggerRect = triggerRef.current?.getBoundingClientRect?.();
+    const panelRect = panelRef.current?.getBoundingClientRect?.();
+    if (!triggerRect || !panelRect?.width || !panelRect?.height) return;
+
+    const viewportPadding = 12;
+    const gap = 10;
+    const left = Math.max(
+      viewportPadding,
+      Math.min(
+        triggerRect.left - panelRect.width - gap,
+        window.innerWidth - panelRect.width - viewportPadding
+      )
+    );
+    const top = Math.max(
+      viewportPadding,
+      Math.min(
+        triggerRect.top + (triggerRect.height - panelRect.height) / 2,
+        window.innerHeight - panelRect.height - viewportPadding
+      )
+    );
+    setPanelPosition({ left, top });
+  }, []);
 
   useEffect(() => {
     ensureFluentModalStyles();
@@ -3467,40 +3536,6 @@ const SyncAdjustButtonFluent = react.memo(() => {
     previousFocusRef.current = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
-
-    const updatePanelPosition = () => {
-      if (window.innerWidth <= 840) {
-        setPanelPosition(null);
-        return;
-      }
-
-      const triggerRect = triggerRef.current?.getBoundingClientRect?.();
-      const panelRect = panelRef.current?.getBoundingClientRect?.();
-      if (!triggerRect || !panelRect?.width || !panelRect?.height) return;
-
-      const viewportPadding = 12;
-      const gap = 10;
-      const left = Math.max(
-        viewportPadding,
-        Math.min(
-          triggerRect.left - panelRect.width - gap,
-          window.innerWidth - panelRect.width - viewportPadding
-        )
-      );
-      const top = Math.max(
-        viewportPadding,
-        Math.min(
-          triggerRect.top + (triggerRect.height - panelRect.height) / 2,
-          window.innerHeight - panelRect.height - viewportPadding
-        )
-      );
-      setPanelPosition({ left, top });
-    };
-
-    const focusFrame = requestAnimationFrame(() => {
-      updatePanelPosition();
-      globalSliderRef.current?.focus();
-    });
 
     const handlePointerDown = (event) => {
       const target = event.target;
@@ -3541,7 +3576,6 @@ const SyncAdjustButtonFluent = react.memo(() => {
     window.addEventListener("resize", updatePanelPosition);
 
     return () => {
-      cancelAnimationFrame(focusFrame);
       document.removeEventListener("mousedown", handlePointerDown, true);
       document.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("resize", updatePanelPosition);
@@ -3554,7 +3588,32 @@ const SyncAdjustButtonFluent = react.memo(() => {
         }
       });
     };
-  }, [isOpen]);
+  }, [isOpen, updatePanelPosition]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    let focusFrame = null;
+    const layoutFrame = requestAnimationFrame(() => {
+      updatePanelPosition();
+      focusFrame = requestAnimationFrame(() => {
+        const panel = panelRef.current;
+        if (!panel || panel.contains(document.activeElement)) return;
+
+        const initialControl = hasTrackOffsetControls
+          ? panel.querySelector?.(".lyrics-track-sync-step")
+          : globalSliderRef.current;
+        initialControl?.focus();
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(layoutFrame);
+      if (focusFrame !== null) {
+        cancelAnimationFrame(focusFrame);
+      }
+    };
+  }, [isOpen, hasTrackOffsetControls, updatePanelPosition]);
 
   const handleGlobalOffsetChange = (newOffset) => {
     const safeOffset = clampSyncOffset(newOffset);
@@ -3563,6 +3622,77 @@ const SyncAdjustButtonFluent = react.memo(() => {
   };
 
   const globalTitle = I18n.t("syncAdjust.globalTitle");
+  const modalTitle = hasTrackOffsetControls
+    ? I18n.t("menu.syncAdjustTitle")
+    : globalTitle;
+  const modalDescription = hasTrackOffsetControls
+    ? I18n.t("syncAdjust.info")
+    : I18n.t("syncAdjust.globalInfo");
+  const globalControls = react.createElement(
+    "div",
+    { className: "lyrics-sync-adjust-layout" },
+    react.createElement(
+      "div",
+      { className: "lyrics-sync-adjust-track" },
+      react.createElement(
+        "div",
+        { className: "lyrics-sync-adjust-slider-container" },
+        react.createElement("input", {
+          ref: globalSliderRef,
+          type: "range",
+          className: "sync-slider",
+          min: -10000,
+          max: 10000,
+          step: 10,
+          value: globalOffset,
+          onInput: (event) => handleGlobalOffsetChange(Number(event.target.value)),
+          "aria-label": globalTitle,
+          "aria-valuetext": formatSyncOffset(globalOffset),
+          style: {
+            "--progress-percent": `${((globalOffset + 10000) / 20000) * 100}%`,
+          },
+        }),
+        react.createElement(
+          "div",
+          { className: "lyrics-sync-adjust-slider-summary" },
+          react.createElement("span", null, "-10s"),
+          react.createElement("span", { className: "lyrics-sync-adjust-current" }, formatSyncOffset(globalOffset)),
+          react.createElement("span", null, "+10s")
+        )
+      )
+    ),
+    react.createElement(
+      "div",
+      { className: "lyrics-sync-adjust-side" },
+      react.createElement(
+        "div",
+        { className: "lyrics-sync-adjust-fine" },
+        react.createElement(
+          "div",
+          { className: "lyrics-sync-adjust-quick" },
+          react.createElement(AdjustButton, { value: "-1000", ariaLabel: `${globalTitle} -1000ms`, onClick: () => handleGlobalOffsetChange(globalOffset - 1000) }),
+          react.createElement(AdjustButton, { value: "-100", ariaLabel: `${globalTitle} -100ms`, onClick: () => handleGlobalOffsetChange(globalOffset - 100) }),
+          react.createElement(AdjustButton, { value: "-10", ariaLabel: `${globalTitle} -10ms`, onClick: () => handleGlobalOffsetChange(globalOffset - 10) })
+        ),
+        react.createElement(
+          "div",
+          { className: "lyrics-sync-adjust-quick" },
+          react.createElement(AdjustButton, { value: "+1000", ariaLabel: `${globalTitle} +1000ms`, onClick: () => handleGlobalOffsetChange(globalOffset + 1000) }),
+          react.createElement(AdjustButton, { value: "+100", ariaLabel: `${globalTitle} +100ms`, onClick: () => handleGlobalOffsetChange(globalOffset + 100) }),
+          react.createElement(AdjustButton, { value: "+10", ariaLabel: `${globalTitle} +10ms`, onClick: () => handleGlobalOffsetChange(globalOffset + 10) })
+        )
+      ),
+      react.createElement(
+        "button",
+        {
+          type: "button",
+          className: "ivlyrics-fluent-btn lyrics-sync-adjust-reset",
+          onClick: () => handleGlobalOffsetChange(0),
+        },
+        I18n.t("syncAdjust.reset")
+      )
+    )
+  );
   const modalOverlay = isOpen
     ? react.createElement(
         "div",
@@ -3582,8 +3712,8 @@ const SyncAdjustButtonFluent = react.memo(() => {
             "data-ui-theme": getSettingsSurfaceTheme(),
             role: "dialog",
             "aria-modal": "true",
-            "aria-labelledby": "ivlyrics-global-sync-title",
-            "aria-describedby": "ivlyrics-global-sync-description",
+            "aria-labelledby": "ivlyrics-sync-adjust-title",
+            "aria-describedby": "ivlyrics-sync-adjust-description",
           },
           react.createElement(
             "div",
@@ -3591,8 +3721,8 @@ const SyncAdjustButtonFluent = react.memo(() => {
             react.createElement(
               "div",
               { className: "ivlyrics-fluent-title-wrap" },
-              react.createElement("div", { id: "ivlyrics-global-sync-title", className: "ivlyrics-fluent-title" }, globalTitle),
-              react.createElement("p", { id: "ivlyrics-global-sync-description", className: "ivlyrics-fluent-subtitle" }, I18n.t("syncAdjust.globalInfo"))
+              react.createElement("div", { id: "ivlyrics-sync-adjust-title", className: "ivlyrics-fluent-title" }, modalTitle),
+              react.createElement("p", { id: "ivlyrics-sync-adjust-description", className: "ivlyrics-fluent-subtitle" }, modalDescription)
             ),
             react.createElement(
               "button",
@@ -3612,71 +3742,23 @@ const SyncAdjustButtonFluent = react.memo(() => {
           react.createElement(
             "div",
             { className: "ivlyrics-fluent-body lyrics-sync-adjust-modal" },
+            hasTrackOffsetControls &&
             react.createElement(
               "div",
-              { className: "lyrics-sync-adjust-layout" },
-              react.createElement(
+              { className: "lyrics-sync-adjust-track-section" },
+              react.createElement("div", { className: "lyrics-sync-adjust-section-title" }, I18n.t("syncAdjust.trackTitle")),
+              react.createElement("p", { className: "lyrics-sync-adjust-section-desc" }, I18n.t("syncAdjust.trackInfo")),
+              react.createElement(TrackSyncAdjustPill, { trackUri })
+            ),
+            hasTrackOffsetControls
+              ? react.createElement(
                 "div",
-                { className: "lyrics-sync-adjust-track" },
-                react.createElement(
-                  "div",
-                  { className: "lyrics-sync-adjust-slider-container" },
-                  react.createElement("input", {
-                    ref: globalSliderRef,
-                    type: "range",
-                    className: "sync-slider",
-                    min: -10000,
-                    max: 10000,
-                    step: 10,
-                    value: globalOffset,
-                    onInput: (event) => handleGlobalOffsetChange(Number(event.target.value)),
-                    "aria-label": globalTitle,
-                    "aria-valuetext": formatSyncOffset(globalOffset),
-                    style: {
-                      "--progress-percent": `${((globalOffset + 10000) / 20000) * 100}%`,
-                    },
-                  }),
-                  react.createElement(
-                    "div",
-                    { className: "lyrics-sync-adjust-slider-summary" },
-                    react.createElement("span", null, "-10s"),
-                    react.createElement("span", { className: "lyrics-sync-adjust-current" }, formatSyncOffset(globalOffset)),
-                    react.createElement("span", null, "+10s")
-                  )
-                )
-              ),
-              react.createElement(
-                "div",
-                { className: "lyrics-sync-adjust-side" },
-                react.createElement(
-                  "div",
-                  { className: "lyrics-sync-adjust-fine" },
-                  react.createElement(
-                    "div",
-                    { className: "lyrics-sync-adjust-quick" },
-                    react.createElement(AdjustButton, { value: "-1000", ariaLabel: `${globalTitle} -1000ms`, onClick: () => handleGlobalOffsetChange(globalOffset - 1000) }),
-                    react.createElement(AdjustButton, { value: "-100", ariaLabel: `${globalTitle} -100ms`, onClick: () => handleGlobalOffsetChange(globalOffset - 100) }),
-                    react.createElement(AdjustButton, { value: "-10", ariaLabel: `${globalTitle} -10ms`, onClick: () => handleGlobalOffsetChange(globalOffset - 10) })
-                  ),
-                  react.createElement(
-                    "div",
-                    { className: "lyrics-sync-adjust-quick" },
-                    react.createElement(AdjustButton, { value: "+1000", ariaLabel: `${globalTitle} +1000ms`, onClick: () => handleGlobalOffsetChange(globalOffset + 1000) }),
-                    react.createElement(AdjustButton, { value: "+100", ariaLabel: `${globalTitle} +100ms`, onClick: () => handleGlobalOffsetChange(globalOffset + 100) }),
-                    react.createElement(AdjustButton, { value: "+10", ariaLabel: `${globalTitle} +10ms`, onClick: () => handleGlobalOffsetChange(globalOffset + 10) })
-                  )
-                ),
-                react.createElement(
-                  "button",
-                  {
-                    type: "button",
-                    className: "ivlyrics-fluent-btn lyrics-sync-adjust-reset",
-                    onClick: () => handleGlobalOffsetChange(0),
-                  },
-                  I18n.t("syncAdjust.reset")
-                )
+                { className: "lyrics-sync-adjust-global-section" },
+                react.createElement("div", { className: "lyrics-sync-adjust-section-title" }, globalTitle),
+                react.createElement("p", { className: "lyrics-sync-adjust-section-desc" }, I18n.t("syncAdjust.globalInfo")),
+                globalControls
               )
-            )
+              : globalControls
           )
         )
       )
@@ -3687,7 +3769,7 @@ const SyncAdjustButtonFluent = react.memo(() => {
     null,
     react.createElement(
       Spicetify.ReactComponent.TooltipWrapper,
-      { label: globalTitle },
+      { label: modalTitle },
       react.createElement(
         "button",
         {
@@ -3695,7 +3777,7 @@ const SyncAdjustButtonFluent = react.memo(() => {
           type: "button",
           className: "lyrics-config-button lyrics-global-sync-button",
           onClick: () => setIsOpen((prev) => !prev),
-          "aria-label": globalTitle,
+          "aria-label": modalTitle,
           "aria-expanded": isOpen,
         },
         react.createElement(IvLyricsToolbarIcon, { name: "globalSync" })

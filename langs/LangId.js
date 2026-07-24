@@ -1144,6 +1144,10 @@ window.LANG_ID = {
         "label": "Ganti Tombol Layar Penuh",
         "info": "Ganti tombol layar penuh default Spotify dengan layar penuh ivLyrics"
       },
+      "quickSyncControls": {
+        "label": "Tampilkan kontrol cepat sinkronisasi trek",
+        "info": "Menampilkan kontrol offset sinkronisasi khusus trek di sudut kiri bawah halaman lirik dan mode layar penuh. Jika disembunyikan, kontrol tetap tersedia di «Atur Sinkronisasi Lirik» pada menu sisi kanan."
+      },
       "fullscreenShortcut": {
         "label": "Pintasan Layar Penuh",
         "desc": "Pintasan keyboard untuk mode layar penuh lirik"
@@ -1799,6 +1803,8 @@ window.LANG_ID = {
     "feedbackNegativeSuccess": "Terima kasih atas umpan baliknya. Akan kami tingkatkan!",
     "feedbackFailed": "Gagal mengirim umpan balik",
     "autoSubmitEnabled": "⚡ Kirim otomatis aktif",
+    "trackTitle": "Sinkronisasi Trek Saat Ini",
+    "trackInfo": "Hanya berlaku untuk trek yang sedang diputar.",
     "globalTitle": "Sinkronisasi Global",
     "globalInfo": "Berlaku untuk semua lagu hanya di perangkat ini. Tidak pernah dikirim ke komunitas.",
     "communityUnavailableLocal": "Offset komunitas tidak dapat dikirim untuk lagu lokal tanpa Spotify trackId."

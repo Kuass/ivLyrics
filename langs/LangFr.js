@@ -1144,6 +1144,10 @@ window.LANG_FR = {
         "label": "Remplacer bouton plein écran",
         "info": "Remplace le bouton plein écran par défaut par ivLyrics"
       },
+      "quickSyncControls": {
+        "label": "Afficher les contrôles rapides de synchro du titre",
+        "info": "Affiche les contrôles de décalage propres au titre en bas à gauche des pages de paroles et du mode plein écran. Lorsqu’ils sont masqués, ils restent accessibles sous « Ajustement de la synchro » dans le menu de droite."
+      },
       "fullscreenShortcut": {
         "label": "Raccourci plein écran",
         "desc": "Raccourci clavier pour le mode plein écran des paroles"
@@ -1799,6 +1803,8 @@ window.LANG_FR = {
     "feedbackNegativeSuccess": "Merci, nous allons améliorer ça !",
     "feedbackFailed": "Échec de l'envoi du retour",
     "autoSubmitEnabled": "⚡ Soumission auto activée",
+    "trackTitle": "Synchronisation du titre actuel",
+    "trackInfo": "S’applique uniquement au titre en cours de lecture.",
     "globalTitle": "Synchronisation globale",
     "globalInfo": "S'applique à tous les titres sur cet appareil uniquement. Elle n'est jamais envoyée à la communauté.",
     "communityUnavailableLocal": "Les offsets communautaires ne peuvent pas être envoyés pour les titres locaux sans Spotify trackId."

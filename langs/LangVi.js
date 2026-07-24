@@ -1144,6 +1144,10 @@ window.LANG_VI = {
         "label": "Thay thế nút toàn màn hình",
         "info": "Thay thế nút toàn màn hình mặc định của Spotify bằng ivLyrics toàn màn hình"
       },
+      "quickSyncControls": {
+        "label": "Hiển thị điều khiển đồng bộ nhanh cho bài hát",
+        "info": "Hiển thị các điều khiển độ lệch đồng bộ riêng cho bài hát ở góc dưới bên trái của trang lời bài hát và chế độ toàn màn hình. Khi ẩn, chúng vẫn có trong mục «Điều chỉnh đồng bộ lời bài hát» ở menu bên phải."
+      },
       "fullscreenShortcut": {
         "label": "Phím tắt toàn màn hình",
         "desc": "Phím tắt bàn phím để vào chế độ toàn màn hình lời bài hát"
@@ -1799,6 +1803,8 @@ window.LANG_VI = {
     "feedbackNegativeSuccess": "Cảm ơn phản hồi. Chúng tôi sẽ cải thiện!",
     "feedbackFailed": "Gửi phản hồi thất bại",
     "autoSubmitEnabled": "⚡ Tự động gửi đang được bật",
+    "trackTitle": "Đồng bộ bài hát hiện tại",
+    "trackInfo": "Chỉ áp dụng cho bài hát đang phát.",
     "globalTitle": "Đồng bộ toàn cục",
     "globalInfo": "Chỉ áp dụng cho mọi bài hát trên thiết bị này. Không bao giờ được gửi lên cộng đồng.",
     "communityUnavailableLocal": "Không thể gửi độ lệch cộng đồng cho bài hát cục bộ không có Spotify trackId."

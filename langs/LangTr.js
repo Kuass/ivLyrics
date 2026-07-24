@@ -1144,6 +1144,10 @@ window.LANG_TR = {
       "label": "Tam Ekran Butonunu Değiştir",
       "info": "Spotify'ın varsayılan tam ekran butonunu ivLyrics tam ekranı ile değiştirir"
     },
+    "quickSyncControls": {
+      "label": "Hızlı parça senkronizasyonu kontrollerini göster",
+      "info": "Parçaya özel senkronizasyon ofseti kontrollerini söz sayfalarının ve tam ekran modunun sol alt köşesinde gösterir. Gizlendiğinde, sağ menüdeki «Söz Senkronizasyonunu Ayarla» altında kullanılmaya devam eder."
+    },
     "fullscreenShortcut": {
       "label": "Tam Ekran Kısayolu",
       "desc": "Sözler tam ekran modu için klavye kısayolu"
@@ -1799,6 +1803,8 @@ window.LANG_TR = {
     "feedbackNegativeSuccess": "Geri bildiriminiz için teşekkürler. Geliştireceğiz!",
     "feedbackFailed": "Geri bildirim gönderilemedi",
     "autoSubmitEnabled": "⚡ Otomatik gönderim etkin",
+    "trackTitle": "Mevcut Parça Senkronizasyonu",
+    "trackInfo": "Yalnızca çalmakta olan parçaya uygulanır.",
     "globalTitle": "Genel Senkronizasyon",
     "globalInfo": "Yalnızca bu cihazdaki her şarkı için geçerlidir. Asla topluluğa gönderilmez.",
     "communityUnavailableLocal": "Yerel parçalar için Spotify trackId olmadan topluluk ofsetleri gönderilemez."
