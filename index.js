@@ -1062,8 +1062,87 @@ window.ivLyricsNormalizeTrackBackgroundOverride = normalizeIvLyricsTrackBackgrou
 const DB_NAME = "ivLyrics-db";
 const DB_VERSION = 1;
 const STORE_NAME = "track-sync-offsets";
+const MAX_TRACK_SYNC_OFFSET = 10000;
 
 let dbInstance = null;
+
+const normalizeTrackSyncOffsets = (
+  offsetsObj,
+  { ignoreInvalidEntries = false } = {}
+) => {
+  const offsetsPrototype =
+    offsetsObj && typeof offsetsObj === "object"
+      ? Object.getPrototypeOf(offsetsObj)
+      : null;
+  const hasSupportedPrototype =
+    offsetsPrototype === Object.prototype || offsetsPrototype === null;
+  if (
+    !offsetsObj ||
+    typeof offsetsObj !== "object" ||
+    Array.isArray(offsetsObj) ||
+    (!ignoreInvalidEntries && !hasSupportedPrototype)
+  ) {
+    throw new TypeError("Invalid track sync offsets backup.");
+  }
+
+  const entries = Object.entries(offsetsObj);
+  const normalizedOffsets = Object.create(null);
+  let ignoredEntryCount = 0;
+
+  entries.forEach(([trackUri, offset]) => {
+    const numericOffset =
+      typeof offset === "number"
+        ? offset
+        : typeof offset === "string" && offset.trim()
+          ? Number(offset)
+          : Number.NaN;
+
+    if (!trackUri.startsWith("spotify:") || !Number.isFinite(numericOffset)) {
+      if (ignoreInvalidEntries) {
+        ignoredEntryCount += 1;
+        return;
+      }
+      throw new TypeError("Track sync offsets backup has an invalid entry.");
+    }
+
+    normalizedOffsets[trackUri] = Math.max(
+      -MAX_TRACK_SYNC_OFFSET,
+      Math.min(MAX_TRACK_SYNC_OFFSET, Math.round(numericOffset))
+    );
+  });
+
+  if (ignoredEntryCount > 0) {
+    console.warn(
+      `[ivLyrics] Ignored ${ignoredEntryCount} invalid stored track sync offset entr${ignoredEntryCount === 1 ? "y" : "ies"}.`
+    );
+  }
+
+  return normalizedOffsets;
+};
+
+const trackSyncOffsetsMatchNormalized = (source, normalized) => {
+  if (
+    !source ||
+    typeof source !== "object" ||
+    Array.isArray(source) ||
+    Object.getPrototypeOf(source) !== Object.prototype
+  ) {
+    return false;
+  }
+
+  const sourceEntries = Object.entries(source);
+  const normalizedEntries = Object.entries(normalized);
+  return (
+    sourceEntries.length === normalizedEntries.length &&
+    sourceEntries.every(([trackUri, offset], index) => {
+      const normalizedEntry = normalizedEntries[index];
+      return (
+        normalizedEntry?.[0] === trackUri &&
+        Object.is(normalizedEntry[1], offset)
+      );
+    })
+  );
+};
 
 const initDB = () => {
   return new Promise((resolve, reject) => {
@@ -1116,16 +1195,22 @@ const TrackSyncDB = {
   async setOffset(trackUri, offset) {
     try {
       const db = await initDB();
-      return new Promise((resolve, reject) => {
+      await new Promise((resolve, reject) => {
         const transaction = db.transaction([STORE_NAME], "readwrite");
         const store = transaction.objectStore(STORE_NAME);
         const request = store.put(offset, trackUri);
 
-        request.onsuccess = () => resolve();
         request.onerror = () => reject(request.error);
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(
+          transaction.error || new Error("Track sync offset write aborted.")
+        );
       });
+      return true;
     } catch (error) {
       console.error("[ivLyrics] Failed to set offset:", error);
+      return false;
     }
   },
 
@@ -1179,26 +1264,52 @@ const TrackSyncDB = {
 
   async importOffsets(offsetsObj) {
     try {
+      const normalizedOffsets = normalizeTrackSyncOffsets(offsetsObj);
       const db = await initDB();
-      return new Promise((resolve, reject) => {
+      await new Promise((resolve, reject) => {
         const transaction = db.transaction([STORE_NAME], "readwrite");
         const store = transaction.objectStore(STORE_NAME);
+        let settled = false;
+        const rejectOnce = (error) => {
+          if (settled) return;
+          settled = true;
+          reject(error || new Error("Track sync offset transaction failed."));
+        };
 
         // Clear existing data first
         const clearRequest = store.clear();
 
         clearRequest.onsuccess = () => {
-          // Add all new offsets
-          Object.entries(offsetsObj).forEach(([trackUri, offset]) => {
-            store.put(offset, trackUri);
-          });
+          try {
+            // Add all new offsets
+            Object.entries(normalizedOffsets).forEach(([trackUri, offset]) => {
+              store.put(offset, trackUri);
+            });
+          } catch (error) {
+            try {
+              transaction.abort();
+            } catch {
+              // Reject with the original write error below.
+            }
+            rejectOnce(error);
+          }
         };
+        clearRequest.onerror = () => rejectOnce(clearRequest.error);
 
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(transaction.error);
+        transaction.oncomplete = () => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
+        transaction.onerror = () => rejectOnce(transaction.error);
+        transaction.onabort = () => rejectOnce(
+          transaction.error || new Error("Track sync offset transaction aborted.")
+        );
       });
+      return true;
     } catch (error) {
       console.error("[ivLyrics] Failed to import offsets:", error);
+      return false;
     }
   },
 };
@@ -1589,10 +1700,32 @@ window.TrackBackgroundDB = TrackBackgroundDB;
     const oldOffsets = localStorage.getItem("ivLyrics:track-sync-offsets");
     if (oldOffsets) {
       ivLyricsDebug("[ivLyrics] Migrating track-sync-offsets to IndexedDB");
-      const offsetsObj = JSON.parse(oldOffsets);
-      await TrackSyncDB.importOffsets(offsetsObj);
-      localStorage.removeItem("ivLyrics:track-sync-offsets");
-      ivLyricsDebug("[ivLyrics] Migration complete");
+      let offsetsObj;
+      try {
+        const parsedOffsets = JSON.parse(oldOffsets);
+        offsetsObj = normalizeTrackSyncOffsets(parsedOffsets, {
+          ignoreInvalidEntries: true,
+        });
+        if (
+          Object.keys(parsedOffsets).length > 0 &&
+          Object.keys(offsetsObj).length === 0
+        ) {
+          console.warn(
+            "[ivLyrics] Legacy track offsets have no recoverable entries; keeping the original backup."
+          );
+          return;
+        }
+      } catch (error) {
+        console.error("[ivLyrics] Keeping invalid legacy track offsets:", error);
+        return;
+      }
+      const imported = await TrackSyncDB.importOffsets(offsetsObj);
+      if (imported) {
+        localStorage.removeItem("ivLyrics:track-sync-offsets");
+        ivLyricsDebug("[ivLyrics] Migration complete");
+      } else {
+        console.warn("[ivLyrics] Keeping legacy track offsets for a later retry.");
+      }
     }
   } catch (error) {
     console.error("[ivLyrics] Migration failed:", error);
@@ -1612,12 +1745,54 @@ const removePersistentSetting = (key) => {
 };
 
 let __storageKeys = [];
+const STORAGE_KEYS_METADATA_KEY = `${APP_NAME}:storage-keys`;
+const TRACK_SYNC_OFFSETS_STORAGE_KEY = `${APP_NAME}:track-sync-offsets`;
+const CURRENT_STORAGE_PREFIX = `${APP_NAME}:`;
+const LEGACY_STORAGE_PREFIX = "lyrics-plus:";
+const PRIVATE_OR_TRANSIENT_STORAGE_KEYS = new Set([
+  STORAGE_KEYS_METADATA_KEY,
+  `${APP_NAME}:user-hash`,
+  `${APP_NAME}:client-id`,
+  `${APP_NAME}:auth-token`,
+  `${APP_NAME}:discord-login-pending`,
+  `${APP_NAME}:return-to-settings`,
+  `${APP_NAME}:restore-route-after-reload`,
+]);
+const OBSOLETE_LEGACY_STORAGE_KEYS = new Set([
+  `${APP_NAME}:provider:lrclib:on`,
+  `${APP_NAME}:provider:ivlyrics:on`,
+  `${APP_NAME}:provider:spotify:on`,
+  `${APP_NAME}:provider:local:on`,
+  `${APP_NAME}:services-order`,
+  `${APP_NAME}:lock-mode`,
+  `${APP_NAME}:visual:global-delay`,
+]);
 try {
-  const savedStorageKeys = readPersistentSetting(`${APP_NAME}:storage-keys`);
+  const savedStorageKeys = readPersistentSetting(STORAGE_KEYS_METADATA_KEY);
   const parsedStorageKeys = savedStorageKeys ? JSON.parse(savedStorageKeys) : [];
-  __storageKeys = Array.isArray(parsedStorageKeys) ? parsedStorageKeys : [];
+  __storageKeys = Array.isArray(parsedStorageKeys)
+    ? Array.from(new Set(parsedStorageKeys.filter(
+      (key) =>
+        typeof key === "string" &&
+        key.startsWith(CURRENT_STORAGE_PREFIX) &&
+        key !== TRACK_SYNC_OFFSETS_STORAGE_KEY &&
+        !OBSOLETE_LEGACY_STORAGE_KEYS.has(key) &&
+        !PRIVATE_OR_TRANSIENT_STORAGE_KEYS.has(key)
+    )))
+    : [];
+  if (JSON.stringify(parsedStorageKeys) !== JSON.stringify(__storageKeys)) {
+    writePersistentSetting(
+      STORAGE_KEYS_METADATA_KEY,
+      JSON.stringify(__storageKeys)
+    );
+  }
 } catch (error) {
   console.warn("[ivLyrics] Ignoring invalid storage key metadata.", error);
+  try {
+    writePersistentSetting(STORAGE_KEYS_METADATA_KEY, "[]");
+  } catch {
+    // Keep the in-memory metadata safe when storage is read-only.
+  }
 }
 const StorageKeys = new Set(__storageKeys);
 const IMPORT_PROVIDER_ORDER_KEYS = new Set([
@@ -1629,8 +1804,38 @@ const normalizeImportedConfig = (config) => {
     throw new TypeError("Invalid ivLyrics settings backup.");
   }
 
-  const normalizedConfig = { ...config };
+  const normalizedConfig = {};
+  const entries = Object.entries(config);
+
+  // Keep current-format values when a backup contains both current and
+  // pre-rebrand keys. This also prevents an older duplicate from overwriting
+  // the value that was exported by a newer version.
+  entries.forEach(([key, value]) => {
+    if (key.startsWith(CURRENT_STORAGE_PREFIX)) {
+      normalizedConfig[key] = value;
+    }
+  });
+  entries.forEach(([key, value]) => {
+    if (!key.startsWith(LEGACY_STORAGE_PREFIX)) return;
+    const migratedKey = `${CURRENT_STORAGE_PREFIX}${key.slice(LEGACY_STORAGE_PREFIX.length)}`;
+    if (
+      !OBSOLETE_LEGACY_STORAGE_KEYS.has(migratedKey) &&
+      !Object.prototype.hasOwnProperty.call(normalizedConfig, migratedKey)
+    ) {
+      normalizedConfig[migratedKey] = value;
+    }
+  });
+
+  OBSOLETE_LEGACY_STORAGE_KEYS.forEach((key) => {
+    delete normalizedConfig[key];
+  });
+  PRIVATE_OR_TRANSIENT_STORAGE_KEYS.forEach((key) => {
+    delete normalizedConfig[key];
+  });
+
   const languageKey = `${APP_NAME}:visual:language`;
+  const quickSyncControlsKey =
+    `${APP_NAME}:visual:quick-sync-controls-enabled`;
 
   if (Object.prototype.hasOwnProperty.call(normalizedConfig, languageKey)) {
     const importedLanguage = String(normalizedConfig[languageKey] ?? "").trim();
@@ -1658,6 +1863,23 @@ const normalizeImportedConfig = (config) => {
     }
   }
 
+  if (
+    Object.prototype.hasOwnProperty.call(
+      normalizedConfig,
+      quickSyncControlsKey
+    )
+  ) {
+    const importedValue = normalizedConfig[quickSyncControlsKey];
+    const normalizedValue =
+      typeof importedValue === "boolean"
+        ? String(importedValue)
+        : typeof importedValue === "string" &&
+          ["true", "false"].includes(importedValue.trim().toLowerCase())
+          ? importedValue.trim().toLowerCase()
+          : "true";
+    normalizedConfig[quickSyncControlsKey] = normalizedValue;
+  }
+
   IMPORT_PROVIDER_ORDER_KEYS.forEach((key) => {
     if (!Object.prototype.hasOwnProperty.call(normalizedConfig, key)) return;
 
@@ -1683,6 +1905,19 @@ const normalizeImportedConfig = (config) => {
     );
   });
 
+  Object.entries(normalizedConfig).forEach(([key, value]) => {
+    if (key === TRACK_SYNC_OFFSETS_STORAGE_KEY) return;
+    if (typeof value === "string") return;
+    if (typeof value === "boolean" || (
+      typeof value === "number" && Number.isFinite(value)
+    )) {
+      normalizedConfig[key] = String(value);
+      return;
+    }
+    delete normalizedConfig[key];
+    console.warn(`[ivLyrics] Ignored invalid imported setting: ${key}`);
+  });
+
   return normalizedConfig;
 };
 /**
@@ -1691,11 +1926,16 @@ const normalizeImportedConfig = (config) => {
  */
 const saveStorageKeys = (newKey) => {
   if (typeof newKey !== "string") return;
-  if (!newKey.startsWith(APP_NAME)) return;
+  if (
+    !newKey.startsWith(CURRENT_STORAGE_PREFIX) ||
+    newKey === TRACK_SYNC_OFFSETS_STORAGE_KEY ||
+    OBSOLETE_LEGACY_STORAGE_KEYS.has(newKey) ||
+    PRIVATE_OR_TRANSIENT_STORAGE_KEYS.has(newKey)
+  ) return;
   StorageKeys.add(newKey);
   try {
     writePersistentSetting(
-      `${APP_NAME}:storage-keys`,
+      STORAGE_KEYS_METADATA_KEY,
       JSON.stringify(Array.from(StorageKeys))
     );
   } catch (e) {
@@ -1707,7 +1947,9 @@ const StorageManager = {
     saveStorageKeys(key);
     try {
       const value = readPersistentSetting(key);
-      return value !== null ? value === "true" : defaultVal;
+      if (value === "true") return true;
+      if (value === "false") return false;
+      return defaultVal;
     } catch (error) {
       return defaultVal;
     }
@@ -1782,21 +2024,51 @@ const StorageManager = {
 
   async exportConfig() {
     const config = {};
-    const CLIENT_HASH_KEY = `${APP_NAME}:user-hash`;
+    const exportKeys = new Set(StorageKeys);
+    try {
+      Object.keys(SettingsPersistence?.getSnapshot?.() || {}).forEach((key) => {
+        exportKeys.add(key);
+      });
+    } catch (error) {
+      console.warn("[ivLyrics] Failed to read the settings recovery snapshot.", error);
+    }
 
-    StorageKeys.forEach((key) => {
-      // Client ID는 내보내기에서 제외
-      if (key === CLIENT_HASH_KEY) return;
+    exportKeys.forEach((key) => {
+      if (
+        !key.startsWith(CURRENT_STORAGE_PREFIX) ||
+        key === TRACK_SYNC_OFFSETS_STORAGE_KEY ||
+        OBSOLETE_LEGACY_STORAGE_KEYS.has(key) ||
+        PRIVATE_OR_TRANSIENT_STORAGE_KEYS.has(key)
+      ) return;
 
-      const val = StorageManager.getItem(key);
+      const val = readPersistentSetting(key);
       if (val !== null) config[key] = val;
     });
 
     // IndexedDB의 track-sync-offsets를 포함
     const trackSyncOffsets = await TrackSyncDB.getAllOffsets();
-    if (Object.keys(trackSyncOffsets).length > 0) {
-      config["ivLyrics:track-sync-offsets"] = JSON.stringify(trackSyncOffsets);
-      ivLyricsDebug("[ivLyrics] Exporting track-sync-offsets from IndexedDB:", trackSyncOffsets);
+    const normalizedTrackSyncOffsets = normalizeTrackSyncOffsets(
+      trackSyncOffsets,
+      { ignoreInvalidEntries: true }
+    );
+    if (!trackSyncOffsetsMatchNormalized(
+      trackSyncOffsets,
+      normalizedTrackSyncOffsets
+    )) {
+      const repaired = await TrackSyncDB.importOffsets(
+        normalizedTrackSyncOffsets
+      );
+      if (!repaired) {
+        console.warn("[ivLyrics] Failed to repair stored track sync offsets.");
+      }
+    }
+    if (Object.keys(normalizedTrackSyncOffsets).length > 0) {
+      config[TRACK_SYNC_OFFSETS_STORAGE_KEY] =
+        JSON.stringify(normalizedTrackSyncOffsets);
+      ivLyricsDebug(
+        "[ivLyrics] Exporting track-sync-offsets from IndexedDB:",
+        normalizedTrackSyncOffsets
+      );
     } else {
       ivLyricsDebug("[ivLyrics] No track-sync-offsets found in IndexedDB");
     }
@@ -1806,31 +2078,29 @@ const StorageManager = {
     return config;
   },
   async importConfig(config) {
-    const CLIENT_HASH_KEY = `${APP_NAME}:user-hash`;
     const importedConfig = normalizeImportedConfig(config);
 
     // track-sync-offsets를 IndexedDB로 가져오기
     if (
       Object.prototype.hasOwnProperty.call(
         importedConfig,
-        "ivLyrics:track-sync-offsets"
+        TRACK_SYNC_OFFSETS_STORAGE_KEY
       )
     ) {
       try {
-        const offsetsObj = JSON.parse(importedConfig["ivLyrics:track-sync-offsets"]);
-        await TrackSyncDB.importOffsets(offsetsObj);
+        const importedOffsets = importedConfig[TRACK_SYNC_OFFSETS_STORAGE_KEY];
+        const offsetsObj =
+          typeof importedOffsets === "string"
+            ? JSON.parse(importedOffsets)
+            : importedOffsets;
+        const imported = await TrackSyncDB.importOffsets(offsetsObj);
+        if (!imported) {
+          throw new TypeError("Invalid track sync offsets backup.");
+        }
         ivLyricsDebug("[ivLyrics] Imported track-sync-offsets to IndexedDB");
-      } catch (error) {
-        console.error("[ivLyrics] Failed to import track-sync-offsets:", error);
       } finally {
-        delete importedConfig["ivLyrics:track-sync-offsets"]; // localStorage에 저장하지 않음
+        delete importedConfig[TRACK_SYNC_OFFSETS_STORAGE_KEY]; // localStorage에 저장하지 않음
       }
-    }
-
-    // Client ID가 있다면 삭제 (불러오기에서 제외)
-    if (Object.prototype.hasOwnProperty.call(importedConfig, CLIENT_HASH_KEY)) {
-      delete importedConfig[CLIENT_HASH_KEY];
-      ivLyricsDebug("[ivLyrics] Client ID excluded from import");
     }
 
     // 나머지 설정을 localStorage에 저장
@@ -1842,6 +2112,26 @@ const StorageManager = {
 };
 
 window.StorageManager = StorageManager;
+
+const getStoredFiniteNumber = (
+  key,
+  defaultValue,
+  min = Number.NEGATIVE_INFINITY,
+  max = Number.POSITIVE_INFINITY
+) => {
+  const storedValue = StorageManager.getItem(key);
+  if (
+    storedValue === null ||
+    storedValue === undefined ||
+    (typeof storedValue === "string" && !storedValue.trim())
+  ) {
+    return defaultValue;
+  }
+  const value = Number(storedValue);
+  return Number.isFinite(value)
+    ? Math.max(min, Math.min(max, value))
+    : defaultValue;
+};
 
 // DB Export/Import Manager - 모든 IndexedDB 데이터 내보내기/가져오기
 const DB_EXPORT_TARGETS = [
@@ -2453,9 +2743,11 @@ const CONFIG = {
       "ivLyrics:visual:spotify-fake-karaoke-enabled",
       false
     ),
-    "pseudo-karaoke-render-advance": StorageManager.get(
+    "pseudo-karaoke-render-advance": getStoredFiniteNumber(
       "ivLyrics:visual:pseudo-karaoke-render-advance",
-      250
+      250,
+      0,
+      500
     ),
     "prefer-sync-data-provider": StorageManager.get(
       "ivLyrics:visual:prefer-sync-data-provider",
@@ -9407,7 +9699,10 @@ class LyricsContainer extends react.Component {
     const trackSyncAdjustPill = canAdjustTrackSync &&
       quickSyncControlsEnabled &&
       typeof TrackSyncAdjustPill !== "undefined"
-      ? react.createElement(TrackSyncAdjustPill, { trackUri: renderTrackUri })
+      ? react.createElement(TrackSyncAdjustPill, {
+        key: renderTrackUri,
+        trackUri: renderTrackUri,
+      })
       : null;
 
     const out = react.createElement(

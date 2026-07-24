@@ -1793,18 +1793,21 @@ const Utils = {
   },
 
   async setTrackSyncOffset(trackUri, offset, options = {}) {
-    if (!trackUri) return;
+    if (!trackUri) return false;
     const shouldDispatch = options.dispatch !== false;
     try {
-      await TrackSyncDB.setOffset(trackUri, offset);
+      const persisted = await TrackSyncDB.setOffset(trackUri, offset);
+      if (!persisted) return false;
       if (shouldDispatch) {
         // Dispatch custom event to notify offset change
         window.dispatchEvent(new CustomEvent('ivLyrics:offset-changed', {
           detail: { trackUri, offset }
         }));
       }
+      return true;
     } catch (error) {
       console.error("[ivLyrics] Failed to set track sync offset:", error);
+      return false;
     }
   },
 
@@ -2081,14 +2084,19 @@ const Utils = {
     }
 
     try {
-      Spicetify?.Platform?.History?.push?.("/ivLyrics");
+      const history = Spicetify?.Platform?.History;
+      if (history?.replace) {
+        history.replace("/");
+      } else {
+        history?.push?.("/");
+      }
     } catch (error) {
-      console.error("[ivLyrics] Failed to navigate to ivLyrics before reload:", error);
+      console.error("[ivLyrics] Failed to navigate to a safe reload route:", error);
     }
 
     window.setTimeout(() => {
       window.location.reload();
-    }, Number(options.reloadDelay) || 300);
+    }, Math.max(150, Number(options.reloadDelay) || 300));
 
     return true;
   },

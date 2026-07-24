@@ -686,10 +686,16 @@
     transform var(--iv-motion-duration-fast) ease;
 }
 
-.lyrics-track-sync-step:hover,
+.lyrics-track-sync-step:hover:not(:disabled),
 .lyrics-track-sync-value:hover:not(:disabled) {
   color: var(--spice-text, #fff);
   background: rgba(var(--spice-rgb-text), 0.08);
+}
+
+.lyrics-track-sync-step:disabled,
+.lyrics-track-sync-value:disabled {
+  opacity: 0.52;
+  cursor: wait;
 }
 
 .lyrics-track-sync-step[data-feedback-source="true"],
@@ -697,7 +703,7 @@
   background: transparent;
 }
 
-.lyrics-track-sync-step:active,
+.lyrics-track-sync-step:active:not(:disabled),
 .lyrics-track-sync-value:active:not(:disabled) {
   transform: scale(0.96);
 }

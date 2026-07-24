@@ -66,47 +66,119 @@
 
     const restoreRouteAfterReload = () => {
         const FLAG_KEY = "ivLyrics:restore-route-after-reload";
-        let attempts = 0;
+        const SETTINGS_FLAG_KEY = "ivLyrics:return-to-settings";
+        const fallbackExpiresAt = Date.now() + 15000;
+        let routerReadySince = 0;
+        let navigationRequestedAt = 0;
+
+        const clearPendingRestore = (clearSettingsReturn = false) => {
+            localStorage.removeItem(FLAG_KEY);
+            if (clearSettingsReturn) {
+                localStorage.removeItem(SETTINGS_FLAG_KEY);
+            }
+        };
+
+        const scheduleRetry = (payload, delay = 150) => {
+            const configuredExpiry = Number(payload?.expiresAt);
+            const expiresAt = Number.isFinite(configuredExpiry)
+                ? configuredExpiry
+                : fallbackExpiresAt;
+            const remaining = expiresAt - Date.now();
+            if (remaining <= 0) {
+                clearPendingRestore(true);
+                return;
+            }
+            setTimeout(tryRestore, Math.min(delay, remaining));
+        };
 
         const tryRestore = () => {
-            attempts += 1;
-
             let payload = null;
             try {
                 const rawValue = localStorage.getItem(FLAG_KEY);
                 if (!rawValue) return;
                 payload = JSON.parse(rawValue);
             } catch (error) {
-                localStorage.removeItem(FLAG_KEY);
+                clearPendingRestore(true);
                 return;
             }
 
             if (!payload?.path) {
-                localStorage.removeItem(FLAG_KEY);
+                clearPendingRestore(true);
                 return;
             }
 
             if (payload.expiresAt && Date.now() > payload.expiresAt) {
-                localStorage.removeItem(FLAG_KEY);
+                clearPendingRestore(true);
                 return;
             }
 
             const history = Spicetify.Platform?.History;
-            if (!history?.push || !history?.location) {
-                if (attempts < 40) {
-                    setTimeout(tryRestore, 150);
-                }
+            if (
+                !history?.push ||
+                !history?.location ||
+                document.readyState !== "complete"
+            ) {
+                routerReadySince = 0;
+                scheduleRetry(payload);
+                return;
+            }
+
+            // Reloading while Spotify is still registering custom-app routes
+            // can make React try to render an undefined route component
+            // (minified error #130). Keep the built-in route alive briefly
+            // after the document and router are both ready.
+            if (!routerReadySince) {
+                routerReadySince = Date.now();
+                scheduleRetry(payload, 1000);
+                return;
+            }
+            const remainingRouterSettleTime =
+                1000 - (Date.now() - routerReadySince);
+            if (remainingRouterSettleTime > 0) {
+                scheduleRetry(payload, remainingRouterSettleTime);
                 return;
             }
 
             const currentPath = history.location.pathname || "";
             if (currentPath.startsWith(payload.path)) {
-                localStorage.removeItem(FLAG_KEY);
+                const appRuntimeReady =
+                    typeof window.StorageManager !== "undefined" &&
+                    typeof window.ivLyricsOpenConfig === "function";
+                if (appRuntimeReady) {
+                    clearPendingRestore();
+                    return;
+                }
+
+                // A stale flag from an older build can still reload directly
+                // on the custom-app path. Move back to a built-in route once,
+                // then retry the guarded restore on a clean document.
+                if (!navigationRequestedAt) {
+                    try {
+                        if (history.replace) {
+                            history.replace("/");
+                        } else {
+                            history.push("/");
+                        }
+                        window.setTimeout(() => window.location.reload(), 150);
+                    } catch (error) {
+                        console.error("[ivLyrics] Failed to recover the safe reload route:", error);
+                        scheduleRetry(payload);
+                    }
+                    return;
+                }
+
+                scheduleRetry(payload);
                 return;
             }
 
-            history.push(payload.path);
-            localStorage.removeItem(FLAG_KEY);
+            try {
+                history.push(payload.path);
+                navigationRequestedAt = Date.now();
+                scheduleRetry(payload);
+            } catch (error) {
+                console.error("[ivLyrics] Failed to restore the ivLyrics route:", error);
+                scheduleRetry(payload);
+            }
         };
 
         tryRestore();

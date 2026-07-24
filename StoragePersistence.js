@@ -228,7 +228,28 @@
     } catch (error) {
       // Reloading once is still safer than leaving CONFIG initialized with defaults.
     }
-    setTimeout(() => window.location.reload(), 0);
+
+    try {
+      const history = window.Spicetify?.Platform?.History;
+      const currentPath = history?.location?.pathname || "";
+      if (currentPath.startsWith("/ivLyrics")) {
+        localStorage.setItem(
+          "ivLyrics:restore-route-after-reload",
+          JSON.stringify({
+            path: "/ivLyrics",
+            expiresAt: Date.now() + 15000,
+          })
+        );
+        if (history?.replace) {
+          history.replace("/");
+        } else {
+          history?.push?.("/");
+        }
+      }
+    } catch (error) {
+      console.warn("[ivLyrics] Failed to prepare the safe recovery reload.", error);
+    }
+    setTimeout(() => window.location.reload(), 150);
   };
 
   const initializeIndexedBackup = async (hadSynchronousRecord) => {

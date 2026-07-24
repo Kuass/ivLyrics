@@ -3189,43 +3189,64 @@ const formatSyncOffset = (value) => {
   return `${safeOffset > 0 ? "+" : ""}${safeOffset}ms`;
 };
 
+const pendingTrackSyncOffsetWrites = new Map();
+let trackSyncOffsetWriteLoop = null;
+
+const startTrackSyncOffsetWriteLoop = () => {
+  if (trackSyncOffsetWriteLoop) return;
+
+  trackSyncOffsetWriteLoop = (async () => {
+    while (pendingTrackSyncOffsetWrites.size > 0) {
+      const [trackUri, offset] =
+        pendingTrackSyncOffsetWrites.entries().next().value;
+      pendingTrackSyncOffsetWrites.delete(trackUri);
+      try {
+        const persisted = await Utils.setTrackSyncOffset(trackUri, offset, {
+          dispatch: false,
+        });
+        if (persisted && !pendingTrackSyncOffsetWrites.has(trackUri)) {
+          window.dispatchEvent(new CustomEvent("ivLyrics:offset-changed", {
+            detail: { trackUri, offset },
+          }));
+        }
+      } catch (error) {
+        console.error("[ivLyrics] Failed to persist track sync offset:", error);
+      }
+    }
+  })()
+    .catch((error) => {
+      console.error("[ivLyrics] Track sync offset write loop failed:", error);
+    })
+    .finally(() => {
+      trackSyncOffsetWriteLoop = null;
+      if (pendingTrackSyncOffsetWrites.size > 0) {
+        startTrackSyncOffsetWriteLoop();
+      }
+    });
+};
+
+const queueTrackSyncOffsetWrite = (trackUri, offset) => {
+  pendingTrackSyncOffsetWrites.set(trackUri, offset);
+  startTrackSyncOffsetWriteLoop();
+};
+
 const TrackSyncAdjustPill = react.memo(({ trackUri }) => {
   const [offset, setOffset] = useState(0);
+  const [loadedTrackUri, setLoadedTrackUri] = useState(null);
   const [interactionFeedback, setInteractionFeedback] = useState(null);
   const activeTrackUriRef = useRef(trackUri || null);
   const optimisticOffsetRef = useRef(0);
   const loadSeqRef = useRef(0);
-  const pendingWriteRef = useRef(null);
-  const writeLoopRef = useRef(null);
   const feedbackSeqRef = useRef(0);
   const feedbackTimerRef = useRef(null);
-
-  const startWriteLoop = () => {
-    if (writeLoopRef.current) return;
-
-    writeLoopRef.current = (async () => {
-      while (pendingWriteRef.current) {
-        const nextWrite = pendingWriteRef.current;
-        pendingWriteRef.current = null;
-        await Utils.setTrackSyncOffset(nextWrite.trackUri, nextWrite.offset, {
-          dispatch: false,
-        });
-      }
-    })()
-      .catch((error) => {
-        console.error("[ivLyrics] Failed to persist track sync offset:", error);
-      })
-      .finally(() => {
-        writeLoopRef.current = null;
-        if (pendingWriteRef.current) {
-          startWriteLoop();
-        }
-      });
-  };
+  const isOffsetLoaded = Boolean(
+    trackUri && loadedTrackUri === trackUri
+  );
 
   useEffect(() => {
     activeTrackUriRef.current = trackUri || null;
     optimisticOffsetRef.current = 0;
+    setLoadedTrackUri(null);
     setOffset(0);
     setInteractionFeedback(null);
     if (feedbackTimerRef.current) {
@@ -3244,9 +3265,16 @@ const TrackSyncAdjustPill = react.memo(({ trackUri }) => {
         const safeOffset = clampSyncOffset(savedOffset);
         optimisticOffsetRef.current = safeOffset;
         setOffset(safeOffset);
+        setLoadedTrackUri(trackUri);
       })
       .catch((error) => {
+        if (!active || loadSeqRef.current !== loadSeq || activeTrackUriRef.current !== trackUri) {
+          return;
+        }
         console.error("[ivLyrics] Failed to load track sync offset:", error);
+        optimisticOffsetRef.current = 0;
+        setOffset(0);
+        setLoadedTrackUri(trackUri);
       });
 
     return () => {
@@ -3268,6 +3296,7 @@ const TrackSyncAdjustPill = react.memo(({ trackUri }) => {
       loadSeqRef.current += 1;
       optimisticOffsetRef.current = nextOffset;
       setOffset(nextOffset);
+      setLoadedTrackUri(trackUri);
     };
 
     window.addEventListener("ivLyrics:offset-changed", handleOffsetChange);
@@ -3277,7 +3306,11 @@ const TrackSyncAdjustPill = react.memo(({ trackUri }) => {
   }, [trackUri]);
 
   const handleOffsetChange = (newOffset) => {
-    if (!trackUri) return;
+    if (
+      !isOffsetLoaded ||
+      !trackUri ||
+      activeTrackUriRef.current !== trackUri
+    ) return;
     const safeOffset = clampSyncOffset(newOffset);
     loadSeqRef.current += 1;
     optimisticOffsetRef.current = safeOffset;
@@ -3285,8 +3318,7 @@ const TrackSyncAdjustPill = react.memo(({ trackUri }) => {
     window.dispatchEvent(new CustomEvent("ivLyrics:offset-changed", {
       detail: { trackUri, offset: safeOffset }
     }));
-    pendingWriteRef.current = { trackUri, offset: safeOffset };
-    startWriteLoop();
+    queueTrackSyncOffsetWrite(trackUri, safeOffset);
   };
 
   const showInteractionFeedback = (kind, event, step = 0) => {
@@ -3343,6 +3375,7 @@ const TrackSyncAdjustPill = react.memo(({ trackUri }) => {
         key: step,
         type: "button",
         className: "lyrics-track-sync-step",
+        disabled: !isOffsetLoaded,
         "data-step-size": absoluteStep,
         "data-feedback-source": interactionFeedback?.kind === "step"
           && interactionFeedback.step === step
@@ -3376,6 +3409,7 @@ const TrackSyncAdjustPill = react.memo(({ trackUri }) => {
           key: "current-offset",
           type: "button",
           className: "lyrics-track-sync-value",
+          disabled: !isOffsetLoaded,
           "data-active": offset !== 0 ? "true" : "false",
           "data-feedback-kind": interactionFeedback?.kind || undefined,
           onClick: (event) => {
@@ -3384,12 +3418,14 @@ const TrackSyncAdjustPill = react.memo(({ trackUri }) => {
           },
           onPointerUp: (event) => event.currentTarget.blur(),
           title: I18n.t("syncAdjust.reset"),
-          "aria-label": `${formatSyncOffset(offset)}, ${I18n.t("syncAdjust.reset")}`,
+          "aria-label": isOffsetLoaded
+            ? `${formatSyncOffset(offset)}, ${I18n.t("syncAdjust.reset")}`
+            : I18n.t("syncAdjust.loading"),
         },
         react.createElement(
           "span",
           {
-            key: `current-${interactionFeedback?.id || 0}-${offset}`,
+            key: `current-${interactionFeedback?.id || 0}-${isOffsetLoaded}-${offset}`,
             className: "lyrics-track-sync-value-current",
             "data-change-direction": interactionFeedback?.kind === "step"
               ? interactionFeedback.direction
@@ -3397,7 +3433,7 @@ const TrackSyncAdjustPill = react.memo(({ trackUri }) => {
             "aria-live": "polite",
             "aria-atomic": "true",
           },
-          formatSyncOffset(offset)
+          isOffsetLoaded ? formatSyncOffset(offset) : "…"
         ),
         react.createElement(
           "span",
@@ -3458,6 +3494,7 @@ const TrackSyncAdjustPill = react.memo(({ trackUri }) => {
       className: "lyrics-track-sync-pill",
       role: "group",
       "aria-label": I18n.t("menu.syncAdjustTitle"),
+      "aria-busy": !isOffsetLoaded,
       "data-offset-active": offset !== 0 ? "true" : "false",
     },
     react.createElement(
@@ -3601,7 +3638,9 @@ const SyncAdjustButtonFluent = react.memo(({
         if (!panel || panel.contains(document.activeElement)) return;
 
         const initialControl = hasTrackOffsetControls
-          ? panel.querySelector?.(".lyrics-track-sync-step")
+          ? panel.querySelector?.(".lyrics-track-sync-step:not([disabled])") ||
+            panel.querySelector?.(".ivlyrics-fluent-close") ||
+            globalSliderRef.current
           : globalSliderRef.current;
         initialControl?.focus();
       });
@@ -3613,7 +3652,7 @@ const SyncAdjustButtonFluent = react.memo(({
         cancelAnimationFrame(focusFrame);
       }
     };
-  }, [isOpen, hasTrackOffsetControls, updatePanelPosition]);
+  }, [isOpen, hasTrackOffsetControls, trackUri, updatePanelPosition]);
 
   const handleGlobalOffsetChange = (newOffset) => {
     const safeOffset = clampSyncOffset(newOffset);
@@ -3748,7 +3787,10 @@ const SyncAdjustButtonFluent = react.memo(({
               { className: "lyrics-sync-adjust-track-section" },
               react.createElement("div", { className: "lyrics-sync-adjust-section-title" }, I18n.t("syncAdjust.trackTitle")),
               react.createElement("p", { className: "lyrics-sync-adjust-section-desc" }, I18n.t("syncAdjust.trackInfo")),
-              react.createElement(TrackSyncAdjustPill, { trackUri })
+              react.createElement(TrackSyncAdjustPill, {
+                key: trackUri,
+                trackUri,
+              })
             ),
             hasTrackOffsetControls
               ? react.createElement(

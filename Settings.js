@@ -18630,14 +18630,19 @@ function queueReloadIntoIvLyrics(options = {}) {
   }
 
   try {
-    Spicetify?.Platform?.History?.push?.("/ivLyrics");
+    const history = Spicetify?.Platform?.History;
+    if (history?.replace) {
+      history.replace("/");
+    } else {
+      history?.push?.("/");
+    }
   } catch (error) {
-    console.error("[ivLyrics] Failed to navigate to ivLyrics before reload:", error);
+    console.error("[ivLyrics] Failed to navigate to a safe reload route:", error);
   }
 
   window.setTimeout(() => {
     window.location.reload();
-  }, Math.max(0, Number(delay) || 0));
+  }, Math.max(150, Number(delay) || 0));
 }
 
 window.ivLyricsOpenConfig = openConfig;
