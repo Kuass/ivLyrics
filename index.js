@@ -1620,6 +1620,71 @@ try {
   console.warn("[ivLyrics] Ignoring invalid storage key metadata.", error);
 }
 const StorageKeys = new Set(__storageKeys);
+const IMPORT_PROVIDER_ORDER_KEYS = new Set([
+  `${APP_NAME}:ai:provider-order`,
+  `${APP_NAME}:lyrics:provider-order`,
+]);
+const normalizeImportedConfig = (config) => {
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    throw new TypeError("Invalid ivLyrics settings backup.");
+  }
+
+  const normalizedConfig = { ...config };
+  const languageKey = `${APP_NAME}:visual:language`;
+
+  if (Object.prototype.hasOwnProperty.call(normalizedConfig, languageKey)) {
+    const importedLanguage = String(normalizedConfig[languageKey] ?? "").trim();
+    let availableLanguages = [];
+
+    try {
+      availableLanguages = (window.I18n?.getAvailableLanguages?.() || [])
+        .map((language) => language?.code)
+        .filter((language) => typeof language === "string" && language);
+    } catch (error) {
+      console.warn("[ivLyrics] Failed to read the supported UI languages.", error);
+    }
+
+    if (availableLanguages.includes(importedLanguage)) {
+      normalizedConfig[languageKey] = importedLanguage;
+    } else {
+      const currentLanguage = window.I18n?.getCurrentLanguage?.();
+      normalizedConfig[languageKey] =
+        availableLanguages.includes(currentLanguage)
+          ? currentLanguage
+          : availableLanguages[0] || "ko";
+      console.warn(
+        `[ivLyrics] Replaced unsupported imported language: ${importedLanguage || "(empty)"}`
+      );
+    }
+  }
+
+  IMPORT_PROVIDER_ORDER_KEYS.forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(normalizedConfig, key)) return;
+
+    let order = normalizedConfig[key];
+    if (typeof order === "string") {
+      try {
+        order = JSON.parse(order);
+      } catch (error) {
+        order = null;
+      }
+    }
+
+    if (!Array.isArray(order)) {
+      normalizedConfig[key] = "[]";
+      console.warn(`[ivLyrics] Reset invalid imported provider order: ${key}`);
+      return;
+    }
+
+    normalizedConfig[key] = JSON.stringify(
+      Array.from(
+        new Set(order.filter((id) => typeof id === "string" && id.length > 0))
+      )
+    );
+  });
+
+  return normalizedConfig;
+};
 /**
  *
  * @param {string} newKey
@@ -1742,27 +1807,34 @@ const StorageManager = {
   },
   async importConfig(config) {
     const CLIENT_HASH_KEY = `${APP_NAME}:user-hash`;
+    const importedConfig = normalizeImportedConfig(config);
 
     // track-sync-offsets를 IndexedDB로 가져오기
-    if (config["ivLyrics:track-sync-offsets"]) {
+    if (
+      Object.prototype.hasOwnProperty.call(
+        importedConfig,
+        "ivLyrics:track-sync-offsets"
+      )
+    ) {
       try {
-        const offsetsObj = JSON.parse(config["ivLyrics:track-sync-offsets"]);
+        const offsetsObj = JSON.parse(importedConfig["ivLyrics:track-sync-offsets"]);
         await TrackSyncDB.importOffsets(offsetsObj);
         ivLyricsDebug("[ivLyrics] Imported track-sync-offsets to IndexedDB");
-        delete config["ivLyrics:track-sync-offsets"]; // localStorage에 저장하지 않음
       } catch (error) {
         console.error("[ivLyrics] Failed to import track-sync-offsets:", error);
+      } finally {
+        delete importedConfig["ivLyrics:track-sync-offsets"]; // localStorage에 저장하지 않음
       }
     }
 
     // Client ID가 있다면 삭제 (불러오기에서 제외)
-    if (config[CLIENT_HASH_KEY]) {
-      delete config[CLIENT_HASH_KEY];
+    if (Object.prototype.hasOwnProperty.call(importedConfig, CLIENT_HASH_KEY)) {
+      delete importedConfig[CLIENT_HASH_KEY];
       ivLyricsDebug("[ivLyrics] Client ID excluded from import");
     }
 
     // 나머지 설정을 localStorage에 저장
-    Object.entries(config).forEach(([key, value]) => {
+    Object.entries(importedConfig).forEach(([key, value]) => {
       StorageManager.setItem(key, value);
       saveStorageKeys(key);
     });
@@ -1914,7 +1986,9 @@ const getOrSeedVinylTypographySetting = (
 
 const CONFIG = {
   visual: {
-    language: StorageManager.getItem("ivLyrics:visual:language"),
+    language:
+      window.I18n?.getCurrentLanguage?.() ||
+      StorageManager.getItem("ivLyrics:visual:language"),
     "playbar-button": StorageManager.get(
       "ivLyrics:visual:playbar-button",
       false

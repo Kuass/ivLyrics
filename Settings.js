@@ -1961,6 +1961,32 @@ const AIProvidersTab = () => {
   );
 };
 
+const getSafeSettingsLocale = () => {
+  let currentLanguage = null;
+  try {
+    currentLanguage = window.I18n?.getCurrentLanguage?.();
+  } catch {
+    // Fall through to the browser locale.
+  }
+
+  const candidates = [
+    currentLanguage,
+    typeof navigator !== "undefined" ? navigator.language : null,
+    "en-US",
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string" || !candidate) continue;
+    try {
+      if (Intl.getCanonicalLocales(candidate).length > 0) {
+        return candidate;
+      }
+    } catch {
+      // Try the next locale.
+    }
+  }
+  return "en-US";
+};
+
 // 로컬 캐시 관리 컴포넌트 (IndexedDB)
 const LocalCacheManager = () => {
   const [stats, setStats] = useState(null);
@@ -1968,6 +1994,7 @@ const LocalCacheManager = () => {
   const [openDbUpdating, setOpenDbUpdating] = useState(false);
   const [openDbError, setOpenDbError] = useState("");
   const [loading, setLoading] = useState(true);
+  const settingsLocale = getSafeSettingsLocale();
 
   // 캐시 통계 로드
   const loadStats = async () => {
@@ -2123,8 +2150,7 @@ const LocalCacheManager = () => {
         : ["minute", 60 * 1000];
 
     try {
-      const locale = CONFIG.visual.language || navigator.language;
-      return new Intl.RelativeTimeFormat(locale, { numeric: "auto" })
+      return new Intl.RelativeTimeFormat(settingsLocale, { numeric: "auto" })
         .format(Math.round(difference / units[1]), units[0]);
     } catch (error) {
       return "";
@@ -2142,11 +2168,14 @@ const LocalCacheManager = () => {
       : new Date(value).getTime();
     if (!Number.isFinite(time)) return value || "";
     try {
-      return new Intl.DateTimeFormat(CONFIG.visual.language || navigator.language, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      }).format(time);
+      return new Intl.DateTimeFormat(
+        settingsLocale,
+        {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        }
+      ).format(time);
     } catch (error) {
       return value || "";
     }
@@ -2221,7 +2250,7 @@ const LocalCacheManager = () => {
     .replace(
       "{isrcCount}",
       Number(openDbInfo?.distinctIsrcCount || 0).toLocaleString(
-        CONFIG.visual.language || navigator.language
+        settingsLocale
       )
     )
     .replace("{providerCount}", openDbInfo?.providerCount || 0);

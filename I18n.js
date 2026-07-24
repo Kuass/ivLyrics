@@ -262,7 +262,18 @@
         var savedLang = getStoredLanguage();
 
         if (!savedLang || AVAILABLE_LANGUAGES.indexOf(savedLang) === -1) {
+            var invalidSavedLang = savedLang;
             savedLang = DEFAULT_LANGUAGE;
+
+            // Old index-based backups can map an unrelated value (for example
+            // "true" or "3") onto the language key. Repair the persisted value
+            // as well as the in-memory fallback so it is not exported again.
+            if (invalidSavedLang) {
+                storeLanguage(savedLang);
+                window.__ivLyricsDebugLog?.(
+                    "[I18n] Replaced an unsupported stored language with the default."
+                );
+            }
         }
 
         // Load fallback data first
@@ -276,6 +287,12 @@
         } else {
             languageData = fallbackData;
             currentLanguage = DEFAULT_LANGUAGE;
+        }
+
+        // The custom-app entrypoint can run before this subfile. Keep the
+        // already-created runtime config aligned with the validated language.
+        if (window.CONFIG && window.CONFIG.visual) {
+            window.CONFIG.visual.language = currentLanguage;
         }
 
         window.__ivLyricsDebugLog?.("[I18n] Initialized: " + currentLanguage);
@@ -325,6 +342,9 @@
 
         languageData = newData;
         currentLanguage = langCode;
+        if (window.CONFIG && window.CONFIG.visual) {
+            window.CONFIG.visual.language = currentLanguage;
+        }
 
         // Save to storage
         storeLanguage(langCode);

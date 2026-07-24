@@ -20,6 +20,43 @@
     const setStoredValue = (key, value) => window.ivLyricsStoragePersistence
         ? window.ivLyricsStoragePersistence.setItem(key, value)
         : Spicetify.LocalStorage.set(key, value);
+    const parseStoredProviderOrder = (storageKey) => {
+        let stored = null;
+        try {
+            stored = getStoredValue(storageKey);
+        } catch {
+            return [];
+        }
+        if (!stored) return [];
+
+        let parsed = null;
+        try {
+            parsed = JSON.parse(stored);
+        } catch {
+            // Invalid persisted data is repaired below.
+        }
+
+        if (!Array.isArray(parsed)) {
+            try {
+                setStoredValue(storageKey, '[]');
+            } catch {
+                // A safe default can still be returned when storage is read-only.
+            }
+            return [];
+        }
+
+        const normalized = Array.from(
+            new Set(parsed.filter(id => typeof id === 'string' && id.length > 0))
+        );
+        if (normalized.length !== parsed.length) {
+            try {
+                setStoredValue(storageKey, JSON.stringify(normalized));
+            } catch {
+                // Keep the in-memory normalized value when storage is read-only.
+            }
+        }
+        return normalized;
+    };
 
     // 기능 유형
     const AI_CAPABILITIES = {
@@ -1045,21 +1082,12 @@ ${normalizedText}
          * @returns {string[]}
          */
         getProviderOrder() {
-            const stored = getStoredValue(STORAGE_PREFIX + 'provider-order');
-            let order = [];
-
-            if (stored) {
-                try {
-                    order = JSON.parse(stored);
-                } catch {
-                    // Fall through to default
-                }
-            }
+            const order = parseStoredProviderOrder(STORAGE_PREFIX + 'provider-order');
 
             const allIds = this.getAddonIds();
 
             // 저장된 순서가 없으면 기본 순서 반환
-            if (!order || order.length === 0) {
+            if (order.length === 0) {
                 return allIds;
             }
 

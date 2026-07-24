@@ -24,6 +24,43 @@
     const setStoredValue = (key, value) => window.ivLyricsStoragePersistence
         ? window.ivLyricsStoragePersistence.setItem(key, value)
         : Spicetify.LocalStorage.set(key, value);
+    const parseStoredProviderOrder = (storageKey) => {
+        let stored = null;
+        try {
+            stored = getStoredValue(storageKey);
+        } catch {
+            return [];
+        }
+        if (!stored) return [];
+
+        let parsed = null;
+        try {
+            parsed = JSON.parse(stored);
+        } catch {
+            // Invalid persisted data is repaired below.
+        }
+
+        if (!Array.isArray(parsed)) {
+            try {
+                setStoredValue(storageKey, '[]');
+            } catch {
+                // A safe default can still be returned when storage is read-only.
+            }
+            return [];
+        }
+
+        const normalized = Array.from(
+            new Set(parsed.filter(id => typeof id === 'string' && id.length > 0))
+        );
+        if (normalized.length !== parsed.length) {
+            try {
+                setStoredValue(storageKey, JSON.stringify(normalized));
+            } catch {
+                // Keep the in-memory normalized value when storage is read-only.
+            }
+        }
+        return normalized;
+    };
     const SYNC_DATA_RENDERER_VERSION = '2026-05-23-source-line-shape-1';
 
     // 가사 유형
@@ -674,16 +711,7 @@
          * @returns {string[]}
          */
         getProviderOrder() {
-            let order = [];
-            const stored = getStoredValue(STORAGE_PREFIX + 'provider-order');
-
-            if (stored) {
-                try {
-                    order = JSON.parse(stored);
-                } catch {
-                    // Ignore error
-                }
-            }
+            let order = parseStoredProviderOrder(STORAGE_PREFIX + 'provider-order');
 
             // Get all currently registered addons
             const allAddonIds = this.getAddonIds();
