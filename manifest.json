@@ -79,6 +79,7 @@
 		"AIAddonManager.js",
 		"LyricsAddonManager.js",
 		"LyricsService.js",
+		"OverlayService.js",
 		"PlaybarButton.js",
 		"VideoBackgroundDepend.js",
 		"GlobalShortcuts.js",

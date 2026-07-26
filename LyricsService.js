@@ -514,6 +514,22 @@
             return TrackIdentity.extractTrackId(uri);
         },
 
+        isSectionHeader(text) {
+            if (!text || typeof text !== "string") return false;
+
+            const normalizedText = text.trim();
+            if (!/^\s*\[.*\]\s*$/.test(normalizedText)) return false;
+
+            const sectionPatterns = [
+                /^\s*\[\s*(verse|chorus|bridge|intro|outro|pre-?chorus|hook|refrain)\s*(\d+)?\s*(:|：)?\s*.*\]\s*$/i,
+                /^\s*\[\s*(절|후렴|브릿지|인트로|아웃트로|간주|부분)\s*(\d+)?\s*(:|：)?\s*.*\]\s*$/i,
+                /^\s*\[\s*(ヴァース|コーラス|ブリッジ|イントロ|アウトロ)\s*(\d+)?\s*(:|：)?\s*.*\]\s*$/i,
+                /^\s*\[\s*(verse|chorus|bridge|intro|outro)\s*(\d+)?\s*(:|：)?\s*[^,\[\]]*\]\s*$/i
+            ];
+
+            return sectionPatterns.some(pattern => pattern.test(normalizedText));
+        },
+
         detectLanguage(lyrics) {
             // Safe array check
             if (!lyrics || !Array.isArray(lyrics) || lyrics.length === 0) {
@@ -8428,158 +8444,11 @@
     // Extension으로 이동하여 어떤 페이지에서든 작동
     // ============================================
 
-    let senderBootstrapTimer = null;
-    let senderBootstrapScheduledChain = null;
-    let senderBootstrapInFlightChain = null;
-    let senderBootstrapRerunRequested = null;
-    let senderBootstrapNextChainId = 0;
-    let senderBootstrapPageGraceUri = null;
-    let senderBootstrapPageGraceUntil = 0;
-    const SENDER_BOOTSTRAP_METADATA_WAIT_MS = 4000;
-
-    // Spotify 시작/헬퍼 재연결 시 songchange보다 리스너 등록이 늦으면 현재 곡을
-    // 영원히 놓칠 수 있다. 두 sender가 공유하는 단일 부트스트랩으로 중복 조회 없이
-    // 현재 곡을 한 번 보충하고, 이후 전송은 각 sender의 enabled 상태에 맡긴다.
-    const scheduleSenderBootstrap = (delay = 1200, previousUri = null, existingChain = null) => {
-        let bootstrapChain = existingChain;
-        if (bootstrapChain) {
-            if (bootstrapChain.id !== senderBootstrapScheduledChain?.id
-                && bootstrapChain.id !== senderBootstrapRerunRequested?.id) {
-                return;
-            }
-        } else if (senderBootstrapTimer && senderBootstrapScheduledChain
-            && (!previousUri || !senderBootstrapScheduledChain.previousUri
-                || previousUri === senderBootstrapScheduledChain.previousUri)) {
-            // 같은 대기 체인에 겹쳐 들어온 예약은 마감 시각까지 포함해 그대로 재사용한다.
-            bootstrapChain = senderBootstrapScheduledChain;
-            if (!bootstrapChain.previousUri && previousUri) {
-                bootstrapChain.previousUri = previousUri;
-            }
-        } else {
-            bootstrapChain = {
-                id: ++senderBootstrapNextChainId,
-                previousUri: previousUri || null,
-                metadataDeadline: Date.now() + SENDER_BOOTSTRAP_METADATA_WAIT_MS
-            };
-        }
-
-        if (senderBootstrapTimer) {
-            clearTimeout(senderBootstrapTimer.handle);
-        }
-
-        const timerHandle = setTimeout(async () => {
-            if (senderBootstrapTimer?.handle === timerHandle) {
-                senderBootstrapTimer = null;
-            }
-            if (senderBootstrapScheduledChain?.id !== bootstrapChain.id) return;
-            if (senderBootstrapInFlightChain) {
-                if (!senderBootstrapRerunRequested
-                    || bootstrapChain.id > senderBootstrapRerunRequested.id) {
-                    senderBootstrapRerunRequested = bootstrapChain;
-                }
-                return;
-            }
-
-            const finishChain = () => {
-                if (senderBootstrapScheduledChain?.id === bootstrapChain.id) {
-                    senderBootstrapScheduledChain = null;
-                }
-                if (senderBootstrapRerunRequested?.id === bootstrapChain.id) {
-                    senderBootstrapRerunRequested = null;
-                }
-            };
-
-            const overlaySender = window.OverlaySender;
-            const helperSender = window.lyricsHelperSender;
-            const overlayEnabled = !!overlaySender?.enabled;
-            const helperEnabled = !!helperSender?.enabled;
-            if (!overlayEnabled && !helperEnabled) {
-                finishChain();
-                return;
-            }
-
-            const item = Spicetify.Player.data?.item;
-            const uri = item?.uri;
-            const title = item?.metadata?.title || item?.name || '';
-            const artist = item?.metadata?.artist_name
-                || item?.artists?.map(artistItem => artistItem.name).filter(Boolean).join(', ')
-                || '';
-            if (!uri || !title) {
-                if (Date.now() < bootstrapChain.metadataDeadline) {
-                    scheduleSenderBootstrap(150, null, bootstrapChain);
-                } else {
-                    finishChain();
-                }
-                return;
-            }
-
-            // songchange 이벤트 직후에는 Player.data가 잠시 이전 URI를 유지한다.
-            if (bootstrapChain.previousUri && uri === bootstrapChain.previousUri
-                && Date.now() < bootstrapChain.metadataDeadline) {
-                scheduleSenderBootstrap(150, null, bootstrapChain);
-                return;
-            }
-
-            const overlayHasCurrentTrack = !overlayEnabled || overlaySender?.lastDeliveredUri === uri;
-            const helperHasCurrentTrack = !helperEnabled || helperSender?.lastDeliveredUri === uri;
-            if (overlayHasCurrentTrack && helperHasCurrentTrack) {
-                finishChain();
-                return;
-            }
-
-            // /ivLyrics 페이지에서는 페이지가 직접 가사를 조회해 lyrics-ready로
-            // 전달하므로 중복 Gemini 호출을 피하려고 잠시 기다린다. 다만 페이지가
-            // 렌더링에 실패하면 아무도 조회하지 않게 되므로, 유예 시간이 지나도
-            // 현재 곡이 전달되지 않으면 부트스트랩이 직접 조회한다.
-            const pathname = Spicetify.Platform?.History?.location?.pathname || "";
-            if (pathname.includes("/ivLyrics")) {
-                if (senderBootstrapPageGraceUri !== uri) {
-                    senderBootstrapPageGraceUri = uri;
-                    senderBootstrapPageGraceUntil = Date.now() + 8000;
-                }
-                if (Date.now() < senderBootstrapPageGraceUntil) {
-                    helperDebug('[LyricsService] ivLyrics 페이지 가사 전달 대기 중:', { uri });
-                    scheduleSenderBootstrap(1000, null, bootstrapChain);
-                    return;
-                }
-                helperDebug('[LyricsService] ivLyrics 페이지가 가사를 전달하지 않아 직접 조회:', { uri });
-            }
-
-            senderBootstrapInFlightChain = bootstrapChain;
-            try {
-                helperDebug('[LyricsService] 현재 곡 가사 초기 동기화:', { uri, title });
-                await LyricsService.getFullLyrics(
-                    {
-                        uri,
-                        title,
-                        artist,
-                        duration: Spicetify.Player.getDuration() || 0
-                    },
-                    { sendToOverlay: true }
-                );
-            } catch (e) {
-                console.error('[LyricsService] 현재 곡 가사 초기 동기화 실패:', e);
-            } finally {
-                if (senderBootstrapInFlightChain?.id === bootstrapChain.id) {
-                    senderBootstrapInFlightChain = null;
-                }
-                const rerunChain = senderBootstrapRerunRequested;
-                if (rerunChain
-                    && senderBootstrapScheduledChain?.id === rerunChain.id
-                    && rerunChain.id > bootstrapChain.id) {
-                    senderBootstrapRerunRequested = null;
-                    scheduleSenderBootstrap(150, null, rerunChain);
-                } else {
-                    if (rerunChain
-                        && rerunChain.id < (senderBootstrapScheduledChain?.id || bootstrapChain.id)) {
-                        senderBootstrapRerunRequested = null;
-                    }
-                    finishChain();
-                }
-            }
-        }, delay);
-        senderBootstrapScheduledChain = bootstrapChain;
-        senderBootstrapTimer = { handle: timerHandle, chainId: bootstrapChain.id };
+    // 현재 곡 조회와 곡 변경 수명주기는 OverlayService.js가 담당한다.
+    // sender 내부의 연결 복구/설정 변경 경로는 이 얇은 위임 함수를 통해
+    // 별도 extension에 동기화를 요청한다.
+    const scheduleSenderBootstrap = (delay = 1200, previousUri = null) => {
+        window.ivLyricsOverlayService?.schedule?.(delay, previousUri);
     };
 
     // Rust helper/overlay의 입력 형식은 정수 밀리초와 문자열만 허용한다.
@@ -9478,10 +9347,8 @@
 
                 // 오버레이 활성화 상태가 아니면 스킵
                 if (!this.enabled) return;
-                // songchange 시점에는 Player.data가 아직 이전 곡일 수 있다.
-                // 두 sender가 공유하는 지연 부트스트랩이 최신 메타데이터를 읽고 한 번만 조회한다.
-                helperDebug('[OverlaySender] 곡 변경 - 현재 곡 가사 동기화 예약');
-                scheduleSenderBootstrap(150, previousUri);
+                // 현재 곡 조회는 별도 OverlayService의 단일 songchange 리스너가 담당한다.
+                helperDebug('[OverlaySender] 곡 변경 - 전송 상태 초기화:', previousUri);
             };
 
             window.addEventListener('storage', this._storageListener);
@@ -9984,9 +9851,8 @@
 
                     // 오버레이 활성화 상태가 아니면 스킵
                     if (!this.enabled) return;
-                    // OverlaySender와 동일한 공용 타이머를 사용해 중복 조회하지 않는다.
-                    helperDebug('[lyricsHelperSender] 곡 변경 - 현재 곡 가사 동기화 예약');
-                    scheduleSenderBootstrap(150, previousUri);
+                    // 현재 곡 조회는 별도 OverlayService의 단일 songchange 리스너가 담당한다.
+                    helperDebug('[lyricsHelperSender] 곡 변경 - 전송 상태 초기화:', previousUri);
                 };
 
                 window.addEventListener('storage', this._storageListener);
@@ -10299,12 +10165,12 @@
     };
     window.addEventListener('ivLyrics:lyrics-ready', window.__ivLyricsSnapshotReadyListener);
 
-    // OverlaySender 초기화 및 전역 등록
-    OverlaySender.init();
+    // OverlayService extension이 초기화 중 sender를 즉시 찾을 수 있도록 먼저 등록한다.
     window.OverlaySender = OverlaySender;
-
-    lyricsHelperSender.init();
     window.lyricsHelperSender = lyricsHelperSender;
+
+    OverlaySender.init();
+    lyricsHelperSender.init();
 
     serviceDebug("[LyricsService] LyricsService Extension initialized successfully!");
     serviceDebug("[LyricsService] Available APIs: window.LyricsService, window.LyricsCache, window.ApiTracker, window.Translator, window.OverlaySender, window.lyricsHelperSender");
