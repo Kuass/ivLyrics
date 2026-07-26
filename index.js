@@ -7150,26 +7150,22 @@ class LyricsContainer extends react.Component {
         currentLyrics: originalLyrics,
       });
       // 🔹 ivLyrics-overlay 앱으로 원문 가사 먼저 전송 (번역 로딩 전)
-      // 단, 번역 모드가 켜져 있다면 번역이 준비될 때까지 기다림 (UI 깜빡임/레이아웃 변경 방지)
-      const isTranslationEnabled = (displayMode1 && displayMode1 !== 'none') || (displayMode2 && displayMode2 !== 'none');
-
-      if (!isTranslationEnabled) {
-        window.dispatchEvent(new CustomEvent('ivLyrics:lyrics-ready', {
-          detail: {
-            trackInfo: { uri, title: this.state.title, artist: this.state.artist },
-            lyrics: originalLyrics,
-            provider: lyricsState.provider || null,
-            karaokeSource: lyricsState.karaokeSource || null,
-            lyricsType: getLyricsModeTypeKey(mode),
-            displayMode1,
-            displayMode2,
-            detectedLanguage: originalLanguage || null,
-            translationTargetLanguage: this.getTranslationTargetLanguage(),
-            translationSourceText: getNonSectionLyricsText(lyrics),
-            presentationComplete: false
-          }
-        }));
-      }
+      // 발음/번역 생성이 오래 걸리더라도 오버레이는 원문을 즉시 표시해야 한다.
+      window.dispatchEvent(new CustomEvent('ivLyrics:lyrics-ready', {
+        detail: {
+          trackInfo: { uri, title: this.state.title, artist: this.state.artist },
+          lyrics: originalLyrics,
+          provider: lyricsState.provider || null,
+          karaokeSource: lyricsState.karaokeSource || null,
+          lyricsType: getLyricsModeTypeKey(mode),
+          displayMode1,
+          displayMode2,
+          detectedLanguage: originalLanguage || null,
+          translationTargetLanguage: this.getTranslationTargetLanguage(),
+          translationSourceText: getNonSectionLyricsText(lyrics),
+          presentationComplete: false
+        }
+      }));
     }
 
     // Progressive loading: keep results per track so Mode 1 does not disappear when Mode 2 finishes
