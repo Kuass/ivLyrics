@@ -6868,6 +6868,29 @@
                 getRawLyricsPresentationSignature(definedUpdate.rawResult) !==
                     getRawLyricsPresentationSignature(previous.rawResult)
             );
+            if (
+                !sourceChanged
+                && Array.isArray(previous.displayLyrics)
+                && Array.isArray(definedUpdate.displayLyrics)
+            ) {
+                const previousPresentationKey = getOverlayPresentationKey(
+                    { uri: trackUri },
+                    previous.displayLyrics,
+                    previous
+                );
+                const nextPresentationKey = getOverlayPresentationKey(
+                    { uri: trackUri },
+                    definedUpdate.displayLyrics,
+                    { ...previous, ...definedUpdate }
+                );
+                if (previousPresentationKey === nextPresentationKey) {
+                    const preserved = preserveOverlayAuxiliaryLyrics(
+                        previous.displayLyrics,
+                        definedUpdate.displayLyrics
+                    );
+                    definedUpdate.displayLyrics = preserved.lyrics;
+                }
+            }
             const snapshot = {
                 ...(sourceChanged ? {
                     trackUri: previous.trackUri,
@@ -7214,6 +7237,9 @@
                 // 2. 가사 선택 (synced, karaoke, unsynced 순)
                 let lyrics = lyricsResult.karaoke || lyricsResult.synced || lyricsResult.unsynced || [];
                 const provider = lyricsResult.provider;
+                const lyricsType = lyrics === lyricsResult.karaoke
+                    ? 'karaoke'
+                    : (lyrics === lyricsResult.synced ? 'synced' : 'unsynced');
 
                 if (lyrics.length === 0) {
                     if (sendToOverlay && window.OverlaySender?.sendLyrics) {
@@ -7275,6 +7301,36 @@
 
                 // 5. 발음/번역 요청 (설정에 따라)
                 const needsTranslation = mode1 !== "none" || mode2 !== "none";
+                // multi-vocal 라인은 각 파트를 별도 요청 줄로 펼친 뒤 다시 파트별로 매핑한다.
+                const translationRequests = lyrics.flatMap((line, lineIndex) => {
+                    const vocalParts = getDisplayedVocalParts(line);
+                    if (vocalParts) {
+                        return vocalParts.map((part) => ({
+                            lineIndex,
+                            vocalPart: part,
+                            text: part.text
+                        }));
+                    }
+
+                    return [{
+                        lineIndex,
+                        vocalPart: null,
+                        text: getTranslationRequestLineText(line)
+                    }];
+                });
+                const lyricsText = translationRequests.map(request => request.text || '').join('\n');
+                const overlayTranslationSourceText = translationRequests
+                    .map(request => request.text || '')
+                    .filter(text => text && !Utils.isSectionHeader(text))
+                    .join('\n');
+                const overlayPresentationContext = {
+                    provider,
+                    lyricsType,
+                    displayMode1: mode1,
+                    displayMode2: mode2,
+                    translationSourceText: overlayTranslationSourceText,
+                    presentationComplete: false
+                };
 
                 // 번역을 기다리는 동안 오버레이가 비어 있지 않도록 원문 가사를 먼저 전송
                 if (needsTranslation) {
@@ -7283,13 +7339,19 @@
                         if (sendToOverlay && window.OverlaySender?.sendLyrics) {
                             originalLyricsSends.push(window.OverlaySender.sendLyrics(
                                 { uri: info.uri, title: info.title, artist: info.artist },
-                                lyrics
+                                lyrics,
+                                false,
+                                'translation-pending',
+                                overlayPresentationContext
                             ));
                         }
                         if (window.lyricsHelperSender?.sendLyrics) {
                             originalLyricsSends.push(window.lyricsHelperSender.sendLyrics(
                                 { uri: info.uri, title: info.title, artist: info.artist },
-                                lyrics
+                                lyrics,
+                                false,
+                                'translation-pending',
+                                overlayPresentationContext
                             ));
                         }
                         void Promise.allSettled(originalLyricsSends);
@@ -7303,25 +7365,6 @@
 
                     try {
                         // Gemini API를 통한 발음/번역 요청
-                        // multi-vocal 라인은 각 파트를 별도 요청 줄로 펼친 뒤 다시 파트별로 매핑한다.
-                        const translationRequests = lyrics.flatMap((line, lineIndex) => {
-                            const vocalParts = getDisplayedVocalParts(line);
-                            if (vocalParts) {
-                                return vocalParts.map((part) => ({
-                                    lineIndex,
-                                    vocalPart: part,
-                                    text: part.text
-                                }));
-                            }
-
-                            return [{
-                                lineIndex,
-                                vocalPart: null,
-                                text: getTranslationRequestLineText(line)
-                            }];
-                        });
-                        const lyricsText = translationRequests.map(request => request.text || '').join('\n');
-
                         // 발음 요청 (mode1 = gemini_romaji)
                         let pronResult = null;
                         if (mode1 && mode1 !== 'none' && String(mode1).startsWith('gemini')) {
@@ -7437,7 +7480,12 @@
                     finalLyricsSends.push(window.OverlaySender.sendLyrics(
                         { uri: info.uri, title: info.title, artist: info.artist },
                         lyrics,
-                        true
+                        true,
+                        'translation-complete',
+                        {
+                            ...overlayPresentationContext,
+                            presentationComplete: true
+                        }
                     ));
                 }
                 // 헬퍼 전송
@@ -7445,7 +7493,12 @@
                     finalLyricsSends.push(window.lyricsHelperSender.sendLyrics(
                         { uri: info.uri, title: info.title, artist: info.artist },
                         lyrics,
-                        true
+                        true,
+                        'translation-complete',
+                        {
+                            ...overlayPresentationContext,
+                            presentationComplete: true
+                        }
                     ));
                 }
                 await Promise.allSettled(finalLyricsSends);
@@ -8571,6 +8624,115 @@
         });
     };
 
+    const getOverlayLineOriginalText = (line) => {
+        const value = line?.originalText ?? line?.text ?? '';
+        return typeof value === 'string' ? value : String(value ?? '');
+    };
+
+    const getOverlayLineAuxiliaryText = (line, type) => {
+        const originalText = getOverlayLineOriginalText(line);
+        const candidates = type === 'pronunciation'
+            ? [
+                line?.phoneticText,
+                line?.pronunciationText,
+                line?.pronText,
+                typeof line?.text === 'string' && line.text !== line?.originalText
+                    ? line.text
+                    : null
+            ]
+            : [
+                line?.text2,
+                line?.translation,
+                line?.translationText,
+                line?.transText
+            ];
+
+        return candidates
+            .find(value => typeof value === 'string' && value.trim() && value !== originalText)
+            || null;
+    };
+
+    const getOverlayPresentationKey = (trackInfo, lyrics, presentationContext = null) => {
+        const context = presentationContext || {};
+        const sourceText = String(
+            context.translationSourceText
+            || lyrics.map(getOverlayLineOriginalText).join('\n')
+        ).normalize('NFC');
+        return JSON.stringify([
+            trackInfo?.uri || '',
+            context.provider || '',
+            context.displayMode1 || 'none',
+            context.displayMode2 || 'none',
+            getLyricsTextCacheHash(sourceText)
+        ]);
+    };
+
+    // 같은 곡/표시 설정의 스트리밍·부트스트랩 요청이 엇갈릴 때, 늦게 도착한
+    // 원문 또는 불완전 결과가 이미 표시된 발음/번역을 지우지 않도록 보완한다.
+    const preserveOverlayAuxiliaryLyrics = (previousLyrics, nextLyrics) => {
+        if (
+            !Array.isArray(previousLyrics)
+            || !Array.isArray(nextLyrics)
+            || previousLyrics.length !== nextLyrics.length
+        ) {
+            return {
+                lyrics: nextLyrics,
+                preservedPronunciationCount: 0,
+                preservedTranslationCount: 0
+            };
+        }
+
+        let preservedPronunciationCount = 0;
+        let preservedTranslationCount = 0;
+        const lyrics = nextLyrics.map((line, index) => {
+            const previousLine = previousLyrics[index];
+            const previousOriginal = getOverlayLineOriginalText(previousLine).normalize('NFC').trim();
+            const nextOriginal = getOverlayLineOriginalText(line).normalize('NFC').trim();
+            if (!previousOriginal || previousOriginal !== nextOriginal) {
+                return line;
+            }
+
+            const previousStartTime = Number(previousLine?.startTime);
+            const nextStartTime = Number(line?.startTime);
+            if (
+                Number.isFinite(previousStartTime)
+                && Number.isFinite(nextStartTime)
+                && Math.abs(previousStartTime - nextStartTime) > 2
+            ) {
+                return line;
+            }
+
+            const previousPronunciation = getOverlayLineAuxiliaryText(previousLine, 'pronunciation');
+            const nextPronunciation = getOverlayLineAuxiliaryText(line, 'pronunciation');
+            const previousTranslation = getOverlayLineAuxiliaryText(previousLine, 'translation');
+            const nextTranslation = getOverlayLineAuxiliaryText(line, 'translation');
+            let nextLine = line;
+
+            if (!nextPronunciation && previousPronunciation) {
+                nextLine = {
+                    ...nextLine,
+                    phoneticText: previousPronunciation
+                };
+                preservedPronunciationCount += 1;
+            }
+            if (!nextTranslation && previousTranslation) {
+                nextLine = {
+                    ...nextLine,
+                    text2: previousTranslation
+                };
+                preservedTranslationCount += 1;
+            }
+
+            return nextLine;
+        });
+
+        return {
+            lyrics,
+            preservedPronunciationCount,
+            preservedTranslationCount
+        };
+    };
+
     const LYRICS_SEND_RETRY_DELAYS = [250, 750];
 
     const OverlaySender = {
@@ -8586,6 +8748,8 @@
         _terminalDeliveryFailure: null,
         _lastTrackInfo: null,
         _lastLyrics: null,
+        _lastPresentationContext: null,
+        _lastPresentationKey: null,
         lastConfigDelay: undefined,
         _offsetCache: {},
 
@@ -8959,7 +9123,13 @@
             }
         },
 
-        async sendLyrics(trackInfo, lyrics, forceResend = false, sendReason = 'normal') {
+        async sendLyrics(
+            trackInfo,
+            lyrics,
+            forceResend = false,
+            sendReason = 'normal',
+            presentationContext = null
+        ) {
             if (!trackInfo || !lyrics || !Array.isArray(lyrics)) return;
             if (!this.enabled) return;
             if (this.isStaleTrackSend(trackInfo)) {
@@ -8968,9 +9138,43 @@
             }
 
             const currentReqId = ++this._reqId;
+            const effectivePresentationContext = presentationContext
+                || (
+                    this._lastTrackInfo?.uri === trackInfo.uri
+                    && ['explicit', 'offset-event', 'reconnect'].includes(sendReason)
+                    ? this._lastPresentationContext
+                    : null
+                );
+            const presentationKey = getOverlayPresentationKey(
+                trackInfo,
+                lyrics,
+                effectivePresentationContext
+            );
+            const preserved = this._lastTrackInfo?.uri === trackInfo.uri
+                && this._lastPresentationKey === presentationKey
+                ? preserveOverlayAuxiliaryLyrics(this._lastLyrics, lyrics)
+                : {
+                    lyrics,
+                    preservedPronunciationCount: 0,
+                    preservedTranslationCount: 0
+                };
+            const lyricsToSend = preserved.lyrics;
+
+            if (
+                preserved.preservedPronunciationCount > 0
+                || preserved.preservedTranslationCount > 0
+            ) {
+                helperDebug('[OverlaySender] 최신 발음/번역 보존:', {
+                    pronunciation: preserved.preservedPronunciationCount,
+                    translation: preserved.preservedTranslationCount,
+                    reason: sendReason
+                });
+            }
 
             this._lastTrackInfo = trackInfo;
-            this._lastLyrics = lyrics;
+            this._lastLyrics = lyricsToSend;
+            this._lastPresentationContext = effectivePresentationContext;
+            this._lastPresentationKey = presentationKey;
 
             const offset = await this.getSyncOffset(trackInfo.uri);
 
@@ -8985,7 +9189,7 @@
                 return;
             }
 
-            const lyricsHash = JSON.stringify(lyrics);
+            const lyricsHash = JSON.stringify(lyricsToSend);
 
             if (!forceResend &&
                 this.lastSentUri === trackInfo.uri &&
@@ -9016,7 +9220,7 @@
                 albumArt = resolveSpotifyImageUrl(imageUrl);
             } catch (e) { }
 
-            const mappedLines = mapLyricsForSender(lyrics, offset);
+            const mappedLines = mapLyricsForSender(lyricsToSend, offset);
 
             // 현재 트랙 정보 가져오기 (Spicetify.Player.data에서 최신 정보 사용)
             const originalTitle = trackInfo.title || Spicetify.Player.data?.item?.metadata?.title || '';
@@ -9046,7 +9250,7 @@
                     duration: Spicetify.Player.getDuration() || 0
                 },
                 lyrics: mappedLines,
-                isSynced: lyrics.some(l => l.startTime !== undefined && l.startTime !== null)
+                isSynced: lyricsToSend.some(l => l.startTime !== undefined && l.startTime !== null)
             }, {
                 key: deliveryKey,
                 generation: deliveryGeneration,
@@ -9062,7 +9266,13 @@
                 : {};
             if (this._lastTrackInfo && this._lastLyrics) {
                 helperDebug('[OverlaySender] 가사 재전송 (싱크 반영)');
-                await this.sendLyrics(this._lastTrackInfo, this._lastLyrics, true, sendReason);
+                await this.sendLyrics(
+                    this._lastTrackInfo,
+                    this._lastLyrics,
+                    true,
+                    sendReason,
+                    this._lastPresentationContext
+                );
             }
         },
 
@@ -9073,7 +9283,13 @@
             // 번역된 메타데이터를 포함하여 가사 재전송
             this._lastTrackInfo.translatedMetadata = translatedMetadata;
             helperDebug('[OverlaySender] 번역된 메타데이터로 재전송');
-            await this.sendLyrics(this._lastTrackInfo, this._lastLyrics, true);
+            await this.sendLyrics(
+                this._lastTrackInfo,
+                this._lastLyrics,
+                true,
+                'translated-metadata',
+                this._lastPresentationContext
+            );
         },
 
         startProgressSync() {
@@ -9205,14 +9421,22 @@
             // ivLyrics 페이지에서 가사가 준비되면 오버레이로 전송
             this._lyricsReadyListener = (e) => {
                 if (!this.enabled) return;
-                const { trackInfo, lyrics } = e.detail || {};
+                const detail = e.detail || {};
+                const { trackInfo, lyrics } = detail;
                 if (trackInfo) {
                     helperDebug('[OverlaySender] 가사 준비 이벤트 수신:', {
                         uri: trackInfo.uri,
                         title: trackInfo.title,
                         lines: lyrics?.length || 0
                     });
-                    this.sendLyrics(trackInfo, lyrics || []);
+                    this.sendLyrics(trackInfo, lyrics || [], false, 'lyrics-ready', {
+                        provider: detail.provider,
+                        lyricsType: detail.lyricsType,
+                        displayMode1: detail.displayMode1,
+                        displayMode2: detail.displayMode2,
+                        translationSourceText: detail.translationSourceText,
+                        presentationComplete: detail.presentationComplete
+                    });
                 }
             };
 
@@ -9249,6 +9473,8 @@
                 this._lastProgressUri = null;
                 this._lastTrackInfo = null;
                 this._lastLyrics = null;
+                this._lastPresentationContext = null;
+                this._lastPresentationKey = null;
 
                 // 오버레이 활성화 상태가 아니면 스킵
                 if (!this.enabled) return;
@@ -9421,6 +9647,8 @@
         _terminalDeliveryFailure: { value: null, writable: true },
         _lastTrackInfo: { value: null, writable: true },
         _lastLyrics: { value: null, writable: true },
+        _lastPresentationContext: { value: null, writable: true },
+        _lastPresentationKey: { value: null, writable: true },
         lastConfigDelay: { value: undefined, writable: true },
         _offsetCache: { value: {}, writable: true },
         _isConnected: { value: false, writable: true },
@@ -9510,7 +9738,13 @@
             }
         },
         sendLyrics: {
-            value: async function (trackInfo, lyrics, forceResend = false, sendReason = 'normal') {
+            value: async function (
+                trackInfo,
+                lyrics,
+                forceResend = false,
+                sendReason = 'normal',
+                presentationContext = null
+            ) {
                 if (!trackInfo || !lyrics || !Array.isArray(lyrics)) return;
                 if (!this.enabled) return;
                 if (this.isStaleTrackSend(trackInfo)) {
@@ -9519,9 +9753,43 @@
                 }
 
                 const currentReqId = ++this._reqId;
+                const effectivePresentationContext = presentationContext
+                    || (
+                        this._lastTrackInfo?.uri === trackInfo.uri
+                        && ['explicit', 'offset-event', 'reconnect'].includes(sendReason)
+                        ? this._lastPresentationContext
+                        : null
+                    );
+                const presentationKey = getOverlayPresentationKey(
+                    trackInfo,
+                    lyrics,
+                    effectivePresentationContext
+                );
+                const preserved = this._lastTrackInfo?.uri === trackInfo.uri
+                    && this._lastPresentationKey === presentationKey
+                    ? preserveOverlayAuxiliaryLyrics(this._lastLyrics, lyrics)
+                    : {
+                        lyrics,
+                        preservedPronunciationCount: 0,
+                        preservedTranslationCount: 0
+                    };
+                const lyricsToSend = preserved.lyrics;
+
+                if (
+                    preserved.preservedPronunciationCount > 0
+                    || preserved.preservedTranslationCount > 0
+                ) {
+                    helperDebug('[lyricsHelperSender] 최신 발음/번역 보존:', {
+                        pronunciation: preserved.preservedPronunciationCount,
+                        translation: preserved.preservedTranslationCount,
+                        reason: sendReason
+                    });
+                }
 
                 this._lastTrackInfo = trackInfo;
-                this._lastLyrics = lyrics;
+                this._lastLyrics = lyricsToSend;
+                this._lastPresentationContext = effectivePresentationContext;
+                this._lastPresentationKey = presentationKey;
 
                 const offset = await this.getSyncOffset(trackInfo.uri);
 
@@ -9536,7 +9804,7 @@
                     return;
                 }
 
-                const lyricsHash = JSON.stringify(lyrics);
+                const lyricsHash = JSON.stringify(lyricsToSend);
 
                 if (!forceResend &&
                     this.lastSentUri === trackInfo.uri &&
@@ -9567,7 +9835,7 @@
                     albumArt = resolveSpotifyImageUrl(imageUrl);
                 } catch (e) { }
 
-                const mappedLines = mapLyricsForSender(lyrics, offset);
+                const mappedLines = mapLyricsForSender(lyricsToSend, offset);
 
                 // 현재 트랙 정보 가져오기 (Spicetify.Player.data에서 최신 정보 사용)
                 const currentTitle = trackInfo.title || Spicetify.Player.data?.item?.metadata?.title || '';
@@ -9591,7 +9859,7 @@
                         duration: Spicetify.Player.getDuration() || 0
                     },
                     lyrics: mappedLines,
-                    isSynced: lyrics.some(l => l.startTime !== undefined && l.startTime !== null)
+                    isSynced: lyricsToSend.some(l => l.startTime !== undefined && l.startTime !== null)
                 }, {
                     key: deliveryKey,
                     generation: deliveryGeneration,
@@ -9608,7 +9876,13 @@
                     : {};
                 if (this._lastTrackInfo && this._lastLyrics) {
                     helperDebug('[lyricsHelperSender] 가사 재전송 (싱크 반영)');
-                    await this.sendLyrics(this._lastTrackInfo, this._lastLyrics, true, sendReason);
+                    await this.sendLyrics(
+                        this._lastTrackInfo,
+                        this._lastLyrics,
+                        true,
+                        sendReason,
+                        this._lastPresentationContext
+                    );
                 }
             }
         },
@@ -9656,14 +9930,22 @@
 
                 this._lyricsReadyListener = (e) => {
                     if (!this.enabled) return;
-                    const { trackInfo, lyrics } = e.detail || {};
+                    const detail = e.detail || {};
+                    const { trackInfo, lyrics } = detail;
                     if (trackInfo) {
                         helperDebug('[lyricsHelperSender] 가사 준비 이벤트 수신:', {
                             uri: trackInfo.uri,
                             title: trackInfo.title,
                             lines: lyrics?.length || 0
                         });
-                        this.sendLyrics(trackInfo, lyrics || []);
+                        this.sendLyrics(trackInfo, lyrics || [], false, 'lyrics-ready', {
+                            provider: detail.provider,
+                            lyricsType: detail.lyricsType,
+                            displayMode1: detail.displayMode1,
+                            displayMode2: detail.displayMode2,
+                            translationSourceText: detail.translationSourceText,
+                            presentationComplete: detail.presentationComplete
+                        });
                     }
                 };
 
@@ -9697,6 +9979,8 @@
                     this._lastProgressUri = null;
                     this._lastTrackInfo = null;
                     this._lastLyrics = null;
+                    this._lastPresentationContext = null;
+                    this._lastPresentationKey = null;
 
                     // 오버레이 활성화 상태가 아니면 스킵
                     if (!this.enabled) return;
