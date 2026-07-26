@@ -52,6 +52,8 @@ const SYNC_CREATOR_IDLE_POSITION_UPDATE_INTERVAL_MS = 500;
 const SYNC_CREATOR_POSITION_COMMIT_THRESHOLD_MS = 80;
 const SYNC_CREATOR_RECORD_POSITION_COMMIT_THRESHOLD_MS = 35;
 const SYNC_CREATOR_HISTORY_HEIGHT_STORAGE_KEY = 'ivLyrics:syncCreator:history-panel-height';
+const SYNC_CREATOR_AUTOSAVE_ENABLED_STORAGE_KEY = 'ivLyrics:syncCreator:autosave-enabled';
+const SYNC_CREATOR_AUTOSAVE_INTERVAL_MS = 30_000;
 const SYNC_CREATOR_HISTORY_MIN_HEIGHT = 130;
 const SYNC_CREATOR_PROGRESS_COLOR = 'rgb(var(--spice-rgb-accent, 30, 215, 96))';
 const SYNC_CREATOR_PROGRESS_BACKGROUND = 'rgba(var(--spice-rgb-accent, 30, 215, 96), 0.18)';
@@ -2166,6 +2168,13 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const [lastSessionSavedAt, setLastSessionSavedAt] = useState(0);
 	const [historyAnnouncement, setHistoryAnnouncement] = useState('');
 	const [isRestoringCheckpoint, setIsRestoringCheckpoint] = useState(false);
+	const [isSessionAutosaveEnabled, setIsSessionAutosaveEnabled] = useState(() => {
+		try {
+			return window.localStorage?.getItem(SYNC_CREATOR_AUTOSAVE_ENABLED_STORAGE_KEY) !== 'false';
+		} catch (error) {
+			return true;
+		}
+	});
 	const [historyPanelHeight, setHistoryPanelHeight] = useState(() => {
 		try {
 			const storedHeight = Number(window.localStorage?.getItem(SYNC_CREATOR_HISTORY_HEIGHT_STORAGE_KEY));
@@ -2198,18 +2207,20 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const providerRef = useRef(provider);
 	const selectedLrclibSourceRef = useRef(selectedLrclibSource);
 	const customSpeakerMetaMemoryRef = useRef(new Map());
-	const sessionActionsRef = useRef(null);
 	const sessionAppliedDraftKeyRef = useRef('');
 	const sessionRecoveryRequestRef = useRef(0);
+	const sessionSourceChangeRequestRef = useRef(0);
 	const sessionCheckpointRestoreRequestRef = useRef(0);
 	const sessionWriteGenerationRef = useRef(0);
 	const sessionClientRevisionRef = useRef(Date.now() * 1000);
 	const sessionAutosaveTimerRef = useRef(null);
+	const sessionAutosaveEnabledRef = useRef(isSessionAutosaveEnabled);
 	const sessionAutosaveSuppressedRef = useRef(false);
 	const sessionAutoRecoveryBlockedRef = useRef(false);
 	const sessionBaselineDraftRef = useRef(null);
 	const activeSessionDraftKeyRef = useRef('');
 	const sessionSkipRecoveryDraftKeyRef = useRef('');
+	const sessionSkipNextSourceRecoveryRef = useRef(false);
 	const latestSessionRecordRef = useRef(null);
 	const sessionLastRecoveryAnnouncementRef = useRef('');
 	const historyListRef = useRef(null);
@@ -2230,16 +2241,33 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		sessionRecoveryRequestRef.current += 1;
 		sessionCheckpointRestoreRequestRef.current += 1;
 		sessionWriteGenerationRef.current += 1;
-		if (sessionAutosaveTimerRef.current) {
-			clearTimeout(sessionAutosaveTimerRef.current);
-			sessionAutosaveTimerRef.current = null;
-		}
 		setIsRestoringCheckpoint(false);
 		setSessionHydrationComplete(true);
 		if (activeSessionDraftKeyRef.current) {
 			sessionAppliedDraftKeyRef.current = activeSessionDraftKeyRef.current;
 			setSessionReadyDraftKey(activeSessionDraftKeyRef.current);
 		}
+	}, []);
+	const toggleSessionAutosave = useCallback(() => {
+		setIsSessionAutosaveEnabled((currentValue) => {
+			const nextValue = !currentValue;
+			sessionAutosaveEnabledRef.current = nextValue;
+			try {
+				window.localStorage?.setItem(
+					SYNC_CREATOR_AUTOSAVE_ENABLED_STORAGE_KEY,
+					String(nextValue)
+				);
+			} catch (error) {
+				// The toggle still applies to this session when storage is unavailable.
+			}
+			sessionWriteGenerationRef.current += 1;
+			if (sessionAutosaveTimerRef.current) {
+				clearTimeout(sessionAutosaveTimerRef.current);
+				sessionAutosaveTimerRef.current = null;
+			}
+			setSessionSaveState(nextValue && latestSessionRecordRef.current ? 'dirty' : (nextValue ? 'idle' : 'disabled'));
+			return nextValue;
+		});
 	}, []);
 	const getHistoryPanelHeightBounds = useCallback(() => {
 		const railHeight = historyPanelRef.current?.parentElement?.clientHeight || 720;
@@ -2480,13 +2508,17 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setPreviewLrclibCandidateKey('');
 		setLrclibSearchMeta(null);
 	}, [setSelectedLrclibSourceValue]);
+	const isCurrentSyncCreatorSourceChange = useCallback((requestId) => (
+		requestId === sessionSourceChangeRequestRef.current
+	), []);
 	const beginSyncCreatorSourceChange = useCallback(() => {
+		const sourceChangeRequestId = ++sessionSourceChangeRequestRef.current;
 		const latestRecord = latestSessionRecordRef.current;
 		if (sessionAutosaveTimerRef.current) {
 			clearTimeout(sessionAutosaveTimerRef.current);
 			sessionAutosaveTimerRef.current = null;
 		}
-		if (latestRecord && syncCreatorDraftStore) {
+		if (latestRecord && syncCreatorDraftStore && sessionAutosaveEnabledRef.current) {
 			syncCreatorDraftStore.saveDraft(latestRecord).catch((error) => {
 				console.warn('[SyncDataCreator] Failed to flush the previous source draft:', error);
 			});
@@ -2495,9 +2527,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		sessionCheckpointRestoreRequestRef.current += 1;
 		sessionWriteGenerationRef.current += 1;
 		sessionAutosaveSuppressedRef.current = false;
-		sessionAutoRecoveryBlockedRef.current = false;
+		sessionAutoRecoveryBlockedRef.current = true;
 		sessionBaselineDraftRef.current = null;
 		sessionSkipRecoveryDraftKeyRef.current = '';
+		sessionSkipNextSourceRecoveryRef.current = true;
 		sessionAppliedDraftKeyRef.current = '';
 		sessionLastRecoveryAnnouncementRef.current = '';
 		latestSessionRecordRef.current = null;
@@ -2505,11 +2538,15 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setSessionReadyDraftKey('');
 		setSessionHistory([]);
 		setSessionHistoryCursorId('');
+		setHistoryAnnouncement('');
 		setSessionSaveState('loading');
 		setSessionHydrationComplete(true);
+		setIsLoadingLrclibId(false);
+		return sourceChangeRequestId;
 	}, [syncCreatorDraftStore]);
 
-	const applyLoadedLyricsResult = useCallback(async (result, usedProvider) => {
+	const applyLoadedLyricsResult = useCallback(async (result, usedProvider, sourceChangeRequestId) => {
+		if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return false;
 		let finalProvider = result.provider || usedProvider;
 		let loadedSyncBody = null;
 
@@ -2542,6 +2579,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				console.warn('[SyncDataCreator] Failed to load existing sync data:', e);
 			}
 		}
+		if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return false;
 
 		const text = extractLyricsText(result.synced || result.unsynced);
 		if (loadedSyncBody) {
@@ -2568,7 +2606,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					preview: text.split('\n').find(line => SYNC_CREATOR_PARALLEL_HINT_REGEX.test(line.trim())) || ''
 				});
 				setError(null);
-				return;
+				return true;
 			}
 			const shouldUseMultiVocalMode = existingHasParallel;
 			setMultiVocalMode(shouldUseMultiVocalMode);
@@ -2580,7 +2618,18 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			setMultiVocalMode(false);
 			setError(I18n.t('syncCreator.noLyrics'));
 		}
-	}, [extractLyricsText, trackId, trackIsrc, trackName, artistName, albumName, setProviderValue, setSelectedLrclibSourceValue]);
+		return true;
+	}, [
+		albumName,
+		artistName,
+		extractLyricsText,
+		isCurrentSyncCreatorSourceChange,
+		setProviderValue,
+		setSelectedLrclibSourceValue,
+		trackId,
+		trackIsrc,
+		trackName
+	]);
 
 	const resolveMultiVocalDecision = useCallback((useMultiVocalMode) => {
 		if (!pendingMultiVocalDecision) return;
@@ -2607,7 +2656,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		const candidate = lrclibCandidates.find(item => item.candidateKey === candidateKey);
 		if (!candidate) return;
 
-		beginSyncCreatorSourceChange();
+		const sourceChangeRequestId = beginSyncCreatorSourceChange();
 		setIsLoading(true);
 		setError(null);
 		setLyrics(null);
@@ -2625,17 +2674,27 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 		try {
 			const syntheticResult = buildSyntheticLrclibResult(candidate);
-			await applyLoadedLyricsResult(syntheticResult, 'lrclib');
+			const applied = await applyLoadedLyricsResult(syntheticResult, 'lrclib', sourceChangeRequestId);
+			if (!applied || !isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
 			setSelectedLrclibCandidateKey(candidate.candidateKey);
 			setSelectedLrclibSourceValue(syntheticResult.lrclibSource || buildLrclibSyncSource(candidate));
 			setPreviewLrclibCandidateKey(candidate.candidateKey);
 		} catch (e) {
+			if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
 			console.error('[SyncDataCreator] Failed to apply LRCLIB candidate:', e);
 			setError(I18n.t('syncCreator.loadError'));
 		}
 
-		setIsLoading(false);
-	}, [applyLoadedLyricsResult, beginSyncCreatorSourceChange, buildLrclibSyncSource, buildSyntheticLrclibResult, lrclibCandidates, setSelectedLrclibSourceValue]);
+		if (isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) setIsLoading(false);
+	}, [
+		applyLoadedLyricsResult,
+		beginSyncCreatorSourceChange,
+		buildLrclibSyncSource,
+		buildSyntheticLrclibResult,
+		isCurrentSyncCreatorSourceChange,
+		lrclibCandidates,
+		setSelectedLrclibSourceValue
+	]);
 
 	const buildLrclibIdCandidate = useCallback((candidate, requestedId) => {
 		if (!candidate) return null;
@@ -2695,7 +2754,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			return;
 		}
 
-		beginSyncCreatorSourceChange();
+		const sourceChangeRequestId = beginSyncCreatorSourceChange();
 		setIsLoadingLrclibId(true);
 		setIsLoading(true);
 		setError(null);
@@ -2724,6 +2783,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 
 			const candidate = await response.json();
+			if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
 			if (!candidate || (!candidate.syncedLyrics && !candidate.plainLyrics)) {
 				throw new Error('No lyrics found');
 			}
@@ -2748,17 +2808,21 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				directLrclibId: lrclibId
 			});
 			setShowLrclibCandidates(true);
-			await applyLoadedLyricsResult(syntheticResult, 'lrclib');
+			const applied = await applyLoadedLyricsResult(syntheticResult, 'lrclib', sourceChangeRequestId);
+			if (!applied || !isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
 			setSelectedLrclibSourceValue(syntheticResult.lrclibSource || buildLrclibSyncSource(decoratedCandidate));
 			Toast.success(I18n.t('syncCreator.lrclibIdLoadSuccess') || 'Loaded lyrics from LRCLIB ID.');
 		} catch (e) {
+			if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
 			console.error('[SyncDataCreator] Failed to load LRCLIB ID:', e);
 			setError(I18n.t('syncCreator.lrclibIdLoadError') || 'Failed to load lyrics from LRCLIB ID.');
 			Toast.error((I18n.t('syncCreator.lrclibIdLoadError') || 'Failed to load lyrics from LRCLIB ID.') + ': ' + e.message);
 		}
 
-		setIsLoading(false);
-		setIsLoadingLrclibId(false);
+		if (isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) {
+			setIsLoading(false);
+			setIsLoadingLrclibId(false);
+		}
 	}, [
 		applyLoadedLyricsResult,
 		buildLrclibIdCandidate,
@@ -2767,6 +2831,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		beginSyncCreatorSourceChange,
 		clearLrclibCandidateState,
 		getLrclibCandidateText,
+		isCurrentSyncCreatorSourceChange,
 		lrclibIdInput,
 		setProviderValue,
 		setSelectedLrclibSourceValue
@@ -3681,7 +3746,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	// 가사 로드 (Spotify -> LRCLIB 순서로 자동 시도)
 	// 가사 로드 (Spotify -> LRCLIB 순서로 자동 시도)
 	const loadLyrics = useCallback(async (preferredProvider = null) => {
-		beginSyncCreatorSourceChange();
+		const sourceChangeRequestId = beginSyncCreatorSourceChange();
 		setIsLoading(true);
 		setError(null);
 		setLyrics(null);
@@ -3709,7 +3774,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				setAddonId('');
 				setProviderValue('');
 				setError(I18n.t('syncCreator.noLyrics'));
-				setIsLoading(false);
+				if (isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) setIsLoading(false);
 				return;
 			}
 			const providersToTry = preferredProvider
@@ -3743,6 +3808,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						const lrclibAddon = window.LyricsAddonManager.getAddon(realProvider);
 						if (typeof lrclibAddon?.searchCandidates === 'function') {
 							const searchResult = await lrclibAddon.searchCandidates(info);
+							if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
 							if (!searchResult?.success) {
 								throw new Error(searchResult?.error || 'No lyrics found');
 							}
@@ -3764,15 +3830,19 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 							result = buildSyntheticLrclibResult(selectedCandidate);
 						} else {
 							result = await window.LyricsAddonManager.getLyricsFrom(realProvider, info);
+							if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
 						}
 						if (result && result.error) throw new Error(result.error);
 					} else if (window.LyricsAddonManager) {
 						result = await window.LyricsAddonManager.getLyricsFrom(realProvider, info);
+						if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
 						if (result && result.error) throw new Error(result.error);
 					} else if (typeof Providers !== 'undefined' && Providers[realProvider]) {
 						result = await Providers[realProvider](info);
+						if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
 					} else if (typeof LyricsService !== 'undefined' && LyricsService.getLyrics) {
 						result = await LyricsService.getLyrics(info, realProvider);
+						if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
 					}
 
 					if (result && (result.synced || result.unsynced)) {
@@ -3781,25 +3851,39 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						break;
 					}
 				} catch (providerError) {
+					if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
 					window.__ivLyricsDebugLog?.('[SyncDataCreator] Provider', tryProvider, 'failed:', providerError.message);
 				}
 			}
 
 			if (result && (result.synced || result.unsynced)) {
-				await applyLoadedLyricsResult(result, usedProvider);
+				await applyLoadedLyricsResult(result, usedProvider, sourceChangeRequestId);
 			} else {
-				// 만약 수동 선택했는데 실패했으면 provider는 그 선택한걸로 유지해서 UI에 보여줌? 
+				if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
+				// 만약 수동 선택했는데 실패했으면 provider는 그 선택한걸로 유지해서 UI에 보여줌?
 				// 아니면 실패 메시지 띄우고 provider는 유지
 				if (preferredProvider) setProviderValue(preferredProvider);
 				setError(I18n.t('syncCreator.noLyrics'));
 			}
 		} catch (e) {
+			if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
 			console.error('[SyncDataCreator] Load lyrics error:', e);
 			setError(I18n.t('syncCreator.loadError'));
 		}
 
-		setIsLoading(false);
-	}, [trackInfo, trackName, artistName, albumName, applyLoadedLyricsResult, beginSyncCreatorSourceChange, buildSyntheticLrclibResult, clearLrclibCandidateState, setProviderValue]);
+		if (isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) setIsLoading(false);
+	}, [
+		albumName,
+		applyLoadedLyricsResult,
+		artistName,
+		beginSyncCreatorSourceChange,
+		buildSyntheticLrclibResult,
+		clearLrclibCandidateState,
+		isCurrentSyncCreatorSourceChange,
+		setProviderValue,
+		trackInfo,
+		trackName
+	]);
 
 
 
@@ -4816,22 +4900,6 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			? { version: SYNC_CREATOR_SYNC_DATA_VERSION, lines: validLines }
 			: null;
 		setSyncData(nextSyncData);
-		const hasIncompleteParallelTarget = options.createCheckpoint
-			? Boolean(getIncompleteParallelPartId(normalizedLineData))
-			: false;
-		if (options.createCheckpoint && nextSyncData && !hasIncompleteParallelTarget) {
-			const nextEditorLineIndex = findNavigableLineIndex(currentLineIndex, 1);
-			sessionActionsRef.current?.addLineCheckpoint?.({
-				syncData: nextSyncData,
-				lineIndex: currentLineIndex,
-				editorLineIndex: nextEditorLineIndex >= 0 ? nextEditorLineIndex : currentLineIndex,
-				lineText: currentMergedLineIndexes
-					.map(index => lyricsLines[index] || '')
-					.filter(Boolean)
-					.join(' / '),
-				partId: hasCurrentParallelParts ? 'full' : activeParallelTargetId
-			});
-		}
 		return normalizedLineData;
 	}, [
 		syncData,
@@ -4850,8 +4918,6 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		currentMergedLineIndexes,
 		lyricsLines,
 		activeParallelTargetId,
-		findNavigableLineIndex,
-		getIncompleteParallelPartId,
 		isCurrentSyncTargetMetaComplete,
 		showMissingMetaToast,
 		normalizeCommittedLineChars
@@ -6404,7 +6470,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setSessionReadyDraftKey('');
 		setSessionHistory([]);
 		setSessionHistoryCursorId('');
-		setSessionSaveState('idle');
+		setSessionSaveState(sessionAutosaveEnabledRef.current ? 'idle' : 'disabled');
 		if (syncCreatorDraftStore && draftKey) {
 			try {
 				await syncCreatorDraftStore.flush();
@@ -6568,7 +6634,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setSessionHistory(Array.isArray(record?.history) ? record.history : []);
 		setSessionHistoryCursorId(record?.historyCursorId || '');
 		setLastSessionSavedAt(Number(record?.updatedAt) || Date.now());
-		setSessionSaveState('saved');
+		setSessionSaveState(sessionAutosaveEnabledRef.current ? 'saved' : 'disabled');
 		const sourceCheckpoint = Array.isArray(record?.history)
 			? record.history.find(entry => entry?.kind === 'source')
 			: null;
@@ -6785,9 +6851,6 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		syncSessionUiFromRecord
 	]);
 
-	const addLineCheckpoint = useCallback((payload) => (
-		saveSessionCheckpoint({ ...payload, kind: 'line' })
-	), [saveSessionCheckpoint]);
 	const addManualCheckpoint = useCallback(() => {
 		claimSessionForLocalEditing();
 		return saveSessionCheckpoint({ kind: 'manual' }).then((saved) => {
@@ -6796,11 +6859,6 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 		});
 	}, [announceHistoryStatus, claimSessionForLocalEditing, saveSessionCheckpoint]);
-
-	sessionActionsRef.current = {
-		addLineCheckpoint,
-		addManualCheckpoint
-	};
 
 	const restoreHistoryCheckpoint = useCallback(async (checkpointId) => {
 		if (
@@ -6939,7 +6997,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				} else {
 					setSessionHistory([]);
 					setSessionHistoryCursorId('');
-					setSessionSaveState('idle');
+					setSessionSaveState(sessionAutosaveEnabledRef.current ? 'idle' : 'disabled');
 				}
 			})
 			.catch((error) => {
@@ -6960,6 +7018,30 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 	useEffect(() => {
 		if (!sessionHydrationComplete || !activeSessionDraftKey || !syncCreatorDraftStore) return undefined;
+		const shouldKeepCurrentSource = sessionSkipNextSourceRecoveryRef.current
+			|| sessionAutoRecoveryBlockedRef.current;
+		if (
+			shouldKeepCurrentSource
+			&& sessionAppliedDraftKeyRef.current !== activeSessionDraftKey
+		) {
+			sessionSkipNextSourceRecoveryRef.current = false;
+			sessionAppliedDraftKeyRef.current = activeSessionDraftKey;
+			setSessionReadyDraftKey(activeSessionDraftKey);
+			setSessionHistory([]);
+			setSessionHistoryCursorId('');
+			try {
+				const baselineRecord = buildSyncCreatorSessionRecord();
+				if (baselineRecord) {
+					sessionBaselineDraftRef.current = syncCreatorDraftStore.cloneValue(baselineRecord.draft);
+					latestSessionRecordRef.current = baselineRecord;
+				}
+				setSessionSaveState(sessionAutosaveEnabledRef.current ? 'dirty' : 'disabled');
+			} catch (error) {
+				console.warn('[SyncDataCreator] Failed to prepare the selected lyrics source:', error);
+				setSessionSaveState('error');
+			}
+			return undefined;
+		}
 		if (sessionAppliedDraftKeyRef.current === activeSessionDraftKey) {
 			setSessionReadyDraftKey(activeSessionDraftKey);
 			return undefined;
@@ -6968,7 +7050,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			sessionSkipRecoveryDraftKeyRef.current = '';
 			sessionAppliedDraftKeyRef.current = activeSessionDraftKey;
 			setSessionReadyDraftKey(activeSessionDraftKey);
-			setSessionSaveState('idle');
+			setSessionSaveState(sessionAutosaveEnabledRef.current ? 'idle' : 'disabled');
 			return undefined;
 		}
 
@@ -6991,20 +7073,22 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					sessionAppliedDraftKeyRef.current = activeSessionDraftKey;
 					setSessionHistory([]);
 					setSessionHistoryCursorId('');
-					setSessionSaveState('idle');
+					setSessionSaveState(sessionAutosaveEnabledRef.current ? 'idle' : 'disabled');
 					const baselineRecord = buildSyncCreatorSessionRecord();
 					if (baselineRecord) {
 						sessionBaselineDraftRef.current = syncCreatorDraftStore.cloneValue(baselineRecord.draft);
 						latestSessionRecordRef.current = baselineRecord;
-						syncCreatorDraftStore.saveDraft(baselineRecord).then((saved) => {
-							if (
-								!cancelled
-								&& requestId === sessionRecoveryRequestRef.current
-								&& activeSessionDraftKeyRef.current === saved?.draftKey
-							) syncSessionUiFromRecord(saved);
-						}).catch((error) => {
-							console.warn('[SyncDataCreator] Failed to create the source checkpoint:', error);
-						});
+						if (sessionAutosaveEnabledRef.current) {
+							syncCreatorDraftStore.saveDraft(baselineRecord).then((saved) => {
+								if (
+									!cancelled
+									&& requestId === sessionRecoveryRequestRef.current
+									&& activeSessionDraftKeyRef.current === saved?.draftKey
+								) syncSessionUiFromRecord(saved);
+							}).catch((error) => {
+								console.warn('[SyncDataCreator] Failed to create the source checkpoint:', error);
+							});
+						}
 					}
 				}
 				setSessionReadyDraftKey(activeSessionDraftKey);
@@ -7035,11 +7119,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (
 			!syncCreatorDraftStore
 			|| !sessionHydrationComplete
-				|| !activeSessionDraftKey
-				|| sessionReadyDraftKey !== activeSessionDraftKey
-				|| !lyricsText
-				|| sessionAutosaveSuppressedRef.current
-			) return undefined;
+			|| !activeSessionDraftKey
+			|| sessionReadyDraftKey !== activeSessionDraftKey
+			|| !lyricsText
+			|| sessionAutosaveSuppressedRef.current
+		) return undefined;
 
 		let record = null;
 		try {
@@ -7052,22 +7136,29 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (!record) return undefined;
 
 		latestSessionRecordRef.current = record;
+		if (!isSessionAutosaveEnabled) {
+			setSessionSaveState('disabled');
+			return undefined;
+		}
 		setSessionSaveState('dirty');
-		const writeGeneration = sessionWriteGenerationRef.current;
-		if (sessionAutosaveTimerRef.current) clearTimeout(sessionAutosaveTimerRef.current);
+		if (sessionAutosaveTimerRef.current) return undefined;
 		sessionAutosaveTimerRef.current = setTimeout(async () => {
 			sessionAutosaveTimerRef.current = null;
+			const pendingRecord = latestSessionRecordRef.current;
+			const writeGeneration = sessionWriteGenerationRef.current;
 			if (
-				writeGeneration !== sessionWriteGenerationRef.current
-				|| record.draftKey !== activeSessionDraftKeyRef.current
+				!pendingRecord
+				|| !sessionAutosaveEnabledRef.current
+				|| pendingRecord.draftKey !== activeSessionDraftKeyRef.current
 				|| sessionAutosaveSuppressedRef.current
 			) return;
 			setSessionSaveState('saving');
 			try {
-				const saved = await syncCreatorDraftStore.saveDraft(record);
+				const saved = await syncCreatorDraftStore.saveDraft(pendingRecord);
 				if (
 					saved?.draftKey === activeSessionDraftKeyRef.current
 					&& writeGeneration === sessionWriteGenerationRef.current
+					&& sessionAutosaveEnabledRef.current
 					&& !sessionAutosaveSuppressedRef.current
 				) {
 					latestSessionRecordRef.current = saved;
@@ -7080,17 +7171,13 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					setSessionSaveState('error');
 				}
 			}
-		}, 450);
+		}, SYNC_CREATOR_AUTOSAVE_INTERVAL_MS);
 
-		return () => {
-			if (sessionAutosaveTimerRef.current) {
-				clearTimeout(sessionAutosaveTimerRef.current);
-				sessionAutosaveTimerRef.current = null;
-			}
-		};
+		return undefined;
 	}, [
 		activeSessionDraftKey,
 		buildSyncCreatorSessionRecord,
+		isSessionAutosaveEnabled,
 		lyricsText,
 		sessionHydrationComplete,
 		sessionReadyDraftKey,
@@ -7104,6 +7191,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			if (
 				record
 				&& syncCreatorDraftStore
+				&& sessionAutosaveEnabledRef.current
 				&& !sessionAutosaveSuppressedRef.current
 				&& record.draftKey === activeSessionDraftKeyRef.current
 			) {
@@ -7173,7 +7261,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setSessionReadyDraftKey('');
 		setSessionHistory([]);
 		setSessionHistoryCursorId('');
-		setSessionSaveState('idle');
+		setSessionSaveState(sessionAutosaveEnabledRef.current ? 'idle' : 'disabled');
 		if (!syncCreatorDraftStore || !draftKey) return;
 		try {
 			await syncCreatorDraftStore.flush();
@@ -7523,7 +7611,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				}
 				setSyncData(sanitizedData);
 				setSelectedLrclibSourceValue(importedLrclibSource);
-				setSessionSaveState('dirty');
+				setSessionSaveState(sessionAutosaveEnabledRef.current ? 'dirty' : 'disabled');
 
 				Toast.success(I18n.t('syncCreator.importSuccess') || 'Imported sync data');
 			} catch (err) {
@@ -8694,6 +8782,30 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		historyTitleRow: { display: 'flex', alignItems: 'center', gap: '8px' },
 		historyTitle: { flex: 1, minWidth: 0, fontSize: '12px', fontWeight: '800', color: 'var(--spice-text)', letterSpacing: '-0.01em' },
 		historyCount: { fontSize: '10px', color: 'var(--spice-subtext)', fontVariantNumeric: 'tabular-nums' },
+		historyAutosaveToggle: {
+			height: '26px', padding: '0 5px 0 7px',
+			display: 'inline-flex', alignItems: 'center', gap: '6px',
+			border: '1px solid transparent', borderRadius: '7px',
+			background: 'transparent', color: 'var(--spice-subtext)', cursor: 'pointer',
+			whiteSpace: 'nowrap'
+		},
+		historyAutosaveLabel: { fontSize: '9.5px', fontWeight: '700', lineHeight: 1 },
+		historyAutosaveTrack: {
+			position: 'relative', width: '27px', height: '15px', flexShrink: 0,
+			borderRadius: '999px', background: 'rgba(255,255,255,0.16)',
+			boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)',
+			transition: 'background 160ms ease, box-shadow 160ms ease'
+		},
+		historyAutosaveTrackActive: {
+			background: TOSS_BLUE,
+			boxShadow: `inset 0 0 0 1px ${TOSS_BLUE_BORDER}`
+		},
+		historyAutosaveThumb: {
+			position: 'absolute', top: '2px', left: '2px',
+			width: '11px', height: '11px', borderRadius: '999px',
+			background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
+			transition: 'transform 160ms ease'
+		},
 		historyActions: { display: 'inline-flex', alignItems: 'center', gap: '2px' },
 		historyIconButton: {
 			width: '28px', height: '28px', padding: 0,
@@ -9866,7 +9978,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const historySaveLabel = (() => {
 		if (isRestoringCheckpoint) return I18n.t('syncCreator.historyRestoring') || '복원 중';
 		if (sessionSaveState === 'loading') return I18n.t('syncCreator.historyChecking') || '복구 확인 중';
-		if (sessionSaveState === 'saving' || sessionSaveState === 'dirty') return I18n.t('syncCreator.historySaving') || '저장 중';
+		if (sessionSaveState === 'saving') return I18n.t('syncCreator.historySaving') || '저장 중';
+		if (sessionSaveState === 'dirty') return I18n.t('syncCreator.historyAutosavePending') || '다음 자동 저장 대기';
+		if (sessionSaveState === 'disabled') return I18n.t('syncCreator.historyAutosaveDisabled') || '자동 저장 꺼짐';
 		if (sessionSaveState === 'error') return I18n.t('syncCreator.historySaveError') || '저장 실패';
 		if (sessionSaveState === 'idle') return I18n.t('syncCreator.historyIdle') || '저장 대기';
 		return I18n.t('syncCreator.historySaved') || '자동 저장됨';
@@ -9875,7 +9989,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		? '#ff7878'
 		: (isRestoringCheckpoint || sessionSaveState === 'saving' || sessionSaveState === 'dirty' || sessionSaveState === 'loading')
 			? '#f6c76b'
-			: (sessionSaveState === 'idle' ? 'rgba(255,255,255,0.30)' : TOSS_BLUE);
+			: (sessionSaveState === 'idle' || sessionSaveState === 'disabled' ? 'rgba(255,255,255,0.30)' : TOSS_BLUE);
 	const historySourceLabel = [
 		provider || addonId,
 		selectedLrclibSource?.lrclibId !== null && selectedLrclibSource?.lrclibId !== undefined
@@ -9918,6 +10032,29 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			react.createElement('div', { style: s.historyTitleRow },
 				react.createElement('h3', { style: { ...s.historyTitle, margin: 0 } }, I18n.t('syncCreator.historyTitle') || '작업 내역'),
 				react.createElement('span', { style: s.historyCount }, sessionHistory.length),
+				react.createElement('button', {
+					type: 'button',
+					className: 'sync-creator-autosave-toggle',
+					style: s.historyAutosaveToggle,
+					role: 'switch',
+					'aria-checked': isSessionAutosaveEnabled,
+					onClick: toggleSessionAutosave,
+					title: I18n.t('syncCreator.historyAutosaveDescription') || '현재 작업을 30초마다 자동 저장합니다.'
+				},
+					react.createElement('span', { style: s.historyAutosaveLabel }, I18n.t('syncCreator.historyAutosaveToggle') || '자동 저장'),
+					react.createElement('span', {
+						style: {
+							...s.historyAutosaveTrack,
+							...(isSessionAutosaveEnabled ? s.historyAutosaveTrackActive : null)
+						},
+						'aria-hidden': true
+					}, react.createElement('span', {
+						style: {
+							...s.historyAutosaveThumb,
+							transform: isSessionAutosaveEnabled ? 'translateX(12px)' : 'translateX(0)'
+						}
+					}))
+				),
 				react.createElement('div', { style: s.historyActions },
 					react.createElement('button', {
 						type: 'button',
@@ -9951,7 +10088,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					}, react.createElement('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' },
 						react.createElement('path', { d: 'M12 5v14M5 12h14' })
 					))
-			)
+				)
 			),
 			react.createElement('div', { style: s.historyMeta },
 				react.createElement('span', { style: s.historySource, title: historySourceLabel }, historySourceLabel || (I18n.t('syncCreator.historyNoSource') || '가사 원본 없음')),
@@ -10003,7 +10140,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				})
 			)
 			: react.createElement('div', { style: s.historyEmpty },
-				I18n.t('syncCreator.historyEmpty') || '한 줄을 완료할 때마다 작업 상태가 여기에 저장됩니다.'
+				I18n.t('syncCreator.historyEmpty') || '30초 자동 저장 또는 수동 저장 시 작업 상태가 여기에 기록됩니다.'
 			),
 		react.createElement('div', {
 			style: s.historyLive,
