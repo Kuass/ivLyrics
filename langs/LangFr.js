@@ -436,6 +436,10 @@ window.LANG_FR = {
         "literal": { "label": "Littérale", "description": "Reste aussi proche que possible des mots et de l'ordre d'origine." },
         "adaptive": { "label": "Adaptée", "description": "S'appuie sur les lignes voisines pour un texte plus fluide et cohérent." }
       },
+      "retryCount": {
+        "label": "Réessais par fournisseur",
+        "description": "Nombre de tentatives supplémentaires après l’échec d’une requête. Réglez sur 0 pour passer immédiatement au fournisseur suivant."
+      },
       "providerSelection": "Sélection du fournisseur IA",
       "providerSelectionDesc": "Choisissez le fournisseur IA pour la traduction, la romanisation et la génération de TMI",
       "metadataProvider": "Traduction des métadonnées",

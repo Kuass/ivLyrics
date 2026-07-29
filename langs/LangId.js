@@ -436,6 +436,10 @@ window.LANG_ID = {
         "literal": { "label": "Harfiah", "description": "Sedekat mungkin dengan pilihan dan urutan kata asli." },
         "adaptive": { "label": "Adaptif", "description": "Memakai konteks baris sekitar agar terjemahan paling lancar dan menyatu." }
       },
+      "retryCount": {
+        "label": "Percobaan ulang per penyedia",
+        "description": "Jumlah percobaan tambahan setelah permintaan gagal. Atur ke 0 untuk langsung beralih ke penyedia berikutnya."
+      },
       "providerSelection": "Pilihan Penyedia AI",
       "providerSelectionDesc": "Pilih penyedia AI untuk terjemahan, romanisasi, dan pembuatan TMI",
       "metadataProvider": "Terjemahan Metadata",

@@ -234,7 +234,7 @@
         return typeof content === 'string' ? content : '';
     }
 
-    async function callPaxsenixAPIRaw(prompt, maxRetries = 3, transformResult = null) {
+    async function callPaxsenixAPIRaw(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[Paxsenix] API key is required. Please configure your API key in settings.');
@@ -331,7 +331,7 @@
         }
     }
 
-    async function callPaxsenixAPIStream(prompt, onLine, onStreamReset, maxRetries = 3, transformResult = null) {
+    async function callPaxsenixAPIStream(prompt, onLine, onStreamReset, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) throw new Error('[Paxsenix] API key is required.');
         const model = getSelectedModel();
@@ -456,7 +456,7 @@
         throw lastError || new Error('[Paxsenix] All API keys and retries exhausted');
     }
 
-    async function callPaxsenixAPI(prompt, maxRetries = 3) {
+    async function callPaxsenixAPI(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3) {
         const rawText = await callPaxsenixAPIRaw(prompt, maxRetries);
         return extractJSON(rawText);
     }
@@ -746,8 +746,8 @@
             const parseLines = rawResponse => parseTextLines(rawResponse, sourceLines);
 
             const lines = onLine
-                ? await callPaxsenixAPIStream(prompt, onLine, onStreamReset, 3, parseLines)
-                : await callPaxsenixAPIRaw(prompt, 3, parseLines);
+                ? await callPaxsenixAPIStream(prompt, onLine, onStreamReset, undefined, parseLines)
+                : await callPaxsenixAPIRaw(prompt, undefined, parseLines);
 
             if (wantSmartPhonetic) {
                 return { phonetic: lines };

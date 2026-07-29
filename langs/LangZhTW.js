@@ -436,6 +436,10 @@ window.LANG_ZH_TW = {
         "literal": { "label": "直譯", "description": "盡可能貼近原文的用詞和語序。" },
         "adaptive": { "label": "意譯", "description": "結合前後行的語境，使表達盡可能流暢連貫。" }
       },
+      "retryCount": {
+        "label": "每個提供者的重試次數",
+        "description": "請求失敗後在同一提供者上額外嘗試的次數。設為 0 時，第一次失敗後立即切換到下一個提供者。"
+      },
       "providerSelection": "AI 提供者選擇",
       "providerSelectionDesc": "選擇用於翻譯、發音和 TMI 生成的 AI 提供者",
       "metadataProvider": "元數據翻譯",

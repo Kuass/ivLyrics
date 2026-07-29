@@ -436,6 +436,10 @@ window.LANG_EN = {
         "literal": { "label": "Literal", "description": "Stays as close as possible to the original wording and order." },
         "adaptive": { "label": "Adaptive", "description": "Uses surrounding lines for the smoothest, most connected phrasing." }
       },
+      "retryCount": {
+        "label": "Retries per provider",
+        "description": "Number of additional attempts after a failed request. Set to 0 to switch to the next provider immediately."
+      },
       "providerSelection": "AI Provider Selection",
       "providerSelectionDesc": "Select AI providers for translation, pronunciation, TMI, and learning mode",
       "metadataProvider": "Metadata Translation",

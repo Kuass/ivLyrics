@@ -217,7 +217,7 @@
         return typeof content === 'string' ? content : '';
     }
 
-    async function callPerplexityAPIRaw(prompt, maxRetries = 3, transformResult = null) {
+    async function callPerplexityAPIRaw(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[Perplexity] API key is required. Please configure your API key in settings.');
@@ -330,7 +330,7 @@
         }
     }
 
-    async function callPerplexityAPIStream(prompt, onLine, onStreamReset, maxRetries = 3, transformResult = null) {
+    async function callPerplexityAPIStream(prompt, onLine, onStreamReset, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) throw new Error('[Perplexity] API key is required.');
         const model = getSelectedModel();
@@ -448,7 +448,7 @@
         throw lastError || new Error('[Perplexity] All API keys and retries exhausted');
     }
 
-    async function callPerplexityAPI(prompt, maxRetries = 3) {
+    async function callPerplexityAPI(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3) {
         const rawText = await callPerplexityAPIRaw(prompt, maxRetries);
         return extractJSON(rawText);
     }
@@ -706,8 +706,8 @@
             const parseLines = rawResponse => parseTextLines(rawResponse, sourceLines);
 
             const lines = onLine
-                ? await callPerplexityAPIStream(prompt, onLine, onStreamReset, 3, parseLines)
-                : await callPerplexityAPIRaw(prompt, 3, parseLines);
+                ? await callPerplexityAPIStream(prompt, onLine, onStreamReset, undefined, parseLines)
+                : await callPerplexityAPIRaw(prompt, undefined, parseLines);
 
             if (wantSmartPhonetic) {
                 return { phonetic: lines };

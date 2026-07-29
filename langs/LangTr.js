@@ -436,6 +436,10 @@ window.LANG_TR = {
         "literal": { "label": "Kelimesi kelimesine", "description": "Özgün sözcüklere ve sıralamaya olabildiğince yakın kalır." },
         "adaptive": { "label": "Serbest", "description": "En akıcı ve bağlantılı anlatım için çevredeki satırları bağlam olarak kullanır." }
       },
+      "retryCount": {
+        "label": "Sağlayıcı başına yeniden deneme",
+        "description": "Başarısız bir istekten sonra yapılacak ek deneme sayısıdır. 0 seçildiğinde hemen sonraki sağlayıcıya geçilir."
+      },
       "providerSelection": "Yapay Zeka Sağlayıcı Seçimi",
       "providerSelectionDesc": "Çeviri, okunuş, bilgi (TMI) ve öğrenme modu için YZ sağlayıcılarını seçin",
       "metadataProvider": "Meta Veri Çevirisi",

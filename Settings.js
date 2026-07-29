@@ -1663,6 +1663,9 @@ const AIProvidersTab = () => {
   const [translationStyle, setTranslationStyle] = useState(
     () => window.AIAddonManager?.getTranslationStyle?.() || "natural"
   );
+  const [providerRetryCount, setProviderRetryCount] = useState(
+    () => window.AIAddonManager?.getProviderRetryCount?.() ?? 2
+  );
   const areCulturalAnnotationsEnabled = () => {
     const value = CONFIG.visual["cultural-annotations-enabled"];
     return value === true || value === "true";
@@ -1672,6 +1675,7 @@ const AIProvidersTab = () => {
   useEffect(() => {
     let retryTimer = null;
     let unsubscribeStyle = null;
+    let unsubscribeRetryCount = null;
     let disposed = false;
 
     const loadProviders = () => {
@@ -1690,9 +1694,13 @@ const AIProvidersTab = () => {
         });
         setEnabledProviders(enabled);
         setTranslationStyle(window.AIAddonManager.getTranslationStyle?.() || "natural");
+        setProviderRetryCount(window.AIAddonManager.getProviderRetryCount?.() ?? 2);
 
         unsubscribeStyle = window.AIAddonManager.on?.("translation:style:changed", ({ style }) => {
           if (!disposed) setTranslationStyle(style || "natural");
+        });
+        unsubscribeRetryCount = window.AIAddonManager.on?.("provider:retry-count:changed", ({ retryCount }) => {
+          if (!disposed) setProviderRetryCount(Number(retryCount) || 0);
         });
       } else {
         retryTimer = setTimeout(loadProviders, 100);
@@ -1704,6 +1712,7 @@ const AIProvidersTab = () => {
       disposed = true;
       if (retryTimer) clearTimeout(retryTimer);
       if (typeof unsubscribeStyle === "function") unsubscribeStyle();
+      if (typeof unsubscribeRetryCount === "function") unsubscribeRetryCount();
     };
   }, [refreshKey]);
 
@@ -1820,6 +1829,28 @@ const AIProvidersTab = () => {
           })
         )
       ),
+      react.createElement(OptionList, {
+        items: [
+          {
+            desc: I18n.t("settings.aiProviders.retryCount.label") || "Retries per provider",
+            key: "ai-provider-retry-count",
+            info: I18n.t("settings.aiProviders.retryCount.description")
+              || "Number of additional attempts after a failed request. Set to 0 to switch to the next provider immediately.",
+            type: ConfigSliderRange,
+            defaultValue: providerRetryCount,
+            min: 0,
+            max: 5,
+            step: 1,
+            showStepMarkers: true,
+          },
+        ],
+        onChange: (_name, value) => {
+          const numericValue = Number(value);
+          const nextValue = window.AIAddonManager?.setProviderRetryCount?.(value)
+            ?? (Number.isFinite(numericValue) ? numericValue : 2);
+          setProviderRetryCount(nextValue);
+        },
+      }),
       react.createElement(OptionList, {
         items: [
           {
@@ -6733,7 +6764,22 @@ const ConfigModal = ({
         "settings.aiProviders.translationStyle.description",
         "settings.aiProviders.translationStyle.natural.label",
         "settings.aiProviders.translationStyle.literal.label",
-        "settings.aiProviders.translationStyle.adaptive.label"
+        "settings.aiProviders.translationStyle.adaptive.label",
+        "settings.aiProviders.retryCount.label",
+        "settings.aiProviders.retryCount.description"
+      ]
+    },
+    {
+      section: I18n.t("tabs.aiProviders"),
+      sectionKey: "ai-providers",
+      settingKey: "ai-provider-retry-count",
+      name: I18n.t("settings.aiProviders.retryCount.label") || "Retries per provider",
+      desc: I18n.t("settings.aiProviders.retryCount.description")
+        || "Number of additional attempts after a failed request. Set to 0 to switch to the next provider immediately.",
+      i18nKeys: [
+        "tabs.aiProviders",
+        "settings.aiProviders.retryCount.label",
+        "settings.aiProviders.retryCount.description"
       ]
     },
     {

@@ -262,7 +262,7 @@
         return { text, finishReason };
     }
 
-    async function callGroqAPIRaw(prompt, maxRetries = 3, transformResult = null) {
+    async function callGroqAPIRaw(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[Groq] API key is required. Please configure your API key in settings.');
@@ -375,7 +375,7 @@
         }
     }
 
-    async function callGroqAPIStream(prompt, onLine, onStreamReset, maxRetries = 3, transformResult = null) {
+    async function callGroqAPIStream(prompt, onLine, onStreamReset, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) throw new Error('[Groq] API key is required.');
         const model = getSelectedModel();
@@ -503,7 +503,7 @@
         throw lastError || new Error('[Groq] All API keys and retries exhausted');
     }
 
-    async function callGroqAPI(prompt, maxRetries = 3) {
+    async function callGroqAPI(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3) {
         return await callGroqAPIRaw(prompt, maxRetries, extractJSON);
     }
 
@@ -755,8 +755,8 @@
             const parseLines = rawResponse => parseTextLines(rawResponse, sourceLines);
 
             const lines = onLine
-                ? await callGroqAPIStream(prompt, onLine, onStreamReset, 3, parseLines)
-                : await callGroqAPIRaw(prompt, 3, parseLines);
+                ? await callGroqAPIStream(prompt, onLine, onStreamReset, undefined, parseLines)
+                : await callGroqAPIRaw(prompt, undefined, parseLines);
 
             if (wantSmartPhonetic) {
                 return { phonetic: lines };

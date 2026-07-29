@@ -207,7 +207,7 @@
             .join('');
     }
 
-    async function callClaudeAPIRaw(prompt, maxRetries = 3, transformResult = null) {
+    async function callClaudeAPIRaw(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[Claude] API key is required. Please configure your API key in settings.');
@@ -326,7 +326,7 @@
         }
     }
 
-    async function callClaudeAPIStream(prompt, onLine, onStreamReset, maxRetries = 3, transformResult = null) {
+    async function callClaudeAPIStream(prompt, onLine, onStreamReset, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[Claude] API key is required. Please configure your API key in settings.');
@@ -532,7 +532,7 @@
         throw lastError || new Error('[Claude] All API keys and retries exhausted');
     }
 
-    async function callClaudeAPI(prompt, maxRetries = 3) {
+    async function callClaudeAPI(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3) {
         const rawText = await callClaudeAPIRaw(prompt, maxRetries);
         return extractJSON(rawText);
     }
@@ -789,8 +789,8 @@
             const parseLines = rawResponse => parseTextLines(rawResponse, sourceLines);
 
             const lines = onLine
-                ? await callClaudeAPIStream(prompt, onLine, onStreamReset, 3, parseLines)
-                : await callClaudeAPIRaw(prompt, 3, parseLines);
+                ? await callClaudeAPIStream(prompt, onLine, onStreamReset, undefined, parseLines)
+                : await callClaudeAPIRaw(prompt, undefined, parseLines);
 
             if (wantSmartPhonetic) {
                 return { phonetic: lines };

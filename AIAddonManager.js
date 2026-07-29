@@ -76,6 +76,9 @@
     const DEFAULT_TRANSLATION_STYLE = TRANSLATION_STYLES.NATURAL;
     const TRANSLATION_STYLE_STORAGE_KEY = `${STORAGE_PREFIX}translation-style`;
     const VALID_TRANSLATION_STYLES = new Set(Object.values(TRANSLATION_STYLES));
+    const DEFAULT_PROVIDER_RETRY_COUNT = 2;
+    const MAX_PROVIDER_RETRY_COUNT = 5;
+    const PROVIDER_RETRY_COUNT_STORAGE_KEY = `${STORAGE_PREFIX}provider-retry-count`;
     const PROMPT_LANGUAGE_DATA = {
         ko: { name: 'Korean', native: '한국어', phoneticDesc: 'Korean Hangul pronunciation (e.g., こんにちは → 콘니치와)' },
         en: { name: 'English', native: 'English', phoneticDesc: 'English romanization (e.g., こんにちは → konnichiwa)' },
@@ -106,6 +109,17 @@
         return VALID_TRANSLATION_STYLES.has(normalized)
             ? normalized
             : DEFAULT_TRANSLATION_STYLE;
+    };
+
+    const normalizeProviderRetryCount = (value) => {
+        if (value === null || value === undefined || value === '') {
+            return DEFAULT_PROVIDER_RETRY_COUNT;
+        }
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) {
+            return DEFAULT_PROVIDER_RETRY_COUNT;
+        }
+        return Math.min(MAX_PROVIDER_RETRY_COUNT, Math.max(0, Math.round(parsed)));
     };
 
     const getTranslationLanguageInfo = (lang) => {
@@ -712,6 +726,41 @@ ${JSON.stringify(payload)}`;
          */
         getTranslationStyle() {
             return normalizeTranslationStyle(getStoredValue(TRANSLATION_STYLE_STORAGE_KEY));
+        }
+
+        /**
+         * AI 제공자별 추가 재시도 횟수 저장
+         * @param {number} retryCount - 최초 요청 실패 후 추가로 시도할 횟수
+         * @returns {number} 0~5 범위로 정규화된 재시도 횟수
+         */
+        setProviderRetryCount(retryCount) {
+            const normalized = normalizeProviderRetryCount(retryCount);
+            const previous = this.getProviderRetryCount();
+            setStoredValue(PROVIDER_RETRY_COUNT_STORAGE_KEY, String(normalized));
+
+            if (previous !== normalized) {
+                this.emit('provider:retry-count:changed', {
+                    retryCount: normalized,
+                    previous
+                });
+            }
+            return normalized;
+        }
+
+        /**
+         * AI 제공자별 추가 재시도 횟수 가져오기
+         * @returns {number} 0~5
+         */
+        getProviderRetryCount() {
+            return normalizeProviderRetryCount(getStoredValue(PROVIDER_RETRY_COUNT_STORAGE_KEY));
+        }
+
+        /**
+         * Addon API 루프에서 사용할 총 요청 횟수
+         * @returns {number} 최초 요청 1회 + 설정된 재시도 횟수
+         */
+        getProviderRequestAttempts() {
+            return this.getProviderRetryCount() + 1;
         }
 
         /**

@@ -436,6 +436,10 @@ window.LANG_ES = {
         "literal": { "label": "Literal", "description": "Se mantiene lo más cerca posible de las palabras y el orden originales." },
         "adaptive": { "label": "Libre", "description": "Usa las líneas cercanas para lograr una redacción más fluida y conectada." }
       },
+      "retryCount": {
+        "label": "Reintentos por proveedor",
+        "description": "Número de intentos adicionales tras una solicitud fallida. Configúralo en 0 para cambiar inmediatamente al siguiente proveedor."
+      },
       "providerSelection": "Selección de proveedor de IA",
       "providerSelectionDesc": "Selecciona el proveedor de IA para traducción, romanización y generación de TMI",
       "metadataProvider": "Traducción de metadatos",

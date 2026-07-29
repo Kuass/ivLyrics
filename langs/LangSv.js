@@ -436,6 +436,10 @@ window.LANG_SV = {
         "literal": { "label": "Ordagrann", "description": "Ligger så nära originalets ordval och ordning som möjligt." },
         "adaptive": { "label": "Anpassad", "description": "Använder omgivande rader för ett så flytande och sammanhängande språk som möjligt." }
       },
+      "retryCount": {
+        "label": "Återförsök per leverantör",
+        "description": "Antal extra försök efter en misslyckad begäran. Ange 0 för att direkt byta till nästa leverantör."
+      },
       "providerSelection": "Val av AI-leverantör",
       "providerSelectionDesc": "Välj AI-leverantörer för översättning, uttal och TMI-generering",
       "metadataProvider": "Metadataöversättning",

@@ -436,6 +436,10 @@ window.LANG_CS = {
         "literal": { "label": "Doslovný", "description": "Drží se co nejblíže původním slovům a jejich pořadí." },
         "adaptive": { "label": "Volný", "description": "Využívá okolní řádky pro co nejplynulejší a souvislé znění." }
       },
+      "retryCount": {
+        "label": "Opakování pro každého poskytovatele",
+        "description": "Počet dalších pokusů po neúspěšném požadavku. Nastavením na 0 se ihned přepne na dalšího poskytovatele."
+      },
       "providerSelection": "Výběr poskytovatele AI",
       "providerSelectionDesc": "Vyberte poskytovatele AI pro překlad, výslovnost, TMI a režim učení",
       "metadataProvider": "Překlad metadat",

@@ -262,7 +262,7 @@
         return { text, finishReason };
     }
 
-    async function callOpenRouterAPIRaw(prompt, maxRetries = 3, transformResult = null) {
+    async function callOpenRouterAPIRaw(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[OpenRouter] API key is required. Please configure your API key in settings.');
@@ -377,7 +377,7 @@
         }
     }
 
-    async function callOpenRouterAPIStream(prompt, onLine, onStreamReset, maxRetries = 3, transformResult = null) {
+    async function callOpenRouterAPIStream(prompt, onLine, onStreamReset, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) throw new Error('[OpenRouter] API key is required.');
         const model = getSelectedModel();
@@ -505,7 +505,7 @@
         throw lastError || new Error('[OpenRouter] All API keys and retries exhausted');
     }
 
-    async function callOpenRouterAPI(prompt, maxRetries = 3) {
+    async function callOpenRouterAPI(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3) {
         return await callOpenRouterAPIRaw(prompt, maxRetries, extractJSON);
     }
 
@@ -776,8 +776,8 @@
             const parseLines = rawResponse => parseTextLines(rawResponse, sourceLines);
 
             const lines = onLine
-                ? await callOpenRouterAPIStream(prompt, onLine, onStreamReset, 3, parseLines)
-                : await callOpenRouterAPIRaw(prompt, 3, parseLines);
+                ? await callOpenRouterAPIStream(prompt, onLine, onStreamReset, undefined, parseLines)
+                : await callOpenRouterAPIRaw(prompt, undefined, parseLines);
 
             if (wantSmartPhonetic) {
                 return { phonetic: lines };

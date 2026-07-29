@@ -422,7 +422,7 @@
         return { text, finishReason };
     }
 
-    async function callChatGPTAPIRaw(prompt, maxRetries = 3, transformResult = null) {
+    async function callChatGPTAPIRaw(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[ChatGPT] API key is required. Please configure your API key in settings.');
@@ -537,7 +537,7 @@
         }
     }
 
-    async function callChatGPTAPIStream(prompt, onLine, onStreamReset, maxRetries = 3, transformResult = null) {
+    async function callChatGPTAPIStream(prompt, onLine, onStreamReset, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[ChatGPT] API key is required. Please configure your API key in settings.');
@@ -698,7 +698,7 @@
     /**
      * Call ChatGPT API and parse JSON response (for metadata, TMI, etc.)
      */
-    async function callChatGPTAPI(prompt, maxRetries = 3) {
+    async function callChatGPTAPI(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3) {
         return await callChatGPTAPIRaw(prompt, maxRetries, extractJSON);
     }
 
@@ -1019,8 +1019,8 @@
 
             // Validate inside the provider retry loop so partial/blocked output can retry safely.
             const lines = onLine
-                ? await callChatGPTAPIStream(prompt, onLine, onStreamReset, 3, parseLines)
-                : await callChatGPTAPIRaw(prompt, 3, parseLines);
+                ? await callChatGPTAPIStream(prompt, onLine, onStreamReset, undefined, parseLines)
+                : await callChatGPTAPIRaw(prompt, undefined, parseLines);
 
             // Return in the format expected by LyricsService
             if (wantSmartPhonetic) {

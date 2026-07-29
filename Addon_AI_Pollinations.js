@@ -365,7 +365,7 @@
     /**
      * Call Pollinations.ai API and return raw text response
      */
-    async function callPollinationsAPIRaw(prompt, maxRetries = 3, transformResult = null) {
+    async function callPollinationsAPIRaw(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const model = getSelectedModel();
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
@@ -477,7 +477,7 @@
         }
     }
 
-    async function callPollinationsAPIStream(prompt, onLine, onStreamReset, maxRetries = 3, transformResult = null) {
+    async function callPollinationsAPIStream(prompt, onLine, onStreamReset, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const model = getSelectedModel();
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
@@ -603,7 +603,7 @@
     /**
      * Call Pollinations.ai API and parse JSON response (for metadata, TMI, etc.)
      */
-    async function callPollinationsAPI(prompt, maxRetries = 3) {
+    async function callPollinationsAPI(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3) {
         const rawText = await callPollinationsAPIRaw(prompt, maxRetries);
         return extractJSON(rawText);
     }
@@ -971,8 +971,8 @@
             const parseLines = rawResponse => parseTextLines(rawResponse, sourceLines);
 
             const lines = onLine
-                ? await callPollinationsAPIStream(prompt, onLine, onStreamReset, 3, parseLines)
-                : await callPollinationsAPIRaw(prompt, 3, parseLines);
+                ? await callPollinationsAPIStream(prompt, onLine, onStreamReset, undefined, parseLines)
+                : await callPollinationsAPIRaw(prompt, undefined, parseLines);
 
             // Return in the format expected by LyricsService
             if (wantSmartPhonetic) {

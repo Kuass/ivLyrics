@@ -436,6 +436,10 @@ window.LANG_VI = {
         "literal": { "label": "Dịch sát", "description": "Bám sát tối đa từ ngữ và trật tự của bản gốc." },
         "adaptive": { "label": "Dịch thoát ý", "description": "Dùng các dòng xung quanh làm ngữ cảnh để câu chữ liền mạch và tự nhiên nhất." }
       },
+      "retryCount": {
+        "label": "Số lần thử lại cho mỗi nhà cung cấp",
+        "description": "Số lần thử thêm sau khi yêu cầu thất bại. Đặt thành 0 để chuyển ngay sang nhà cung cấp tiếp theo."
+      },
       "providerSelection": "Lựa chọn nhà cung cấp AI",
       "providerSelectionDesc": "Chọn nhà cung cấp AI cho dịch thuật, phát âm và tạo TMI",
       "metadataProvider": "Dịch siêu dữ liệu (Metadata)",

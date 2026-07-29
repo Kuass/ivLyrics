@@ -436,6 +436,10 @@ window.LANG_JA = {
         "literal": { "label": "直訳", "description": "原文の語句と語順にできるだけ近い形で翻訳します。" },
         "adaptive": { "label": "意訳", "description": "前後の行を文脈として使い、最も滑らかにつながる表現にします。" }
       },
+      "retryCount": {
+        "label": "プロバイダーごとの再試行回数",
+        "description": "リクエスト失敗後に同じプロバイダーで追加試行する回数です。0にすると、1回失敗した時点で次のプロバイダーへ切り替えます。"
+      },
       "providerSelection": "AIプロバイダーの選択",
       "providerSelectionDesc": "翻訳、発音、TMI生成に使用するAIプロバイダーを選択します",
       "metadataProvider": "メタデータ翻訳",

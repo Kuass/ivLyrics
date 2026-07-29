@@ -436,6 +436,10 @@ window.LANG_KO = {
         "literal": { "label": "직역", "description": "원문의 단어와 어순에 최대한 가깝게 번역합니다." },
         "adaptive": { "label": "의역", "description": "앞뒤 줄의 문맥을 반영해 가장 매끄럽게 이어지도록 번역합니다." }
       },
+      "retryCount": {
+        "label": "Provider별 재시도 횟수",
+        "description": "요청 실패 후 같은 Provider에서 추가로 시도할 횟수입니다. 0으로 설정하면 한 번 실패한 즉시 다음 Provider로 전환합니다."
+      },
       "providerSelection": "AI 제공자 선택",
       "providerSelectionDesc": "번역, 발음 표기, TMI, 학습 모드에 사용할 AI 제공자를 선택하세요",
       "metadataProvider": "메타데이터 번역",

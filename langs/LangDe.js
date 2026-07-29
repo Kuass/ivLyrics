@@ -436,6 +436,10 @@ window.LANG_DE = {
         "literal": { "label": "Wörtlich", "description": "Bleibt möglichst nah an Wortwahl und Reihenfolge des Originals." },
         "adaptive": { "label": "Sinngemäß", "description": "Bezieht benachbarte Zeilen für einen besonders flüssigen Zusammenhang ein." }
       },
+      "retryCount": {
+        "label": "Wiederholungen pro Anbieter",
+        "description": "Anzahl zusätzlicher Versuche nach einer fehlgeschlagenen Anfrage. Bei 0 wird sofort zum nächsten Anbieter gewechselt."
+      },
       "providerSelection": "KI-Anbieter auswählen",
       "providerSelectionDesc": "Wählen Sie den KI-Anbieter für Übersetzungen, Transkriptionen und TMI-Generierung aus",
       "metadataProvider": "Metadaten-Übersetzung",

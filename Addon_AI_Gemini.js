@@ -274,7 +274,7 @@
     /**
      * Call Gemini API and return raw text response
      */
-    async function callGeminiAPIRaw(prompt, maxRetries = 3, transformResult = null) {
+    async function callGeminiAPIRaw(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[Gemini] API key is required. Please configure your Gemini API key in settings.');
@@ -386,7 +386,7 @@
         }
     }
 
-    async function callGeminiAPIStream(prompt, onLine, onStreamReset, maxRetries = 3, transformResult = null) {
+    async function callGeminiAPIStream(prompt, onLine, onStreamReset, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) throw new Error('[Gemini] API key is required.');
         const model = getSelectedModel();
@@ -533,7 +533,7 @@
     /**
      * Call Gemini API and parse JSON response (for metadata, TMI, etc.)
      */
-    async function callGeminiAPI(prompt, maxRetries = 3) {
+    async function callGeminiAPI(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3) {
         const rawText = await callGeminiAPIRaw(prompt, maxRetries);
         return extractJSON(rawText);
     }
@@ -854,8 +854,8 @@
 
             // Validate inside the provider retry loop so partial/blocked output can retry safely.
             const lines = onLine
-                ? await callGeminiAPIStream(prompt, onLine, onStreamReset, 3, parseLines)
-                : await callGeminiAPIRaw(prompt, 3, parseLines);
+                ? await callGeminiAPIStream(prompt, onLine, onStreamReset, undefined, parseLines)
+                : await callGeminiAPIRaw(prompt, undefined, parseLines);
 
             // Return in the format expected by LyricsService
             if (wantSmartPhonetic) {
