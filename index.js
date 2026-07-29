@@ -6382,7 +6382,7 @@ class LyricsContainer extends react.Component {
     return {
       duration: Number(meta.duration),
       album: meta.album_title,
-      artist: meta.artist_name,
+      artist: track.artists?.map((artist) => artist?.name).filter(Boolean).join(", ") || meta.artist_name,
       title: meta.title,
       uri: track.uri,
       image:
