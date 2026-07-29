@@ -166,6 +166,30 @@ const repairSyncCreatorLineCharsFromParallel = (line) => {
 		chars: normalizeSyncCreatorTimeSequence(rebuiltChars)
 	};
 };
+const getSyncCreatorRangesValidationError = (ranges, lineStart, lineEnd, label) => {
+	if (!Array.isArray(ranges) || ranges.length === 0) {
+		return `${label}: ranges must be a non-empty array`;
+	}
+
+	let previousEnd = lineStart - 1;
+	for (let rangeIndex = 0; rangeIndex < ranges.length; rangeIndex++) {
+		const range = ranges[rangeIndex];
+		const start = Number(range?.start);
+		const end = Number(range?.end);
+		if (!Number.isInteger(start) || !Number.isInteger(end)) {
+			return `${label}: range ${rangeIndex + 1} start/end must be integers`;
+		}
+		if (start < lineStart || end > lineEnd || end < start) {
+			return `${label}: range ${rangeIndex + 1} is outside the parent line`;
+		}
+		if (start <= previousEnd) {
+			return `${label}: range ${rangeIndex + 1} overlaps or is out of order`;
+		}
+		previousEnd = end;
+	}
+
+	return null;
+};
 const getSyncCreatorSyncDataValidationError = (data) => {
 	if (!data || !Array.isArray(data.lines)) return 'Invalid sync data format';
 
@@ -173,7 +197,7 @@ const getSyncCreatorSyncDataValidationError = (data) => {
 		const line = data.lines[lineIndex];
 		const start = Number(line?.start);
 		const end = Number(line?.end);
-		if (!Number.isInteger(start) || !Number.isInteger(end) || end < start) {
+		if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start) {
 			return `Line ${lineIndex + 1}: invalid character range`;
 		}
 
@@ -190,12 +214,29 @@ const getSyncCreatorSyncDataValidationError = (data) => {
 			return `Line ${lineIndex + 1}, char ${backwardLineCharIndex}: time goes backwards`;
 		}
 
+		if (line.hiddenRanges !== undefined) {
+			const hiddenError = getSyncCreatorRangesValidationError(
+				line.hiddenRanges,
+				start,
+				end,
+				`Line ${lineIndex + 1}, hiddenRanges`
+			);
+			if (hiddenError) return hiddenError;
+		}
+
 		const parts = Array.isArray(line?.parallel?.parts) ? line.parallel.parts : [];
 		for (let partIndex = 0; partIndex < parts.length; partIndex++) {
 			const part = parts[partIndex];
+			const partLabel = String(part?.id || partIndex + 1);
+			const rangeError = getSyncCreatorRangesValidationError(
+				part?.ranges,
+				start,
+				end,
+				`Line ${lineIndex + 1}, parallel part ${partLabel}`
+			);
+			if (rangeError) return rangeError;
 			if (!Array.isArray(part?.chars)) continue;
 			const expectedPartLength = countSyncCreatorRangeChars(part.ranges);
-			const partLabel = String(part?.id || partIndex + 1);
 			if (part.chars.length !== expectedPartLength) {
 				return `Line ${lineIndex + 1}, parallel part ${partLabel}: expected ${expectedPartLength} char timings, received ${part.chars.length}`;
 			}
@@ -207,6 +248,16 @@ const getSyncCreatorSyncDataValidationError = (data) => {
 			if (backwardPartCharIndex >= 0) {
 				return `Line ${lineIndex + 1}, parallel part ${partLabel}, char ${backwardPartCharIndex}: time goes backwards`;
 			}
+		}
+
+		if (line?.parallel?.hiddenRanges !== undefined) {
+			const hiddenError = getSyncCreatorRangesValidationError(
+				line.parallel.hiddenRanges,
+				start,
+				end,
+				`Line ${lineIndex + 1}, hiddenRanges`
+			);
+			if (hiddenError) return hiddenError;
 		}
 	}
 
@@ -2077,7 +2128,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		const existingParts = Array.isArray(existingParallel?.parts) ? existingParallel.parts : [];
 		return sanitizeSyncCreatorParallel({
 			layout: existingParallel?.layout || template.layout || 'stack',
-			hiddenRanges: Array.isArray(existingParallel?.hiddenRanges) ? existingParallel.hiddenRanges : template.hiddenRanges,
+			hiddenRanges: Array.isArray(template.hiddenRanges) ? template.hiddenRanges : [],
 			parts: template.parts.map((part) => {
 				const existing = existingParts.find(item => item?.id === part.id);
 				const reusableChars = hasReusableSyncCreatorParallelChars(part, existing)
