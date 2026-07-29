@@ -4943,7 +4943,7 @@ const ShareImageModal = ({ lyrics, trackInfo, onClose }) => {
 
     // 저작권 경고 모달
     showCopyrightModal && react.createElement("div", {
-      className: "ivlyrics-fluent-overlay",
+      className: "ivlyrics-fluent-overlay is-open",
       "data-ui-theme": getSettingsSurfaceTheme(),
       onClick: (e) => {
         if (e.target === e.currentTarget) handleCopyrightCancel();
