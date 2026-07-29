@@ -2100,6 +2100,18 @@ window.LANG_SV = {
     "tmiHint": "Högerklicka eller håll ned omslaget för att öppna TMI",
     "click": "Klicka",
     "tmiGesture": "Högerklick · Håll ned",
+    "presentation": {
+      "switcherLabel": "Helskärmspresentation",
+      "settingsTitle": "Layout för fokuserad låttext",
+      "settingsDescription": "Välj vyn som används när albumet öppnar den fokuserade låttexten.",
+      "standardLabel": "Standard",
+      "vinylLabel": "Komplett skivspelare",
+      "vinylDescription": "Visar hela skivspelaren och den stora aktiva textraden längst ned.",
+      "compactLabel": "Kompakt vinyl",
+      "compactDescription": "Behåller standardlayouten för låttexten och visar en delvis synlig skiva bakom albumomslaget.",
+      "videoLabel": "Videoscen",
+      "videoDescription": "Visar den synkroniserade YouTube-videon och den stora aktiva textraden längst ned."
+    },
     "settings": {
       "subtitle": "Anpassa storlek, animationer och typografi för den nedre textraden i vinylläget.",
       "albumSizeLabel": "Omslagsstorlek",

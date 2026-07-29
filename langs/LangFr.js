@@ -2101,6 +2101,18 @@ window.LANG_FR = {
     "tmiHint": "Faites un clic droit ou appuyez longuement sur la pochette pour ouvrir TMI",
     "click": "Clic",
     "tmiGesture": "Clic droit · Appui long",
+    "presentation": {
+      "switcherLabel": "Présentation plein écran",
+      "settingsTitle": "Disposition des paroles ciblées",
+      "settingsDescription": "Choisissez la vue utilisée lorsque l’album ouvre les paroles ciblées.",
+      "standardLabel": "Standard",
+      "vinylLabel": "Platine complète",
+      "vinylDescription": "Affiche la platine complète et la grande ligne active en bas.",
+      "compactLabel": "Vinyle compact",
+      "compactDescription": "Conserve la disposition standard des paroles et affiche un disque partiellement visible derrière la pochette.",
+      "videoLabel": "Scène vidéo",
+      "videoDescription": "Affiche la vidéo YouTube synchronisée et la grande ligne active en bas."
+    },
     "settings": {
       "subtitle": "Personnalisez la taille, les animations et la typographie inférieure du mode vinyle.",
       "albumSizeLabel": "Taille de la pochette",

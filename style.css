@@ -8435,6 +8435,144 @@ html.is-lp-view-exit::view-transition-new(root) {
   animation: fullscreen-vinyl-player-out 420ms cubic-bezier(0.4, 0, 1, 1) both;
 }
 
+.fullscreen-presentation-dock {
+  position: fixed;
+  z-index: 2147482000;
+  top: 0;
+  left: 50%;
+  width: min(420px, calc(100vw - 96px));
+  height: max(154px, calc(env(safe-area-inset-top) + 126px));
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.fullscreen-presentation-dock.is-hidden {
+  display: none;
+}
+
+.fullscreen-presentation-hotspot {
+  position: absolute;
+  top: max(68px, calc(env(safe-area-inset-top) + 36px));
+  left: 50%;
+  width: min(360px, 100%);
+  height: 66px;
+  pointer-events: auto;
+  transform: translateX(-50%);
+}
+
+.fullscreen-presentation-switcher {
+  position: absolute;
+  z-index: 1;
+  top: max(78px, calc(env(safe-area-inset-top) + 46px));
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  background: rgba(14, 14, 18, 0.68);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  transform: translate(-50%, -10px) scale(0.98);
+  transition:
+    opacity 180ms ease,
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 180ms linear;
+}
+
+.fullscreen-presentation-hotspot:hover + .fullscreen-presentation-switcher,
+.fullscreen-presentation-switcher:hover,
+.fullscreen-presentation-dock:focus-within .fullscreen-presentation-switcher {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.fullscreen-presentation-option {
+  display: inline-flex;
+  min-width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 11px;
+  outline: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.66);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.fullscreen-presentation-option:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.fullscreen-presentation-option:active {
+  transform: scale(0.95);
+}
+
+.fullscreen-presentation-option.active {
+  background: color-mix(
+    in srgb,
+    var(--spice-button-active, #1ed760) 24%,
+    rgba(255, 255, 255, 0.1)
+  );
+  color: #fff;
+}
+
+.fullscreen-presentation-option:focus-visible {
+  outline: 2px solid color-mix(
+    in srgb,
+    var(--spice-button-active, #1ed760) 74%,
+    white
+  );
+  outline-offset: 2px;
+}
+
+.fullscreen-presentation-option svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+}
+
+.fullscreen-presentation-option > span {
+  max-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    max-width 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 140ms ease;
+}
+
+.fullscreen-presentation-option:is(.active, :hover, :focus-visible) > span {
+  max-width: 150px;
+  opacity: 1;
+}
+
 @keyframes fullscreen-vinyl-overlay-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -8494,6 +8632,12 @@ html.is-lp-view-exit::view-transition-new(root) {
   overflow: visible;
   transform: translateY(0);
   transform-origin: center bottom;
+  font-family: var(--iv-vinyl-original-font-family, 'Pretendard Variable'), Pretendard, sans-serif;
+  font-size: var(--iv-vinyl-original-font-size, 31px);
+  font-weight: var(--iv-vinyl-original-font-weight, 600);
+  letter-spacing: var(--iv-vinyl-original-letter-spacing, 0);
+  line-height: 1.25;
+  opacity: var(--iv-vinyl-original-opacity, 0.95);
   will-change: opacity, transform;
 }
 
@@ -9744,8 +9888,331 @@ html.is-lp-view-exit::view-transition-new(root) {
   font-size: var(--iv-vinyl-translation-font-size, 15px) !important;
 }
 
+.fullscreen-vinyl-overlay.is-presentation-compact-vinyl {
+  grid-template-columns: minmax(220px, 0.82fr) minmax(360px, 1.38fr);
+  column-gap: clamp(28px, 6vw, 96px);
+  align-items: center;
+  place-items: initial;
+  padding:
+    clamp(72px, 10svh, 112px)
+    clamp(38px, 7vw, 120px)
+    clamp(38px, 6svh, 72px);
+}
+
+.ivlyrics-compact-album-vinyl {
+  --iv-vinyl-spin-angle: 0turn;
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  isolation: isolate;
+  pointer-events: none;
+}
+
+.clickable-album-container:has(> .ivlyrics-compact-album-vinyl) {
+  overflow: visible;
+}
+
+.ivlyrics-compact-album-record {
+  position: absolute;
+  z-index: 0;
+  top: 4%;
+  right: -50%;
+  display: block;
+  width: 92%;
+  height: 92%;
+  border-radius: 50%;
+  filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.42));
+  animation: ivlyrics-vinyl-spin-clock 6s linear infinite;
+  animation-play-state: paused;
+}
+
+.ivlyrics-compact-album-vinyl.is-playing .ivlyrics-compact-album-record {
+  animation-play-state: running;
+}
+
+.ivlyrics-compact-album-vinyl.is-center-rotation-enabled .ivlyrics-vinyl-label {
+  transform: translate(-50%, -50%) rotate(var(--iv-vinyl-spin-angle));
+  will-change: transform;
+}
+
+.ivlyrics-compact-album-cover {
+  position: absolute !important;
+  z-index: 2;
+  inset: 0;
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  object-fit: cover;
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, 0.42),
+    0 2px 8px rgba(0, 0, 0, 0.24);
+}
+
+.ivlyrics-compact-album-vinyl.is-motion-disabled .ivlyrics-compact-album-record {
+  --iv-vinyl-spin-angle: 0turn;
+  animation: none !important;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-lyric-stage {
+  width: calc(100vw - clamp(48px, 7vw, 96px));
+  max-width: none;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric {
+  right: 0;
+  left: 0;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+  padding-inline: clamp(6px, 1vw, 16px);
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric > .ivlyrics-active-lyric-renderer,
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  overflow: visible;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine > p,
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-phonetic,
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-translation,
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-culturalNote {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine > p {
+  width: fit-content;
+  margin-inline: auto;
+  padding: 0.08em 0.32em;
+  border: 0;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.46);
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.62),
+    0 2px 5px rgba(0, 0, 0, 0.2) !important;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-phonetic,
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-translation {
+  position: relative;
+  z-index: 1;
+  width: fit-content;
+  margin-inline: auto;
+  padding: 0.08em 0.32em;
+  border: 0;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.46);
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.52) !important;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-culturalNote {
+  position: relative;
+  z-index: 1;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.52) !important;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-phonetic {
+  font-size: max(var(--iv-vinyl-phonetic-font-size, 11px), 13px) !important;
+  font-weight: max(var(--iv-vinyl-phonetic-font-weight, 100), 400) !important;
+  margin-top: 3px;
+  opacity: max(var(--iv-vinyl-phonetic-opacity, 0.7), 0.95) !important;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-translation {
+  font-size: max(var(--iv-vinyl-translation-font-size, 15px), 16px) !important;
+  font-weight: max(var(--iv-vinyl-translation-font-weight, 300), 400) !important;
+  margin-top: 3px;
+  opacity: max(var(--iv-vinyl-translation-opacity, 0.85), 0.96) !important;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-culturalNote {
+  font-size: max(var(--iv-vinyl-cultural-note-font-size, 12px), 13px) !important;
+  font-weight: max(var(--iv-vinyl-cultural-note-font-weight, 300), 400) !important;
+  opacity: max(var(--iv-vinyl-cultural-note-opacity, 0.6), 0.9) !important;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine > p:has(.lyrics-karaoke-line),
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine > p:has(.lyrics-karaoke-stack) {
+  text-shadow: none !important;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-karaoke-line {
+  filter:
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.62))
+    drop-shadow(0 2px 5px rgba(0, 0, 0, 0.2));
+}
+
+.fullscreen-vinyl-overlay.is-presentation-compact-vinyl:not(.has-lyric-slot) {
+  grid-template-columns: 1fr;
+  place-items: center;
+}
+
+.ivlyrics-compact-vinyl-stage {
+  --iv-vinyl-spin-angle: 0turn;
+  position: relative;
+  display: block;
+  width: min(33vw, 50svh, 420px);
+  aspect-ratio: 1;
+  justify-self: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  filter: drop-shadow(0 24px 42px rgba(0, 0, 0, 0.38));
+  scale: var(--iv-vinyl-compact-scale, 1);
+  cursor: pointer;
+  container-type: inline-size;
+  -webkit-tap-highlight-color: transparent;
+  animation:
+    fullscreen-compact-vinyl-in 560ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    ivlyrics-vinyl-spin-clock 6s linear infinite;
+  animation-play-state: running, paused;
+  transition:
+    filter 220ms ease,
+    scale 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ivlyrics-compact-vinyl-stage.is-playing {
+  animation-play-state: running, running;
+}
+
+.ivlyrics-compact-vinyl-stage:hover {
+  filter: drop-shadow(0 30px 54px rgba(0, 0, 0, 0.46));
+}
+
+.ivlyrics-compact-vinyl-stage:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--iv-vinyl-accent) 82%, white);
+  outline-offset: 8px;
+}
+
+.ivlyrics-compact-vinyl-stage.is-center-rotation-enabled .ivlyrics-vinyl-label {
+  transform: translate(-50%, -50%) rotate(var(--iv-vinyl-spin-angle));
+  will-change: transform;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-compact-vinyl .fullscreen-vinyl-lyric-stage {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  width: 100%;
+  min-width: 0;
+  min-height: clamp(126px, 20svh, 220px);
+  align-self: center;
+  transform: none;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-compact-vinyl.has-cultural-annotation .fullscreen-vinyl-lyric-stage {
+  min-height: clamp(154px, 24svh, 260px);
+}
+
+.fullscreen-vinyl-overlay.is-closing > .ivlyrics-compact-vinyl-stage {
+  animation: fullscreen-compact-vinyl-out 320ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes fullscreen-compact-vinyl-in {
+  from {
+    opacity: 0;
+    transform: translateY(5%) scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fullscreen-compact-vinyl-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(3%) scale(0.92);
+  }
+}
+
+@media (orientation: portrait), (max-width: 760px) {
+  .fullscreen-vinyl-overlay.is-presentation-compact-vinyl {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+    row-gap: clamp(16px, 3svh, 34px);
+    place-items: center;
+    padding:
+      clamp(76px, 10svh, 112px)
+      clamp(18px, 5vw, 42px)
+      clamp(26px, 4svh, 48px);
+  }
+
+  .fullscreen-vinyl-overlay.is-presentation-compact-vinyl.has-lyric-slot {
+    padding-bottom: clamp(26px, 4svh, 48px);
+  }
+
+  .fullscreen-vinyl-overlay.is-presentation-compact-vinyl .ivlyrics-compact-vinyl-stage {
+    width: min(68vw, 43svh, 420px);
+    align-self: end;
+  }
+
+  .fullscreen-vinyl-overlay.is-presentation-compact-vinyl .fullscreen-vinyl-lyric-stage {
+    width: min(92vw, 760px);
+    min-height: clamp(112px, 17svh, 188px);
+    align-self: start;
+  }
+}
+
+@media (max-width: 700px) {
+  .fullscreen-presentation-dock {
+    width: calc(100vw - 24px);
+  }
+
+  .fullscreen-presentation-hotspot {
+    width: min(280px, 100%);
+  }
+
+  .fullscreen-presentation-option {
+    width: 38px;
+    padding-inline: 9px;
+  }
+
+  .fullscreen-presentation-option > span {
+    display: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .fullscreen-presentation-switcher {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
 .fullscreen-vinyl-overlay.is-motion-disabled,
 .fullscreen-vinyl-overlay.is-motion-disabled > .ivlyrics-vinyl-player,
+.fullscreen-vinyl-overlay.is-motion-disabled > .ivlyrics-compact-vinyl-stage,
 .fullscreen-vinyl-overlay.is-motion-disabled .fullscreen-vinyl-active-lyric,
 .fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-incoming-sleeve,
 .fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-incoming-record-shell {
@@ -9772,6 +10239,11 @@ html.is-lp-view-exit::view-transition-new(root) {
 }
 
 .fullscreen-vinyl-overlay.is-motion-disabled .ivlyrics-vinyl-label {
+  animation: none !important;
+}
+
+.fullscreen-vinyl-overlay.is-motion-disabled > .ivlyrics-compact-vinyl-stage {
+  --iv-vinyl-spin-angle: 0turn;
   animation: none !important;
 }
 
@@ -9870,6 +10342,7 @@ html.is-lp-view-exit::view-transition-new(root) {
 @media (prefers-reduced-motion: reduce) {
   .fullscreen-vinyl-overlay,
   .fullscreen-vinyl-overlay>.ivlyrics-vinyl-player,
+  .fullscreen-vinyl-overlay>.ivlyrics-compact-vinyl-stage,
   .fullscreen-vinyl-active-lyric {
     animation-duration: 1ms !important;
   }
@@ -9883,6 +10356,11 @@ html.is-lp-view-exit::view-transition-new(root) {
 
   .ivlyrics-vinyl-visual-group {
     animation-duration: 12s;
+  }
+
+  .ivlyrics-compact-vinyl-stage {
+    --iv-vinyl-spin-angle: 0turn;
+    animation: none !important;
   }
 }
 

@@ -2100,6 +2100,18 @@ window.LANG_CS = {
     "tmiHint": "Kliknutím pravým tlačítkem nebo podržením obalu otevřete TMI",
     "click": "Kliknutí",
     "tmiGesture": "Pravé tlačítko · Podržení",
+    "presentation": {
+      "switcherLabel": "Zobrazení na celou obrazovku",
+      "settingsTitle": "Rozvržení zvýrazněného textu",
+      "settingsDescription": "Zvolte vzhled, který se použije při otevření zvýrazněného textu z alba.",
+      "standardLabel": "Standardní",
+      "vinylLabel": "Celý gramofon",
+      "vinylDescription": "Zobrazí celý gramofon a velký aktivní řádek textu dole.",
+      "compactLabel": "Kompaktní vinyl",
+      "compactDescription": "Zachová standardní rozvržení textu a za obalem alba zobrazí částečně vysunutou desku.",
+      "videoLabel": "Videorežim",
+      "videoDescription": "Zobrazí synchronizované video YouTube a velký aktivní řádek dole."
+    },
     "settings": {
       "subtitle": "Přizpůsobte velikost, animace a typografii spodního textu ve vinylovém režimu.",
       "albumSizeLabel": "Velikost obalu",

@@ -2101,6 +2101,18 @@ window.LANG_KO = {
     "tmiHint": "앨범을 우클릭하거나 길게 눌러 TMI 열기",
     "click": "클릭",
     "tmiGesture": "우클릭 · 길게 누르기",
+    "presentation": {
+      "switcherLabel": "전체화면 화면 구성",
+      "settingsTitle": "집중 가사 레이아웃",
+      "settingsDescription": "앨범을 클릭해 집중 가사를 열 때 사용할 화면 구성을 선택합니다.",
+      "standardLabel": "일반",
+      "vinylLabel": "전체 LP",
+      "vinylDescription": "LP 플레이어 전체와 하단의 큰 활성 가사를 표시합니다.",
+      "compactLabel": "컴팩트 LP",
+      "compactDescription": "일반 가사 레이아웃은 유지하고 앨범 커버 뒤에 LP 판이 일부 보이도록 표시합니다.",
+      "videoLabel": "비디오 스테이지",
+      "videoDescription": "동기화된 YouTube 영상과 하단의 큰 활성 가사만 표시합니다."
+    },
     "settings": {
       "subtitle": "LP 모드의 크기, 모션, 하단 가사 글꼴을 조정합니다.",
       "albumSizeLabel": "앨범 커버 크기",

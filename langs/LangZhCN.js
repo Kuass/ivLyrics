@@ -2101,6 +2101,18 @@ window.LANG_ZH_CN = {
     "tmiHint": "右键点击或长按专辑封面以打开 TMI",
     "click": "点击",
     "tmiGesture": "右键点击 · 长按",
+    "presentation": {
+      "switcherLabel": "全屏呈现方式",
+      "settingsTitle": "聚焦歌词布局",
+      "settingsDescription": "选择点击专辑封面打开聚焦歌词时使用的画面布局。",
+      "standardLabel": "标准",
+      "vinylLabel": "完整黑胶唱机",
+      "vinylDescription": "显示完整的黑胶唱机，并在底部显示大号当前歌词。",
+      "compactLabel": "紧凑黑胶",
+      "compactDescription": "保留标准歌词布局，并在专辑封面后方显示部分露出的黑胶唱片。",
+      "videoLabel": "视频舞台",
+      "videoDescription": "显示同步的 YouTube 视频，并在底部显示大号当前歌词。"
+    },
     "settings": {
       "subtitle": "调整黑胶模式的尺寸、动效和底部歌词字体。",
       "albumSizeLabel": "专辑封面大小",

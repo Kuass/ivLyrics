@@ -2101,6 +2101,18 @@ window.LANG_ZH_TW = {
     "tmiHint": "以右鍵點擊或長按專輯封面來開啟 TMI",
     "click": "點擊",
     "tmiGesture": "右鍵點擊 · 長按",
+    "presentation": {
+      "switcherLabel": "全螢幕呈現方式",
+      "settingsTitle": "聚焦歌詞版面",
+      "settingsDescription": "選擇點擊專輯封面開啟聚焦歌詞時使用的畫面配置。",
+      "standardLabel": "標準",
+      "vinylLabel": "完整黑膠唱盤",
+      "vinylDescription": "顯示完整的黑膠唱盤，並在底部顯示大型目前歌詞。",
+      "compactLabel": "精簡黑膠",
+      "compactDescription": "保留標準歌詞版面，並在專輯封面後方顯示部分露出的黑膠唱片。",
+      "videoLabel": "影片舞台",
+      "videoDescription": "顯示同步的 YouTube 影片，並在底部顯示大型目前歌詞。"
+    },
     "settings": {
       "subtitle": "調整黑膠模式的大小、動效與底部歌詞字型。",
       "albumSizeLabel": "專輯封面大小",

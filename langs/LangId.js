@@ -2100,6 +2100,18 @@ window.LANG_ID = {
     "tmiHint": "Klik kanan atau tekan lama sampul album untuk membuka TMI",
     "click": "Klik",
     "tmiGesture": "Klik kanan · Tekan lama",
+    "presentation": {
+      "switcherLabel": "Tampilan layar penuh",
+      "settingsTitle": "Tata letak lirik fokus",
+      "settingsDescription": "Pilih tampilan yang digunakan saat album membuka lirik fokus.",
+      "standardLabel": "Standar",
+      "vinylLabel": "Pemutar vinil penuh",
+      "vinylDescription": "Tampilkan pemutar piringan penuh dengan lirik aktif besar di bagian bawah.",
+      "compactLabel": "Vinil ringkas",
+      "compactDescription": "Pertahankan tata letak lirik standar dan tampilkan piringan yang sebagian terlihat di belakang sampul album.",
+      "videoLabel": "Panggung video",
+      "videoDescription": "Tampilkan video YouTube tersinkron dengan lirik aktif besar di bagian bawah."
+    },
     "settings": {
       "subtitle": "Sesuaikan ukuran, animasi, dan tipografi lirik bawah pada mode vinil.",
       "albumSizeLabel": "Ukuran sampul album",

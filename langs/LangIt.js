@@ -2101,6 +2101,18 @@ window.LANG_IT = {
     "tmiHint": "Fai clic con il tasto destro o tieni premuta la copertina per aprire TMI",
     "click": "Clic",
     "tmiGesture": "Clic destro · Pressione prolungata",
+    "presentation": {
+      "switcherLabel": "Presentazione a schermo intero",
+      "settingsTitle": "Layout del testo in evidenza",
+      "settingsDescription": "Scegli la vista usata quando l’album apre il testo in evidenza.",
+      "standardLabel": "Standard",
+      "vinylLabel": "Giradischi completo",
+      "vinylDescription": "Mostra il giradischi completo e il testo attivo grande in basso.",
+      "compactLabel": "Vinile compatto",
+      "compactDescription": "Mantiene il layout standard dei testi e mostra un disco parzialmente visibile dietro la copertina.",
+      "videoLabel": "Scena video",
+      "videoDescription": "Mostra il video YouTube sincronizzato e il testo attivo grande in basso."
+    },
     "settings": {
       "subtitle": "Personalizza dimensioni, animazioni e tipografia inferiore della modalità vinile.",
       "albumSizeLabel": "Dimensione copertina",

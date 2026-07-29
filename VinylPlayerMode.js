@@ -43,6 +43,16 @@ const VinylPlayerMode = (() => {
     const VINYL_FALLBACK_ACCENT = "var(--spice-button-active, #ff809d)";
     const VINYL_SEEK_END_GUARD_MIN_MS = 250;
     const VINYL_SEEK_END_GUARD_MAX_MS = 500;
+    const PRESENTATION_MODES = Object.freeze([
+        "standard",
+        "vinyl",
+        "compact-vinyl",
+        "video"
+    ]);
+    const normalizePresentationMode = (value) => {
+        const normalized = String(value || "").trim();
+        return PRESENTATION_MODES.includes(normalized) ? normalized : "vinyl";
+    };
 
     const clampVinylProgress = (value) => Math.min(Math.max(value, 0), 1);
     const clampVinylSeekPosition = (value, duration) => {
@@ -165,6 +175,212 @@ const VinylPlayerMode = (() => {
                 react.createElement("span", { className: "ivlyrics-vinyl-label-artist" }, artist || ""),
                 react.createElement("span", { className: "ivlyrics-vinyl-label-spindle" })
             )
+        );
+    });
+
+    const PRESENTATION_OPTIONS = Object.freeze([
+        {
+            id: "standard",
+            labelKey: "vinyl.presentation.standardLabel",
+            fallback: "Standard",
+            icon: "standard"
+        },
+        {
+            id: "compact-vinyl",
+            labelKey: "vinyl.presentation.compactLabel",
+            fallback: "Compact vinyl",
+            icon: "compact"
+        },
+        {
+            id: "vinyl",
+            labelKey: "vinyl.presentation.vinylLabel",
+            fallback: "Full vinyl",
+            icon: "vinyl"
+        },
+        {
+            id: "video",
+            labelKey: "vinyl.presentation.videoLabel",
+            fallback: "Video stage",
+            icon: "video"
+        }
+    ]);
+
+    const PresentationIcon = ({ name }) => {
+        if (name === "standard") {
+            return react.createElement("svg", {
+                viewBox: "0 0 24 24",
+                "aria-hidden": "true"
+            },
+                react.createElement("rect", {
+                    x: 3,
+                    y: 5,
+                    width: 18,
+                    height: 14,
+                    rx: 3
+                }),
+                react.createElement("path", { d: "M10 5v14" })
+            );
+        }
+        if (name === "vinyl") {
+            return react.createElement("svg", {
+                viewBox: "0 0 24 24",
+                "aria-hidden": "true"
+            },
+                react.createElement("rect", {
+                    x: 3,
+                    y: 5,
+                    width: 9,
+                    height: 14,
+                    rx: 2
+                }),
+                react.createElement("circle", { cx: 15, cy: 12, r: 6 }),
+                react.createElement("circle", { cx: 15, cy: 12, r: 1.5 })
+            );
+        }
+        if (name === "compact") {
+            return react.createElement("svg", {
+                viewBox: "0 0 24 24",
+                "aria-hidden": "true"
+            },
+                react.createElement("circle", { cx: 12, cy: 12, r: 8 }),
+                react.createElement("circle", { cx: 12, cy: 12, r: 2 })
+            );
+        }
+        return react.createElement("svg", {
+            viewBox: "0 0 24 24",
+            "aria-hidden": "true"
+        },
+            react.createElement("rect", {
+                x: 3,
+                y: 5,
+                width: 18,
+                height: 14,
+                rx: 3
+            }),
+            react.createElement("path", { d: "m10 9 5 3-5 3z" })
+        );
+    };
+
+    const PresentationSwitcher = react.memo(({
+        activeMode,
+        visible = true,
+        onChange
+    }) => {
+        const groupLabel = I18n.t("vinyl.presentation.switcherLabel")
+            || "Fullscreen presentation";
+
+        return react.createElement("div", {
+            className: `fullscreen-presentation-dock${visible ? "" : " is-hidden"}`
+        },
+            react.createElement("div", {
+                className: "fullscreen-presentation-hotspot",
+                "aria-hidden": "true"
+            }),
+            react.createElement("div", {
+                className: "fullscreen-presentation-switcher",
+                role: "group",
+                "aria-label": groupLabel
+            },
+                PRESENTATION_OPTIONS.map((option) => {
+                    const label = I18n.t(option.labelKey) || option.fallback;
+                    const active = activeMode === option.id;
+                    return react.createElement("button", {
+                        key: option.id,
+                        type: "button",
+                        className: `fullscreen-presentation-option${active ? " active" : ""}`,
+                        "aria-pressed": active,
+                        "aria-label": label,
+                        title: label,
+                        onClick: (event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            onChange?.(option.id);
+                        }
+                    },
+                        react.createElement(PresentationIcon, { name: option.icon }),
+                        react.createElement("span", null, label)
+                    );
+                })
+            )
+        );
+    });
+
+    const CompactVinyl = react.memo(({
+        track,
+        isPlaying,
+        centerRotationEnabled,
+        recordScale = 1,
+        interactionProps = {}
+    }) => {
+        const label = I18n.t("vinyl.closeHint") || "Return to standard view";
+        return react.createElement("button", {
+            ...interactionProps,
+            type: "button",
+            className: [
+                "ivlyrics-compact-vinyl-stage",
+                isPlaying ? "is-playing" : "is-paused",
+                centerRotationEnabled ? "is-center-rotation-enabled" : ""
+            ].filter(Boolean).join(" "),
+            style: {
+                "--iv-vinyl-accent": track.accent,
+                "--iv-vinyl-compact-scale": recordScale
+            },
+            "aria-label": label,
+            title: label
+        },
+            react.createElement(VinylDisc, {
+                title: track.title,
+                artist: track.artist,
+                album: track.album,
+                idPrefix: "ivlyrics-vinyl-compact"
+            })
+        );
+    });
+
+    const CompactAlbumVinyl = react.memo(({
+        track,
+        isPlaying,
+        animationsEnabled = true,
+        centerRotationEnabled = true,
+        albumRadius = 12,
+        coverClassName = "",
+        coverStyle = {}
+    }) => {
+        return react.createElement("div", {
+            className: [
+                "ivlyrics-compact-album-vinyl",
+                isPlaying ? "is-playing" : "is-paused",
+                animationsEnabled ? "" : "is-motion-disabled",
+                centerRotationEnabled ? "is-center-rotation-enabled" : ""
+            ].filter(Boolean).join(" "),
+            style: {
+                "--iv-vinyl-accent": track.accent,
+                "--iv-compact-album-radius": `${albumRadius}px`
+            },
+            "aria-hidden": "true"
+        },
+            react.createElement("span", {
+                className: "ivlyrics-compact-album-record"
+            },
+                react.createElement(VinylDisc, {
+                    title: track.title,
+                    artist: track.artist,
+                    album: track.album,
+                    idPrefix: "ivlyrics-compact-album"
+                })
+            ),
+            react.createElement("img", {
+                src: track.coverUrl,
+                className: [
+                    "ivlyrics-compact-album-cover",
+                    coverClassName
+                ].filter(Boolean).join(" "),
+                style: {
+                    ...coverStyle,
+                    borderRadius: `${albumRadius}px`
+                },
+                draggable: false
+            })
         );
     });
 
@@ -824,6 +1040,8 @@ const VinylPlayerMode = (() => {
         albumRadius = 0,
         isClosing = false,
         isPortraitLayout = false,
+        presentationMode = "vinyl",
+        controlsVisible = true,
         isPlaying = false,
         position = 0,
         duration = 0,
@@ -836,10 +1054,19 @@ const VinylPlayerMode = (() => {
         karaokeSource = null,
         lyricsSettingsRevision = 0,
         vinylSettings = {},
+        onPresentationModeChange,
         onSeek,
         onStopPlayback,
         onTogglePlayback
     }) => {
+        const normalizedPresentationMode =
+            normalizePresentationMode(presentationMode);
+        const isFullVinylPresentation =
+            normalizedPresentationMode === "vinyl";
+        const isCompactVinylPresentation =
+            normalizedPresentationMode === "compact-vinyl";
+        const isVideoPresentation =
+            normalizedPresentationMode === "video";
         const animationsEnabled = vinylSettings.animations !== false;
         const centerRotationEnabled = vinylSettings.centerRotation !== false;
         const lyricsEnabled = vinylSettings.lyricsEnabled !== false;
@@ -904,6 +1131,20 @@ const VinylPlayerMode = (() => {
 
         useEffect(() => {
             const shownTrack = displayedTrackRef.current;
+            if (!isFullVinylPresentation) {
+                trackTransitionRevisionRef.current += 1;
+                requestedTrackKeyRef.current = "";
+                clearTrackTimers();
+                if (!areSameTrackVisuals(shownTrack, liveTrack)) {
+                    displayedTrackRef.current = liveTrack;
+                    setDisplayedTrack(liveTrack);
+                }
+                incomingTrackRef.current = null;
+                setIncomingTrack(null);
+                setTrackTransition("idle");
+                return;
+            }
+
             if (areSameTrackVisuals(shownTrack, liveTrack)) {
                 return;
             }
@@ -1035,7 +1276,8 @@ const VinylPlayerMode = (() => {
             liveTrack.artist,
             liveTrack.album,
             animationsEnabled,
-            clearTrackTimers
+            clearTrackTimers,
+            isFullVinylPresentation
         ]);
 
         useEffect(() => () => {
@@ -1046,6 +1288,7 @@ const VinylPlayerMode = (() => {
         // Keep the visible incoming LP's label stable. A color that arrives after
         // the record starts emerging is applied only after handoff has settled.
         useEffect(() => {
+            if (!isFullVinylPresentation) return;
             if (!liveTrack.accent) return;
 
             setIncomingTrack((current) => {
@@ -1072,7 +1315,12 @@ const VinylPlayerMode = (() => {
                 displayedTrackRef.current = updatedTrack;
                 setDisplayedTrack(updatedTrack);
             }
-        }, [liveTrack.uri, liveTrack.accent, trackTransition]);
+        }, [
+            isFullVinylPresentation,
+            liveTrack.uri,
+            liveTrack.accent,
+            trackTransition
+        ]);
 
         const activeVinylLyric = String(activeLyric || "")
             .replace(/\s+/g, " ")
@@ -1134,7 +1382,8 @@ const VinylPlayerMode = (() => {
                     settingsRevision: snapshot.settingsRevision,
                     positionOverride: null,
                     motionEnabled: animationsEnabled,
-                    durationMs: duration
+                    durationMs: duration,
+                    singleLineScroll: !isVideoPresentation
                 })
                 : snapshot.plainText);
         };
@@ -1144,6 +1393,10 @@ const VinylPlayerMode = (() => {
                 "fullscreen-vinyl-overlay",
                 isClosing ? "is-closing" : "is-open",
                 isPortraitLayout ? "is-portrait-layout" : "is-landscape-layout",
+                `is-presentation-${normalizedPresentationMode}`,
+                isFullVinylPresentation ? "has-full-vinyl-stage" : "",
+                isCompactVinylPresentation ? "has-compact-vinyl-stage" : "",
+                isVideoPresentation ? "has-video-stage" : "",
                 animationsEnabled ? "" : "is-motion-disabled",
                 transitionClass,
                 lyricsEnabled ? "has-lyric-slot" : "",
@@ -1152,7 +1405,13 @@ const VinylPlayerMode = (() => {
             ].filter(Boolean).join(" "),
             role: "dialog",
             "aria-modal": "true",
-            "aria-label": I18n.t("vinyl.mode") || "LP",
+            "aria-label": I18n.t(
+                normalizedPresentationMode === "compact-vinyl"
+                    ? "vinyl.presentation.compactLabel"
+                    : normalizedPresentationMode === "video"
+                        ? "vinyl.presentation.videoLabel"
+                        : "vinyl.presentation.vinylLabel"
+            ) || I18n.t("vinyl.mode") || "LP",
             style: {
                 "--iv-vinyl-original-font-family": `'${String(vinylSettings.originalFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
                 "--iv-vinyl-original-font-size": `${Number(vinylSettings.originalFontSize) || 31}px`,
@@ -1177,7 +1436,7 @@ const VinylPlayerMode = (() => {
                 "--iv-vinyl-cultural-note-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.culturalOpacity) || 60) / 100))
             }
         },
-            react.createElement(VinylPlayer, {
+            isFullVinylPresentation ? react.createElement(VinylPlayer, {
                 className: [
                     "ivlyrics-vinyl-player--immersive",
                     isPortraitLayout ? "ivlyrics-vinyl-player--portrait-layout" : "",
@@ -1228,6 +1487,18 @@ const VinylPlayerMode = (() => {
                 onSeek,
                 onStopPlayback,
                 onTogglePlayback
+            }) : null,
+            isCompactVinylPresentation ? react.createElement(CompactVinyl, {
+                track: liveTrack,
+                isPlaying,
+                centerRotationEnabled,
+                recordScale,
+                interactionProps
+            }) : null,
+            react.createElement(PresentationSwitcher, {
+                activeMode: normalizedPresentationMode,
+                visible: true,
+                onChange: onPresentationModeChange
             }),
             lyricsEnabled ? react.createElement("div", {
                 className: `fullscreen-vinyl-lyric-stage${hasVisibleLyric ? "" : " is-empty"}`,
@@ -1240,6 +1511,8 @@ const VinylPlayerMode = (() => {
         );
     });
 
+    Mode.PresentationSwitcher = PresentationSwitcher;
+    Mode.CompactAlbumVinyl = CompactAlbumVinyl;
     return Mode;
 })();
 

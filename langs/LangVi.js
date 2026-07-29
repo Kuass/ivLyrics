@@ -2101,6 +2101,18 @@ window.LANG_VI = {
     "tmiHint": "Nhấp chuột phải hoặc nhấn giữ bìa album để mở TMI",
     "click": "Nhấp",
     "tmiGesture": "Chuột phải · Nhấn giữ",
+    "presentation": {
+      "switcherLabel": "Trình bày toàn màn hình",
+      "settingsTitle": "Bố cục lời bài hát tập trung",
+      "settingsDescription": "Chọn giao diện được dùng khi mở lời bài hát tập trung từ album.",
+      "standardLabel": "Tiêu chuẩn",
+      "vinylLabel": "Máy phát đĩa đầy đủ",
+      "vinylDescription": "Hiển thị toàn bộ máy phát đĩa và dòng lời đang phát cỡ lớn ở phía dưới.",
+      "compactLabel": "Đĩa than thu gọn",
+      "compactDescription": "Giữ bố cục lời tiêu chuẩn và hiển thị một phần đĩa than phía sau ảnh bìa.",
+      "videoLabel": "Sân khấu video",
+      "videoDescription": "Hiển thị video YouTube đồng bộ và dòng lời đang phát cỡ lớn ở phía dưới."
+    },
     "settings": {
       "subtitle": "Tùy chỉnh kích thước, chuyển động và phông lời bên dưới của chế độ đĩa than.",
       "albumSizeLabel": "Kích thước bìa album",

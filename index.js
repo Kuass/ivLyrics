@@ -1022,6 +1022,24 @@ const IVLYRICS_BACKGROUND_MODE_IDS = [
 const IVLYRICS_BACKGROUND_FLAG_IDS = IVLYRICS_BACKGROUND_MODE_IDS.filter(
   (modeId) => modeId !== "none"
 );
+const IVLYRICS_FULLSCREEN_PRESENTATION_IDS = Object.freeze([
+  "standard",
+  "vinyl",
+  "compact-vinyl",
+  "video",
+]);
+
+function normalizeIvLyricsFullscreenPresentation(value, fallback = "standard") {
+  const normalized = String(value || "").trim();
+  return IVLYRICS_FULLSCREEN_PRESENTATION_IDS.includes(normalized)
+    ? normalized
+    : fallback;
+}
+
+function normalizeIvLyricsDefaultFullscreenPresentation(value) {
+  const normalized = normalizeIvLyricsFullscreenPresentation(value, "vinyl");
+  return normalized === "standard" ? "vinyl" : normalized;
+}
 
 function getIvLyricsGlobalBackgroundMode(visual = window.CONFIG?.visual || {}) {
   if (visual["video-background"]) return "video-background";
@@ -2828,6 +2846,10 @@ const CONFIG = {
       "ivLyrics:visual:fullscreen-vinyl-lyrics-enabled",
       true
     ),
+    "fullscreen-focus-presentation":
+      normalizeIvLyricsDefaultFullscreenPresentation(
+        StorageManager.getItem("ivLyrics:visual:fullscreen-focus-presentation")
+      ),
     "fullscreen-vinyl-tonearm-style":
       StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-tonearm-style") ||
       "s",
@@ -4511,6 +4533,7 @@ class LyricsContainer extends react.Component {
       versionIndex: 0,
       versionIndex2: 0,
       isFullscreen: false,
+      fullscreenPresentation: "standard",
       fullscreenLyricsHidden: false,
       isFloatingMenuOpen: false,
       isFloatingMenuClosing: false,
@@ -8656,6 +8679,19 @@ class LyricsContainer extends react.Component {
       lyricContainerUpdate();
     };
 
+    this.exitFullscreenPresentation = () => {
+      if (
+        normalizeIvLyricsFullscreenPresentation(
+          this.state.fullscreenPresentation
+        ) === "standard"
+      ) {
+        return false;
+      }
+
+      this.setState({ fullscreenPresentation: "standard" });
+      return true;
+    };
+
     this.toggleFullscreen = () => {
       const isEnabled = !this.state.isFullscreen;
       const usePageFullscreenUi = isEnabled
@@ -8687,6 +8723,7 @@ class LyricsContainer extends react.Component {
         ));
         this.mousetrap.bind("esc", () => {
           if (hasOpenIvLyricsDialog()) return;
+          if (this.exitFullscreenPresentation()) return;
           this.toggleFullscreen();
         });
         // 전체화면 키 직접 리스너 추가 (Mousetrap이 캡처하지 못할 경우 대비)
@@ -8695,6 +8732,7 @@ class LyricsContainer extends react.Component {
             if (hasOpenIvLyricsDialog()) return;
             e.preventDefault();
             e.stopPropagation();
+            if (this.exitFullscreenPresentation()) return;
             this.toggleFullscreen();
             return;
           }
@@ -8773,6 +8811,11 @@ class LyricsContainer extends react.Component {
       // 먼저 상태를 업데이트하여 React가 Portal 렌더링을 중단하게 함
       this.setState({
         isFullscreen: isEnabled,
+        fullscreenPresentation: isEnabled
+          ? normalizeIvLyricsFullscreenPresentation(
+            this.state.fullscreenPresentation
+          )
+          : "standard",
         fullscreenLyricsHidden: isEnabled ? this.state.fullscreenLyricsHidden : false,
         justEnteredFullscreen: isEnabled, // 전체화면 진입 시 true로 설정하여 축소 아이콘 대신 메뉴 아이콘 표시
         isFloatingMenuOpen: isEnabled ? this.state.isFloatingMenuOpen : false,
@@ -9467,11 +9510,26 @@ class LyricsContainer extends react.Component {
     };
     const renderTrackUri = currentTrackInfo?.uri || this.currentTrackUri || this.state.uri || "";
     const isLocalTrack = !!renderTrackUri && !Utils.extractTrackId(renderTrackUri);
+    const fullscreenPresentation = this.state.isFullscreen
+      ? normalizeIvLyricsFullscreenPresentation(
+        this.state.fullscreenPresentation
+      )
+      : "standard";
+    const isFocusedFullscreenPresentation =
+      fullscreenPresentation === "vinyl"
+      || fullscreenPresentation === "video";
+    const isVideoStagePresentation =
+      fullscreenPresentation === "video";
     const floatingToolbarStyle = this.state.isFullscreen
       ? { "--iv-floating-menu-content-top-offset": `${this.getFloatingMenuContentTopOffset()}px` }
       : undefined;
     const shouldUseVideoBackground =
-      !isSyncCreatorActive && !this.state.isFADMode && effectiveBackgroundMode === "video-background";
+      !isSyncCreatorActive &&
+      !this.state.isFADMode &&
+      (
+        effectiveBackgroundMode === "video-background" ||
+        fullscreenPresentation === "video"
+      );
     const shouldRenderStaticBackground = !shouldUseVideoBackground;
     const renderFloatingToolbarIcon = (name, size = 18) =>
       window.IvLyricsToolbarIcon
@@ -9558,6 +9616,9 @@ class LyricsContainer extends react.Component {
       }
       if (isFullscreenPageUi) {
         fullscreenClasses += " fullscreen-page-ui";
+      }
+      if (isFocusedFullscreenPresentation) {
+        fullscreenClasses += ` fullscreen-focus-active focus-presentation-${fullscreenPresentation}`;
       }
       // TMI 폰트 크기 CSS 변수 업데이트
       if (this.fullscreenContainer) {
@@ -9751,6 +9812,13 @@ class LyricsContainer extends react.Component {
         trackUri: this.state.uri,
         trackAccent: vinylTrackAccent,
         trackAccentUri: this.state.colorsUri || "",
+        presentationMode: fullscreenPresentation,
+        onPresentationModeChange: (nextPresentation) => {
+          const normalized = normalizeIvLyricsFullscreenPresentation(
+            nextPresentation
+          );
+          this.setState({ fullscreenPresentation: normalized });
+        },
         onExitFullscreen: this.toggleFullscreen
       }),
       // Tab bar for mode switching
@@ -9775,8 +9843,12 @@ class LyricsContainer extends react.Component {
       shouldUseVideoBackground && window.VideoBackground && react.createElement(window.VideoBackground, {
         trackUri: this.state.uri,
         firstLyricTime: this.state.currentLyrics && this.state.currentLyrics.length > 0 ? this.state.currentLyrics[0].startTime : 0,
-        brightness: CONFIG.visual["background-brightness"],
-        blurAmount: CONFIG.visual["video-blur"],
+        brightness: isVideoStagePresentation
+          ? 100
+          : CONFIG.visual["background-brightness"],
+        blurAmount: isVideoStagePresentation
+          ? 0
+          : CONFIG.visual["video-blur"],
         coverMode: CONFIG.visual["video-cover"],
         videoScale: CONFIG.visual["video-scale"],
         externalVideoInfo: this.state.videoInfo,
@@ -9909,7 +9981,7 @@ class LyricsContainer extends react.Component {
             }),
             react.createElement(CommunityVideoButton, {
               trackUri: this.currentTrackUri,
-              enabled: effectiveBackgroundMode === "video-background",
+              enabled: shouldUseVideoBackground,
               videoInfo: this.state.videoInfo,
               defaultStartTime: defaultCommunityVideoStartTime,
               onVideoSelect: async (newVideoInfo) => {

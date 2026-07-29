@@ -46,6 +46,24 @@ const FullscreenOverlay = (() => {
     const QUEUE_EMPTY_GRACE_MS = 1500;
     const PLAYER_SEEK_END_GUARD_MIN_MS = 250;
     const PLAYER_SEEK_END_GUARD_MAX_MS = 500;
+    const FOCUSED_PRESENTATION_IDS = new Set([
+        "vinyl",
+        "compact-vinyl",
+        "video"
+    ]);
+    const normalizeFocusedPresentation = (value, fallback = "standard") => {
+        const normalized = String(value || "").trim();
+        return normalized === "standard" || FOCUSED_PRESENTATION_IDS.has(normalized)
+            ? normalized
+            : fallback;
+    };
+    const getDefaultFocusedPresentation = () => {
+        const normalized = normalizeFocusedPresentation(
+            CONFIG?.visual?.["fullscreen-focus-presentation"],
+            "vinyl"
+        );
+        return normalized === "standard" ? "vinyl" : normalized;
+    };
 
     const clampSeekPositionToLiveDuration = (value, duration) => {
         const safeDuration = Math.max(Number(duration) || 0, 0);
@@ -1856,13 +1874,14 @@ const FullscreenOverlay = (() => {
         trackUri = null,
         trackAccent = "",
         trackAccentUri = "",
+        presentationMode = "standard",
+        onPresentationModeChange = null,
         onExitFullscreen = null
     }) => {
         const [uiVisible, setUiVisible] = useState(true);
         const [tmiMode, setTmiMode] = useState(false);
         const [tmiData, setTmiData] = useState(null);
         const [tmiLoading, setTmiLoading] = useState(false);
-        const [lpMode, setLpMode] = useState(false);
         const [lpModeClosing, setLpModeClosing] = useState(false);
         const [isPlaying, setIsPlaying] = useState(false);
         const [position, setPosition] = useState(0);
@@ -1882,6 +1901,16 @@ const FullscreenOverlay = (() => {
         const suppressAlbumClickTimerRef = useRef(null);
         const lpModeExitTimerRef = useRef(null);
         const lpViewTransitionRef = useRef(null);
+        const normalizedPresentationMode = normalizeFocusedPresentation(
+            presentationMode
+        );
+        const presentationModeActive =
+            normalizedPresentationMode !== "standard";
+        const focusModeActive =
+            normalizedPresentationMode === "vinyl"
+            || normalizedPresentationMode === "video";
+        const compactPresentationActive =
+            normalizedPresentationMode === "compact-vinyl";
 
         const runLpSharedTransition = useCallback((direction, updateMode) => {
             const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
@@ -2160,11 +2189,11 @@ const FullscreenOverlay = (() => {
                 return;
             }
 
-            if (lpMode) {
+            if (presentationModeActive) {
                 if (lpModeClosing) return;
                 if (!vinylAnimationsEnabled) {
                     setLpModeClosing(false);
-                    setLpMode(false);
+                    onPresentationModeChange?.("standard");
                     return;
                 }
                 if (runLpSharedTransition("exit", () => {
@@ -2173,14 +2202,14 @@ const FullscreenOverlay = (() => {
                         lpModeExitTimerRef.current = null;
                     }
                     setLpModeClosing(false);
-                    setLpMode(false);
+                    onPresentationModeChange?.("standard");
                 })) return;
 
                 setLpModeClosing(true);
                 lpModeExitTimerRef.current = window.setTimeout(() => {
                     lpModeExitTimerRef.current = null;
-                    setLpMode(false);
                     setLpModeClosing(false);
+                    onPresentationModeChange?.("standard");
                 }, 420);
                 return;
             }
@@ -2190,13 +2219,38 @@ const FullscreenOverlay = (() => {
                 lpModeExitTimerRef.current = null;
             }
             setLpModeClosing(false);
+            const nextPresentation = getDefaultFocusedPresentation();
             if (!vinylAnimationsEnabled) {
-                setLpMode(true);
+                onPresentationModeChange?.(nextPresentation);
                 return;
             }
-            if (runLpSharedTransition("enter", () => setLpMode(true))) return;
-            setLpMode(true);
-        }, [lpMode, lpModeClosing, runLpSharedTransition, vinylAnimationsEnabled]);
+            if (runLpSharedTransition(
+                "enter",
+                () => onPresentationModeChange?.(nextPresentation)
+            )) return;
+            onPresentationModeChange?.(nextPresentation);
+        }, [
+            presentationModeActive,
+            lpModeClosing,
+            onPresentationModeChange,
+            runLpSharedTransition,
+            vinylAnimationsEnabled
+        ]);
+
+        const handlePresentationModeChange = useCallback((nextMode) => {
+            const normalized = normalizeFocusedPresentation(nextMode);
+            if (normalized === "standard") {
+                handleAlbumModeClick();
+                return;
+            }
+
+            if (lpModeExitTimerRef.current) {
+                window.clearTimeout(lpModeExitTimerRef.current);
+                lpModeExitTimerRef.current = null;
+            }
+            setLpModeClosing(false);
+            onPresentationModeChange?.(normalized);
+        }, [handleAlbumModeClick, onPresentationModeChange]);
 
         const handleAlbumContextMenu = useCallback((event) => {
             event.preventDefault();
@@ -2331,7 +2385,9 @@ const FullscreenOverlay = (() => {
         const albumActionCopy = {
             click: I18n.t("vinyl.click"),
             lpTitle: I18n.t("vinyl.mode"),
-            lpHint: I18n.t("vinyl.openHint"),
+            lpHint: presentationModeActive
+                ? I18n.t("vinyl.closeHint")
+                : I18n.t("vinyl.openHint"),
             tmiGesture: I18n.t("vinyl.tmiGesture")
         };
         const tmiTitle = I18n.t("tmi.title");
@@ -2388,12 +2444,15 @@ const FullscreenOverlay = (() => {
         if (!isFullscreen) return null;
 
         const VinylMode = window.ivLyricsVinylPlayerMode;
-        if (lpMode && !tmiMode && VinylMode) {
+        if (focusModeActive && !tmiMode && VinylMode) {
             return react.createElement(VinylMode, {
                 track: liveVinylTrack,
                 albumRadius,
                 isClosing: lpModeClosing,
                 isPortraitLayout: isPortraitViewport,
+                presentationMode: normalizedPresentationMode,
+                controlsVisible: uiVisible,
+                onPresentationModeChange: handlePresentationModeChange,
                 isPlaying,
                 position,
                 duration,
@@ -2451,6 +2510,32 @@ const FullscreenOverlay = (() => {
             });
         }
 
+        const CompactAlbumVinyl = VinylMode?.CompactAlbumVinyl;
+        const renderAlbumVisual = ({
+            coverClassName,
+            coverStyle
+        }) => {
+            if (compactPresentationActive && CompactAlbumVinyl) {
+                return react.createElement(CompactAlbumVinyl, {
+                    track: liveVinylTrack,
+                    isPlaying,
+                    animationsEnabled: vinylAnimationsEnabled,
+                    centerRotationEnabled:
+                        CONFIG?.visual?.["fullscreen-vinyl-center-rotation"] !== false,
+                    albumRadius,
+                    coverClassName,
+                    coverStyle
+                });
+            }
+
+            return react.createElement("img", {
+                src: currentCoverUrl,
+                className: coverClassName,
+                style: coverStyle,
+                draggable: false
+            });
+        };
+
         const isPortraitFullscreen = isFullscreen && isPortraitViewport && !tvModeEnabled;
         const isTwoColumn = CONFIG?.visual?.["fullscreen-two-column"] !== false;
         const hideLeftPanel = !showAlbum && !showInfo && controlsPosition !== "left-panel";
@@ -2475,8 +2560,14 @@ const FullscreenOverlay = (() => {
 
         // In TV mode, hide the left panel (album/info shown at bottom-left instead)
         const hideLeftPanelForTvMode = tvModeEnabled;
+        const PresentationSwitcher = VinylMode?.PresentationSwitcher;
 
         return react.createElement(react.Fragment, null,
+            !tmiMode && PresentationSwitcher && react.createElement(PresentationSwitcher, {
+                activeMode: normalizedPresentationMode,
+                visible: true,
+                onChange: handlePresentationModeChange
+            }),
             // TMI Overlay for TV Mode & Portrait Mode (rendered above everything when active)
             (tvModeEnabled || isPortraitFullscreen) && tmiMode && react.createElement("div", {
                 className: "fullscreen-tv-tmi-overlay"
@@ -2529,15 +2620,13 @@ const FullscreenOverlay = (() => {
                         flexShrink: 0
                     }
                 },
-                    react.createElement("img", {
-                        src: currentCoverUrl,
-                        className: "fullscreen-tv-album ivlyrics-fullscreen-shared-album",
-                        style: {
+                    renderAlbumVisual({
+                        coverClassName: "fullscreen-tv-album ivlyrics-fullscreen-shared-album",
+                        coverStyle: {
                             width: '100%',
                             height: '100%',
                             borderRadius: `${albumRadius}px`
-                        },
-                        draggable: false
+                        }
                     }),
                     renderAlbumModeHint()
                 ),
@@ -2727,11 +2816,9 @@ const FullscreenOverlay = (() => {
                         className: "portrait-album-container clickable-album-container",
                         style: { borderRadius: `${albumRadius}px` }
                     },
-                        react.createElement("img", {
-                            src: currentCoverUrl,
-                            className: `portrait-album-art ivlyrics-fullscreen-shared-album ${albumShadow ? 'with-shadow' : ''}`,
-                            style: { borderRadius: `${albumRadius}px` },
-                            draggable: false
+                        renderAlbumVisual({
+                            coverClassName: `portrait-album-art ivlyrics-fullscreen-shared-album ${albumShadow ? 'with-shadow' : ''}`,
+                            coverStyle: { borderRadius: `${albumRadius}px` }
                         }),
                         renderAlbumModeHint()
                     ),
@@ -2936,15 +3023,13 @@ const FullscreenOverlay = (() => {
                                 borderRadius: `${albumRadius}px`
                             }
                         },
-                            react.createElement("img", {
-                                src: currentCoverUrl,
-                                className: `lyrics-fullscreen-album-art ivlyrics-fullscreen-shared-album ${albumShadow ? 'with-shadow' : ''}`,
-                                style: {
+                            renderAlbumVisual({
+                                coverClassName: `lyrics-fullscreen-album-art ivlyrics-fullscreen-shared-album ${albumShadow ? 'with-shadow' : ''}`,
+                                coverStyle: {
                                     width: '100%',
                                     height: '100%',
                                     borderRadius: `${albumRadius}px`
-                                },
-                                draggable: false
+                                }
                             }),
                             renderAlbumModeHint()
                         ),

@@ -2101,6 +2101,18 @@ window.LANG_EN = {
     "tmiHint": "Right-click or hold the album to open TMI",
     "click": "Click",
     "tmiGesture": "Right click · Hold",
+    "presentation": {
+      "switcherLabel": "Fullscreen presentation",
+      "settingsTitle": "Focused lyric layout",
+      "settingsDescription": "Choose the visual used when the album opens focused lyrics.",
+      "standardLabel": "Standard",
+      "vinylLabel": "Full vinyl",
+      "vinylDescription": "Show the full record player with the focused lyric at the bottom.",
+      "compactLabel": "Compact vinyl",
+      "compactDescription": "Keep the standard lyric layout and show a partially exposed record behind the album cover.",
+      "videoLabel": "Video stage",
+      "videoDescription": "Show the synchronized YouTube video with the focused lyric at the bottom."
+    },
     "settings": {
       "subtitle": "Customize the LP mode size, motion, and bottom lyric typography.",
       "albumSizeLabel": "Album cover size",

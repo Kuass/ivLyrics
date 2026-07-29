@@ -2101,6 +2101,18 @@ window.LANG_JA = {
     "tmiHint": "ジャケットを右クリックまたは長押しして TMI を開く",
     "click": "クリック",
     "tmiGesture": "右クリック · 長押し",
+    "presentation": {
+      "switcherLabel": "全画面表示",
+      "settingsTitle": "フォーカス歌詞のレイアウト",
+      "settingsDescription": "アルバムからフォーカス歌詞を開いたときに使用する表示を選択します。",
+      "standardLabel": "標準",
+      "vinylLabel": "フルレコード",
+      "vinylDescription": "レコードプレーヤー全体と画面下部の大きなアクティブ歌詞を表示します。",
+      "compactLabel": "コンパクトレコード",
+      "compactDescription": "通常の歌詞レイアウトを保ち、アルバムカバーの後ろからレコードを一部見せます。",
+      "videoLabel": "ビデオステージ",
+      "videoDescription": "同期されたYouTube動画と画面下部の大きなアクティブ歌詞を表示します。"
+    },
     "settings": {
       "subtitle": "LP モードのサイズ、アニメーション、下部歌詞のフォントを調整します。",
       "albumSizeLabel": "アルバムジャケットのサイズ",

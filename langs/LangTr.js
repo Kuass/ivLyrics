@@ -2101,6 +2101,18 @@ window.LANG_TR = {
     "tmiHint": "TMI'ı açmak için albüm kapağına sağ tıklayın veya basılı tutun",
     "click": "Tıkla",
     "tmiGesture": "Sağ tık · Basılı tut",
+    "presentation": {
+      "switcherLabel": "Tam ekran sunumu",
+      "settingsTitle": "Odaklanmış şarkı sözü düzeni",
+      "settingsDescription": "Albümden odaklanmış şarkı sözleri açıldığında kullanılacak görünümü seçin.",
+      "standardLabel": "Standart",
+      "vinylLabel": "Tam pikap",
+      "vinylDescription": "Pikabın tamamını ve altta büyük etkin şarkı sözü satırını gösterir.",
+      "compactLabel": "Kompakt plak",
+      "compactDescription": "Standart şarkı sözü düzenini korur ve albüm kapağının arkasında kısmen görünen bir plak gösterir.",
+      "videoLabel": "Video sahnesi",
+      "videoDescription": "Senkronize YouTube videosunu ve altta büyük etkin şarkı sözü satırını gösterir."
+    },
     "settings": {
       "subtitle": "Plak modunun boyutunu, animasyonlarını ve alttaki şarkı sözü yazı tipini özelleştirin.",
       "albumSizeLabel": "Albüm kapağı boyutu",

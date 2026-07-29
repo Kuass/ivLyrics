@@ -5932,6 +5932,146 @@ const SETTINGS_BACKGROUND_PRESETS = [
   },
 ];
 
+const FULLSCREEN_PRESENTATION_PRESETS = Object.freeze([
+  {
+    id: "compact-vinyl",
+    labelKey: "vinyl.presentation.compactLabel",
+    fallbackLabel: "Compact vinyl",
+    descriptionKey: "vinyl.presentation.compactDescription",
+    fallbackDescription:
+      "Keep the standard lyric layout and show a partially exposed record behind the album cover.",
+    icon:
+      '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/>',
+  },
+  {
+    id: "vinyl",
+    labelKey: "vinyl.presentation.vinylLabel",
+    fallbackLabel: "Full vinyl",
+    descriptionKey: "vinyl.presentation.vinylDescription",
+    fallbackDescription:
+      "Show the full record player with the focused lyric at the bottom.",
+    icon:
+      '<rect x="3" y="5" width="9" height="14" rx="2"/><circle cx="15" cy="12" r="6"/><circle cx="15" cy="12" r="1.5"/>',
+  },
+  {
+    id: "video",
+    labelKey: "vinyl.presentation.videoLabel",
+    fallbackLabel: "Video stage",
+    descriptionKey: "vinyl.presentation.videoDescription",
+    fallbackDescription:
+      "Show the synchronized YouTube video with the focused lyric at the bottom.",
+    icon:
+      '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/>',
+  },
+]);
+
+const normalizeFullscreenPresentationPreset = (value) => {
+  const normalized = String(value || "").trim();
+  return FULLSCREEN_PRESENTATION_PRESETS.some(
+    (preset) => preset.id === normalized
+  )
+    ? normalized
+    : "vinyl";
+};
+
+const FullscreenPresentationPicker = ({ defaultValue, onChange }) => {
+  const [selectedMode, setSelectedMode] = react.useState(() =>
+    normalizeFullscreenPresentationPreset(defaultValue)
+  );
+
+  const applyMode = (modeId) => {
+    const normalized = normalizeFullscreenPresentationPreset(modeId);
+    setSelectedMode(normalized);
+    onChange?.("fullscreen-focus-presentation", normalized);
+  };
+
+  return react.createElement(
+    "div",
+    {
+      className: "fullscreen-presentation-picker",
+      "data-setting-key": "fullscreen-focus-presentation",
+    },
+    react.createElement(
+      "div",
+      { className: "fullscreen-presentation-picker-heading" },
+      react.createElement(
+        "strong",
+        null,
+        getSettingsText(
+          "vinyl.presentation.settingsTitle",
+          "Focused lyric layout"
+        )
+      ),
+      react.createElement(
+        "span",
+        null,
+        getSettingsText(
+          "vinyl.presentation.settingsDescription",
+          "Choose the visual used when the album opens focused lyrics."
+        )
+      )
+    ),
+    react.createElement(
+      "div",
+      {
+        className: "settings-card-grid fullscreen-presentation-grid",
+        role: "radiogroup",
+        "aria-label": getSettingsText(
+          "vinyl.presentation.settingsTitle",
+          "Focused lyric layout"
+        ),
+      },
+      FULLSCREEN_PRESENTATION_PRESETS.map((preset) =>
+        react.createElement(
+          "button",
+          {
+            key: preset.id,
+            className: `settings-choice-card ${
+              selectedMode === preset.id ? "active" : ""
+            }`,
+            type: "button",
+            role: "radio",
+            "aria-checked": selectedMode === preset.id,
+            onClick: () => applyMode(preset.id),
+          },
+          react.createElement(
+            "div",
+            { className: "settings-choice-icon" },
+            react.createElement("svg", {
+              width: 20,
+              height: 20,
+              viewBox: "0 0 24 24",
+              fill: "none",
+              stroke: "currentColor",
+              strokeWidth: 1.7,
+              strokeLinecap: "round",
+              strokeLinejoin: "round",
+              dangerouslySetInnerHTML: { __html: preset.icon },
+            })
+          ),
+          react.createElement(
+            "div",
+            { className: "settings-choice-content" },
+            react.createElement(
+              "strong",
+              null,
+              getSettingsText(preset.labelKey, preset.fallbackLabel)
+            ),
+            react.createElement(
+              "span",
+              null,
+              getSettingsText(
+                preset.descriptionKey,
+                preset.fallbackDescription
+              )
+            )
+          )
+        )
+      )
+    )
+  );
+};
+
 const getCurrentSettingsBackgroundMode = () => {
   if (CONFIG.visual["video-background"]) return "video-background";
   if (CONFIG.visual["solid-background"]) return "solid-background";
@@ -6628,7 +6768,16 @@ const ConfigModal = ({
       settingKey: "vinyl-mode",
       name: I18n.t("vinyl.mode"),
       desc: I18n.t("vinyl.settings.subtitle"),
-      i18nKeys: ["tabs.fullscreen", "vinyl.mode", "vinyl.settings.subtitle"]
+      i18nKeys: [
+        "tabs.fullscreen",
+        "vinyl.mode",
+        "vinyl.settings.subtitle",
+        "vinyl.presentation.settingsTitle",
+        "vinyl.presentation.settingsDescription",
+        "vinyl.presentation.vinylLabel",
+        "vinyl.presentation.compactLabel",
+        "vinyl.presentation.videoLabel"
+      ]
     },
     {
       section: I18n.t("tabs.fullscreen"),
@@ -9378,6 +9527,33 @@ const ConfigModal = ({
     grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
     gap: 12px;
     margin-bottom: 20px;
+}
+
+#${APP_NAME}-config-container .fullscreen-presentation-picker {
+    margin-bottom: 8px;
+}
+
+#${APP_NAME}-config-container .fullscreen-presentation-picker-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin: 0 0 12px;
+}
+
+#${APP_NAME}-config-container .fullscreen-presentation-picker-heading strong {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+#${APP_NAME}-config-container .fullscreen-presentation-picker-heading span {
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+#${APP_NAME}-config-container .fullscreen-presentation-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 #${APP_NAME}-config-container .settings-choice-card {
@@ -12550,7 +12726,8 @@ const ConfigModal = ({
         line-height: 1.5;
     }
 
-    #${APP_NAME}-config-container .settings-card-grid {
+    #${APP_NAME}-config-container .settings-card-grid,
+    #${APP_NAME}-config-container .settings-card-grid.fullscreen-presentation-grid {
         grid-template-columns: 1fr;
     }
 
@@ -16998,6 +17175,11 @@ const ConfigModal = ({
           title: I18n.t("vinyl.mode"),
           subtitle: I18n.t("vinyl.settings.subtitle"),
           sectionKey: "vinyl-mode",
+        }),
+        react.createElement(FullscreenPresentationPicker, {
+          defaultValue:
+            CONFIG.visual["fullscreen-focus-presentation"] || "vinyl",
+          onChange: saveVinylSetting,
         }),
         react.createElement(OptionList, {
           items: [

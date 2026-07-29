@@ -2100,6 +2100,18 @@ window.LANG_DE = {
     "tmiHint": "Rechtsklicken oder das Cover gedrückt halten, um TMI zu öffnen",
     "click": "Klicken",
     "tmiGesture": "Rechtsklick · Gedrückt halten",
+    "presentation": {
+      "switcherLabel": "Vollbild-Darstellung",
+      "settingsTitle": "Layout für fokussierte Liedtexte",
+      "settingsDescription": "Wähle die Darstellung, die beim Öffnen fokussierter Liedtexte über das Album verwendet wird.",
+      "standardLabel": "Standard",
+      "vinylLabel": "Kompletter Plattenspieler",
+      "vinylDescription": "Zeigt den vollständigen Plattenspieler und die große aktive Textzeile unten.",
+      "compactLabel": "Kompaktes Vinyl",
+      "compactDescription": "Behält das Standard-Textlayout bei und zeigt hinter dem Albumcover eine teilweise sichtbare Schallplatte.",
+      "videoLabel": "Videobühne",
+      "videoDescription": "Zeigt das synchronisierte YouTube-Video und die große aktive Textzeile unten."
+    },
     "settings": {
       "subtitle": "Passe Größe, Animationen und die untere Liedtext-Typografie des Vinylmodus an.",
       "albumSizeLabel": "Covergröße",

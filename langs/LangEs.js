@@ -2101,6 +2101,18 @@ window.LANG_ES = {
     "tmiHint": "Haz clic derecho o mantén pulsada la portada para abrir TMI",
     "click": "Clic",
     "tmiGesture": "Clic derecho · Mantener pulsado",
+    "presentation": {
+      "switcherLabel": "Presentación a pantalla completa",
+      "settingsTitle": "Diseño de letra enfocada",
+      "settingsDescription": "Elige la vista que se usará al abrir la letra enfocada desde el álbum.",
+      "standardLabel": "Estándar",
+      "vinylLabel": "Tocadiscos completo",
+      "vinylDescription": "Muestra el tocadiscos completo y la letra activa grande en la parte inferior.",
+      "compactLabel": "Vinilo compacto",
+      "compactDescription": "Mantiene el diseño estándar de letras y muestra un disco parcialmente visible detrás de la portada.",
+      "videoLabel": "Escenario de vídeo",
+      "videoDescription": "Muestra el vídeo de YouTube sincronizado y la letra activa grande en la parte inferior."
+    },
     "settings": {
       "subtitle": "Personaliza el tamaño, las animaciones y la tipografía inferior del modo vinilo.",
       "albumSizeLabel": "Tamaño de la portada",

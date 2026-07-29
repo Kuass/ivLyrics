@@ -188,6 +188,7 @@ const VinylActiveLyricRenderer = (() => {
         positionOverride = null,
         motionEnabled = true,
         durationMs = 0,
+        singleLineScroll = true,
     }) => {
         const rootRef = useRef(null);
         const playbackPosition = useLyricsPlaybackPosition();
@@ -322,7 +323,7 @@ const VinylActiveLyricRenderer = (() => {
                 activeGlobalCharIndex: isKara && !trailingInterludeLine
                     ? activeGlobalCharIndex
                     : -1,
-                singleLineScroll: true,
+                singleLineScroll,
             })
         );
     });

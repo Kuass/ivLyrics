@@ -2110,6 +2110,18 @@ window.LANG_MS = {
     "tmiHint": "Klik kanan atau tekan lama kulit album untuk membuka TMI",
     "click": "Klik",
     "tmiGesture": "Klik kanan · Tekan lama",
+    "presentation": {
+      "switcherLabel": "Paparan skrin penuh",
+      "settingsTitle": "Susun atur lirik fokus",
+      "settingsDescription": "Pilih paparan yang digunakan apabila album membuka lirik fokus.",
+      "standardLabel": "Standard",
+      "vinylLabel": "Pemain vinil penuh",
+      "vinylDescription": "Paparkan pemain piring hitam penuh dengan lirik aktif besar di bahagian bawah.",
+      "compactLabel": "Vinil padat",
+      "compactDescription": "Kekalkan susun atur lirik standard dan paparkan piring hitam yang kelihatan sebahagian di belakang kulit album.",
+      "videoLabel": "Pentas video",
+      "videoDescription": "Paparkan video YouTube yang disegerakkan dengan lirik aktif besar di bahagian bawah."
+    },
     "settings": {
       "subtitle": "Sesuaikan saiz, animasi dan tipografi lirik bawah bagi mod vinil.",
       "albumSizeLabel": "Saiz kulit album",
