@@ -6817,7 +6817,8 @@ ruby rt {
   line-height: 1.45;
 }
 
-.community-video-random-setting {
+.community-video-random-setting,
+.community-video-filter-setting {
   margin: 0 0 16px;
   padding: 2px 0 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -6967,12 +6968,32 @@ ruby rt {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   color: inherit;
   font-size: 14px;
   font-weight: 600;
+  text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.community-video-title-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.community-video-external-icon {
+  flex: 0 0 auto;
+  opacity: 0.56;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.community-video-title:hover .community-video-external-icon {
+  opacity: 1;
+  transform: translate(1px, -1px);
 }
 
 .community-video-title .auto-badge {
@@ -7155,6 +7176,31 @@ ruby rt {
   color: inherit;
   font-size: 14px;
   border-radius: 0;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.community-video-open-external {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  text-decoration: none;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.community-video-open-external:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.09);
+  transform: translateY(-1px);
 }
 
 .community-video-submit-form input:focus {
@@ -7274,6 +7320,7 @@ ruby rt {
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-actions .vote-btn,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-submit-btn,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-add-btn,
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-open-external,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .video-title-preview .video-title-text,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .confirm-dialog,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .confirm-dialog-btn {
@@ -7295,7 +7342,8 @@ ruby rt {
   color: rgba(15, 23, 42, 0.58);
 }
 
-#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-random-setting {
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-random-setting,
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-filter-setting {
   border-bottom-color: rgba(15, 23, 42, 0.08);
 }
 

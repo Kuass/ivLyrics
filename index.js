@@ -2437,6 +2437,10 @@ const CONFIG = {
       "ivLyrics:visual:community-video-random",
       false
     ),
+    "community-video-hide-disliked": StorageManager.get(
+      "ivLyrics:visual:community-video-hide-disliked",
+      true
+    ),
     "video-helper-enabled": StorageManager.get(
       "ivLyrics:visual:video-helper-enabled",
       false

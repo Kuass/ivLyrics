@@ -2770,6 +2770,12 @@ const Utils = {
       const likes = Number(video.likes) || 0;
       const dislikes = Number(video.dislikes) || 0;
       if (dislikes > likes) return false;
+      if (
+        CONFIG?.visual?.["community-video-hide-disliked"] !== false &&
+        video.userVote === -1
+      ) {
+        return false;
+      }
 
       seenVideoIds.add(videoId);
       return true;
