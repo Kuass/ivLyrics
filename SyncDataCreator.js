@@ -59,6 +59,21 @@ const SYNC_CREATOR_PROGRESS_COLOR = 'rgb(var(--spice-rgb-accent, 30, 215, 96))';
 const SYNC_CREATOR_PROGRESS_BACKGROUND = 'rgba(var(--spice-rgb-accent, 30, 215, 96), 0.18)';
 const SYNC_CREATOR_SYNCED_BACKGROUND = 'rgba(255, 255, 255, 0.055)';
 const SYNC_CREATOR_RECORDING_BACKGROUND = 'rgba(255, 152, 0, 0.6)';
+const getSyncCreatorLockedPlaybackProgressIndex = (previewIndex, lockIndex, recordingIndex) => {
+	const numericLockIndex = Number(lockIndex);
+	const numericRecordingIndex = Number(recordingIndex);
+	if (
+		!Number.isInteger(numericLockIndex)
+		|| numericLockIndex < 0
+		|| (Number.isFinite(numericRecordingIndex) && numericRecordingIndex >= 0)
+	) {
+		return null;
+	}
+
+	const numericPreviewIndex = Number(previewIndex);
+	if (!Number.isFinite(numericPreviewIndex)) return -1;
+	return Math.max(-1, Math.min(numericLockIndex, numericPreviewIndex));
+};
 const countSyncCreatorRangeChars = (ranges) => (Array.isArray(ranges) ? ranges : []).reduce((sum, range) => {
 	const start = Number(range?.start);
 	const end = Number(range?.end);
@@ -5156,7 +5171,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		charTimesRef.current = buildLockedCharTimes(safeIndex);
 		setDragStartTime(null);
 		setDragStartCharIndex(-1);
-		setRecordingProgressIndex(safeIndex, { commitState: false });
+		// Keep the lock armed without treating the locked prefix as live input.
+		// Playback can then animate the preserved timing up to the lock boundary,
+		// and the next recording action continues the orange progress from there.
+		setRecordingProgressIndex(-1, { animate: false, commitState: false });
 		setIsDragging(false);
 		Toast.success(I18n.t('settings.syncLockSet') || 'Locked timing up to the selected character.');
 	}, [
@@ -7888,11 +7906,21 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		lastPaintedPlaybackIndexRef.current = -2;
 		const paint = () => {
 			if (disposed) return;
-			if (!(mode === 'record' && recordingCharIndexRef.current >= 0)) {
-				const pos = Number(Spicetify.Player?.getProgress?.() || 0);
-				const nextIndex = Number.isFinite(pos)
-					? getPreviewProgressIndexAtTime(currentLineIndex, pos / 1000)
-					: -1;
+			const pos = Number(Spicetify.Player?.getProgress?.() || 0);
+			const nextIndex = Number.isFinite(pos)
+				? getPreviewProgressIndexAtTime(currentLineIndex, pos / 1000)
+				: -1;
+			const lockedPlaybackIndex = mode === 'record'
+				? getSyncCreatorLockedPlaybackProgressIndex(
+					nextIndex,
+					getActiveRecordingLockIndex(),
+					recordingCharIndexRef.current
+				)
+				: null;
+
+			if (lockedPlaybackIndex !== null) {
+				applyRecordingProgressVisual(lockedPlaybackIndex);
+			} else if (!(mode === 'record' && recordingCharIndexRef.current >= 0)) {
 				applyPlaybackProgressVisual(nextIndex);
 			}
 			frameId = scheduleFrame(paint);
@@ -7909,7 +7937,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		currentLineIndex,
 		lyricsLines.length,
 		getPreviewProgressIndexAtTime,
-		applyPlaybackProgressVisual
+		applyPlaybackProgressVisual,
+		applyRecordingProgressVisual,
+		getActiveRecordingLockIndex
 	]);
 
 	// Keep the creator on the same restrained visual system as Settings.
@@ -8983,9 +9013,17 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		? getPreviewProgressIndex(currentLineIndex)
 		: -1;
 	const currentRecordingCharIndex = recordingCharIndexRef.current;
+	const isRecordingLockArmed = mode === 'record' && recordingLockIndex >= 0;
+	const currentLockedPlaybackIndex = mode === 'record'
+		? getSyncCreatorLockedPlaybackProgressIndex(
+			currentLinePreviewIndex,
+			recordingLockIndex,
+			currentRecordingCharIndex
+		)
+		: null;
 	const currentLineProgressIndex = mode === 'record' && currentRecordingCharIndex >= 0
 		? currentRecordingCharIndex
-		: currentLinePreviewIndex;
+		: (currentLockedPlaybackIndex ?? currentLinePreviewIndex);
 	const currentLineProgressPercent = currentLineChars.length > 0 && currentLineProgressIndex >= 0
 		? Math.max(0, Math.min(100, ((currentLineProgressIndex + 1) / currentLineChars.length) * 100))
 		: 0;
@@ -9002,11 +9040,15 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const renderCharacterSpan = (char, i, options = {}) => {
 		const isSynced = isCharSynced(currentLineIndex, i);
 		const isRec = mode === 'record' && currentRecordingCharIndex >= 0 && i <= currentRecordingCharIndex;
-		const isLocked = mode === 'record' && recordingLockIndex >= 0 && i <= recordingLockIndex;
+		const isLocked = isRecordingLockArmed && i <= recordingLockIndex;
+		const lockedPlaybackCompletedIndex = currentLockedPlaybackIndex === null
+			? -1
+			: Math.floor(currentLockedPlaybackIndex);
+		const isLockedPlaybackProgress = isLocked && i <= lockedPlaybackCompletedIndex;
 		const previewIdx = currentLinePreviewIndex;
 		const previewNumericIndex = Number(previewIdx);
 		const previewCompletedIndex = Number.isFinite(previewNumericIndex) ? Math.floor(previewNumericIndex) : -1;
-		const isPlayed = isSynced && previewCompletedIndex >= i;
+		const isPlayed = isSynced && !isRecordingLockArmed && previewCompletedIndex >= i;
 		const charTime = getCharSyncTime(currentLineIndex, i);
 		const furigana = currentLineFuriganaMap.get(i);
 		const characterPronunciation = options.hidePronunciation ? '' : currentLineCharacterPronunciationMap.get(i);
@@ -9031,7 +9073,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (options.inWordUnit) style = { ...style, ...s.charSpanInWord };
 		if (options.inWordPrimary) style = { ...style, ...s.charSpanInWordPrimary };
 		if (!options.wordSpacer) {
-			if (isRec) style = { ...style, ...s.charRecording };
+			if (isRec || isLockedPlaybackProgress) style = { ...style, ...s.charRecording };
 			else if (isSynced) style = isPlayed ? { ...style, ...s.charPlayed } : { ...style, ...s.charSynced };
 			if (isLocked) style = { ...style, ...s.charLocked };
 		}
