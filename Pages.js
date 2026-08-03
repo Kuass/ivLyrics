@@ -1936,12 +1936,14 @@ const useLyricsPlaybackPosition = () => {
 const useScrollActivity = (containerRef, deps = []) => {
 	const [isScrolling, setIsScrolling] = useState(false);
 	const scrollTimeout = useRef(null);
+	const manualScrollIntentUntilRef = useRef(0);
 
 	useEffect(() => {
 		const container = containerRef.current;
 		if (!container) return;
+		let scrollbarPointerId = null;
 
-		const handleWheel = () => {
+		const extendManualScroll = () => {
 			cancelSyncedLyricsScrollAnimation(container);
 			setIsScrolling(true);
 			if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
@@ -1949,13 +1951,65 @@ const useScrollActivity = (containerRef, deps = []) => {
 				setIsScrolling(false);
 			}, 3000);
 		};
+		const markManualScrollIntent = () => {
+			manualScrollIntentUntilRef.current = Date.now() + 500;
+		};
+		const handleWheel = () => {
+			markManualScrollIntent();
+			extendManualScroll();
+		};
+		const handleScroll = () => {
+			if (scrollbarPointerId !== null || Date.now() <= manualScrollIntentUntilRef.current) extendManualScroll();
+		};
+		const handlePointerDown = (event) => {
+			if (event.target !== container) return;
+			const rect = container.getBoundingClientRect();
+			const x = event.clientX - rect.left;
+			const y = event.clientY - rect.top;
+			const verticalGutterWidth = Math.max(0, container.offsetWidth - container.clientWidth);
+			const horizontalGutterHeight = Math.max(0, container.offsetHeight - container.clientHeight);
+			const isInVerticalScrollbar = verticalGutterWidth > 0 && (
+				x < verticalGutterWidth || x >= container.clientWidth
+			);
+			const isInHorizontalScrollbar = horizontalGutterHeight > 0 && y >= container.clientHeight;
+			if (isInVerticalScrollbar || isInHorizontalScrollbar) {
+				scrollbarPointerId = event.pointerId;
+				markManualScrollIntent();
+			}
+		};
+		const handlePointerRelease = (event) => {
+			if (scrollbarPointerId === null || event.pointerId !== scrollbarPointerId) return;
+			scrollbarPointerId = null;
+			manualScrollIntentUntilRef.current = 0;
+			extendManualScroll();
+		};
+		const handleKeyDown = (event) => {
+			if (!["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " ", "Spacebar"].includes(event.key)) return;
+			if (event.defaultPrevented) return;
+			const interactiveTarget = event.target?.closest?.(
+				'button, a[href], input, select, textarea, [role="button"], [contenteditable="true"]'
+			);
+			if (interactiveTarget && interactiveTarget !== container) return;
+			markManualScrollIntent();
+			extendManualScroll();
+		};
 
 		container.addEventListener("wheel", handleWheel, { passive: true });
 		container.addEventListener("touchmove", handleWheel, { passive: true });
+		container.addEventListener("scroll", handleScroll, { passive: true });
+		container.addEventListener("pointerdown", handlePointerDown, { passive: true });
+		container.addEventListener("keydown", handleKeyDown);
+		window.addEventListener("pointerup", handlePointerRelease, { passive: true });
+		window.addEventListener("pointercancel", handlePointerRelease, { passive: true });
 
 		return () => {
 			container.removeEventListener("wheel", handleWheel);
 			container.removeEventListener("touchmove", handleWheel);
+			container.removeEventListener("scroll", handleScroll);
+			container.removeEventListener("pointerdown", handlePointerDown);
+			container.removeEventListener("keydown", handleKeyDown);
+			window.removeEventListener("pointerup", handlePointerRelease);
+			window.removeEventListener("pointercancel", handlePointerRelease);
 			cancelSyncedLyricsScrollAnimation(container);
 			if (scrollTimeout.current) {
 				clearTimeout(scrollTimeout.current);
@@ -2591,7 +2645,9 @@ const KARAOKE_TEXT_EFFECT_KIND_CLASSES = new Set([
 	"pop",
 ]);
 
-const areKaraokeTextEffectsEnabled = () => CONFIG?.visual?.["karaoke-text-effects"] !== false;
+const areKaraokeTextEffectsEnabled = () => (
+	CONFIG?.visual?.["karaoke-text-effects"] !== false && !prefersReducedLyricsMotion()
+);
 
 const getKaraokeKindClassParts = (kind) => {
 	const kindClass = String(kind || "").trim().toLowerCase();
@@ -3374,9 +3430,6 @@ const KARAOKE_FILL_CORRECTION_DEFAULT_POINTS = [
 	{ x: 1, y: 1 },
 ];
 const PSEUDO_KARAOKE_SOURCES = new Set(["audio-analysis-pseudo", "spotify-audio-analysis", "line-timing-pseudo"]);
-const KARAOKE_NO_WORD_WRAP_LANGUAGE_PREFIXES = ["ja", "zh", "th", "lo", "km", "my"];
-const KARAOKE_NO_WORD_WRAP_SCRIPT_REGEX = /[\u3040-\u30ff\uff66-\uff9f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u0e00-\u0e7f\u0e80-\u0eff\u1780-\u17ff\u1000-\u109f]/u;
-const KARAOKE_NON_WHITESPACE_CHAR_REGEX = /\S/u;
 const KARAOKE_RTL_STRONG_CHAR_REGEX = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFC]/u;
 const KARAOKE_LTR_STRONG_CHAR_REGEX = /[A-Za-z\u00C0-\u02AF\u0370-\u052F\u1E00-\u1EFF]/u;
 const KARAOKE_JOINING_SCRIPT_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFC]/u;
@@ -3405,39 +3458,9 @@ const shouldUseKaraokeTextRun = (text) => {
 		KARAOKE_JOINING_SCRIPT_REGEX.test(normalizedText);
 };
 
-const hasDominantNoWordWrapScript = (text) => {
+const shouldWrapKaraokeByWord = (text) => {
 	const normalizedText = typeof text === "string" ? text : "";
-	let nonWhitespaceCount = 0;
-	let matchedCount = 0;
-	for (const char of normalizedText) {
-		if (!KARAOKE_NON_WHITESPACE_CHAR_REGEX.test(char)) {
-			continue;
-		}
-		nonWhitespaceCount++;
-		if (KARAOKE_NO_WORD_WRAP_SCRIPT_REGEX.test(char)) {
-			matchedCount++;
-		}
-	}
-	return nonWhitespaceCount > 0 && matchedCount / nonWhitespaceCount >= 0.45;
-};
-
-const shouldWrapKaraokeByWord = (text, language) => {
-	const normalizedText = typeof text === "string" ? text : "";
-	if (!/\S\s+\S/u.test(normalizedText)) {
-		return false;
-	}
-	if (hasDominantNoWordWrapScript(normalizedText)) {
-		return false;
-	}
-
-	const normalizedLanguage = String(language || "").toLowerCase();
-	if (!normalizedLanguage) {
-		return true;
-	}
-
-	return !KARAOKE_NO_WORD_WRAP_LANGUAGE_PREFIXES.some((prefix) =>
-		normalizedLanguage === prefix || normalizedLanguage.startsWith(`${prefix}-`)
-	);
+	return /\S\s+\S/u.test(normalizedText);
 };
 
 const clampKaraokeFillCurveValue = (value, fallback = 0) => {
@@ -3925,6 +3948,11 @@ const LyricsLineBlock = react.memo(({
 			Spicetify.Player.seek(seekTime);
 		}
 	}, [seekTime]);
+	const handleKeyDown = useCallback((event) => {
+		if (!Number.isFinite(seekTime) || !["Enter", " ", "Spacebar"].includes(event.key)) return;
+		event.preventDefault();
+		handleClick();
+	}, [handleClick, seekTime]);
 
 	const mainContent = shouldRenderInterlude
 		? (shouldShowInterlude ? react.createElement(InterludeIndicator, {
@@ -3964,6 +3992,12 @@ const LyricsLineBlock = react.memo(({
                   dir,
                   ref: lineRef,
                   onClick: Number.isFinite(seekTime) ? handleClick : null,
+				  ...(Number.isFinite(seekTime) ? {
+					  role: "button",
+					  tabIndex: 0,
+					  title: `Seek to ${Math.max(0, Math.round(seekTime / 1000))} seconds`,
+					  onKeyDown: handleKeyDown,
+				  } : {}),
 		},
 		react.createElement(
 			"p",
@@ -4263,6 +4297,9 @@ const useSyncedLyricsEngine = ({
 	// each time. Now scoped to the events that can actually change the offset:
 	// active line shifts, scrolling state flips, compact mode toggles.
 	const [compactOffset, setCompactOffset] = useState(0);
+	const [suppressLayoutShiftAnimation, setSuppressLayoutShiftAnimation] = useState(false);
+	const previousPreparedLyricsRef = useRef(preparedLyrics);
+	const layoutShiftAnimationFramesRef = useRef({ first: null, second: null });
 	const syncCompactOffset = useCallback(() => {
 		if (!compact) {
 			setCompactOffset(0);
@@ -4274,6 +4311,49 @@ const useSyncedLyricsEngine = ({
 			Math.abs(prevOffset - nextOffset) < 0.5 ? prevOffset : nextOffset
 		));
 	}, [compact, containerRef, activeLineRef, isScrolling]);
+
+	// Streaming translation/pronunciation changes lyric row heights without
+	// changing playback position. Re-centering is still necessary, but animating
+	// that corrective offset makes the active lyric fall and spring back for every
+	// streamed line. Suppress only the corrective transition for two frames; the
+	// normal animated transition remains enabled when playback advances a line.
+	useSyncedLayoutEffect(() => {
+		const previousPreparedLyrics = previousPreparedLyricsRef.current;
+		previousPreparedLyricsRef.current = preparedLyrics;
+
+		const frames = layoutShiftAnimationFramesRef.current;
+		const cancelFrame = typeof cancelAnimationFrame === "function"
+			? cancelAnimationFrame
+			: clearTimeout;
+		if (frames.first !== null) cancelFrame(frames.first);
+		if (frames.second !== null) cancelFrame(frames.second);
+		frames.first = null;
+		frames.second = null;
+
+		if (!compact || isScrolling || previousPreparedLyrics === preparedLyrics) {
+			setSuppressLayoutShiftAnimation(false);
+			return undefined;
+		}
+
+		setSuppressLayoutShiftAnimation(true);
+		const requestFrame = typeof requestAnimationFrame === "function"
+			? requestAnimationFrame
+			: (callback) => setTimeout(callback, 0);
+		frames.first = requestFrame(() => {
+			frames.first = null;
+			frames.second = requestFrame(() => {
+				frames.second = null;
+				setSuppressLayoutShiftAnimation(false);
+			});
+		});
+
+		return () => {
+			if (frames.first !== null) cancelFrame(frames.first);
+			if (frames.second !== null) cancelFrame(frames.second);
+			frames.first = null;
+			frames.second = null;
+		};
+	}, [compact, isScrolling, preparedLyrics]);
 
   useSyncedLayoutEffect(() => {
           syncCompactOffset();
@@ -4457,7 +4537,7 @@ const useSyncedLyricsEngine = ({
 				...getKaraokeSpeakerStyle(line?.speaker, line?.['speaker-color'], line?.['speaker-fallback']),
 				"--position-index": animationIndex,
 				"--animation-index": Math.abs(animationIndex) + 1,
-				"--line-shift-duration": isScrolling
+				"--line-shift-duration": isScrolling || suppressLayoutShiftAnimation
 					? "0s"
 					: "var(--iv-lyrics-centering-duration, 820ms)",
 				"--line-shift-delay": "0s",
@@ -4472,6 +4552,7 @@ const useSyncedLyricsEngine = ({
 		activeDisplayLineIndex,
 		compactWindowStartIndex,
 		activeTrailingInterludeKey,
+		suppressLayoutShiftAnimation,
 		settingsRevision,
 	]);
 	const renderPosition = isKara || (compact && activeLineIndex <= leadingEmptyLines)
@@ -4645,7 +4726,7 @@ const useSyncedLyricsEngine = ({
 						cursor: "default",
 						"--position-index": virtualAnimationIndex,
 						"--animation-index": Math.abs(virtualAnimationIndex) + 1,
-						"--line-shift-duration": isScrolling
+						"--line-shift-duration": isScrolling || suppressLayoutShiftAnimation
 							? "0s"
 							: "var(--iv-lyrics-centering-duration, 820ms)",
 						"--line-shift-delay": "0s",
@@ -4684,6 +4765,7 @@ const useSyncedLyricsEngine = ({
 		globalCharOffsets,
 		activeGlobalCharIndex,
 		stableLineStyles,
+		suppressLayoutShiftAnimation,
 		settingsRevision,
 	]);
 
@@ -5335,7 +5417,6 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 
 	const furiganaEnabled = CONFIG?.visual?.["furigana-enabled"] === true;
 	const furiganaReady = window.FuriganaConverter?.isAvailable?.() === true;
-	const detectedLanguage = Utils.getDetectedLanguage?.() || null;
 
 	const { furiganaMap, timedChars, endTime, wrapByWord, textDirection, useTextRun } = useMemo(() => {
 		const sourceSyllables = Array.isArray(line.syllables) && line.syllables.length > 0
@@ -5359,11 +5440,11 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 				(maxEndTime, charInfo) => Math.max(maxEndTime, Number.isFinite(charInfo?.endTime) ? charInfo.endTime : 0),
 				getKaraokeLineBounds(line).endTime
 			),
-			wrapByWord: shouldWrapKaraokeByWord(rawLineText, detectedLanguage),
+			wrapByWord: shouldWrapKaraokeByWord(rawLineText),
 			textDirection: detectedTextDirection,
 			useTextRun: shouldUseKaraokeTextRun(rawLineText),
 		};
-	}, [line, furiganaEnabled, furiganaReady, detectedLanguage, furiganaMapOverride]);
+	}, [line, furiganaEnabled, furiganaReady, furiganaMapOverride]);
 	const isComplete = isActive && position >= endTime;
 	const timedText = timedChars.map(charInfo => String(charInfo?.char || "")).join("");
 	const culturalMarkersByCharIndex = new Map();
@@ -5606,6 +5687,9 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copy
 			className: `lyrics-lyricsContainer-SyncedLyricsPage${isKara ? " is-karaoke" : ""}${karaokeLineTransitionClass}${isScrolling ? " scrolling-active" : ""}`,
 			ref: containerRefCallback,
 			onClick: handleContainerClick,
+			tabIndex: 0,
+			role: "region",
+			"aria-label": I18n.t("lyricsTitle") || "Synced lyrics",
 		},
 		react.createElement(
 			"div",

@@ -936,6 +936,7 @@ const FullscreenOverlay = (() => {
         const volumeChangeTimeoutRef = useRef(null);
         const playlistPickerRef = useRef(null);
         const playlistStatusCheckRef = useRef(0);
+        const likeRequestGenerationRef = useRef(0);
 
         // 재생 상태를 Spicetify.Player.data.isPaused에서 직접 가져옴
         useEffect(() => {
@@ -950,13 +951,17 @@ const FullscreenOverlay = (() => {
             const updateRepeat = () => setRepeatMode(Spicetify.Player.getRepeat?.() || 0);
 
             const checkLiked = async () => {
+                const requestGeneration = ++likeRequestGenerationRef.current;
+                const uri = Spicetify.Player.data?.item?.uri;
                 try {
-                    const uri = Spicetify.Player.data?.item?.uri;
                     if (uri && Spicetify.Platform?.LibraryAPI) {
                         const result = await Spicetify.Platform.LibraryAPI.contains(uri);
+                        if (requestGeneration !== likeRequestGenerationRef.current || Spicetify.Player.data?.item?.uri !== uri) return;
                         setIsLiked(Array.isArray(result) ? result[0] : result);
                     }
-                } catch (e) { }
+                } catch (e) {
+                    if (requestGeneration !== likeRequestGenerationRef.current || Spicetify.Player.data?.item?.uri !== uri) return;
+                }
             };
 
             // 볼륨 변경 감지 (Spotify 단축키로 변경 시에도 반영)
@@ -1022,17 +1027,21 @@ const FullscreenOverlay = (() => {
         }, [show]);
 
         const toggleLike = async () => {
+            const requestGeneration = ++likeRequestGenerationRef.current;
+            const uri = Spicetify.Player.data?.item?.uri;
+            const nextLiked = !isLiked;
             try {
-                const uri = Spicetify.Player.data?.item?.uri;
                 if (uri && Spicetify.Platform?.LibraryAPI) {
                     if (isLiked) {
                         await Spicetify.Platform.LibraryAPI.remove({ uris: [uri] });
                     } else {
                         await Spicetify.Platform.LibraryAPI.add({ uris: [uri] });
                     }
-                    setIsLiked(!isLiked);
+                    if (requestGeneration !== likeRequestGenerationRef.current || Spicetify.Player.data?.item?.uri !== uri) return;
+                    setIsLiked(nextLiked);
                 }
             } catch (e) {
+                if (requestGeneration !== likeRequestGenerationRef.current || Spicetify.Player.data?.item?.uri !== uri) return;
                 console.error("Toggle like error:", e);
             }
         };

@@ -220,7 +220,12 @@ const MarketplacePage = (() => {
             onClick: () => onClick(addon),
             tabIndex: 0,
             role: 'button',
-            onKeyDown: (e) => { if (e.key === 'Enter') onClick(addon); }
+            'aria-label': addon.name,
+            onKeyDown: (e) => {
+                if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+                e.preventDefault();
+                onClick(addon);
+            }
         },
             // Preview Image
             react.createElement('div', { className: 'ivlyrics-marketplace-card-image' },
@@ -251,7 +256,13 @@ const MarketplacePage = (() => {
                             className: 'ivlyrics-marketplace-author-link',
                             onClick: handleAuthorClick,
                             role: 'button',
-                            tabIndex: 0
+                            tabIndex: 0,
+                            'aria-label': addon.author,
+                            onKeyDown: (e) => {
+                                if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+                                e.preventDefault();
+                                handleAuthorClick(e);
+                            }
                         }, I18n.t('marketplace.by', { author: addon.author }))
                         : I18n.t('marketplace.by', { author: addon.author })
                 ),
@@ -292,7 +303,13 @@ const MarketplacePage = (() => {
             className: 'ivlyrics-marketplace-sidebar-minicard',
             onClick: () => onClick(addon),
             role: 'button',
-            tabIndex: 0
+            tabIndex: 0,
+            'aria-label': addon.name,
+            onKeyDown: (e) => {
+                if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+                e.preventDefault();
+                onClick(addon);
+            }
         },
             addon.preview
                 ? react.createElement('img', {

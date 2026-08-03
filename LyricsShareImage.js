@@ -272,22 +272,38 @@ const LyricsShareImage = (() => {
 
   // 텍스트 줄바꿈 처리
   function wrapText(ctx, text, maxWidth) {
-    const words = text.split(' ');
+    const tokens = String(text || '').match(/\S+|\s+/gu) || [];
     const lines = [];
     let currentLine = '';
 
-    for (const word of words) {
-      const testLine = currentLine ? `${currentLine} ${word}` : word;
-      const metrics = ctx.measureText(testLine);
-
-      if (metrics.width > maxWidth && currentLine) {
-        lines.push(currentLine);
-        currentLine = word;
-      } else {
-        currentLine = testLine;
+    const pushOversizedToken = (token) => {
+      for (const char of Array.from(token)) {
+        const testLine = currentLine + char;
+        if (currentLine && ctx.measureText(testLine).width > maxWidth) {
+          lines.push(currentLine.trimEnd());
+          currentLine = char;
+        } else {
+          currentLine = testLine;
+        }
       }
+    };
+
+    for (const token of tokens) {
+      if (!currentLine && /^\s+$/u.test(token)) continue;
+      const testLine = currentLine + token;
+      if (!currentLine || ctx.measureText(testLine).width <= maxWidth) {
+        if (ctx.measureText(token).width > maxWidth) pushOversizedToken(token);
+        else currentLine = testLine;
+        continue;
+      }
+
+      if (currentLine.trim()) lines.push(currentLine.trimEnd());
+      currentLine = '';
+      if (/^\s+$/u.test(token)) continue;
+      if (ctx.measureText(token).width > maxWidth) pushOversizedToken(token);
+      else currentLine = token;
     }
-    if (currentLine) lines.push(currentLine);
+    if (currentLine.trim()) lines.push(currentLine.trimEnd());
     return lines;
   }
 
