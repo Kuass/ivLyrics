@@ -6859,6 +6859,37 @@
         }
     };
 
+    const sendLyricsToConsumers = ({
+        trackInfo,
+        lyrics,
+        sendToOverlay = true,
+        forceResend = false,
+        sendReason = 'normal',
+        presentationContext = null
+    }) => {
+        const sends = [];
+        const queueSend = (sender) => {
+            if (!sender?.sendLyrics) return;
+            try {
+                sends.push(sender.sendLyrics(
+                    trackInfo,
+                    lyrics,
+                    forceResend,
+                    sendReason,
+                    presentationContext
+                ));
+            } catch (error) {
+                sends.push(Promise.reject(error));
+            }
+        };
+
+        if (sendToOverlay) {
+            queueSend(window.OverlaySender);
+        }
+        queueSend(window.lyricsHelperSender);
+        return Promise.allSettled(sends);
+    };
+
     const LyricsService = {
         // 버전 정보
         version: "1.0.0",
@@ -7232,20 +7263,12 @@
 
                 if (lyricsResult.error) {
                     // 가사 없음 - 오버레이에 트랙 정보만 전송
-                    if (sendToOverlay && window.OverlaySender?.sendLyrics) {
-                        await window.OverlaySender.sendLyrics(
-                            { uri: info.uri, title: info.title, artist: info.artist },
-                            [],
-                            true
-                        );
-                    }
-                    if (window.lyricsHelperSender?.sendLyrics) {
-                        await window.lyricsHelperSender.sendLyrics(
-                            { uri: info.uri, title: info.title, artist: info.artist },
-                            [],
-                            true
-                        );
-                    }
+                    await sendLyricsToConsumers({
+                        trackInfo: { uri: info.uri, title: info.title, artist: info.artist },
+                        lyrics: [],
+                        sendToOverlay,
+                        forceResend: true
+                    });
 
                     return { lyrics: [], provider: null, error: lyricsResult.error };
                 }
@@ -7258,20 +7281,12 @@
                     : (lyrics === lyricsResult.synced ? 'synced' : 'unsynced');
 
                 if (lyrics.length === 0) {
-                    if (sendToOverlay && window.OverlaySender?.sendLyrics) {
-                        await window.OverlaySender.sendLyrics(
-                            { uri: info.uri, title: info.title, artist: info.artist },
-                            [],
-                            true
-                        );
-                    }
-                    if (window.lyricsHelperSender?.sendLyrics) {
-                        await window.lyricsHelperSender.sendLyrics(
-                            { uri: info.uri, title: info.title, artist: info.artist },
-                            [],
-                            true
-                        );
-                    }
+                    await sendLyricsToConsumers({
+                        trackInfo: { uri: info.uri, title: info.title, artist: info.artist },
+                        lyrics: [],
+                        sendToOverlay,
+                        forceResend: true
+                    });
                     return { lyrics: [], provider, error: "No lyrics" };
                 }
 
@@ -7350,30 +7365,14 @@
 
                 // 번역을 기다리는 동안 오버레이가 비어 있지 않도록 원문 가사를 먼저 전송
                 if (needsTranslation) {
-                    try {
-                        const originalLyricsSends = [];
-                        if (sendToOverlay && window.OverlaySender?.sendLyrics) {
-                            originalLyricsSends.push(window.OverlaySender.sendLyrics(
-                                { uri: info.uri, title: info.title, artist: info.artist },
-                                lyrics,
-                                false,
-                                'translation-pending',
-                                overlayPresentationContext
-                            ));
-                        }
-                        if (window.lyricsHelperSender?.sendLyrics) {
-                            originalLyricsSends.push(window.lyricsHelperSender.sendLyrics(
-                                { uri: info.uri, title: info.title, artist: info.artist },
-                                lyrics,
-                                false,
-                                'translation-pending',
-                                overlayPresentationContext
-                            ));
-                        }
-                        void Promise.allSettled(originalLyricsSends);
-                    } catch (e) {
-                        // 원문 선전송 실패는 무시하고 번역 진행
-                    }
+                    // 원문 선전송 결과는 번역 작업을 막지 않는다.
+                    void sendLyricsToConsumers({
+                        trackInfo: { uri: info.uri, title: info.title, artist: info.artist },
+                        lyrics,
+                        sendToOverlay,
+                        sendReason: 'translation-pending',
+                        presentationContext: overlayPresentationContext
+                    });
                 }
 
                 if (needsTranslation && window.Translator?.callGemini) {
@@ -7491,33 +7490,17 @@
                 }
 
                 // 6. 오버레이 전송
-                const finalLyricsSends = [];
-                if (sendToOverlay && window.OverlaySender?.sendLyrics) {
-                    finalLyricsSends.push(window.OverlaySender.sendLyrics(
-                        { uri: info.uri, title: info.title, artist: info.artist },
-                        lyrics,
-                        true,
-                        'translation-complete',
-                        {
-                            ...overlayPresentationContext,
-                            presentationComplete: true
-                        }
-                    ));
-                }
-                // 헬퍼 전송
-                if (window.lyricsHelperSender?.sendLyrics) {
-                    finalLyricsSends.push(window.lyricsHelperSender.sendLyrics(
-                        { uri: info.uri, title: info.title, artist: info.artist },
-                        lyrics,
-                        true,
-                        'translation-complete',
-                        {
-                            ...overlayPresentationContext,
-                            presentationComplete: true
-                        }
-                    ));
-                }
-                await Promise.allSettled(finalLyricsSends);
+                await sendLyricsToConsumers({
+                    trackInfo: { uri: info.uri, title: info.title, artist: info.artist },
+                    lyrics,
+                    sendToOverlay,
+                    forceResend: true,
+                    sendReason: 'translation-complete',
+                    presentationContext: {
+                        ...overlayPresentationContext,
+                        presentationComplete: true
+                    }
+                });
 
                 // 6. 이벤트 발생
                 this.emit('lyrics-loaded', {

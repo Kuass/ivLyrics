@@ -5733,6 +5733,53 @@ class LyricsContainer extends react.Component {
     this.clearGenerationRequestLoading("cultural-annotations", token, options);
   }
 
+  publishLyricsPresentation(lyrics, context = {}) {
+    const publisher = window.ivLyricsPresentationPublisher;
+    if (!publisher?.publishLyricsReady) {
+      throw new Error("LyricsPresentationPublisher is not loaded");
+    }
+
+    const {
+      uri = this.state.uri,
+      provider = this.state.provider || null,
+      karaokeSource = this.state.karaokeSource || null,
+      mode = this.getCurrentMode(),
+      lyricsType = getLyricsModeTypeKey(mode),
+      displayMode1 = null,
+      displayMode2 = null,
+      detectedLanguage = null,
+      translationTargetLanguage = this.getTranslationTargetLanguage(),
+      translationSourceLyrics = null,
+      translationSourceText,
+      presentationComplete = true,
+    } = context;
+
+    const payload = {
+      trackInfo: {
+        uri,
+        title: this.state.title,
+        artist: this.state.artist,
+      },
+      lyrics,
+      provider,
+      karaokeSource,
+      lyricsType,
+      displayMode1,
+      displayMode2,
+      detectedLanguage,
+      translationTargetLanguage,
+      presentationComplete,
+    };
+
+    if (translationSourceText !== undefined) {
+      payload.translationSourceText = translationSourceText;
+    } else if (Array.isArray(translationSourceLyrics)) {
+      payload.translationSourceText = getNonSectionLyricsText(translationSourceLyrics);
+    }
+
+    return publisher.publishLyricsReady(payload);
+  }
+
   applyStreamingTranslation({
     uri,
     presentationSeq = null,
@@ -5783,25 +5830,14 @@ class LyricsContainer extends react.Component {
         currentLyrics: finalLyrics,
       });
 
-      window.dispatchEvent(new CustomEvent('ivLyrics:lyrics-ready', {
-        detail: {
-          trackInfo: {
-            uri: payload.uri,
-            title: this.state.title,
-            artist: this.state.artist
-          },
-          lyrics: finalLyrics,
-          provider: this.state.provider || null,
-          karaokeSource: this.state.karaokeSource || null,
-          lyricsType: getLyricsModeTypeKey(this.getCurrentMode()),
-          displayMode1: payload.displayMode1,
-          displayMode2: payload.displayMode2,
-          detectedLanguage: this.provideLanguageCode(payload.lyrics),
-          translationTargetLanguage: this.getTranslationTargetLanguage(),
-          translationSourceText: getNonSectionLyricsText(payload.lyrics),
-          presentationComplete: false
-        }
-      }));
+      this.publishLyricsPresentation(finalLyrics, {
+        uri: payload.uri,
+        displayMode1: payload.displayMode1,
+        displayMode2: payload.displayMode2,
+        detectedLanguage: this.provideLanguageCode(payload.lyrics),
+        translationSourceLyrics: payload.lyrics,
+        presentationComplete: false,
+      });
     }, 50);
   }
 
@@ -6996,18 +7032,12 @@ class LyricsContainer extends react.Component {
       if (!isActivePresentation()) return;
       this.setState({ currentLyrics: [] });
       // 오버레이에 가사 없음 상태 전송 (트랙 정보 업데이트용)
-      window.dispatchEvent(new CustomEvent('ivLyrics:lyrics-ready', {
-        detail: {
-          trackInfo: { uri: lyricsState.uri, title: this.state.title, artist: this.state.artist },
-          lyrics: [],
-          provider: lyricsState.provider || null,
-          karaokeSource: lyricsState.karaokeSource || null,
-          lyricsType: getLyricsModeTypeKey(mode),
-          detectedLanguage: null,
-          translationTargetLanguage: this.getTranslationTargetLanguage(),
-          presentationComplete: true
-        }
-      }));
+      this.publishLyricsPresentation([], {
+        uri: lyricsState.uri,
+        provider: lyricsState.provider || null,
+        karaokeSource: lyricsState.karaokeSource || null,
+        mode,
+      });
       return;
     }
 
@@ -7056,6 +7086,19 @@ class LyricsContainer extends react.Component {
     this.displayMode2 = displayMode2;
 
     const { uri } = lyricsState; // Capture the URI for this specific request
+    const publishCurrentPresentation = (displayLyrics, presentationComplete) =>
+      this.publishLyricsPresentation(displayLyrics, {
+        uri,
+        provider: lyricsState.provider || null,
+        karaokeSource: lyricsState.karaokeSource || null,
+        mode,
+        displayMode1,
+        displayMode2,
+        detectedLanguage: originalLanguage || null,
+        translationSourceLyrics: lyrics,
+        presentationComplete,
+      });
+
     this.requestCulturalAnnotations({
       lyricsState,
       lyrics,
@@ -7083,11 +7126,12 @@ class LyricsContainer extends react.Component {
         uri,
         `${lyricsState.provider || ''}:${displayMode1 || 'none'}:${displayMode2 || 'none'}:${getSyncDataRendererCacheVersion(lyricsState)}`
       );
-      if (this.state.currentLyrics !== sharedSnapshot.displayLyrics) {
-        this.setState({
-          currentLyrics: this.applyCulturalAnnotations(sharedSnapshot.displayLyrics, uri),
-        });
-      }
+      const sharedDisplayLyrics = this.applyCulturalAnnotations(
+        sharedSnapshot.displayLyrics,
+        uri
+      );
+      this.setState({ currentLyrics: sharedDisplayLyrics });
+      publishCurrentPresentation(sharedDisplayLyrics, true);
       return;
     }
 
@@ -7145,21 +7189,7 @@ class LyricsContainer extends react.Component {
         currentLyrics: finalLyrics,
       });
       // 🔹 ivLyrics-overlay 앱으로 원문 가사 전송 (번역 모드 미사용)
-      window.dispatchEvent(new CustomEvent('ivLyrics:lyrics-ready', {
-        detail: {
-          trackInfo: { uri, title: this.state.title, artist: this.state.artist },
-          lyrics: finalLyrics,
-          provider: lyricsState.provider || null,
-          karaokeSource: lyricsState.karaokeSource || null,
-          lyricsType: getLyricsModeTypeKey(mode),
-          displayMode1,
-          displayMode2,
-          detectedLanguage: originalLanguage || null,
-          translationTargetLanguage: this.getTranslationTargetLanguage(),
-          translationSourceText: getNonSectionLyricsText(lyrics),
-          presentationComplete: true
-        }
-      }));
+      publishCurrentPresentation(finalLyrics, true);
       return;
     }
 
@@ -7179,21 +7209,7 @@ class LyricsContainer extends react.Component {
       });
       // 🔹 ivLyrics-overlay 앱으로 원문 가사 먼저 전송 (번역 로딩 전)
       // 발음/번역 생성이 오래 걸리더라도 오버레이는 원문을 즉시 표시해야 한다.
-      window.dispatchEvent(new CustomEvent('ivLyrics:lyrics-ready', {
-        detail: {
-          trackInfo: { uri, title: this.state.title, artist: this.state.artist },
-          lyrics: originalLyrics,
-          provider: lyricsState.provider || null,
-          karaokeSource: lyricsState.karaokeSource || null,
-          lyricsType: getLyricsModeTypeKey(mode),
-          displayMode1,
-          displayMode2,
-          detectedLanguage: originalLanguage || null,
-          translationTargetLanguage: this.getTranslationTargetLanguage(),
-          translationSourceText: getNonSectionLyricsText(lyrics),
-          presentationComplete: false
-        }
-      }));
+      publishCurrentPresentation(originalLyrics, false);
     }
 
     // Progressive loading: keep results per track so Mode 1 does not disappear when Mode 2 finishes
@@ -7268,22 +7284,10 @@ class LyricsContainer extends react.Component {
       });
 
       // 🔹 ivLyrics-overlay 앱으로 가사 전송
-      window.dispatchEvent(new CustomEvent('ivLyrics:lyrics-ready', {
-        detail: {
-          trackInfo: { uri, title: this.state.title, artist: this.state.artist },
-          lyrics: finalLyrics,
-          provider: lyricsState.provider || null,
-          karaokeSource: lyricsState.karaokeSource || null,
-          lyricsType: getLyricsModeTypeKey(mode),
-          displayMode1,
-          displayMode2,
-          detectedLanguage: originalLanguage || null,
-          translationTargetLanguage: this.getTranslationTargetLanguage(),
-          translationSourceText: getNonSectionLyricsText(lyrics),
-          presentationComplete: (!mode1Active || !!lyricsMode1) &&
-            (!mode2Active || !!lyricsMode2)
-        }
-      }));
+      publishCurrentPresentation(
+        finalLyrics,
+        (!mode1Active || !!lyricsMode1) && (!mode2Active || !!lyricsMode2)
+      );
     };
 
     // 스마트 로딩 전략: 두 모드 모두 활성화된 경우 둘 다 완료될 때까지 기다림
