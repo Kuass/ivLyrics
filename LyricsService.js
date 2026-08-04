@@ -352,125 +352,93 @@
     // Utils - 유틸리티 함수들 (Extension 전용)
     // ============================================
     const IVLYRICS_PROGRESS_GUARD_KEY = "__ivLyricsPlaybackProgressGuard";
-    const IVLYRICS_PROGRESS_CORRECTION_THRESHOLD_MS = 350;
-    const IVLYRICS_PROGRESS_DISCONTINUITY_THRESHOLD_MS = 1500;
+    const IVLYRICS_PROGRESS_GUARD_VERSION = 2;
 
     const clampPlayerProgress = (value) => {
         const num = Number(value);
         return Number.isFinite(num) && num > 0 ? num : 0;
     };
 
-    const isSpotifyAutomixPlayback = () => {
-        const itemMetadata = Spicetify.Player?.data?.item?.metadata || {};
-        const contextMetadata = Spicetify.Player?.data?.context?.metadata || {};
-        const itemProductType = String(itemMetadata.agentic_product_type || "").trim().toLowerCase();
-        const contextProductType = String(contextMetadata.agentic_product_type || "").trim().toLowerCase();
-        const itemAutomixMode = String(itemMetadata["audio.automix_mode"] || "").trim().toLowerCase();
-        const contextAutomixMode = String(contextMetadata["automix.mode"] || "").trim().toLowerCase();
-        const lexiconSetType = String(contextMetadata.lexicon_set_type || "").trim().toLowerCase();
-        const mixerEnabled = String(contextMetadata.mixer_enabled || "").trim().toLowerCase();
-
-        return (
-            itemProductType === "dj" ||
-            contextProductType === "dj" ||
-            lexiconSetType === "your_dj" ||
-            (itemAutomixMode && itemAutomixMode !== "off" && itemAutomixMode !== "none") ||
-            (contextAutomixMode && contextAutomixMode !== "off" && contextAutomixMode !== "none") ||
-            mixerEnabled === "true"
-        );
-    };
-
-    const getSongChangeProgressCorrection = (rawProgress) => {
-        if (isSpotifyAutomixPlayback()) {
-            return 0;
+    const createFallbackPlaybackClock = () => ({
+        version: 0,
+        start() {},
+        destroy() {},
+        invalidate() {},
+        handleSongChange() {},
+        getProgress() {
+            return clampPlayerProgress(Spicetify.Player?.getProgress?.());
+        },
+        getSnapshot() {
+            const playerData = Spicetify.Player?.data || null;
+            const playerState = Spicetify.Platform?.PlayerAPI?._state || null;
+            const uri = playerState?.item?.uri || playerData?.item?.uri || null;
+            const position = clampPlayerProgress(Spicetify.Player?.getProgress?.());
+            return {
+                version: 0,
+                uri,
+                playbackId: playerState?.playbackId || playerData?.playbackId || null,
+                identityKey: uri || "",
+                item: playerState?.item || null,
+                position,
+                duration: Spicetify.Player?.getDuration?.() || 0,
+                isPlaying: Spicetify.Player?.isPlaying?.() === true,
+                isLocal: Spicetify.Platform?.PlaybackAPI?._isLocal === true,
+                automix: window.ivLyricsPlaybackClock?.isAutomixPlayback?.(playerData, playerState) === true,
+                djNarration: window.ivLyricsPlaybackClock?.isDjNarrationPlayback?.(playerData, playerState) === true,
+                source: "public-progress",
+                sampledAt: performance.now()
+            };
         }
-
-        return rawProgress >= IVLYRICS_PROGRESS_CORRECTION_THRESHOLD_MS
-            ? rawProgress
-            : 0;
-    };
+    });
 
     const ensurePlaybackProgressGuard = () => {
-        if (window[IVLYRICS_PROGRESS_GUARD_KEY]) {
-            return window[IVLYRICS_PROGRESS_GUARD_KEY];
+        const existingGuard = window[IVLYRICS_PROGRESS_GUARD_KEY];
+        if (existingGuard?.version === IVLYRICS_PROGRESS_GUARD_VERSION) {
+            return existingGuard;
         }
 
+        existingGuard?.destroy?.();
+        const playbackClock = window.ivLyricsPlaybackClock?.createSpotifyPlaybackClock
+            ? window.ivLyricsPlaybackClock.createSpotifyPlaybackClock(Spicetify, {
+                onError(error) {
+                    serviceDebug("[PlaybackClock] precise position sample failed:", error);
+                }
+            })
+            : createFallbackPlaybackClock();
+
         const guard = {
+            version: IVLYRICS_PROGRESS_GUARD_VERSION,
             initialized: false,
-            currentUri: "",
-            correctionMs: 0,
-            songChangeAt: 0,
-            lastRawProgress: 0,
-            lastAdjustedProgress: 0,
-            lastSampleAt: 0,
-            applyCurrentState() {
-                const uri = Spicetify.Player?.data?.item?.uri || "";
-                const rawProgress = clampPlayerProgress(Spicetify.Player?.getProgress?.());
-                const now = performance.now();
-
-                this.currentUri = uri;
-                this.songChangeAt = now;
-                this.correctionMs = 0;
-                this.lastRawProgress = rawProgress;
-                this.lastAdjustedProgress = rawProgress;
-                this.lastSampleAt = now;
-            },
-            applySongChangeState() {
-                const uri = Spicetify.Player?.data?.item?.uri || "";
-                const rawProgress = clampPlayerProgress(Spicetify.Player?.getProgress?.());
-                const now = performance.now();
-
-                this.currentUri = uri;
-                this.songChangeAt = now;
-                this.correctionMs = getSongChangeProgressCorrection(rawProgress);
-                this.lastRawProgress = rawProgress;
-                this.lastAdjustedProgress = Math.max(0, rawProgress - this.correctionMs);
-                this.lastSampleAt = now;
-            },
+            songChangeListener: null,
+            playbackClock,
             ensureInitialized() {
                 if (this.initialized || typeof Spicetify.Player?.addEventListener !== "function") {
                     return;
                 }
 
                 this.initialized = true;
-                Spicetify.Player.addEventListener("songchange", () => {
-                    this.applySongChangeState();
-                });
-                this.applyCurrentState();
+                this.songChangeListener = () => this.playbackClock.handleSongChange();
+                Spicetify.Player.addEventListener("songchange", this.songChangeListener);
+                this.playbackClock.start();
             },
             clearCorrection() {
-                this.correctionMs = 0;
+                this.playbackClock.invalidate();
             },
             getAdjustedProgress() {
                 this.ensureInitialized();
-
-                const uri = Spicetify.Player?.data?.item?.uri || "";
-                const rawProgress = clampPlayerProgress(Spicetify.Player?.getProgress?.());
-                const now = performance.now();
-
-                if (uri !== this.currentUri) {
-                    this.currentUri = uri;
-                    this.songChangeAt = now;
-                    this.correctionMs = getSongChangeProgressCorrection(rawProgress);
-                    this.lastRawProgress = rawProgress;
-                    this.lastAdjustedProgress = Math.max(0, rawProgress - this.correctionMs);
-                    this.lastSampleAt = now;
-                    return this.lastAdjustedProgress;
+                return this.playbackClock.getProgress();
+            },
+            getSnapshot() {
+                this.ensureInitialized();
+                return this.playbackClock.getSnapshot();
+            },
+            destroy() {
+                if (this.songChangeListener && typeof Spicetify.Player?.removeEventListener === "function") {
+                    Spicetify.Player.removeEventListener("songchange", this.songChangeListener);
                 }
-
-                if (this.lastSampleAt > 0) {
-                    const elapsedMs = Math.max(0, now - this.lastSampleAt);
-                    const driftMs = rawProgress - this.lastRawProgress - elapsedMs;
-                    if (Math.abs(driftMs) >= IVLYRICS_PROGRESS_DISCONTINUITY_THRESHOLD_MS) {
-                        this.clearCorrection();
-                    }
-                }
-
-                const adjustedProgress = Math.max(0, rawProgress - this.correctionMs);
-                this.lastRawProgress = rawProgress;
-                this.lastAdjustedProgress = adjustedProgress;
-                this.lastSampleAt = now;
-                return adjustedProgress;
+                this.songChangeListener = null;
+                this.playbackClock.destroy();
+                this.initialized = false;
             }
         };
 
@@ -492,6 +460,31 @@
 
         getSafePlayerProgress() {
             return ensurePlaybackProgressGuard().getAdjustedProgress();
+        },
+
+        getPlayerPlaybackSnapshot() {
+            return ensurePlaybackProgressGuard().getSnapshot();
+        },
+
+        isSpotifyAutomixPlayback() {
+            return ensurePlaybackProgressGuard().getSnapshot().automix === true;
+        },
+
+        isSpotifyDjNarrationPlayback() {
+            return ensurePlaybackProgressGuard().getSnapshot().djNarration === true;
+        },
+
+        resolveStablePlaybackTrack(candidateItem = null, playbackSnapshot = null) {
+            const snapshot = playbackSnapshot || ensurePlaybackProgressGuard().getSnapshot();
+            const resolver = window.ivLyricsPlaybackClock?.resolveStablePlayerItem;
+            if (typeof resolver === "function") {
+                return resolver(Spicetify.Player?.data || null, snapshot, candidateItem);
+            }
+
+            const currentItem = Spicetify.Player?.data?.item || null;
+            if (!currentItem?.uri) return candidateItem?.uri ? candidateItem : null;
+            if (snapshot?.uri && snapshot.uri !== currentItem.uri) return null;
+            return currentItem;
         },
 
         clearSafePlayerProgressCorrection() {
@@ -7206,7 +7199,8 @@
          * @returns {Object|null}
          */
         getCurrentTrackInfo() {
-            const item = Spicetify.Player.data?.item;
+            const snapshot = Utils.getPlayerPlaybackSnapshot();
+            const item = Utils.resolveStablePlaybackTrack(null, snapshot);
             if (!item) return null;
 
             return {
@@ -7214,7 +7208,8 @@
                 title: item.name,
                 artist: item.artists?.map(a => a.name).join(', ') || '',
                 album: item.album?.name || '',
-                duration: item.duration?.milliseconds || 0,
+                duration: snapshot.duration || item.duration?.milliseconds || 0,
+                playbackId: snapshot.playbackId || null,
                 trackId: Utils.extractTrackId(item.uri)
             };
         },
@@ -8937,7 +8932,8 @@
         // 현재 재생 중인 곡과 다른(이전) 곡의 가사 전송인지 확인
         isStaleTrackSend(trackInfo) {
             try {
-                const currentUri = Spicetify.Player.data?.item?.uri;
+                const currentUri = Utils.getPlayerPlaybackSnapshot()?.uri
+                    || Spicetify.Player.data?.item?.uri;
                 return !!(currentUri && trackInfo?.uri && trackInfo.uri !== currentUri);
             } catch (e) {
                 return false;
@@ -9269,25 +9265,27 @@
 
                 this._isSendingProgress = true;
                 try {
-                    const position = Utils.getSafePlayerProgress() || 0;
-                    const duration = Spicetify.Player.getDuration() || 0;
+                    const playbackSnapshot = Utils.getPlayerPlaybackSnapshot();
+                    const position = playbackSnapshot.position || 0;
+                    const duration = playbackSnapshot.duration || Spicetify.Player.getDuration() || 0;
                     const remaining = (duration - position) / 1000;
 
                     // 현재 트랙 정보 (트랙 변경 감지용)
                     let currentTrack = null;
-                    const currentUri = Spicetify.Player.data?.item?.uri;
+                    const currentItem = Utils.resolveStablePlaybackTrack(null, playbackSnapshot);
+                    const currentUri = playbackSnapshot.uri || currentItem?.uri;
                     if (currentUri && this._lastProgressUri !== currentUri) {
                         this._lastProgressUri = currentUri;
                         try {
-                            const imageUrl = Spicetify.Player.data?.item?.metadata?.image_xlarge_url
-                                || Spicetify.Player.data?.item?.metadata?.image_url
-                                || Spicetify.Player.data?.item?.metadata?.image_large_url;
+                            const imageUrl = currentItem?.metadata?.image_xlarge_url
+                                || currentItem?.metadata?.image_url
+                                || currentItem?.metadata?.image_large_url;
                             let albumArt = null;
                             albumArt = resolveSpotifyImageUrl(imageUrl);
                             currentTrack = {
-                                title: Spicetify.Player.data?.item?.metadata?.title || '',
-                                artist: Spicetify.Player.data?.item?.metadata?.artist_name || '',
-                                album: Spicetify.Player.data?.item?.metadata?.album_title || '',
+                                title: currentItem?.metadata?.title || currentItem?.name || '',
+                                artist: currentItem?.metadata?.artist_name || '',
+                                album: currentItem?.metadata?.album_title || '',
                                 albumArt: albumArt
                             };
                         } catch (e) { }
@@ -10014,24 +10012,26 @@
 
                     this._isSendingProgress = true;
                     try {
-                        const position = Utils.getSafePlayerProgress() || 0;
-                        const duration = Spicetify.Player.getDuration() || 0;
+                        const playbackSnapshot = Utils.getPlayerPlaybackSnapshot();
+                        const position = playbackSnapshot.position || 0;
+                        const duration = playbackSnapshot.duration || Spicetify.Player.getDuration() || 0;
                         const remaining = (duration - position) / 1000;
 
                         let currentTrack = null;
-                        const currentUri = Spicetify.Player.data?.item?.uri;
+                        const currentItem = Utils.resolveStablePlaybackTrack(null, playbackSnapshot);
+                        const currentUri = playbackSnapshot.uri || currentItem?.uri;
                         if (currentUri && this._lastProgressUri !== currentUri) {
                             this._lastProgressUri = currentUri;
                             try {
-                                const imageUrl = Spicetify.Player.data?.item?.metadata?.image_xlarge_url
-                                    || Spicetify.Player.data?.item?.metadata?.image_url
-                                    || Spicetify.Player.data?.item?.metadata?.image_large_url;
+                                const imageUrl = currentItem?.metadata?.image_xlarge_url
+                                    || currentItem?.metadata?.image_url
+                                    || currentItem?.metadata?.image_large_url;
                                 let albumArt = null;
                                 albumArt = resolveSpotifyImageUrl(imageUrl);
                                 currentTrack = {
-                                    title: Spicetify.Player.data?.item?.metadata?.title || '',
-                                    artist: Spicetify.Player.data?.item?.metadata?.artist_name || '',
-                                    album: Spicetify.Player.data?.item?.metadata?.album_title || '',
+                                    title: currentItem?.metadata?.title || currentItem?.name || '',
+                                    artist: currentItem?.metadata?.artist_name || '',
+                                    album: currentItem?.metadata?.album_title || '',
                                     albumArt: albumArt
                                 };
                             } catch (e) { }

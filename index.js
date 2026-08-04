@@ -4576,6 +4576,8 @@ class LyricsContainer extends react.Component {
     this._lyricsFetchSeq = 0;
     this._activeLyricsFetchSeq = 0;
     this._lyricsPresentationSeq = 0;
+    this._playbackTrackResolutionSeq = 0;
+    this._playbackTrackResolutionTimer = null;
     this.nextTrackUri = "";
     this._cleanupFloatingMenuOutsideClick = null;
     this.availableModes = [];
@@ -6629,7 +6631,8 @@ class LyricsContainer extends react.Component {
       this.currentTrackUri = requestUri;
       isLatestLyricsRequest = () =>
         this._activeLyricsFetchSeq === requestSeq &&
-        this.currentTrackUri === requestUri;
+        this.currentTrackUri === requestUri &&
+        this.isPlaybackUriCurrent(requestUri);
 
       this.clearPendingLyricsUpdates();
       this.lastProcessedUri = null;
@@ -8412,6 +8415,148 @@ class LyricsContainer extends react.Component {
     return !(Spicetify.Player?.isPlaying?.() ?? false);
   }
 
+  isPlaybackUriCurrent(uri) {
+    if (!uri) return false;
+    const snapshot = window.Utils?.getPlayerPlaybackSnapshot?.() || null;
+    const liveUri = snapshot?.uri || Spicetify.Player?.data?.item?.uri || "";
+    return !liveUri || liveUri === uri;
+  }
+
+  clearPlaybackTrackResolutionTimer() {
+    if (this._playbackTrackResolutionTimer) {
+      clearTimeout(this._playbackTrackResolutionTimer);
+      this._playbackTrackResolutionTimer = null;
+    }
+  }
+
+  beginPlaybackTrackTransition(candidateTrack = null) {
+    const candidateUri = candidateTrack?.uri || "";
+    if (candidateUri && candidateUri === this.currentTrackUri) return false;
+
+    const transitionSeq = ++this._lyricsFetchSeq;
+    this._activeLyricsFetchSeq = transitionSeq;
+    this.clearPendingLyricsUpdates();
+    this.setState({
+      karaoke: null,
+      synced: null,
+      unsynced: null,
+      currentLyrics: null,
+      isLoading: true,
+      lyricsRequestSeq: transitionSeq,
+    });
+    return true;
+  }
+
+  commitDjNarrationTrack(track, snapshot) {
+    const uri = track?.uri || snapshot?.uri || "";
+    const transitionSeq = ++this._lyricsFetchSeq;
+    this._activeLyricsFetchSeq = transitionSeq;
+    this.currentTrackUri = uri;
+    this.trackLanguageOverride = null;
+    this.trackLyricsProviderOverride = null;
+    this.trackBackgroundOverride = null;
+    this.clearPendingLyricsUpdates();
+    this.setState({
+      ...emptyState,
+      uri,
+      title: track?.metadata?.title || track?.name || "Spotify DJ",
+      artist: track?.metadata?.artist_name || "",
+      coverUrl: track?.metadata?.image_xlarge_url || track?.metadata?.image_url || null,
+      error: "DJ narration",
+      isLoading: false,
+      explicitMode: -1,
+      lyricsRequestSeq: transitionSeq,
+      videoInfo: null,
+    });
+  }
+
+  commitResolvedPlaybackTrack(track, snapshot) {
+    const newUri = track?.uri;
+    if (!newUri) return;
+
+    if (snapshot?.djNarration === true) {
+      this.commitDjNarrationTrack(track, snapshot);
+      return;
+    }
+
+    if (this.currentTrackUri === newUri) {
+      window.Utils?.clearSafePlayerProgressCorrection?.();
+      return;
+    }
+
+    if (this.state.isLyricsEditModalOpen) {
+      this.closeLyricsEditModal();
+    }
+    const previousTrackId = Utils.extractTrackId(this.currentTrackUri);
+    if (previousTrackId) {
+      window.Translator.clearInflightRequests(previousTrackId);
+    }
+
+    const transitionInfo = this.infoFromTrack(track) || { uri: newUri };
+    const transitionSeq = ++this._lyricsFetchSeq;
+    this._activeLyricsFetchSeq = transitionSeq;
+    this.currentTrackUri = newUri;
+    this.trackLanguageOverride = null;
+    this.trackLyricsProviderOverride = null;
+    this.trackBackgroundOverride = null;
+    this.clearPendingLyricsUpdates();
+    this.setState({
+      ...this.getLoadingLyricsState(transitionInfo, transitionSeq),
+      explicitMode: -1,
+    }, () => {
+      this.fetchLyrics(track, -1);
+    });
+    this.viewPort?.scrollTo?.(0, 0);
+
+    this.setState({ videoInfo: null });
+    this.loadSavedVideoForTrack(newUri);
+  }
+
+  schedulePlaybackTrackResolution(candidateTrack = null) {
+    const resolutionSeq = ++this._playbackTrackResolutionSeq;
+    const deadline = Date.now() + 4000;
+    this.clearPlaybackTrackResolutionTimer();
+    let transitionCleared = this.beginPlaybackTrackTransition(candidateTrack);
+
+    const resolve = () => {
+      if (!this._isComponentMounted || resolutionSeq !== this._playbackTrackResolutionSeq) {
+        return;
+      }
+
+      const snapshot = window.Utils?.getPlayerPlaybackSnapshot?.() || null;
+      const stableTrack = window.Utils?.resolveStablePlaybackTrack?.(candidateTrack, snapshot) || null;
+      const trackChanged = !!stableTrack?.uri && stableTrack.uri !== this.currentTrackUri;
+
+      if (!transitionCleared && snapshot?.uri && snapshot.uri !== this.currentTrackUri) {
+        transitionCleared = this.beginPlaybackTrackTransition({ uri: snapshot.uri });
+      }
+
+      if (snapshot?.djNarration === true && snapshot.uri) {
+        this.clearPlaybackTrackResolutionTimer();
+        this.commitDjNarrationTrack(stableTrack, snapshot);
+        return;
+      }
+
+      if (stableTrack && trackChanged) {
+        this.clearPlaybackTrackResolutionTimer();
+        this.commitResolvedPlaybackTrack(stableTrack, snapshot);
+        return;
+      }
+
+      if (Date.now() >= deadline) {
+        this.clearPlaybackTrackResolutionTimer();
+        if (transitionCleared) {
+          this.setState({ isLoading: false, error: "Playback transition unresolved" });
+        }
+        return;
+      }
+
+      this._playbackTrackResolutionTimer = setTimeout(resolve, 100);
+    };
+
+    resolve();
+  }
+
   componentDidMount() {
     this._isComponentMounted = true;
     document.body.classList.add('ivlyrics-page-active');
@@ -8493,40 +8638,8 @@ class LyricsContainer extends react.Component {
     Spicetify.Player?.addEventListener?.("songchange", this.updatePlaybackPausedState);
 
     this.onQueueChange = async ({ data: queue }) => {
-      const newUri = queue.current?.uri;
-      if (!newUri) return;
-
-      // 트랙이 변경되었을 때만 실행 (중복 요청 방지)
-      if (this.currentTrackUri !== newUri) {
-        if (this.state.isLyricsEditModalOpen) {
-          this.closeLyricsEditModal();
-        }
-        // 이전 트랙의 진행 중인 번역 요청 정리
-        const previousTrackId = Utils.extractTrackId(this.currentTrackUri);
-        if (previousTrackId) {
-          window.Translator.clearInflightRequests(previousTrackId);
-        }
-
-        const transitionInfo = this.infoFromTrack(queue.current) || { uri: newUri };
-        const transitionSeq = ++this._lyricsFetchSeq;
-        this._activeLyricsFetchSeq = transitionSeq;
-        this.currentTrackUri = newUri;
-        this.trackLanguageOverride = null;
-        this.trackLyricsProviderOverride = null;
-        this.trackBackgroundOverride = null;
-        this.clearPendingLyricsUpdates();
-        this.setState({
-          ...this.getLoadingLyricsState(transitionInfo, transitionSeq),
-          explicitMode: -1,
-        }, () => {
-          this.fetchLyrics(queue.current, -1);
-        });
-        this.viewPort.scrollTo(0, 0);
-
-        // 트랙 변경 시 videoInfo 초기화 후 저장된 영상 확인
-        this.setState({ videoInfo: null });
-        this.loadSavedVideoForTrack(newUri);
-
+      if (queue.current?.uri && queue.current.uri !== this.currentTrackUri) {
+        this.schedulePlaybackTrackResolution(queue.current);
       }
 
       // 다음 곡의 모든 요소 프리페치 (가사 → 번역/발음 → 영상 배경)
@@ -8540,19 +8653,13 @@ class LyricsContainer extends react.Component {
       Prefetcher.prefetchNextTrack(nextInfo, this.state.explicitMode);
     };
 
+    this.handlePlaybackSongChange = (event) => {
+      this.schedulePlaybackTrackResolution(event?.data?.item || null);
+    };
+    Spicetify.Player?.addEventListener?.("songchange", this.handlePlaybackSongChange);
+
     if (Spicetify.Player?.data?.item) {
-      const initialInfo = this.infoFromTrack(Spicetify.Player.data.item);
-      const initialSeq = ++this._lyricsFetchSeq;
-      this.currentTrackUri = Spicetify.Player.data.item.uri;
-      this._activeLyricsFetchSeq = initialSeq;
-      this.setState({
-        ...this.getLoadingLyricsState(initialInfo, initialSeq),
-        explicitMode: -1,
-      }, () => {
-        this.fetchLyrics(Spicetify.Player.data.item, -1);
-      });
-      // 초기 로드 시 저장된 영상 확인
-      this.loadSavedVideoForTrack(Spicetify.Player.data.item.uri);
+      this.schedulePlaybackTrackResolution(Spicetify.Player.data.item);
     }
 
     this.updateVisualOnConfigChange();
@@ -8895,7 +9002,11 @@ class LyricsContainer extends react.Component {
     this._unsubscribeLyricsProviderAttempt = null;
     Spicetify.Player?.removeEventListener?.("onplaypause", this.updatePlaybackPausedState);
     Spicetify.Player?.removeEventListener?.("songchange", this.updatePlaybackPausedState);
+    Spicetify.Player?.removeEventListener?.("songchange", this.handlePlaybackSongChange);
     this.updatePlaybackPausedState = null;
+    this.handlePlaybackSongChange = null;
+    this._playbackTrackResolutionSeq += 1;
+    this.clearPlaybackTrackResolutionTimer();
     if (this._cleanupFloatingMenuOutsideClick) {
       this._cleanupFloatingMenuOutsideClick();
       this._cleanupFloatingMenuOutsideClick = null;

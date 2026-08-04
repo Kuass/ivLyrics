@@ -56,7 +56,19 @@
     };
 
     const getCurrentTrack = () => {
-        const item = Spicetify.Player.data?.item;
+        const snapshot = window.Utils?.getPlayerPlaybackSnapshot?.() || null;
+        const item = window.Utils?.resolveStablePlaybackTrack?.(null, snapshot) || null;
+        if (snapshot?.djNarration === true && snapshot.uri) {
+            return {
+                uri: snapshot.uri,
+                title: item?.metadata?.title || item?.name || "Spotify DJ",
+                artist: item?.metadata?.artist_name || "",
+                duration: snapshot.duration || 0,
+                playbackId: snapshot.playbackId || null,
+                isDjNarration: true
+            };
+        }
+
         const uri = item?.uri;
         const title = item?.metadata?.title || item?.name || "";
         const artist = item?.metadata?.artist_name
@@ -68,8 +80,31 @@
             uri,
             title,
             artist,
-            duration: Spicetify.Player.getDuration?.() || 0
+            duration: snapshot?.duration || Spicetify.Player.getDuration?.() || 0,
+            playbackId: snapshot?.playbackId || null,
+            isDjNarration: false
         };
+    };
+
+    const sendEmptyLyricsForDjNarration = async (trackInfo) => {
+        const deliveries = [];
+        if (window.OverlaySender?.enabled) {
+            deliveries.push(window.OverlaySender.sendLyrics(
+                trackInfo,
+                [],
+                true,
+                "dj-narration"
+            ));
+        }
+        if (window.lyricsHelperSender?.enabled) {
+            deliveries.push(window.lyricsHelperSender.sendLyrics(
+                trackInfo,
+                [],
+                true,
+                "dj-narration"
+            ));
+        }
+        await Promise.allSettled(deliveries);
     };
 
     const hasCurrentDelivery = (trackUri) => {
@@ -149,6 +184,19 @@
             const delivery = hasCurrentDelivery(trackInfo.uri);
             if (!delivery.anyEnabled || delivery.complete) {
                 finishChain(chain);
+                return;
+            }
+
+            if (trackInfo.isDjNarration) {
+                inFlightChain = chain;
+                try {
+                    await sendEmptyLyricsForDjNarration(trackInfo);
+                } finally {
+                    if (inFlightChain?.id === chain.id) {
+                        inFlightChain = null;
+                    }
+                    finishChain(chain);
+                }
                 return;
             }
 
