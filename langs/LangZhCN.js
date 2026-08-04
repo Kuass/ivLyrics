@@ -1117,6 +1117,16 @@ window.LANG_ZH_CN = {
         "desc": "振假名与汉字之间的距离 (像素)"
       }
     },
+    "textOutline": {
+      "width": {
+        "label": "文字描边粗细",
+        "desc": "字符外侧可见描边的粗细 (px)"
+      },
+      "color": {
+        "label": "文字描边颜色",
+        "desc": "文字描边的颜色（HEX 代码）"
+      }
+    },
     "textShadow": {
       "title": "文本阴影",
       "subtitle": "提高可读性的阴影效果",

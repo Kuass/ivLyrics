@@ -1117,6 +1117,16 @@ window.LANG_ID = {
         "desc": "Jarak antara furigana dan kanji (piksel)"
       }
     },
+    "textOutline": {
+      "width": {
+        "label": "Ketebalan garis tepi teks",
+        "desc": "Ketebalan garis tepi yang terlihat di luar karakter (px)"
+      },
+      "color": {
+        "label": "Warna garis tepi teks",
+        "desc": "Warna garis tepi teks (kode HEX)"
+      }
+    },
     "textShadow": {
       "title": "Bayangan Teks",
       "subtitle": "Efek bayangan untuk meningkatkan keterbacaan",

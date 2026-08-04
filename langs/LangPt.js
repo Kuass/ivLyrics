@@ -1117,6 +1117,16 @@ window.LANG_PT = {
         "desc": "Espaço entre o Furigana e o Kanji (px)"
       }
     },
+    "textOutline": {
+      "width": {
+        "label": "Espessura do contorno do texto",
+        "desc": "Espessura visível do contorno fora dos caracteres (px)"
+      },
+      "color": {
+        "label": "Cor do contorno do texto",
+        "desc": "Cor do contorno do texto (código HEX)"
+      }
+    },
     "textShadow": {
       "title": "Sombra do Texto",
       "subtitle": "Efeito de sombra para melhorar a legibilidade",

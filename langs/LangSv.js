@@ -1117,6 +1117,16 @@ window.LANG_SV = {
         "desc": "Marginal mellan Furigana och Kanji (px)"
       }
     },
+    "textOutline": {
+      "width": {
+        "label": "Textkonturens tjocklek",
+        "desc": "Konturens synliga tjocklek utanför tecknen (px)"
+      },
+      "color": {
+        "label": "Textkonturens färg",
+        "desc": "Textkonturens färg (HEX-kod)"
+      }
+    },
     "textShadow": {
       "title": "Text skugga",
       "subtitle": "Skuggeffekter för att förbättra läsbarheten",

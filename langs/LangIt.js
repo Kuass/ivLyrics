@@ -1117,6 +1117,16 @@ window.LANG_IT = {
         "desc": "Margine tra Furigana e Kanji (px)"
       }
     },
+    "textOutline": {
+      "width": {
+        "label": "Spessore del contorno del testo",
+        "desc": "Spessore visibile del contorno esterno ai caratteri (px)"
+      },
+      "color": {
+        "label": "Colore del contorno del testo",
+        "desc": "Colore del contorno del testo (codice HEX)"
+      }
+    },
     "textShadow": {
       "title": "Ombreggiatura testo",
       "subtitle": "Effetto ombra per migliore leggibilità",

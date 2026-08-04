@@ -1117,6 +1117,16 @@ window.LANG_KO = {
         "desc": "후리가나와 한자 사이의 여백 (픽셀)"
       }
     },
+    "textOutline": {
+      "width": {
+        "label": "글자 테두리 두께",
+        "desc": "글자 바깥쪽에 표시되는 테두리 두께 (px)"
+      },
+      "color": {
+        "label": "글자 테두리 색상",
+        "desc": "글자 테두리 색상 (HEX 코드)"
+      }
+    },
     "textShadow": {
       "title": "텍스트 그림자",
       "subtitle": "가독성을 높이는 그림자 효과",

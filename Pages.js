@@ -2377,6 +2377,10 @@ const getInstrumentalBreakSettings = () => {
 			"--break-label-font-size": `${getLabelNumber("instrumental-break-label-font-size", 20, 12, 128)}px`,
 			"--break-label-font-weight": getLabelNumber("instrumental-break-label-font-weight", 200, 100, 900),
 			"--break-label-opacity": getLabelNumber("instrumental-break-label-opacity", 65, 0, 100) / 100,
+			"--break-label-outline-shadow": createOutsideTextOutlineShadow(
+				getLabelNumber("instrumental-break-label-outline-width", 0, 0, 10),
+				CONFIG?.visual?.["instrumental-break-label-outline-color"]
+			),
 		},
 	};
 };
@@ -2489,6 +2493,63 @@ const getFiniteLyricsStyleNumber = (value, fallback) => {
 	return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+// Build a crisp outline from copies of the completed glyph silhouette. Unlike
+// -webkit-text-stroke, these layers sit behind the fill and never consume the
+// inside of thin glyphs. Multiple rings keep large configured widths solid.
+const createOutsideTextOutlineShadow = (widthValue, colorValue = "#000000") => {
+	const width = Math.max(0, Math.min(10, Number(widthValue) || 0));
+	if (width <= 0) return "0 0 0 transparent";
+
+	const color = String(colorValue || "#000000");
+	const ringCount = Math.max(1, Math.min(4, Math.ceil(width * 2)));
+	const directionCount = width <= 0.5 ? 8 : width <= 1 ? 12 : 16;
+	const layers = [];
+	const formatOffset = (value) => {
+		const rounded = Math.abs(value) < 0.0005 ? 0 : value;
+		return `${rounded.toFixed(3)}px`;
+	};
+
+	for (let ring = 1; ring <= ringCount; ring += 1) {
+		const radius = width * (ring / ringCount);
+		for (let direction = 0; direction < directionCount; direction += 1) {
+			const angle = (Math.PI * 2 * direction) / directionCount;
+			layers.push(
+				`${formatOffset(Math.cos(angle) * radius)} ${formatOffset(Math.sin(angle) * radius)} 0 ${color}`
+			);
+		}
+	}
+
+	return layers.join(", ");
+};
+
+// A full-density outline becomes visually much heavier after the surrounding
+// lyric line is blurred. Keep the configured geometry but render a sparse,
+// low-opacity variant so its width still tracks the setting without flooding
+// the glyph interior.
+const getBlurredLineOutlineWidth = (widthValue) => Math.min(
+	10,
+	Math.max(0, Number(widthValue) || 0)
+);
+
+const createBlurredLineOutlineShadow = (widthValue, colorValue = "#000000") => {
+	const width = getBlurredLineOutlineWidth(widthValue);
+	if (width <= 0) return "0 0 0 transparent";
+
+	const color = String(colorValue || "#000000");
+	const hexMatch = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
+	const mutedColor = hexMatch
+		? `rgba(${parseInt(hexMatch[1], 16)}, ${parseInt(hexMatch[2], 16)}, ${parseInt(hexMatch[3], 16)}, 0.03)`
+		: `color-mix(in srgb, ${color} 3%, transparent)`;
+	const formatOffset = (value) => `${(Math.abs(value) < 0.0005 ? 0 : value).toFixed(3)}px`;
+
+	return Array.from({ length: 16 }, (_, direction) => direction)
+		.map((direction) => {
+			const angle = (Math.PI * 2 * direction) / 16;
+			return `${formatOffset(Math.cos(angle) * width)} ${formatOffset(Math.sin(angle) * width)} 0 ${mutedColor}`;
+		})
+		.join(", ");
+};
+
 // Keep the settings preview and the playback renderer on one typography contract.
 // Container geometry and playback transforms stay local to each surface, but every
 // glyph, ruby and auxiliary-line metric comes from this shared variable set.
@@ -2511,7 +2572,7 @@ const getLyricsTypographyStyleVariables = (visual = CONFIG?.visual || {}) => {
 		: shadowColor;
 	const textShadow = visual["text-shadow-enabled"]
 		? `0 0 ${shadowBlur}px ${resolvedShadowColor}`
-		: "none";
+		: "0 0 0 transparent";
 
 	return {
 		"--lyrics-align-text": alignment,
@@ -2522,29 +2583,89 @@ const getLyricsTypographyStyleVariables = (visual = CONFIG?.visual || {}) => {
 		"--lyrics-original-font-weight": getFiniteLyricsStyleNumber(visual["original-font-weight"], 600),
 		"--lyrics-original-opacity": getFiniteLyricsStyleNumber(visual["original-opacity"], 95) / 100,
 		"--lyrics-original-letter-spacing": `${getFiniteLyricsStyleNumber(visual["original-letter-spacing"], 0)}px`,
+		"--lyrics-original-outline-shadow": createOutsideTextOutlineShadow(
+			visual["original-outline-width"],
+			visual["original-outline-color"]
+		),
+		"--lyrics-original-outline-blurred-shadow": createBlurredLineOutlineShadow(
+			visual["original-outline-width"],
+			visual["original-outline-color"]
+		),
+		"--lyrics-original-outline-stroke-width": `${getFiniteLyricsStyleNumber(visual["original-outline-width"], 0) * 2}px`,
+		"--lyrics-original-outline-blurred-stroke-width": `${getBlurredLineOutlineWidth(visual["original-outline-width"]) * 2}px`,
+		"--lyrics-original-outline-blurred-stroke-color": `color-mix(in srgb, ${visual["original-outline-color"] || "#000000"} 8%, transparent)`,
+		"--lyrics-original-outline-stroke-color": visual["original-outline-color"] || "#000000",
 		"--lyrics-phonetic-font-family": visual["phonetic-font-family"] || baseFontFamily,
 		"--lyrics-phonetic-font-size": `${getFiniteLyricsStyleNumber(visual["phonetic-font-size"], 16)}px`,
 		"--lyrics-phonetic-font-weight": getFiniteLyricsStyleNumber(visual["phonetic-font-weight"], 100),
 		"--lyrics-phonetic-opacity": getFiniteLyricsStyleNumber(visual["phonetic-opacity"], 70) / 100,
 		"--lyrics-phonetic-spacing": `${getFiniteLyricsStyleNumber(visual["phonetic-spacing"], -1)}px`,
 		"--lyrics-phonetic-letter-spacing": `${getFiniteLyricsStyleNumber(visual["phonetic-letter-spacing"], 0)}px`,
+		"--lyrics-phonetic-outline-shadow": createOutsideTextOutlineShadow(
+			visual["phonetic-outline-width"],
+			visual["phonetic-outline-color"]
+		),
+		"--lyrics-phonetic-outline-blurred-shadow": createBlurredLineOutlineShadow(
+			visual["phonetic-outline-width"],
+			visual["phonetic-outline-color"]
+		),
 		"--lyrics-translation-font-family": visual["translation-font-family"] || baseFontFamily,
 		"--lyrics-translation-font-size": `${getFiniteLyricsStyleNumber(visual["translation-font-size"], 22)}px`,
 		"--lyrics-translation-font-weight": getFiniteLyricsStyleNumber(visual["translation-font-weight"], 300),
 		"--lyrics-translation-opacity": getFiniteLyricsStyleNumber(visual["translation-opacity"], 85) / 100,
 		"--lyrics-translation-spacing": `${getFiniteLyricsStyleNumber(visual["translation-spacing"], 0)}px`,
 		"--lyrics-translation-letter-spacing": `${getFiniteLyricsStyleNumber(visual["translation-letter-spacing"], 0)}px`,
+		"--lyrics-translation-outline-shadow": createOutsideTextOutlineShadow(
+			visual["translation-outline-width"],
+			visual["translation-outline-color"]
+		),
+		"--lyrics-translation-outline-blurred-shadow": createBlurredLineOutlineShadow(
+			visual["translation-outline-width"],
+			visual["translation-outline-color"]
+		),
 		"--lyrics-cultural-note-font-family": visual["cultural-annotations-font-family"] || visual["translation-font-family"] || baseFontFamily,
 		"--lyrics-cultural-note-font-size": `${getFiniteLyricsStyleNumber(visual["cultural-annotations-font-size"], 14)}px`,
 		"--lyrics-cultural-note-font-weight": getFiniteLyricsStyleNumber(visual["cultural-annotations-font-weight"], 300),
 		"--lyrics-cultural-note-opacity": getFiniteLyricsStyleNumber(visual["cultural-annotations-opacity"], 60) / 100,
+		"--lyrics-cultural-note-outline-shadow": createOutsideTextOutlineShadow(
+			visual["cultural-annotations-outline-width"],
+			visual["cultural-annotations-outline-color"]
+		),
+		"--lyrics-cultural-note-outline-blurred-shadow": createBlurredLineOutlineShadow(
+			visual["cultural-annotations-outline-width"],
+			visual["cultural-annotations-outline-color"]
+		),
 		"--lyrics-cultural-note-margin-left": culturalNoteMargins.left,
 		"--lyrics-cultural-note-margin-right": culturalNoteMargins.right,
 		"--lyrics-furigana-font-size": `${getFiniteLyricsStyleNumber(visual["furigana-font-size"], 14)}px`,
 		"--lyrics-furigana-font-weight": getFiniteLyricsStyleNumber(visual["furigana-font-weight"], 300),
 		"--lyrics-furigana-opacity": getFiniteLyricsStyleNumber(visual["furigana-opacity"], 80) / 100,
 		"--lyrics-furigana-spacing": `${getFiniteLyricsStyleNumber(visual["furigana-spacing"], 2)}px`,
+		"--lyrics-furigana-outline-shadow": createOutsideTextOutlineShadow(
+			visual["furigana-outline-width"],
+			visual["furigana-outline-color"]
+		),
+		"--lyrics-furigana-outline-blurred-shadow": createBlurredLineOutlineShadow(
+			visual["furigana-outline-width"],
+			visual["furigana-outline-color"]
+		),
 		"--lyrics-line-spacing": `${getFiniteLyricsStyleNumber(visual["line-spacing"], 8)}px`,
+		"--fullscreen-title-outline-shadow": createOutsideTextOutlineShadow(
+			visual["fullscreen-title-outline-width"],
+			visual["fullscreen-title-outline-color"]
+		),
+		"--fullscreen-artist-outline-shadow": createOutsideTextOutlineShadow(
+			visual["fullscreen-artist-outline-width"],
+			visual["fullscreen-artist-outline-color"]
+		),
+		"--fullscreen-clock-outline-shadow": createOutsideTextOutlineShadow(
+			visual["fullscreen-clock-outline-width"],
+			visual["fullscreen-clock-outline-color"]
+		),
+		"--fullscreen-tmi-outline-shadow": createOutsideTextOutlineShadow(
+			visual["fullscreen-tmi-outline-width"],
+			visual["fullscreen-tmi-outline-color"]
+		),
 		"--lyrics-text-shadow": textShadow,
 		"--lyrics-text-drop-shadow": visual["text-shadow-enabled"]
 			? `drop-shadow(0 0 ${shadowBlur}px ${resolvedShadowColor})`
@@ -3788,9 +3909,14 @@ const buildKaraokeTextRunElements = (
 				className: segmentClassName,
 				dir: segmentDirection,
 				style: segmentStyle,
+				"data-outline-text": segment.text,
 				key: `karaoke-text-run-segment-${segment.startIndex}`,
 			},
-			segment.text
+			react.createElement(
+				"span",
+				{ className: "lyrics-karaoke-glyph-fill" },
+				segment.text
+			)
 		);
 	});
 };
@@ -5533,9 +5659,14 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 			{
 				className,
 				style: karaokeStyle,
+				"data-outline-text": charInfo.char,
 				key: `karaoke-char-${index}`,
 			},
-			charInfo.char
+			react.createElement(
+				"span",
+				{ className: "lyrics-karaoke-glyph-fill" },
+				charInfo.char
+			)
 		);
 		const reading = furiganaMap.get(index);
 

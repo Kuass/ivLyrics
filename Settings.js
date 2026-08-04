@@ -1897,6 +1897,9 @@ const AIProvidersTab = () => {
             unit: "%",
             when: () => areCulturalAnnotationsEnabled(),
           },
+          ...createTextOutlineSettingItems("cultural-annotations", {
+            when: () => areCulturalAnnotationsEnabled(),
+          }),
           {
             desc: `${vinylModeLabel} · ${I18n.t("settings.culturalAnnotations.fontFamily.label")}`,
             key: "cultural-annotations-vinyl-font-family",
@@ -1934,6 +1937,11 @@ const AIProvidersTab = () => {
             unit: "%",
             when: () => areCulturalAnnotationsEnabled(),
           },
+          ...createTextOutlineSettingItems("cultural-annotations-vinyl", {
+            labelPrefix: `${vinylModeLabel} · `,
+            infoPrefix: `${vinylModeLabel}: `,
+            when: () => areCulturalAnnotationsEnabled(),
+          }),
         ],
         onChange: (name, value) => {
           CONFIG.visual[name] = value;
@@ -3168,6 +3176,39 @@ const ConfigColorPicker = ({ name, defaultValue, onChange = () => { } }) => {
     })
   );
 };
+
+const createTextOutlineSettingItems = (
+  settingPrefix,
+  {
+    labelPrefix = "",
+    infoPrefix = "",
+    when,
+    disabled,
+  } = {}
+) => [
+  {
+    desc: `${labelPrefix}${I18n.t("settingsAdvanced.textOutline.width.label") || "Text Outline Thickness"}`,
+    info: `${infoPrefix}${I18n.t("settingsAdvanced.textOutline.width.desc") || "Visible thickness of the outline outside the glyphs (px)"}`,
+    key: `${settingPrefix}-outline-width`,
+    type: ConfigSliderRange,
+    min: 0,
+    max: 10,
+    step: 0.5,
+    unit: "px",
+    defaultValue: Number(CONFIG.visual[`${settingPrefix}-outline-width`] ?? 0),
+    when,
+    disabled,
+  },
+  {
+    desc: `${labelPrefix}${I18n.t("settingsAdvanced.textOutline.color.label") || "Text Outline Color"}`,
+    info: `${infoPrefix}${I18n.t("settingsAdvanced.textOutline.color.desc") || "Color of the text outline (HEX code)"}`,
+    key: `${settingPrefix}-outline-color`,
+    type: ConfigColorPicker,
+    defaultValue: CONFIG.visual[`${settingPrefix}-outline-color`] || "#000000",
+    when,
+    disabled,
+  },
+];
 
 const MULTI_VOCAL_COLOR_GROUPS = [
   {
@@ -4853,6 +4894,10 @@ const NowPlayingPanelPreview = () => {
     const parsed = parseInt(value, 10);
     return Number.isNaN(parsed) ? fallback : parsed;
   };
+  const parsePanelFloat = (value, fallback) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
 
   const [fontFamily, setFontFamily] = useState(CONFIG.visual["panel-lyrics-font-family"] || "Pretendard Variable");
   const [originalFont, setOriginalFont] = useState(CONFIG.visual["panel-lyrics-original-font"] || "");
@@ -4862,6 +4907,12 @@ const NowPlayingPanelPreview = () => {
   const [originalSize, setOriginalSize] = useState(parsePanelNumber(CONFIG.visual["panel-lyrics-original-size"], 26));
   const [phoneticSize, setPhoneticSize] = useState(parsePanelNumber(CONFIG.visual["panel-lyrics-phonetic-size"], 13));
   const [translationSize, setTranslationSize] = useState(parsePanelNumber(CONFIG.visual["panel-lyrics-translation-size"], 13));
+  const [originalOutlineWidth, setOriginalOutlineWidth] = useState(parsePanelFloat(CONFIG.visual["panel-lyrics-original-outline-width"], 0));
+  const [originalOutlineColor, setOriginalOutlineColor] = useState(CONFIG.visual["panel-lyrics-original-outline-color"] || "#000000");
+  const [phoneticOutlineWidth, setPhoneticOutlineWidth] = useState(parsePanelFloat(CONFIG.visual["panel-lyrics-phonetic-outline-width"], 0));
+  const [phoneticOutlineColor, setPhoneticOutlineColor] = useState(CONFIG.visual["panel-lyrics-phonetic-outline-color"] || "#000000");
+  const [translationOutlineWidth, setTranslationOutlineWidth] = useState(parsePanelFloat(CONFIG.visual["panel-lyrics-translation-outline-width"], 0));
+  const [translationOutlineColor, setTranslationOutlineColor] = useState(CONFIG.visual["panel-lyrics-translation-outline-color"] || "#000000");
 
   // 배경 설정
   const [bgType, setBgType] = useState(CONFIG.visual["panel-bg-type"] || "album");
@@ -4887,6 +4938,12 @@ const NowPlayingPanelPreview = () => {
       if (name === "panel-lyrics-original-size") setOriginalSize(parsePanelNumber(value, 26));
       if (name === "panel-lyrics-phonetic-size") setPhoneticSize(parsePanelNumber(value, 13));
       if (name === "panel-lyrics-translation-size") setTranslationSize(parsePanelNumber(value, 13));
+      if (name === "panel-lyrics-original-outline-width") setOriginalOutlineWidth(parsePanelFloat(value, 0));
+      if (name === "panel-lyrics-original-outline-color") setOriginalOutlineColor(value || "#000000");
+      if (name === "panel-lyrics-phonetic-outline-width") setPhoneticOutlineWidth(parsePanelFloat(value, 0));
+      if (name === "panel-lyrics-phonetic-outline-color") setPhoneticOutlineColor(value || "#000000");
+      if (name === "panel-lyrics-translation-outline-width") setTranslationOutlineWidth(parsePanelFloat(value, 0));
+      if (name === "panel-lyrics-translation-outline-color") setTranslationOutlineColor(value || "#000000");
       // 배경 설정
       if (name === "panel-bg-type") setBgType(value || "album");
       if (name === "panel-bg-color") setBgColor(value || "#6366f1");
@@ -5059,6 +5116,7 @@ const NowPlayingPanelPreview = () => {
                   color: line.active ? "#ffffff" : "rgba(255, 255, 255, 0.7)",
                   lineHeight: 1.4,
                   fontFamily: originalFontFamily,
+                  textShadow: createOutsideTextOutlineShadow(originalOutlineWidth, originalOutlineColor),
                 }
               },
               line.original
@@ -5073,6 +5131,7 @@ const NowPlayingPanelPreview = () => {
                   color: line.active ? "rgba(255, 255, 255, 0.75)" : "rgba(255, 255, 255, 0.55)",
                   lineHeight: 1.35,
                   fontFamily: phoneticFontFamily,
+                  textShadow: createOutsideTextOutlineShadow(phoneticOutlineWidth, phoneticOutlineColor),
                 }
               },
               line.phonetic
@@ -5087,6 +5146,7 @@ const NowPlayingPanelPreview = () => {
                   color: line.active ? "rgba(255, 255, 255, 0.8)" : "rgba(255, 255, 255, 0.5)",
                   lineHeight: 1.35,
                   fontFamily: translationFontFamily,
+                  textShadow: createOutsideTextOutlineShadow(translationOutlineWidth, translationOutlineColor),
                 }
               },
               line.translation
@@ -15231,6 +15291,9 @@ const ConfigModal = ({
               defaultValue: getInstrumentalBreakLabelStyleDefault("opacity", null, 65),
               disabled: () => CONFIG.visual["instrumental-break-show-label"] !== true,
             },
+            ...createTextOutlineSettingItems("instrumental-break-label", {
+              disabled: () => CONFIG.visual["instrumental-break-show-label"] !== true,
+            }),
             {
               desc: I18n.t("settingsAdvanced.instrumentalBreak.speed.label") || "Animation Speed",
               key: "instrumental-break-animation-speed",
@@ -15474,6 +15537,7 @@ const ConfigModal = ({
               step: 0.5,
               unit: "px",
             },
+            ...createTextOutlineSettingItems("original"),
           ],
           onChange: (name, value) => {
             CONFIG.visual[name] = value;
@@ -15619,6 +15683,7 @@ const ConfigModal = ({
               step: 0.5,
               unit: "px",
             },
+            ...createTextOutlineSettingItems("phonetic"),
             {
               desc: I18n.t("settingsAdvanced.pronunciationStyle.hyphenReplace.label"),
               info: I18n.t("settingsAdvanced.pronunciationStyle.hyphenReplace.desc"),
@@ -15780,6 +15845,7 @@ const ConfigModal = ({
               step: 0.5,
               unit: "px",
             },
+            ...createTextOutlineSettingItems("translation"),
           ],
           onChange: (name, value) => {
             CONFIG.visual[name] = value;
@@ -15842,6 +15908,7 @@ const ConfigModal = ({
               step: 1,
               unit: "px",
             },
+            ...createTextOutlineSettingItems("furigana"),
           ],
           onChange: (name, value) => {
             CONFIG.visual[name] = value;
@@ -17345,6 +17412,7 @@ const ConfigModal = ({
               step: 0.5,
               unit: "px",
             },
+            ...createTextOutlineSettingItems("fullscreen-vinyl-original"),
           ],
           onChange: saveVinylSetting,
         }),
@@ -17409,6 +17477,7 @@ const ConfigModal = ({
               step: 0.5,
               unit: "px",
             },
+            ...createTextOutlineSettingItems("fullscreen-vinyl-phonetic"),
           ],
           onChange: saveVinylSetting,
         }),
@@ -17473,6 +17542,7 @@ const ConfigModal = ({
               step: 0.5,
               unit: "px",
             },
+            ...createTextOutlineSettingItems("fullscreen-vinyl-translation"),
           ],
           onChange: saveVinylSetting,
         }),
@@ -17697,6 +17767,7 @@ const ConfigModal = ({
               unit: "px",
               defaultValue: CONFIG.visual["fullscreen-title-size"] || 48,
             },
+            ...createTextOutlineSettingItems("fullscreen-title"),
             {
               desc: I18n.t("settingsAdvanced.fullscreenStyle.artistFontSize.desc"),
               info: I18n.t("settingsAdvanced.fullscreenStyle.artistFontSize.info"),
@@ -17708,6 +17779,7 @@ const ConfigModal = ({
               unit: "px",
               defaultValue: CONFIG.visual["fullscreen-artist-size"] || 24,
             },
+            ...createTextOutlineSettingItems("fullscreen-artist"),
             {
               desc: I18n.t("settingsAdvanced.fullscreenStyle.lyricsRightMargin.desc"),
               info: I18n.t("settingsAdvanced.fullscreenStyle.lyricsRightMargin.info"),
@@ -17757,6 +17829,9 @@ const ConfigModal = ({
               defaultValue: CONFIG.visual["fullscreen-clock-size"] || 48,
               when: () => CONFIG.visual["fullscreen-show-clock"] !== false,
             },
+            ...createTextOutlineSettingItems("fullscreen-clock", {
+              when: () => CONFIG.visual["fullscreen-show-clock"] !== false,
+            }),
             {
               desc: I18n.t("settingsAdvanced.fullscreenUI.showContext.desc"),
               info: I18n.t("settingsAdvanced.fullscreenUI.showContext.info"),
@@ -17933,6 +18008,7 @@ const ConfigModal = ({
               unit: "%",
               defaultValue: CONFIG.visual["fullscreen-tmi-font-size"] || 100,
             },
+            ...createTextOutlineSettingItems("fullscreen-tmi"),
           ],
           onChange: (name, value) => {
             CONFIG.visual[name] = value;
@@ -18012,6 +18088,9 @@ const ConfigModal = ({
               step: 1,
               unit: "px",
             },
+            ...createTextOutlineSettingItems("panel-lyrics-original", {
+              labelPrefix: `${I18n.t("settingsAdvanced.nowPlayingPanel.originalFont.label") || "Original Text"} · `,
+            }),
             {
               desc: I18n.t("settingsAdvanced.nowPlayingPanel.phoneticSize.label") || "Phonetic Text Size",
               key: "panel-lyrics-phonetic-size",
@@ -18022,6 +18101,9 @@ const ConfigModal = ({
               step: 1,
               unit: "px",
             },
+            ...createTextOutlineSettingItems("panel-lyrics-phonetic", {
+              labelPrefix: `${I18n.t("settingsAdvanced.nowPlayingPanel.phoneticFont.label") || "Phonetic Text"} · `,
+            }),
             {
               desc: I18n.t("settingsAdvanced.nowPlayingPanel.translationSize.label") || "Translation Text Size",
               key: "panel-lyrics-translation-size",
@@ -18032,6 +18114,9 @@ const ConfigModal = ({
               step: 1,
               unit: "px",
             },
+            ...createTextOutlineSettingItems("panel-lyrics-translation", {
+              labelPrefix: `${I18n.t("settingsAdvanced.nowPlayingPanel.translationFont.label") || "Translation Text"} · `,
+            }),
           ],
           onChange: (name, value) => {
             CONFIG.visual[name] = value;

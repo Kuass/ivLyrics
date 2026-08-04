@@ -1117,6 +1117,16 @@ window.LANG_EN = {
         "desc": "Margin between Furigana and Kanji (px)"
       }
     },
+    "textOutline": {
+      "width": {
+        "label": "Text Outline Thickness",
+        "desc": "Visible thickness of the outline outside the glyphs (px)"
+      },
+      "color": {
+        "label": "Text Outline Color",
+        "desc": "Color of the text outline (HEX code)"
+      }
+    },
     "textShadow": {
       "title": "Text Shadow",
       "subtitle": "Shadow effects to improve readability",

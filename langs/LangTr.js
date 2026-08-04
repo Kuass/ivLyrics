@@ -1117,6 +1117,16 @@ window.LANG_TR = {
       "desc": "Furigana ve Kanji arasındaki boşluk (px)"
     }
   },
+  "textOutline": {
+    "width": {
+      "label": "Metin dış çizgi kalınlığı",
+      "desc": "Karakterlerin dışında görünen dış çizginin kalınlığı (px)"
+    },
+    "color": {
+      "label": "Metin dış çizgi rengi",
+      "desc": "Metin dış çizgisinin rengi (HEX kodu)"
+    }
+  },
   "textShadow": {
     "title": "Metin Gölgesi",
     "subtitle": "Okunabilirliği artırmak için gölge efektleri",

@@ -1551,22 +1551,40 @@ const VinylPlayerMode = (() => {
                 "--iv-vinyl-original-font-weight": Number(vinylSettings.originalFontWeight) || 600,
                 "--iv-vinyl-original-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.originalOpacity) || 95) / 100)),
                 "--iv-vinyl-original-letter-spacing": `${Number(vinylSettings.originalLetterSpacing) || 0}px`,
+                "--iv-vinyl-original-outline-shadow": createOutsideTextOutlineShadow(
+                    vinylSettings.originalOutlineWidth,
+                    vinylSettings.originalOutlineColor
+                ),
+                "--iv-vinyl-original-outline-stroke-width": `${(Number(vinylSettings.originalOutlineWidth) || 0) * 2}px`,
+                "--iv-vinyl-original-outline-stroke-color": vinylSettings.originalOutlineColor || "#000000",
                 "--iv-vinyl-phonetic-font-family": `'${String(vinylSettings.phoneticFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
                 "--iv-vinyl-phonetic-font-size": `${Number(vinylSettings.phoneticFontSize) || 11}px`,
                 "--iv-vinyl-phonetic-font-weight": Number(vinylSettings.phoneticFontWeight) || 100,
                 "--iv-vinyl-phonetic-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.phoneticOpacity) || 70) / 100)),
                 "--iv-vinyl-phonetic-spacing": `${Number.isFinite(Number(vinylSettings.phoneticSpacing)) ? Number(vinylSettings.phoneticSpacing) : -1}px`,
                 "--iv-vinyl-phonetic-letter-spacing": `${Number(vinylSettings.phoneticLetterSpacing) || 0}px`,
+                "--iv-vinyl-phonetic-outline-shadow": createOutsideTextOutlineShadow(
+                    vinylSettings.phoneticOutlineWidth,
+                    vinylSettings.phoneticOutlineColor
+                ),
                 "--iv-vinyl-translation-font-family": `'${String(vinylSettings.translationFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
                 "--iv-vinyl-translation-font-size": `${Number(vinylSettings.translationFontSize) || 15}px`,
                 "--iv-vinyl-translation-font-weight": Number(vinylSettings.translationFontWeight) || 300,
                 "--iv-vinyl-translation-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.translationOpacity) || 85) / 100)),
                 "--iv-vinyl-translation-spacing": `${Number(vinylSettings.translationSpacing) || 0}px`,
                 "--iv-vinyl-translation-letter-spacing": `${Number(vinylSettings.translationLetterSpacing) || 0}px`,
+                "--iv-vinyl-translation-outline-shadow": createOutsideTextOutlineShadow(
+                    vinylSettings.translationOutlineWidth,
+                    vinylSettings.translationOutlineColor
+                ),
                 "--iv-vinyl-cultural-note-font-family": `'${String(vinylSettings.culturalFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
                 "--iv-vinyl-cultural-note-font-size": `${Number(vinylSettings.culturalFontSize) || 12}px`,
                 "--iv-vinyl-cultural-note-font-weight": Number(vinylSettings.culturalFontWeight) || 300,
                 "--iv-vinyl-cultural-note-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.culturalOpacity) || 60) / 100)),
+                "--iv-vinyl-cultural-note-outline-shadow": createOutsideTextOutlineShadow(
+                    vinylSettings.culturalOutlineWidth,
+                    vinylSettings.culturalOutlineColor
+                ),
                 "--iv-vinyl-background-blur": `${backgroundBlur}px`
             }
         },

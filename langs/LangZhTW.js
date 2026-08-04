@@ -1117,6 +1117,16 @@ window.LANG_ZH_TW = {
         "desc": "振假名與漢字之間的留白 (px)"
       }
     },
+    "textOutline": {
+      "width": {
+        "label": "文字描邊粗細",
+        "desc": "字元外側可見描邊的粗細 (px)"
+      },
+      "color": {
+        "label": "文字描邊顏色",
+        "desc": "文字描邊的顏色（HEX 色碼）"
+      }
+    },
     "textShadow": {
       "title": "文字陰影",
       "subtitle": "提升可讀性的陰影效果",

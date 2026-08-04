@@ -2305,24 +2305,25 @@ div.lyrics-tabBar-headerItemLink {
 @keyframes ivlyrics-kind-sparkle {
   0%, 100% {
     filter: brightness(1);
-    text-shadow: 0 0 0 rgba(255, 255, 255, 0);
+    text-shadow: var(--lyrics-current-original-outline-shadow, 0 0 0 transparent), 0 0 0 rgba(255, 255, 255, 0);
   }
   42% {
     filter: brightness(1.22);
-    text-shadow: 0 0 0.18em rgba(255, 255, 255, 0.34), 0 0 0.42em currentColor;
+    text-shadow: var(--lyrics-current-original-outline-shadow, 0 0 0 transparent), 0 0 0.18em rgba(255, 255, 255, 0.34), 0 0 0.42em currentColor;
   }
   58% {
     filter: brightness(0.96);
-    text-shadow: 0 0 0.08em rgba(255, 255, 255, 0.16);
+    text-shadow: var(--lyrics-current-original-outline-shadow, 0 0 0 transparent), 0 0 0.08em rgba(255, 255, 255, 0.16);
   }
 }
 
 @keyframes ivlyrics-kind-echo {
   0%, 100% {
-    text-shadow: 0 0 0 rgba(255, 255, 255, 0);
+    text-shadow: var(--lyrics-current-original-outline-shadow, 0 0 0 transparent), 0 0 0 rgba(255, 255, 255, 0);
   }
   50% {
     text-shadow:
+      var(--lyrics-current-original-outline-shadow, 0 0 0 transparent),
       0.07em 0.04em 0 rgba(255, 255, 255, 0.18),
       0.14em 0.08em 0.22em color-mix(in srgb, var(--lyrics-color-active, #fff) 36%, transparent);
   }
@@ -2367,6 +2368,7 @@ div.lyrics-tabBar-headerItemLink {
   0%, 100% {
     filter: brightness(1.08);
     text-shadow:
+      var(--lyrics-current-original-outline-shadow, 0 0 0 transparent),
       0 0 0.12em rgba(255, 255, 255, 0.3),
       0 0 0.48em color-mix(in srgb, var(--lyrics-color-active, #fff) 42%, transparent),
       0 0 0.76em color-mix(in srgb, var(--lyrics-color-active, #fff) 20%, transparent);
@@ -2374,6 +2376,7 @@ div.lyrics-tabBar-headerItemLink {
   50% {
     filter: brightness(1.03);
     text-shadow:
+      var(--lyrics-current-original-outline-shadow, 0 0 0 transparent),
       0 0 0.1em rgba(255, 255, 255, 0.24),
       0 0 0.4em color-mix(in srgb, var(--lyrics-color-active, #fff) 36%, transparent),
       0 0 0.68em color-mix(in srgb, var(--lyrics-color-active, #fff) 16%, transparent);
@@ -2383,27 +2386,27 @@ div.lyrics-tabBar-headerItemLink {
 @keyframes ivlyrics-kind-glitch {
   0%, 100% {
     translate: 0 0;
-    text-shadow: 0 0 0 transparent;
+    text-shadow: var(--lyrics-current-original-outline-shadow, 0 0 0 transparent), 0 0 0 transparent;
   }
   16% {
     translate: -0.035em 0.01em;
-    text-shadow: 0.045em 0 rgba(111, 211, 255, 0.34), -0.045em 0 rgba(255, 116, 172, 0.3);
+    text-shadow: var(--lyrics-current-original-outline-shadow, 0 0 0 transparent), 0.045em 0 rgba(111, 211, 255, 0.34), -0.045em 0 rgba(255, 116, 172, 0.3);
   }
   18% {
     translate: 0.03em -0.01em;
-    text-shadow: -0.04em 0 rgba(111, 211, 255, 0.26), 0.04em 0 rgba(255, 116, 172, 0.28);
+    text-shadow: var(--lyrics-current-original-outline-shadow, 0 0 0 transparent), -0.04em 0 rgba(111, 211, 255, 0.26), 0.04em 0 rgba(255, 116, 172, 0.28);
   }
   20%, 64% {
     translate: 0 0;
-    text-shadow: 0 0 0 transparent;
+    text-shadow: var(--lyrics-current-original-outline-shadow, 0 0 0 transparent), 0 0 0 transparent;
   }
   66% {
     translate: 0.025em 0;
-    text-shadow: 0.035em 0 rgba(111, 211, 255, 0.24), -0.035em 0 rgba(255, 116, 172, 0.24);
+    text-shadow: var(--lyrics-current-original-outline-shadow, 0 0 0 transparent), 0.035em 0 rgba(111, 211, 255, 0.24), -0.035em 0 rgba(255, 116, 172, 0.24);
   }
   68% {
     translate: 0 0;
-    text-shadow: 0 0 0 transparent;
+    text-shadow: var(--lyrics-current-original-outline-shadow, 0 0 0 transparent), 0 0 0 transparent;
   }
 }
 
@@ -8827,7 +8830,8 @@ html.is-lp-view-exit::view-transition-new(root) {
 }
 
 .fullscreen-stage-controls-dock:hover .fullscreen-stage-controls-surface,
-.fullscreen-stage-controls-dock:focus-within .fullscreen-stage-controls-surface {
+.fullscreen-stage-controls-dock:focus-visible .fullscreen-stage-controls-surface,
+.fullscreen-stage-controls-dock:has(:focus-visible) .fullscreen-stage-controls-surface {
   visibility: visible;
   opacity: 1;
   pointer-events: auto;
@@ -16658,4 +16662,290 @@ html.is-lp-view-exit::view-transition-new(root) {
   .community-video-random-switch {
     margin-top: 2px;
   }
+}
+
+/* Configurable outside-only text outlines. Each variable contains hard shadow
+   copies of the completed glyph silhouette, so the visible fill is never made
+   thinner as it is with a centered WebKit text stroke. */
+.lyrics-lyricsContainer-LyricsLine {
+  --lyrics-current-original-outline-shadow: var(--lyrics-original-outline-shadow, 0 0 0 transparent);
+  --lyrics-current-original-outline-stroke-width: var(--lyrics-original-outline-stroke-width, 0px);
+  --lyrics-current-original-outline-stroke-color: var(--lyrics-original-outline-stroke-color, #000000);
+  text-shadow:
+    var(--lyrics-original-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
+}
+
+.lyrics-lyricsContainer-LyricsLine > p:first-child {
+  text-shadow:
+    var(--lyrics-original-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
+}
+
+.lyrics-lyricsContainer-LyricsLine-active {
+  text-shadow:
+    var(--lyrics-original-outline-shadow, 0 0 0 transparent),
+    0 3px 10px rgba(0, 0, 0, 0.7),
+    0 0 18px rgba(0, 0, 0, 0.65);
+}
+
+.lyrics-lyricsContainer-LyricsLine-active > p:first-child {
+  text-shadow:
+    var(--lyrics-original-outline-shadow, 0 0 0 transparent),
+    0 3px 10px rgba(0, 0, 0, 0.7),
+    0 0 18px rgba(0, 0, 0, 0.65);
+}
+
+/* The depth blur is applied to the whole inactive line. Re-blurring dozens of
+   full-size outline copies makes their color flood back into the glyph and
+   appear much heavier than the configured width. Use a sparse, low-opacity
+   variant on surrounding lines while preserving the configured geometry; the
+   focused line keeps the full-density outline. */
+.lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active),
+.lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active) > p:first-child {
+  text-shadow:
+    var(--lyrics-original-outline-blurred-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
+}
+
+.lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active) > .lyrics-lyricsContainer-LyricsLine-phonetic {
+  text-shadow:
+    var(--lyrics-phonetic-outline-blurred-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
+}
+
+.lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active) > .lyrics-lyricsContainer-LyricsLine-translation,
+.lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active) > .lyrics-lyricsContainer-LyricsLine-sub {
+  text-shadow:
+    var(--lyrics-translation-outline-blurred-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
+}
+
+.lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active) > .lyrics-lyricsContainer-LyricsLine-culturalNote {
+  text-shadow:
+    var(--lyrics-cultural-note-outline-blurred-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
+}
+
+.lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active) ruby rt {
+  text-shadow: var(--lyrics-furigana-outline-blurred-shadow, 0 0 0 transparent);
+}
+
+.lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active) .lyrics-karaoke-line {
+  text-shadow: var(--lyrics-original-outline-blurred-shadow, 0 0 0 transparent) !important;
+}
+
+.lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active) .lyrics-karaoke-char::before,
+.lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active) .lyrics-karaoke-text-run-segment::before {
+  -webkit-text-stroke-width: var(--lyrics-original-outline-blurred-stroke-width, 0px);
+  -webkit-text-stroke-color: var(--lyrics-original-outline-blurred-stroke-color, transparent);
+}
+
+.lyrics-lyricsContainer-LyricsLine .lyrics-karaoke-line {
+  text-shadow: var(--lyrics-current-original-outline-shadow, 0 0 0 transparent) !important;
+}
+
+/* Karaoke glyphs intentionally reset inherited text shadows to keep their
+   transparent progress fill stable. Draw a duplicate behind each glyph: the
+   foreground glyph covers the inward half of this stroke, leaving only the
+   configured outside thickness visible. */
+.lyrics-karaoke-char,
+.lyrics-karaoke-text-run-segment {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+}
+
+.lyrics-karaoke-char::before,
+.lyrics-karaoke-text-run-segment::before {
+  content: attr(data-outline-text) / "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline: var(--karaoke-glyph-bleed-x, 0.16em);
+  z-index: 0;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke-width: var(--lyrics-current-original-outline-stroke-width, 0px);
+  -webkit-text-stroke-color: var(--lyrics-current-original-outline-stroke-color, #000000);
+  pointer-events: none;
+}
+
+.lyrics-karaoke-glyph-fill {
+  position: relative;
+  z-index: 1;
+}
+
+.lyrics-karaoke-char--done > .lyrics-karaoke-glyph-fill,
+.lyrics-karaoke-text-run-segment--done > .lyrics-karaoke-glyph-fill,
+.lyrics-karaoke-line.is-complete .lyrics-karaoke-glyph-fill {
+  color: transparent;
+  background-color: var(--lyrics-color-active);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.lyrics-karaoke-char--active > .lyrics-karaoke-glyph-fill,
+.lyrics-karaoke-text-run-segment--active > .lyrics-karaoke-glyph-fill {
+  color: transparent;
+  background-image: linear-gradient(var(--karaoke-gradient-direction, to right),
+      var(--lyrics-color-active) 0,
+      var(--lyrics-color-active) var(--karaoke-char-fill-soft-start, var(--karaoke-char-fill, 0%)),
+      var(--lyrics-color-inactive) var(--karaoke-char-fill-soft-end, var(--karaoke-char-fill, 0%)),
+      var(--lyrics-color-inactive) 100%);
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.lyrics-lyricsContainer-LyricsLine > .lyrics-lyricsContainer-LyricsLine-phonetic,
+.lyrics-lyricsContainer-LyricsLine-phonetic {
+  text-shadow:
+    var(--lyrics-phonetic-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
+}
+
+.lyrics-lyricsContainer-LyricsLine > .lyrics-lyricsContainer-LyricsLine-translation,
+.lyrics-lyricsContainer-LyricsLine > .lyrics-lyricsContainer-LyricsLine-sub,
+.lyrics-lyricsContainer-LyricsLine-translation,
+.lyrics-lyricsContainer-LyricsLine-sub {
+  text-shadow:
+    var(--lyrics-translation-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
+}
+
+.lyrics-lyricsContainer-LyricsLine > .lyrics-lyricsContainer-LyricsLine-culturalNote,
+.lyrics-lyricsContainer-LyricsLine-culturalNote {
+  text-shadow:
+    var(--lyrics-cultural-note-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
+}
+
+.lyrics-lyricsContainer-LyricsLine ruby rt {
+  text-shadow: var(--lyrics-furigana-outline-shadow, 0 0 0 transparent);
+}
+
+.lyrics-lyricsContainer-LyricsLine-active ruby rt {
+  text-shadow:
+    var(--lyrics-furigana-outline-shadow, 0 0 0 transparent),
+    0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.lyrics-break-label {
+  text-shadow: var(--break-label-outline-shadow, 0 0 0 transparent);
+}
+
+.fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine,
+.fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine > p:first-child {
+  --lyrics-current-original-outline-shadow: var(--iv-vinyl-original-outline-shadow, 0 0 0 transparent);
+  --lyrics-current-original-outline-stroke-width: var(--iv-vinyl-original-outline-stroke-width, 0px);
+  --lyrics-current-original-outline-stroke-color: var(--iv-vinyl-original-outline-stroke-color, #000000);
+  text-shadow:
+    var(--iv-vinyl-original-outline-shadow, 0 0 0 transparent),
+    0 2px 18px rgba(0, 0, 0, 0.62);
+}
+
+.fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine .lyrics-karaoke-line {
+  text-shadow: var(--lyrics-current-original-outline-shadow, 0 0 0 transparent) !important;
+}
+
+.fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-phonetic {
+  text-shadow:
+    var(--iv-vinyl-phonetic-outline-shadow, 0 0 0 transparent),
+    0 2px 18px rgba(0, 0, 0, 0.62);
+}
+
+.fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-translation {
+  text-shadow:
+    var(--iv-vinyl-translation-outline-shadow, 0 0 0 transparent),
+    0 2px 18px rgba(0, 0, 0, 0.62);
+}
+
+.fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-culturalNote {
+  text-shadow:
+    var(--iv-vinyl-cultural-note-outline-shadow, 0 0 0 transparent),
+    0 2px 18px rgba(0, 0, 0, 0.62);
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine > p {
+  text-shadow:
+    var(--iv-vinyl-original-outline-shadow, 0 0 0 transparent),
+    0 1px 2px rgba(0, 0, 0, 0.62),
+    0 2px 5px rgba(0, 0, 0, 0.2) !important;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-phonetic {
+  text-shadow:
+    var(--iv-vinyl-phonetic-outline-shadow, 0 0 0 transparent),
+    0 1px 2px rgba(0, 0, 0, 0.52) !important;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-translation {
+  text-shadow:
+    var(--iv-vinyl-translation-outline-shadow, 0 0 0 transparent),
+    0 1px 2px rgba(0, 0, 0, 0.52) !important;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-culturalNote {
+  text-shadow:
+    var(--iv-vinyl-cultural-note-outline-shadow, 0 0 0 transparent),
+    0 1px 2px rgba(0, 0, 0, 0.52) !important;
+}
+
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine > p:has(.lyrics-karaoke-line),
+.fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine > p:has(.lyrics-karaoke-stack) {
+  text-shadow: var(--iv-vinyl-original-outline-shadow, 0 0 0 transparent) !important;
+}
+
+.lyrics-fullscreen-title {
+  text-shadow:
+    var(--fullscreen-title-outline-shadow, 0 0 0 transparent),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.lyrics-fullscreen-title-translated,
+.lyrics-fullscreen-title-romanized,
+.portrait-track-title,
+.portrait-track-title-sub {
+  text-shadow: var(--fullscreen-title-outline-shadow, 0 0 0 transparent);
+}
+
+.fullscreen-tv-title {
+  text-shadow:
+    var(--fullscreen-title-outline-shadow, 0 0 0 transparent),
+    0 2px 8px rgba(0, 0, 0, 0.6),
+    0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.lyrics-fullscreen-artist,
+.lyrics-fullscreen-artist-translated,
+.lyrics-fullscreen-artist-romanized,
+.lyrics-fullscreen-album-name,
+.portrait-track-artist,
+.portrait-track-artist-sub,
+.portrait-track-album-name {
+  text-shadow: var(--fullscreen-artist-outline-shadow, 0 0 0 transparent);
+}
+
+.fullscreen-tv-artist {
+  text-shadow:
+    var(--fullscreen-artist-outline-shadow, 0 0 0 transparent),
+    0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.fullscreen-tv-album-name {
+  text-shadow:
+    var(--fullscreen-artist-outline-shadow, 0 0 0 transparent),
+    0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.fullscreen-clock {
+  text-shadow:
+    var(--fullscreen-clock-outline-shadow, 0 0 0 transparent),
+    0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.tmi-fullview {
+  text-shadow: var(--fullscreen-tmi-outline-shadow, 0 0 0 transparent);
 }

@@ -1117,6 +1117,16 @@ window.LANG_MS = {
         "desc": "Ruang kosong antara furigana dengan aksara Kanji (piksel)"
       }
     },
+    "textOutline": {
+      "width": {
+        "label": "Ketebalan garis luar teks",
+        "desc": "Ketebalan garis luar yang kelihatan di luar aksara (px)"
+      },
+      "color": {
+        "label": "Warna garis luar teks",
+        "desc": "Warna garis luar teks (kod HEX)"
+      }
+    },
     "textShadow": {
       "title": "Bayang Teks",
       "subtitle": "Kesan bayang untuk meningkatkan kebolehbacaan",

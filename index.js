@@ -2326,6 +2326,18 @@ const CONFIG = {
       StorageManager.getItem("ivLyrics:visual:panel-lyrics-phonetic-size") || "13",
     "panel-lyrics-translation-size":
       StorageManager.getItem("ivLyrics:visual:panel-lyrics-translation-size") || "13",
+    "panel-lyrics-original-outline-width":
+      StorageManager.getItem("ivLyrics:visual:panel-lyrics-original-outline-width") || "0",
+    "panel-lyrics-original-outline-color":
+      StorageManager.getItem("ivLyrics:visual:panel-lyrics-original-outline-color") || "#000000",
+    "panel-lyrics-phonetic-outline-width":
+      StorageManager.getItem("ivLyrics:visual:panel-lyrics-phonetic-outline-width") || "0",
+    "panel-lyrics-phonetic-outline-color":
+      StorageManager.getItem("ivLyrics:visual:panel-lyrics-phonetic-outline-color") || "#000000",
+    "panel-lyrics-translation-outline-width":
+      StorageManager.getItem("ivLyrics:visual:panel-lyrics-translation-outline-width") || "0",
+    "panel-lyrics-translation-outline-color":
+      StorageManager.getItem("ivLyrics:visual:panel-lyrics-translation-outline-color") || "#000000",
     "panel-bg-type":
       StorageManager.getItem("ivLyrics:visual:panel-bg-type") || "album",
     "panel-bg-color":
@@ -2414,6 +2426,10 @@ const CONFIG = {
     "instrumental-break-label-opacity":
       StorageManager.getItem("ivLyrics:visual:instrumental-break-label-opacity") ||
       "",
+    "instrumental-break-label-outline-width":
+      StorageManager.getItem("ivLyrics:visual:instrumental-break-label-outline-width") || "0",
+    "instrumental-break-label-outline-color":
+      StorageManager.getItem("ivLyrics:visual:instrumental-break-label-outline-color") || "#000000",
     "instrumental-break-animation-speed":
       Number(StorageManager.getItem("ivLyrics:visual:instrumental-break-animation-speed")) ||
       100,
@@ -2498,6 +2514,30 @@ const CONFIG = {
     "cultural-annotations-vinyl-font-family":
       StorageManager.getItem("ivLyrics:visual:cultural-annotations-vinyl-font-family") ||
       "Pretendard Variable",
+    "original-outline-width":
+      StorageManager.getItem("ivLyrics:visual:original-outline-width") || "0",
+    "original-outline-color":
+      StorageManager.getItem("ivLyrics:visual:original-outline-color") || "#000000",
+    "phonetic-outline-width":
+      StorageManager.getItem("ivLyrics:visual:phonetic-outline-width") || "0",
+    "phonetic-outline-color":
+      StorageManager.getItem("ivLyrics:visual:phonetic-outline-color") || "#000000",
+    "translation-outline-width":
+      StorageManager.getItem("ivLyrics:visual:translation-outline-width") || "0",
+    "translation-outline-color":
+      StorageManager.getItem("ivLyrics:visual:translation-outline-color") || "#000000",
+    "furigana-outline-width":
+      StorageManager.getItem("ivLyrics:visual:furigana-outline-width") || "0",
+    "furigana-outline-color":
+      StorageManager.getItem("ivLyrics:visual:furigana-outline-color") || "#000000",
+    "cultural-annotations-outline-width":
+      StorageManager.getItem("ivLyrics:visual:cultural-annotations-outline-width") || "0",
+    "cultural-annotations-outline-color":
+      StorageManager.getItem("ivLyrics:visual:cultural-annotations-outline-color") || "#000000",
+    "cultural-annotations-vinyl-outline-width":
+      StorageManager.getItem("ivLyrics:visual:cultural-annotations-vinyl-outline-width") || "0",
+    "cultural-annotations-vinyl-outline-color":
+      StorageManager.getItem("ivLyrics:visual:cultural-annotations-vinyl-outline-color") || "#000000",
     "original-font-weight":
       StorageManager.getItem("ivLyrics:visual:original-font-weight") ||
       "600",
@@ -2900,6 +2940,10 @@ const CONFIG = {
         0,
         { numeric: true }
       ),
+    "fullscreen-vinyl-original-outline-width":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-outline-width") || "0",
+    "fullscreen-vinyl-original-outline-color":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-outline-color") || "#000000",
     "fullscreen-vinyl-phonetic-font-family":
       getOrSeedVinylTypographySetting(
         "phonetic-font-family",
@@ -2941,6 +2985,10 @@ const CONFIG = {
         0,
         { numeric: true }
       ),
+    "fullscreen-vinyl-phonetic-outline-width":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-outline-width") || "0",
+    "fullscreen-vinyl-phonetic-outline-color":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-outline-color") || "#000000",
     "fullscreen-vinyl-translation-font-family":
       getOrSeedVinylTypographySetting(
         "translation-font-family",
@@ -2982,12 +3030,24 @@ const CONFIG = {
         0,
         { numeric: true }
       ),
+    "fullscreen-vinyl-translation-outline-width":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-outline-width") || "0",
+    "fullscreen-vinyl-translation-outline-color":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-outline-color") || "#000000",
     "fullscreen-title-size":
       StorageManager.getItem("ivLyrics:visual:fullscreen-title-size") ||
       "48",
+    "fullscreen-title-outline-width":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-title-outline-width") || "0",
+    "fullscreen-title-outline-color":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-title-outline-color") || "#000000",
     "fullscreen-artist-size":
       StorageManager.getItem("ivLyrics:visual:fullscreen-artist-size") ||
       "24",
+    "fullscreen-artist-outline-width":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-artist-outline-width") || "0",
+    "fullscreen-artist-outline-color":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-artist-outline-color") || "#000000",
     "fullscreen-lyrics-right-padding":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-lyrics-right-padding")) ||
       0,
@@ -2999,6 +3059,10 @@ const CONFIG = {
     "fullscreen-clock-size":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-clock-size")) ||
       48,
+    "fullscreen-clock-outline-width":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-clock-outline-width") || "0",
+    "fullscreen-clock-outline-color":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-clock-outline-color") || "#000000",
     "fullscreen-show-context": StorageManager.get(
       "ivLyrics:visual:fullscreen-show-context",
       true
@@ -3059,6 +3123,10 @@ const CONFIG = {
     "fullscreen-tmi-font-size":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-tmi-font-size")) ||
       100,
+    "fullscreen-tmi-outline-width":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-tmi-outline-width") || "0",
+    "fullscreen-tmi-outline-color":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-tmi-outline-color") || "#000000",
     // TV Mode settings
     "fullscreen-tv-mode": StorageManager.get(
       "ivLyrics:visual:fullscreen-tv-mode",

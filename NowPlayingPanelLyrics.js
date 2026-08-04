@@ -58,6 +58,12 @@
     const ORIGINAL_SIZE_KEY = "ivLyrics:visual:panel-lyrics-original-size";
     const PHONETIC_SIZE_KEY = "ivLyrics:visual:panel-lyrics-phonetic-size";
     const TRANSLATION_SIZE_KEY = "ivLyrics:visual:panel-lyrics-translation-size";
+    const ORIGINAL_OUTLINE_WIDTH_KEY = "ivLyrics:visual:panel-lyrics-original-outline-width";
+    const ORIGINAL_OUTLINE_COLOR_KEY = "ivLyrics:visual:panel-lyrics-original-outline-color";
+    const PHONETIC_OUTLINE_WIDTH_KEY = "ivLyrics:visual:panel-lyrics-phonetic-outline-width";
+    const PHONETIC_OUTLINE_COLOR_KEY = "ivLyrics:visual:panel-lyrics-phonetic-outline-color";
+    const TRANSLATION_OUTLINE_WIDTH_KEY = "ivLyrics:visual:panel-lyrics-translation-outline-width";
+    const TRANSLATION_OUTLINE_COLOR_KEY = "ivLyrics:visual:panel-lyrics-translation-outline-color";
     const PSEUDO_KARAOKE_SOURCES = new Set(['audio-analysis-pseudo', 'spotify-audio-analysis', 'line-timing-pseudo']);
     // 배경 설정 키
     const BG_TYPE_KEY = "ivLyrics:visual:panel-bg-type";
@@ -80,6 +86,29 @@
     const DEFAULT_PANEL_WIDTH = 280;
     const PANEL_LINE_TRANSITION_DURATION_MS = 820;
     const PANEL_LINE_TRANSITION_EASING = "cubic-bezier(0.20, 0.70, 0.42, 0.96)";
+
+    const createPanelOutsideTextOutlineShadow = (widthValue, colorValue = "#000000") => {
+        const width = Math.max(0, Math.min(10, Number(widthValue) || 0));
+        if (width <= 0) return "0 0 0 transparent";
+
+        const color = String(colorValue || "#000000");
+        const ringCount = Math.max(1, Math.min(4, Math.ceil(width * 2)));
+        const directionCount = width <= 0.5 ? 8 : width <= 1 ? 12 : 16;
+        const layers = [];
+        const formatOffset = (value) => `${(Math.abs(value) < 0.0005 ? 0 : value).toFixed(3)}px`;
+
+        for (let ring = 1; ring <= ringCount; ring += 1) {
+            const radius = width * (ring / ringCount);
+            for (let direction = 0; direction < directionCount; direction += 1) {
+                const angle = (Math.PI * 2 * direction) / directionCount;
+                layers.push(
+                    `${formatOffset(Math.cos(angle) * radius)} ${formatOffset(Math.sin(angle) * radius)} 0 ${color}`
+                );
+            }
+        }
+
+        return layers.join(", ");
+    };
 
     const getPanelTrackId = (uri) => {
         if (!uri) return null;
@@ -153,6 +182,12 @@
         const originalSize = getStorageValue(ORIGINAL_SIZE_KEY, DEFAULT_ORIGINAL_SIZE);
         const phoneticSize = getStorageValue(PHONETIC_SIZE_KEY, DEFAULT_PHONETIC_SIZE);
         const translationSize = getStorageValue(TRANSLATION_SIZE_KEY, DEFAULT_TRANSLATION_SIZE);
+        const originalOutlineWidth = getStorageValue(ORIGINAL_OUTLINE_WIDTH_KEY, 0);
+        const originalOutlineColor = getStorageValue(ORIGINAL_OUTLINE_COLOR_KEY, "#000000") || "#000000";
+        const phoneticOutlineWidth = getStorageValue(PHONETIC_OUTLINE_WIDTH_KEY, 0);
+        const phoneticOutlineColor = getStorageValue(PHONETIC_OUTLINE_COLOR_KEY, "#000000") || "#000000";
+        const translationOutlineWidth = getStorageValue(TRANSLATION_OUTLINE_WIDTH_KEY, 0);
+        const translationOutlineColor = getStorageValue(TRANSLATION_OUTLINE_COLOR_KEY, "#000000") || "#000000";
 
         // 개별 폰트가 설정되어 있으면 사용, 아니면 기본 폰트 사용
         const baseFontStack = `'${fontFamily}', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif`;
@@ -174,6 +209,9 @@
   --ivlyrics-panel-original-size: ${originalSize}px;
   --ivlyrics-panel-phonetic-size: ${phoneticSize}px;
   --ivlyrics-panel-translation-size: ${translationSize}px;
+  --ivlyrics-panel-original-outline-shadow: ${createPanelOutsideTextOutlineShadow(originalOutlineWidth, originalOutlineColor)};
+  --ivlyrics-panel-phonetic-outline-shadow: ${createPanelOutsideTextOutlineShadow(phoneticOutlineWidth, phoneticOutlineColor)};
+  --ivlyrics-panel-translation-outline-shadow: ${createPanelOutsideTextOutlineShadow(translationOutlineWidth, translationOutlineColor)};
   --ivlyrics-panel-line-transition-duration: ${PANEL_LINE_TRANSITION_DURATION_MS}ms;
   --ivlyrics-panel-line-transition-easing: ${PANEL_LINE_TRANSITION_EASING};
 }
@@ -627,7 +665,7 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
 .lyrics-break-indicator { display: inline-flex; align-items: center; gap: 0.3em; max-width: 100%; color: currentColor; vertical-align: middle; white-space: nowrap; }
 .lyrics-break-icon { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1.16em; height: 1.16em; min-width: 18px; min-height: 18px; flex: 0 0 auto; overflow: visible; color: currentColor; }
 .lyrics-break-icon span, .lyrics-break-icon svg { flex: 0 0 auto; }
-.lyrics-break-label { font-family: var(--break-label-font-family, var(--ivlyrics-panel-original-font, inherit)); font-size: var(--break-label-font-size, 12px); font-weight: var(--break-label-font-weight, 200); line-height: 1; letter-spacing: 0; opacity: var(--break-label-opacity, 0.65); }
+.lyrics-break-label { font-family: var(--break-label-font-family, var(--ivlyrics-panel-original-font, inherit)); font-size: var(--break-label-font-size, 12px); font-weight: var(--break-label-font-weight, 200); line-height: 1; letter-spacing: 0; opacity: var(--break-label-opacity, 0.65); text-shadow: var(--break-label-outline-shadow, 0 0 0 transparent); }
 .lyrics-break-icon-equalizer, .lyrics-break-icon-dotWave, .lyrics-break-icon-diamonds, .lyrics-break-icon-splitBars, .lyrics-break-icon-reels, .lyrics-break-icon-piano { display: inline-flex; }
 .lyrics-break-icon-equalizer, .lyrics-break-icon-splitBars { align-items: center; gap: 0.09em; }
 .lyrics-break-icon-equalizer span, .lyrics-break-icon-splitBars span { display: block; width: 0.11em; min-width: 2px; height: 0.76em; border-radius: 999px; background: currentColor; transform: scaleY(0.4); transform-origin: center; }
@@ -721,6 +759,7 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   letter-spacing: 0.01em !important;
   overflow: hidden !important;
   font-family: var(--ivlyrics-panel-phonetic-font) !important;
+  text-shadow: var(--ivlyrics-panel-phonetic-outline-shadow, 0 0 0 transparent) !important;
 }
 
 .ivlyrics-panel-line.active .ivlyrics-panel-line-phonetic {
@@ -742,6 +781,7 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   white-space: pre-line !important;
   overflow: hidden !important;
   font-family: var(--ivlyrics-panel-original-font) !important;
+  text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent) !important;
 }
 
 .ivlyrics-panel-line.active .ivlyrics-panel-line-text {
@@ -773,6 +813,7 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   margin-top: 1px !important;
   overflow: hidden !important;
   font-family: var(--ivlyrics-panel-translation-font) !important;
+  text-shadow: var(--ivlyrics-panel-translation-outline-shadow, 0 0 0 transparent) !important;
 }
 
 .ivlyrics-panel-line.active .ivlyrics-panel-line-translation {
@@ -792,6 +833,7 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   font-weight: 700 !important;
   line-height: 1.2 !important;
   font-family: var(--ivlyrics-panel-original-font) !important;
+  text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent) !important;
   max-height: calc(var(--ivlyrics-panel-original-size, 26px) * var(--ivlyrics-font-scale, 1) * 2.85) !important;
   overflow: hidden !important;
 }
@@ -1066,14 +1108,14 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
 }
 
 @keyframes ivlyrics-panel-sparkle {
-  0%, 100% { filter: brightness(1); text-shadow: 0 0 0 rgba(255, 255, 255, 0); }
-  42% { filter: brightness(1.22); text-shadow: 0 0 0.18em rgba(255, 255, 255, 0.34), 0 0 0.42em currentColor; }
-  58% { filter: brightness(0.96); text-shadow: 0 0 0.08em rgba(255, 255, 255, 0.16); }
+  0%, 100% { filter: brightness(1); text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent), 0 0 0 rgba(255, 255, 255, 0); }
+  42% { filter: brightness(1.22); text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent), 0 0 0.18em rgba(255, 255, 255, 0.34), 0 0 0.42em currentColor; }
+  58% { filter: brightness(0.96); text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent), 0 0 0.08em rgba(255, 255, 255, 0.16); }
 }
 
 @keyframes ivlyrics-panel-echo {
-  0%, 100% { text-shadow: 0 0 0 rgba(255, 255, 255, 0); }
-  50% { text-shadow: 0.07em 0.04em 0 rgba(255, 255, 255, 0.18), 0.14em 0.08em 0.22em rgba(248, 251, 255, 0.28); }
+  0%, 100% { text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent), 0 0 0 rgba(255, 255, 255, 0); }
+  50% { text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent), 0.07em 0.04em 0 rgba(255, 255, 255, 0.18), 0.14em 0.08em 0.22em rgba(248, 251, 255, 0.28); }
 }
 
 @keyframes ivlyrics-panel-whisper {
@@ -1095,17 +1137,17 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
 }
 
 @keyframes ivlyrics-panel-glow {
-  0%, 100% { filter: brightness(1.16); text-shadow: 0 0 0.14em rgba(255, 255, 255, 0.34), 0 0 0.54em rgba(248, 251, 255, 0.3); }
-  50% { filter: brightness(1.1); text-shadow: 0 0 0.1em rgba(255, 255, 255, 0.28), 0 0 0.44em rgba(248, 251, 255, 0.24); }
+  0%, 100% { filter: brightness(1.16); text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent), 0 0 0.14em rgba(255, 255, 255, 0.34), 0 0 0.54em rgba(248, 251, 255, 0.3); }
+  50% { filter: brightness(1.1); text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent), 0 0 0.1em rgba(255, 255, 255, 0.28), 0 0 0.44em rgba(248, 251, 255, 0.24); }
 }
 
 @keyframes ivlyrics-panel-glitch {
-  0%, 100% { translate: 0 0; text-shadow: 0 0 0 transparent; }
-  16% { translate: -0.035em 0.01em; text-shadow: 0.045em 0 rgba(111, 211, 255, 0.34), -0.045em 0 rgba(255, 116, 172, 0.3); }
-  18% { translate: 0.03em -0.01em; text-shadow: -0.04em 0 rgba(111, 211, 255, 0.26), 0.04em 0 rgba(255, 116, 172, 0.28); }
-  20%, 64% { translate: 0 0; text-shadow: 0 0 0 transparent; }
-  66% { translate: 0.025em 0; text-shadow: 0.035em 0 rgba(111, 211, 255, 0.24), -0.035em 0 rgba(255, 116, 172, 0.24); }
-  68% { translate: 0 0; text-shadow: 0 0 0 transparent; }
+  0%, 100% { translate: 0 0; text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent), 0 0 0 transparent; }
+  16% { translate: -0.035em 0.01em; text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent), 0.045em 0 rgba(111, 211, 255, 0.34), -0.045em 0 rgba(255, 116, 172, 0.3); }
+  18% { translate: 0.03em -0.01em; text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent), -0.04em 0 rgba(111, 211, 255, 0.26), 0.04em 0 rgba(255, 116, 172, 0.28); }
+  20%, 64% { translate: 0 0; text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent), 0 0 0 transparent; }
+  66% { translate: 0.025em 0; text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent), 0.035em 0 rgba(111, 211, 255, 0.24), -0.035em 0 rgba(255, 116, 172, 0.24); }
+  68% { translate: 0 0; text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent), 0 0 0 transparent; }
 }
 
 @keyframes ivlyrics-panel-flicker {
@@ -1294,7 +1336,7 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
 .ivlyrics-panel-line.active .ivlyrics-panel-karaoke-word.sung,
 .ivlyrics-panel-line.active .ivlyrics-panel-karaoke-text-run-segment.sung {
   color: var(--ivlyrics-panel-karaoke-color, #ffffff) !important;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5) !important;
+  text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent), 0 0 10px rgba(255, 255, 255, 0.5) !important;
 }
 
 .ivlyrics-panel-line-karaoke-row.speaker-male-1 .ivlyrics-panel-karaoke-word.sung,
@@ -1564,12 +1606,21 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const originalSize = getStorageValue(ORIGINAL_SIZE_KEY, DEFAULT_ORIGINAL_SIZE);
         const phoneticSize = getStorageValue(PHONETIC_SIZE_KEY, DEFAULT_PHONETIC_SIZE);
         const translationSize = getStorageValue(TRANSLATION_SIZE_KEY, DEFAULT_TRANSLATION_SIZE);
+        const originalOutlineWidth = getStorageValue(ORIGINAL_OUTLINE_WIDTH_KEY, 0);
+        const originalOutlineColor = getStorageValue(ORIGINAL_OUTLINE_COLOR_KEY, "#000000") || "#000000";
+        const phoneticOutlineWidth = getStorageValue(PHONETIC_OUTLINE_WIDTH_KEY, 0);
+        const phoneticOutlineColor = getStorageValue(PHONETIC_OUTLINE_COLOR_KEY, "#000000") || "#000000";
+        const translationOutlineWidth = getStorageValue(TRANSLATION_OUTLINE_WIDTH_KEY, 0);
+        const translationOutlineColor = getStorageValue(TRANSLATION_OUTLINE_COLOR_KEY, "#000000") || "#000000";
 
         document.documentElement.style.setProperty('--ivlyrics-panel-width', panelWidth + 'px');
         document.documentElement.style.setProperty('--ivlyrics-panel-font-family', `'${fontFamily}', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif`);
         document.documentElement.style.setProperty('--ivlyrics-panel-original-size', originalSize + 'px');
         document.documentElement.style.setProperty('--ivlyrics-panel-phonetic-size', phoneticSize + 'px');
         document.documentElement.style.setProperty('--ivlyrics-panel-translation-size', translationSize + 'px');
+        document.documentElement.style.setProperty('--ivlyrics-panel-original-outline-shadow', createPanelOutsideTextOutlineShadow(originalOutlineWidth, originalOutlineColor));
+        document.documentElement.style.setProperty('--ivlyrics-panel-phonetic-outline-shadow', createPanelOutsideTextOutlineShadow(phoneticOutlineWidth, phoneticOutlineColor));
+        document.documentElement.style.setProperty('--ivlyrics-panel-translation-outline-shadow', createPanelOutsideTextOutlineShadow(translationOutlineWidth, translationOutlineColor));
         window.ivLyricsSpeakerColors?.applyCssVariables?.();
     };
 
@@ -2481,6 +2532,10 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 "--break-label-font-size": `${getLabelNumber("instrumental-break-label-font-size", 12, 12, 128)}px`,
                 "--break-label-font-weight": getLabelNumber("instrumental-break-label-font-weight", 200, 100, 900),
                 "--break-label-opacity": getLabelNumber("instrumental-break-label-opacity", 65, 0, 100) / 100,
+                "--break-label-outline-shadow": createPanelOutsideTextOutlineShadow(
+                    getLabelNumber("instrumental-break-label-outline-width", 0, 0, 10),
+                    getVisualSetting("instrumental-break-label-outline-color", "#000000")
+                ),
             },
         };
     };
@@ -3838,6 +3893,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     event.detail?.name === 'instrumental-break-label-font-size' ||
                     event.detail?.name === 'instrumental-break-label-font-weight' ||
                     event.detail?.name === 'instrumental-break-label-opacity' ||
+                    event.detail?.name === 'instrumental-break-label-outline-width' ||
+                    event.detail?.name === 'instrumental-break-label-outline-color' ||
                     event.detail?.name === 'instrumental-break-auto-detect' ||
                     event.detail?.name === 'instrumental-break-animation-speed' ||
                     event.detail?.name === 'panel-lyrics-original-font' ||
@@ -3852,9 +3909,9 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 // 새로운 설정들 처리 - CSS 변수 업데이트
                 if (event.detail?.name === 'panel-lyrics-width' ||
                     event.detail?.name === 'panel-lyrics-font-family' ||
-                    event.detail?.name === 'panel-lyrics-original-size' ||
-                    event.detail?.name === 'panel-lyrics-phonetic-size' ||
-                    event.detail?.name === 'panel-lyrics-translation-size') {
+                    event.detail?.name?.startsWith?.('panel-lyrics-original-') ||
+                    event.detail?.name?.startsWith?.('panel-lyrics-phonetic-') ||
+                    event.detail?.name?.startsWith?.('panel-lyrics-translation-')) {
                     updateCSSVariables();
                 }
             };
@@ -5177,9 +5234,9 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
 
         if (event.detail?.name === 'panel-lyrics-width' ||
             event.detail?.name === 'panel-lyrics-font-family' ||
-            event.detail?.name === 'panel-lyrics-original-size' ||
-            event.detail?.name === 'panel-lyrics-phonetic-size' ||
-            event.detail?.name === 'panel-lyrics-translation-size' ||
+            event.detail?.name?.startsWith?.('panel-lyrics-original-') ||
+            event.detail?.name?.startsWith?.('panel-lyrics-phonetic-') ||
+            event.detail?.name?.startsWith?.('panel-lyrics-translation-') ||
             event.detail?.name?.startsWith?.('multi-vocal-speaker-color-')) {
             updateCSSVariables();
         }

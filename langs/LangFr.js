@@ -1117,6 +1117,16 @@ window.LANG_FR = {
         "desc": "Espace entre le furigana et le kanji (px)"
       }
     },
+    "textOutline": {
+      "width": {
+        "label": "Épaisseur du contour du texte",
+        "desc": "Épaisseur visible du contour à l’extérieur des caractères (px)"
+      },
+      "color": {
+        "label": "Couleur du contour du texte",
+        "desc": "Couleur du contour du texte (code HEX)"
+      }
+    },
     "textShadow": {
       "title": "Ombre du texte",
       "subtitle": "Effet d'ombre pour une meilleure lisibilité",

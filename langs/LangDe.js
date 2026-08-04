@@ -1117,6 +1117,16 @@ window.LANG_DE = {
         "desc": "Abstand zwischen Furigana und Kanji (px)"
       }
     },
+    "textOutline": {
+      "width": {
+        "label": "Textkonturstärke",
+        "desc": "Sichtbare Stärke der Kontur außerhalb der Zeichen (px)"
+      },
+      "color": {
+        "label": "Textkonturfarbe",
+        "desc": "Farbe der Textkontur (HEX-Code)"
+      }
+    },
     "textShadow": {
       "title": "Textschatten",
       "subtitle": "Schatteneffekte für bessere Lesbarkeit",

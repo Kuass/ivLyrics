@@ -1117,6 +1117,16 @@ window.LANG_JA = {
         "desc": "ふりがなと漢字の間の余白 (ピクセル)"
       }
     },
+    "textOutline": {
+      "width": {
+        "label": "文字の縁取り太さ",
+        "desc": "文字の外側に表示する縁取りの太さ (px)"
+      },
+      "color": {
+        "label": "文字の縁取り色",
+        "desc": "文字の縁取り色 (HEXコード)"
+      }
+    },
     "textShadow": {
       "title": "テキストの影",
       "subtitle": "可読性を高める影の効果",

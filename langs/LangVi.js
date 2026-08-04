@@ -1117,6 +1117,16 @@ window.LANG_VI = {
         "desc": "Khoảng cách giữa Furigana và chữ Hán (pixel)"
       }
     },
+    "textOutline": {
+      "width": {
+        "label": "Độ dày viền chữ",
+        "desc": "Độ dày hiển thị của viền bên ngoài ký tự (px)"
+      },
+      "color": {
+        "label": "Màu viền chữ",
+        "desc": "Màu của viền chữ (mã HEX)"
+      }
+    },
     "textShadow": {
       "title": "Bóng văn bản",
       "subtitle": "Hiệu ứng bóng giúp tăng khả năng đọc",

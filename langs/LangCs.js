@@ -1117,6 +1117,16 @@ window.LANG_CS = {
         "desc": "Rozpětí mezi Furiganou a Kanji (px)"
       }
     },
+    "textOutline": {
+      "width": {
+        "label": "Tloušťka obrysu textu",
+        "desc": "Viditelná tloušťka obrysu vně znaků (px)"
+      },
+      "color": {
+        "label": "Barva obrysu textu",
+        "desc": "Barva obrysu textu (HEX kód)"
+      }
+    },
     "textShadow": {
       "title": "Textový stín",
       "subtitle": "Stínové efekty pro zlepšení čitelnosti",
