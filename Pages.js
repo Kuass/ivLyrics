@@ -1800,9 +1800,13 @@ const getEmbeddedAuxiliaryDisplayValues = (line) => {
 		? line.text2.trim()
 		: translationText;
 	if (!phoneticText && !translationText) {
+		const hasExplicitOriginalText = line?.originalText !== null && line?.originalText !== undefined;
 		return {
-			text: line?.text,
-			originalText: line?.originalText,
+			// Raw provider lines initially arrive as { text: original }. Until the
+			// presentation pipeline adds originalText, treating text as an auxiliary
+			// row renders the only lyric at the much smaller phonetic size.
+			text: hasExplicitOriginalText ? line?.text : null,
+			originalText: hasExplicitOriginalText ? line?.originalText : line?.text,
 			text2: line?.text2,
 		};
 	}
