@@ -11746,9 +11746,10 @@ html.is-lp-view-exit::view-transition-new(root) {
 
 /* TV Mode Song Info - Bottom Left */
 .fullscreen-tv-song-info {
+  --fullscreen-tv-edge-offset: 48px;
   position: fixed;
-  bottom: 48px;
-  left: 48px;
+  bottom: var(--fullscreen-tv-edge-offset);
+  left: var(--fullscreen-tv-edge-offset);
   z-index: 100;
   display: flex;
   align-items: flex-end;
@@ -11878,16 +11879,14 @@ html.is-lp-view-exit::view-transition-new(root) {
 /* TV Mode - Responsive adjustments */
 @media (max-width: 1200px) {
   .fullscreen-tv-song-info {
-    bottom: 36px;
-    left: 36px;
+    --fullscreen-tv-edge-offset: 36px;
     gap: 16px;
   }
 }
 
 @media (max-width: 768px) {
   .fullscreen-tv-song-info {
-    bottom: 24px;
-    left: 24px;
+    --fullscreen-tv-edge-offset: 24px;
     gap: 12px;
   }
 
@@ -11917,21 +11916,21 @@ html.is-lp-view-exit::view-transition-new(root) {
 
   /* TV Mode: Song info at bottom-left in portrait */
   .lyrics-lyricsContainer-LyricsContainer.fullscreen-active.tv-mode-active .fullscreen-tv-song-info {
-    bottom: 24px;
-    left: 24px;
+    --fullscreen-tv-edge-offset: 24px;
   }
 }
 
 /* TV Mode Controls */
 /* TV Mode Controls Wrapper (right side) */
 .fullscreen-tv-controls-wrapper {
+  position: fixed;
+  right: var(--fullscreen-tv-edge-offset);
+  bottom: var(--fullscreen-tv-edge-offset);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  margin-left: auto;
-  padding-left: 24px;
   pointer-events: auto;
 }
 
