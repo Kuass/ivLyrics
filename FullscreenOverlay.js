@@ -2189,6 +2189,9 @@ const FullscreenOverlay = (() => {
             event?.preventDefault?.();
             event?.stopPropagation?.();
 
+            // TV mode always uses the plain album artwork presentation.
+            if (tvModeEnabled) return;
+
             if (suppressAlbumClickRef.current) {
                 suppressAlbumClickRef.current = false;
                 if (suppressAlbumClickTimerRef.current) {
@@ -2243,6 +2246,7 @@ const FullscreenOverlay = (() => {
             lpModeClosing,
             onPresentationModeChange,
             runLpSharedTransition,
+            tvModeEnabled,
             vinylAnimationsEnabled
         ]);
 
@@ -2402,7 +2406,11 @@ const FullscreenOverlay = (() => {
         const tmiTitle = I18n.t("tmi.title");
         const vinylTmiHint = I18n.t("vinyl.tmiHint");
         const tmiDisclaimer = I18n.t("tmi.disclaimer");
-        const albumInteractionLabel = [albumActionCopy.lpHint, vinylTmiHint, tmiDisclaimer]
+        const albumInteractionLabel = [
+            tvModeEnabled ? null : albumActionCopy.lpHint,
+            vinylTmiHint,
+            tmiDisclaimer
+        ]
             .filter(Boolean)
             .join(". ");
 
@@ -2453,7 +2461,7 @@ const FullscreenOverlay = (() => {
         if (!isFullscreen) return null;
 
         const VinylMode = window.ivLyricsVinylPlayerMode;
-        if (focusModeActive && !tmiMode && VinylMode) {
+        if (!tvModeEnabled && focusModeActive && !tmiMode && VinylMode) {
             return react.createElement(VinylMode, {
                 track: liveVinylTrack,
                 albumRadius,
@@ -2524,7 +2532,7 @@ const FullscreenOverlay = (() => {
             coverClassName,
             coverStyle
         }) => {
-            if (compactPresentationActive && CompactAlbumVinyl) {
+            if (!tvModeEnabled && compactPresentationActive && CompactAlbumVinyl) {
                 return react.createElement(CompactAlbumVinyl, {
                     track: liveVinylTrack,
                     isPlaying,
@@ -2572,7 +2580,7 @@ const FullscreenOverlay = (() => {
         const PresentationSwitcher = VinylMode?.PresentationSwitcher;
 
         return react.createElement(react.Fragment, null,
-            !tmiMode && PresentationSwitcher && react.createElement(PresentationSwitcher, {
+            !tvModeEnabled && !tmiMode && PresentationSwitcher && react.createElement(PresentationSwitcher, {
                 activeMode: normalizedPresentationMode,
                 visible: true,
                 onChange: handlePresentationModeChange
@@ -2616,7 +2624,7 @@ const FullscreenOverlay = (() => {
             tvModeEnabled ? react.createElement("div", {
                 className: "fullscreen-tv-song-info"
             },
-                // Album click toggles LP mode. Context click or hold opens TMI.
+                // TV mode keeps the plain album artwork. Context click or hold opens TMI.
                 react.createElement("div", {
                     ...albumInteractionProps,
                     className: "fullscreen-tv-album-wrapper clickable-album-container",
@@ -2636,8 +2644,7 @@ const FullscreenOverlay = (() => {
                             height: '100%',
                             borderRadius: `${albumRadius}px`
                         }
-                    }),
-                    renderAlbumModeHint()
+                    })
                 ),
                 // Track info (Title, Artist, Album)
                 react.createElement("div", { className: "fullscreen-tv-track-info" },
