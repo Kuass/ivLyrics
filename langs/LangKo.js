@@ -2134,6 +2134,8 @@ window.LANG_KO = {
       "albumSizeDesc": "LP 모드의 앨범 커버 크기를 조절합니다.",
       "recordSizeLabel": "LP 판 크기",
       "recordSizeDesc": "LP 모드의 LP 판 크기를 조절합니다.",
+      "backgroundBlurLabel": "전체 LP 배경 블러",
+      "backgroundBlurDesc": "전체 LP 모드에서만 배경에 추가 블러를 적용합니다.",
       "animationsLabel": "LP 애니메이션",
       "animationsDesc": "재생·정지, 회전, 등장 및 곡 전환 애니메이션을 사용합니다.",
       "centerRotationLabel": "LP 중앙 회전",

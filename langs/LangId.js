@@ -2132,6 +2132,8 @@ window.LANG_ID = {
       "albumSizeDesc": "Menyesuaikan ukuran sampul album dalam mode vinil.",
       "recordSizeLabel": "Ukuran piringan",
       "recordSizeDesc": "Menyesuaikan ukuran piringan dalam mode vinil.",
+      "backgroundBlurLabel": "Buram latar vinil penuh",
+      "backgroundBlurDesc": "Menerapkan buram tambahan pada latar hanya dalam mode vinil penuh.",
       "animationsLabel": "Animasi vinil",
       "animationsDesc": "Gunakan animasi putar, jeda, rotasi, masuk, dan pergantian lagu.",
       "centerRotationLabel": "Putar bagian tengah vinil",

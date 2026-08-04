@@ -2133,6 +2133,8 @@ window.LANG_VI = {
       "albumSizeDesc": "Điều chỉnh kích thước bìa album trong chế độ đĩa than.",
       "recordSizeLabel": "Kích thước đĩa",
       "recordSizeDesc": "Điều chỉnh kích thước đĩa trong chế độ đĩa than.",
+      "backgroundBlurLabel": "Làm mờ nền chế độ đĩa than đầy đủ",
+      "backgroundBlurDesc": "Chỉ áp dụng thêm độ mờ cho nền trong chế độ đĩa than đầy đủ.",
       "animationsLabel": "Hoạt ảnh đĩa than",
       "animationsDesc": "Dùng hoạt ảnh phát, tạm dừng, xoay, xuất hiện và chuyển bài.",
       "centerRotationLabel": "Xoay tâm đĩa than",

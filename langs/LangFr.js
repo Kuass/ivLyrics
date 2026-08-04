@@ -2133,6 +2133,8 @@ window.LANG_FR = {
       "albumSizeDesc": "Ajuste la taille de la pochette en mode vinyle.",
       "recordSizeLabel": "Taille du disque",
       "recordSizeDesc": "Ajuste la taille du disque en mode vinyle.",
+      "backgroundBlurLabel": "Flou d’arrière-plan du vinyle complet",
+      "backgroundBlurDesc": "Ajoute un flou supplémentaire à l’arrière-plan uniquement en mode vinyle complet.",
       "animationsLabel": "Animations du vinyle",
       "animationsDesc": "Active les animations de lecture, pause, rotation, entrée et changement de morceau.",
       "centerRotationLabel": "Faire tourner le centre du vinyle",

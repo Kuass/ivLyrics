@@ -2132,6 +2132,8 @@ window.LANG_FA = {
       "albumSizeDesc": "اندازه جلد آلبوم را در حالت وینیل تنظیم می‌کند.",
       "recordSizeLabel": "اندازه صفحه وینیل",
       "recordSizeDesc": "اندازه صفحه را در حالت وینیل تنظیم می‌کند.",
+      "backgroundBlurLabel": "تاری پس‌زمینه وینیل کامل",
+      "backgroundBlurDesc": "فقط در حالت وینیل کامل، تاری بیشتری به پس‌زمینه اعمال می‌کند.",
       "animationsLabel": "پویانمایی‌های وینیل",
       "animationsDesc": "پویانمایی پخش، مکث، چرخش، ورود و تعویض آهنگ را فعال می‌کند.",
       "centerRotationLabel": "چرخش مرکز صفحه",

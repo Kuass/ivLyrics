@@ -2134,6 +2134,8 @@ window.LANG_EN = {
       "albumSizeDesc": "Adjusts the album cover size in LP mode.",
       "recordSizeLabel": "Record size",
       "recordSizeDesc": "Adjusts the vinyl record size in LP mode.",
+      "backgroundBlurLabel": "Full LP background blur",
+      "backgroundBlurDesc": "Apply additional background blur only in full LP mode.",
       "animationsLabel": "LP animations",
       "animationsDesc": "Use play/pause, record spin, entrance, and track-change animations.",
       "centerRotationLabel": "Rotate LP center",

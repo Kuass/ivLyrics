@@ -2133,6 +2133,8 @@ window.LANG_BN = {
       "albumSizeDesc": "ভিনাইল মোডে অ্যালবাম কভারের আকার ঠিক করুন।",
       "recordSizeLabel": "রেকর্ডের আকার",
       "recordSizeDesc": "ভিনাইল মোডে রেকর্ডের আকার ঠিক করুন।",
+      "backgroundBlurLabel": "পূর্ণ ভিনাইলের পটভূমি ঝাপসা",
+      "backgroundBlurDesc": "শুধু পূর্ণ ভিনাইল মোডের পটভূমিতে অতিরিক্ত ঝাপসা প্রয়োগ করে।",
       "animationsLabel": "ভিনাইল অ্যানিমেশন",
       "animationsDesc": "প্লে, বিরতি, ঘূর্ণন, প্রবেশ ও গান বদলের অ্যানিমেশন ব্যবহার করুন।",
       "centerRotationLabel": "LP-এর কেন্দ্র ঘোরান",

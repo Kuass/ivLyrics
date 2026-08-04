@@ -2142,6 +2142,8 @@ window.LANG_MS = {
       "albumSizeDesc": "Melaraskan saiz kulit album dalam mod vinil.",
       "recordSizeLabel": "Saiz piring hitam",
       "recordSizeDesc": "Melaraskan saiz piring hitam dalam mod vinil.",
+      "backgroundBlurLabel": "Kabur latar vinil penuh",
+      "backgroundBlurDesc": "Menambah kabur pada latar hanya dalam mod vinil penuh.",
       "animationsLabel": "Animasi vinil",
       "animationsDesc": "Gunakan animasi main, jeda, putaran, kemunculan dan pertukaran lagu.",
       "centerRotationLabel": "Putar bahagian tengah vinil",

@@ -2133,6 +2133,8 @@ window.LANG_TR = {
       "albumSizeDesc": "Plak modundaki albüm kapağının boyutunu ayarlar.",
       "recordSizeLabel": "Plak boyutu",
       "recordSizeDesc": "Plak modundaki plağın boyutunu ayarlar.",
+      "backgroundBlurLabel": "Tam plak arka plan bulanıklığı",
+      "backgroundBlurDesc": "Yalnızca tam plak modunda arka plana ek bulanıklık uygular.",
       "animationsLabel": "Plak animasyonları",
       "animationsDesc": "Oynatma, duraklatma, dönme, giriş ve parça geçişi animasyonlarını kullanır.",
       "centerRotationLabel": "Plak merkezini döndür",

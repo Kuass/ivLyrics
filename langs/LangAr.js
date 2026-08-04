@@ -2133,6 +2133,8 @@ window.LANG_AR = {
       "albumSizeDesc": "يضبط حجم غلاف الألبوم في وضع الأسطوانة.",
       "recordSizeLabel": "حجم الأسطوانة",
       "recordSizeDesc": "يضبط حجم الأسطوانة في وضع الأسطوانة.",
+      "backgroundBlurLabel": "تمويه خلفية الأسطوانة الكاملة",
+      "backgroundBlurDesc": "يضيف تمويهًا إضافيًا إلى الخلفية في وضع الأسطوانة الكاملة فقط.",
       "animationsLabel": "حركات الأسطوانة",
       "animationsDesc": "استخدم حركات التشغيل والإيقاف والدوران والظهور وتغيير الأغنية.",
       "centerRotationLabel": "تدوير مركز الأسطوانة",

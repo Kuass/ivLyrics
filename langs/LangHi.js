@@ -2132,6 +2132,8 @@ window.LANG_HI = {
       "albumSizeDesc": "विनाइल मोड में एल्बम कवर का आकार बदलें।",
       "recordSizeLabel": "रिकॉर्ड का आकार",
       "recordSizeDesc": "विनाइल मोड में रिकॉर्ड का आकार बदलें।",
+      "backgroundBlurLabel": "पूर्ण विनाइल पृष्ठभूमि धुंधलापन",
+      "backgroundBlurDesc": "केवल पूर्ण विनाइल मोड में पृष्ठभूमि पर अतिरिक्त धुंधलापन लागू करें।",
       "animationsLabel": "विनाइल ऐनिमेशन",
       "animationsDesc": "चलाने/रोकने, रिकॉर्ड घुमाने, प्रवेश और गीत बदलने के ऐनिमेशन चालू करें।",
       "centerRotationLabel": "LP केंद्र घुमाएँ",

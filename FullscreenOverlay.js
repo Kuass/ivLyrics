@@ -2481,9 +2481,12 @@ const FullscreenOverlay = (() => {
                 activeLyricsKaraoke,
                 karaokeSource,
                 lyricsSettingsRevision,
+                showStageControls: showControls,
+                showStageProgress: showProgress,
                 vinylSettings: {
                     albumSize: CONFIG?.visual?.["fullscreen-vinyl-album-size"] ?? 100,
                     recordSize: CONFIG?.visual?.["fullscreen-vinyl-record-size"] ?? 100,
+                    backgroundBlur: CONFIG?.visual?.["fullscreen-vinyl-background-blur"] ?? 0,
                     animations: CONFIG?.visual?.["fullscreen-vinyl-animations"] !== false,
                     centerRotation: CONFIG?.visual?.["fullscreen-vinyl-center-rotation"] !== false,
                     lyricsEnabled: CONFIG?.visual?.["fullscreen-vinyl-lyrics-enabled"] !== false,
@@ -2512,6 +2515,7 @@ const FullscreenOverlay = (() => {
                     culturalFontWeight: CONFIG?.visual?.["cultural-annotations-vinyl-font-weight"] ?? 300,
                     culturalOpacity: CONFIG?.visual?.["cultural-annotations-vinyl-opacity"] ?? 60
                 },
+                onPrevious: () => Spicetify.Player.back(),
                 onSeek: (nextPosition) => {
                     window.Utils?.clearSafePlayerProgressCorrection?.();
                     const liveDuration = Spicetify.Player.getDuration?.() || duration;
@@ -2523,7 +2527,8 @@ const FullscreenOverlay = (() => {
                     if (typeof Spicetify.Player?.pause === "function") Spicetify.Player.pause();
                     else Spicetify.Player?.togglePlay?.();
                 },
-                onTogglePlayback: () => Spicetify.Player.togglePlay()
+                onTogglePlayback: () => Spicetify.Player.togglePlay(),
+                onNext: () => Spicetify.Player.next()
             });
         }
 

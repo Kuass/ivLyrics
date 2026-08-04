@@ -2132,6 +2132,8 @@ window.LANG_DE = {
       "albumSizeDesc": "Passt die Größe des Albumcovers im Vinylmodus an.",
       "recordSizeLabel": "Plattengröße",
       "recordSizeDesc": "Passt die Größe der Schallplatte im Vinylmodus an.",
+      "backgroundBlurLabel": "Hintergrundunschärfe für komplettes Vinyl",
+      "backgroundBlurDesc": "Fügt nur im vollständigen Vinylmodus zusätzliche Hintergrundunschärfe hinzu.",
       "animationsLabel": "Vinyl-Animationen",
       "animationsDesc": "Aktiviert Animationen für Wiedergabe, Pause, Drehung, Einblenden und Titelwechsel.",
       "centerRotationLabel": "LP-Mitte drehen",

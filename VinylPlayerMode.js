@@ -305,6 +305,134 @@ const VinylPlayerMode = (() => {
         );
     });
 
+    const StagePlaybackControls = react.memo(({
+        isPlaying = false,
+        position = 0,
+        duration = 0,
+        showControls = true,
+        showProgress = true,
+        onPrevious,
+        onTogglePlayback,
+        onNext,
+        onSeek
+    }) => {
+        const [seekPreview, setSeekPreview] = useState(null);
+        const safeDuration = Math.max(Number(duration) || 0, 0);
+        const safePosition = Math.min(
+            safeDuration || Number.MAX_SAFE_INTEGER,
+            Math.max(Number(position) || 0, 0)
+        );
+        const displayedPosition = seekPreview === null
+            ? safePosition
+            : seekPreview;
+        const groupLabel = I18n.t("settingsAdvanced.fullscreenUI.showControls.desc")
+            || "Player controls";
+        const progressLabel = I18n.t("settingsAdvanced.fullscreenUI.showProgressBar.desc")
+            || "Playback position";
+
+        const previewSeek = useCallback((event) => {
+            setSeekPreview(Number(event.currentTarget.value) || 0);
+        }, []);
+
+        const commitSeek = useCallback((event) => {
+            const nextPosition = Math.max(Number(event.currentTarget.value) || 0, 0);
+            setSeekPreview(null);
+            onSeek?.(nextPosition);
+        }, [onSeek]);
+
+        if (!showControls && !showProgress) return null;
+
+        const renderIconButton = ({
+            key,
+            className = "",
+            label,
+            icon,
+            onClick
+        }) => react.createElement("button", {
+            key,
+            type: "button",
+            className: `fullscreen-stage-control-button ${className}`.trim(),
+            onClick,
+            "aria-label": label,
+            title: label
+        },
+            react.createElement("svg", {
+                viewBox: "0 0 16 16",
+                fill: "currentColor",
+                "aria-hidden": "true",
+                dangerouslySetInnerHTML: { __html: icon || "" }
+            })
+        );
+
+        return react.createElement("div", {
+            className: "fullscreen-stage-controls-dock",
+            role: "group",
+            tabIndex: 0,
+            "aria-label": groupLabel
+        },
+            react.createElement("div", {
+                className: "fullscreen-stage-controls-surface"
+            },
+                showProgress && react.createElement("div", {
+                    className: "fullscreen-stage-controls-progress"
+                },
+                    react.createElement("span", {
+                        className: "fullscreen-stage-controls-time"
+                    }, formatTime(displayedPosition)),
+                    react.createElement("input", {
+                        className: "fullscreen-stage-controls-range",
+                        type: "range",
+                        min: 0,
+                        max: Math.max(safeDuration, 1),
+                        step: 250,
+                        value: Math.min(displayedPosition, Math.max(safeDuration, 1)),
+                        disabled: safeDuration <= 0,
+                        "aria-label": progressLabel,
+                        onPointerDown: (event) => {
+                            event.currentTarget.setPointerCapture?.(event.pointerId);
+                        },
+                        onInput: previewSeek,
+                        onChange: previewSeek,
+                        onPointerUp: commitSeek,
+                        onPointerCancel: () => setSeekPreview(null),
+                        onKeyUp: commitSeek,
+                        onBlur: seekPreview === null ? undefined : commitSeek
+                    }),
+                    react.createElement("span", {
+                        className: "fullscreen-stage-controls-time"
+                    }, formatTime(safeDuration))
+                ),
+                showControls && react.createElement("div", {
+                    className: "fullscreen-stage-controls-buttons"
+                }, [
+                    renderIconButton({
+                        key: "previous",
+                        label: I18n.t("fullscreen.controls.previous") || "Previous",
+                        icon: Spicetify.SVGIcons["skip-back"],
+                        onClick: onPrevious
+                    }),
+                    renderIconButton({
+                        key: "play-pause",
+                        className: "is-primary",
+                        label: isPlaying
+                            ? (I18n.t("fullscreen.controls.pause") || "Pause")
+                            : (I18n.t("fullscreen.controls.play") || "Play"),
+                        icon: isPlaying
+                            ? Spicetify.SVGIcons.pause
+                            : Spicetify.SVGIcons.play,
+                        onClick: onTogglePlayback
+                    }),
+                    renderIconButton({
+                        key: "next",
+                        label: I18n.t("fullscreen.controls.next") || "Next",
+                        icon: Spicetify.SVGIcons["skip-forward"],
+                        onClick: onNext
+                    })
+                ])
+            )
+        );
+    });
+
     const CompactVinyl = react.memo(({
         track,
         isPlaying,
@@ -1054,10 +1182,14 @@ const VinylPlayerMode = (() => {
         karaokeSource = null,
         lyricsSettingsRevision = 0,
         vinylSettings = {},
+        showStageControls = true,
+        showStageProgress = true,
         onPresentationModeChange,
+        onPrevious,
         onSeek,
         onStopPlayback,
-        onTogglePlayback
+        onTogglePlayback,
+        onNext
     }) => {
         const normalizedPresentationMode =
             normalizePresentationMode(presentationMode);
@@ -1072,6 +1204,7 @@ const VinylPlayerMode = (() => {
         const lyricsEnabled = vinylSettings.lyricsEnabled !== false;
         const albumScale = Math.min(1.4, Math.max(0.7, (Number(vinylSettings.albumSize) || 100) / 100));
         const recordScale = Math.min(1.4, Math.max(0.7, (Number(vinylSettings.recordSize) || 100) / 100));
+        const backgroundBlur = Math.min(100, Math.max(0, Number(vinylSettings.backgroundBlur) || 0));
         const safeScaleFactor = 1 / Math.max(1, albumScale, recordScale);
         const liveTrack = {
             uri: track.uri || `${track.title || "LP"}\u0000${track.artist || ""}`,
@@ -1433,7 +1566,8 @@ const VinylPlayerMode = (() => {
                 "--iv-vinyl-cultural-note-font-family": `'${String(vinylSettings.culturalFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
                 "--iv-vinyl-cultural-note-font-size": `${Number(vinylSettings.culturalFontSize) || 12}px`,
                 "--iv-vinyl-cultural-note-font-weight": Number(vinylSettings.culturalFontWeight) || 300,
-                "--iv-vinyl-cultural-note-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.culturalOpacity) || 60) / 100))
+                "--iv-vinyl-cultural-note-opacity": Math.min(1, Math.max(0, (Number(vinylSettings.culturalOpacity) || 60) / 100)),
+                "--iv-vinyl-background-blur": `${backgroundBlur}px`
             }
         },
             isFullVinylPresentation ? react.createElement(VinylPlayer, {
@@ -1499,6 +1633,17 @@ const VinylPlayerMode = (() => {
                 activeMode: normalizedPresentationMode,
                 visible: true,
                 onChange: onPresentationModeChange
+            }),
+            (isFullVinylPresentation || isVideoPresentation) && react.createElement(StagePlaybackControls, {
+                isPlaying,
+                position,
+                duration,
+                showControls: showStageControls,
+                showProgress: showStageProgress,
+                onPrevious,
+                onTogglePlayback,
+                onNext,
+                onSeek
             }),
             lyricsEnabled ? react.createElement("div", {
                 className: `fullscreen-vinyl-lyric-stage${hasVisibleLyric ? "" : " is-empty"}`,

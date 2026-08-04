@@ -2133,6 +2133,8 @@ window.LANG_IT = {
       "albumSizeDesc": "Regola la dimensione della copertina in modalità vinile.",
       "recordSizeLabel": "Dimensione disco",
       "recordSizeDesc": "Regola la dimensione del disco in modalità vinile.",
+      "backgroundBlurLabel": "Sfocatura sfondo vinile completo",
+      "backgroundBlurDesc": "Applica una sfocatura aggiuntiva allo sfondo solo nella modalità vinile completa.",
       "animationsLabel": "Animazioni vinile",
       "animationsDesc": "Usa le animazioni di riproduzione, pausa, rotazione, ingresso e cambio brano.",
       "centerRotationLabel": "Ruota il centro del vinile",

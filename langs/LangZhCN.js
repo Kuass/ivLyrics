@@ -2133,6 +2133,8 @@ window.LANG_ZH_CN = {
       "albumSizeDesc": "调整黑胶模式中的专辑封面大小。",
       "recordSizeLabel": "唱片大小",
       "recordSizeDesc": "调整黑胶模式中的唱片大小。",
+      "backgroundBlurLabel": "完整黑胶背景模糊",
+      "backgroundBlurDesc": "仅在完整黑胶模式下为背景增加额外模糊。",
       "animationsLabel": "黑胶动画",
       "animationsDesc": "启用播放/暂停、唱片旋转、入场和切歌动画。",
       "centerRotationLabel": "旋转唱片中心",

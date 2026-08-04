@@ -2838,6 +2838,9 @@ const CONFIG = {
     "fullscreen-vinyl-record-size":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-record-size")) ||
       100,
+    "fullscreen-vinyl-background-blur":
+      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-background-blur")) ||
+      0,
     "fullscreen-vinyl-animations": StorageManager.get(
       "ivLyrics:visual:fullscreen-vinyl-animations",
       true

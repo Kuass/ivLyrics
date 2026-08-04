@@ -2132,6 +2132,8 @@ window.LANG_SV = {
       "albumSizeDesc": "Justerar albumomslagets storlek i vinylläget.",
       "recordSizeLabel": "Skivstorlek",
       "recordSizeDesc": "Justerar vinylskivans storlek i vinylläget.",
+      "backgroundBlurLabel": "Bakgrundsoskärpa för komplett vinyl",
+      "backgroundBlurDesc": "Lägger till extra oskärpa i bakgrunden endast i komplett vinylläge.",
       "animationsLabel": "Vinylanimationer",
       "animationsDesc": "Använd animationer för uppspelning, paus, rotation, entré och låtbyte.",
       "centerRotationLabel": "Rotera skivans mitt",

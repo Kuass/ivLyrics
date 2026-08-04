@@ -6776,7 +6776,9 @@ const ConfigModal = ({
         "vinyl.presentation.settingsDescription",
         "vinyl.presentation.vinylLabel",
         "vinyl.presentation.compactLabel",
-        "vinyl.presentation.videoLabel"
+        "vinyl.presentation.videoLabel",
+        "vinyl.settings.backgroundBlurLabel",
+        "vinyl.settings.backgroundBlurDesc"
       ]
     },
     {
@@ -17204,6 +17206,17 @@ const ConfigModal = ({
               step: 5,
               unit: "%",
               defaultValue: CONFIG.visual["fullscreen-vinyl-record-size"] ?? 100,
+            },
+            {
+              desc: I18n.t("vinyl.settings.backgroundBlurLabel"),
+              info: I18n.t("vinyl.settings.backgroundBlurDesc"),
+              key: "fullscreen-vinyl-background-blur",
+              type: ConfigSliderRange,
+              min: 0,
+              max: 100,
+              step: 5,
+              unit: "px",
+              defaultValue: CONFIG.visual["fullscreen-vinyl-background-blur"] ?? 0,
             },
             {
               desc: I18n.t("vinyl.settings.animationsLabel"),

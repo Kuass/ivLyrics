@@ -2133,6 +2133,8 @@ window.LANG_ES = {
       "albumSizeDesc": "Ajusta el tamaño de la portada en el modo vinilo.",
       "recordSizeLabel": "Tamaño del disco",
       "recordSizeDesc": "Ajusta el tamaño del disco en el modo vinilo.",
+      "backgroundBlurLabel": "Desenfoque de fondo del vinilo completo",
+      "backgroundBlurDesc": "Aplica desenfoque adicional al fondo solo en el modo de vinilo completo.",
       "animationsLabel": "Animaciones del vinilo",
       "animationsDesc": "Usa animaciones de reproducción, pausa, giro, entrada y cambio de canción.",
       "centerRotationLabel": "Girar el centro del vinilo",

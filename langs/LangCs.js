@@ -2132,6 +2132,8 @@ window.LANG_CS = {
       "albumSizeDesc": "Upraví velikost obalu alba ve vinylovém režimu.",
       "recordSizeLabel": "Velikost desky",
       "recordSizeDesc": "Upraví velikost vinylové desky ve vinylovém režimu.",
+      "backgroundBlurLabel": "Rozostření pozadí celého vinylu",
+      "backgroundBlurDesc": "Přidá další rozostření pozadí pouze v režimu celého gramofonu.",
       "animationsLabel": "Animace vinylu",
       "animationsDesc": "Použije animace přehrávání, pauzy, otáčení, příchodu a změny skladby.",
       "centerRotationLabel": "Otáčet střed desky",

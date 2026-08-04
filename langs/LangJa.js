@@ -2133,6 +2133,8 @@ window.LANG_JA = {
       "albumSizeDesc": "LP モードのアルバムジャケットのサイズを調整します。",
       "recordSizeLabel": "レコードのサイズ",
       "recordSizeDesc": "LP モードのレコードのサイズを調整します。",
+      "backgroundBlurLabel": "フル LP の背景ぼかし",
+      "backgroundBlurDesc": "フル LP モードでのみ背景に追加のぼかしを適用します。",
       "animationsLabel": "LP アニメーション",
       "animationsDesc": "再生・一時停止、回転、登場、曲変更のアニメーションを使用します。",
       "centerRotationLabel": "LP中央を回転",
