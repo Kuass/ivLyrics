@@ -830,12 +830,54 @@ const CommunityVideoSelector = ({
     updateRandomSelection(!randomSelectionEnabled);
   }, [randomSelectionEnabled, updateRandomSelection]);
 
-  const toggleHideDislikedVideos = useCallback(() => {
+  const replaceHiddenCurrentVideo = useCallback(async (nextVideos, hiddenVideoId) => {
+    if (!hiddenVideoId || currentVideoId !== hiddenVideoId) return;
+
+    const seenVideoIds = new Set([hiddenVideoId]);
+    const replacement = nextVideos.find((video) => {
+      const videoId = String(video?.youtubeVideoId || "").trim();
+      if (!videoId || seenVideoIds.has(videoId) || video.userVote === -1) {
+        return false;
+      }
+      seenVideoIds.add(videoId);
+      return true;
+    });
+
+    setPreviewVideoId(null);
+
+    if (randomSelectionEnabled) {
+      window.dispatchEvent(new CustomEvent(
+        "ivLyrics:communityVideoCurrentHidden",
+        { detail: { trackUri, videoId: hiddenVideoId } }
+      ));
+      return;
+    }
+
+    await onVideoSelect?.(
+      replacement
+        ? getCommunityVideoSelectionInfo(
+          replacement,
+          replacement.startTime,
+          replacement.skipSegments
+        )
+        : null
+    );
+  }, [currentVideoId, onVideoSelect, randomSelectionEnabled, trackUri]);
+
+  const toggleHideDislikedVideos = useCallback(async () => {
     const nextValue = !hideDislikedVideos;
     setHideDislikedVideos(nextValue);
     CONFIG.visual["community-video-hide-disliked"] = nextValue;
     StorageManager.saveConfig("community-video-hide-disliked", nextValue);
-  }, [hideDislikedVideos]);
+    if (nextValue) {
+      const hiddenCurrentVideo = videos.find((video) =>
+        video.userVote === -1 && video.youtubeVideoId === currentVideoId
+      );
+      if (hiddenCurrentVideo) {
+        await replaceHiddenCurrentVideo(videos, hiddenCurrentVideo.youtubeVideoId);
+      }
+    }
+  }, [currentVideoId, hideDislikedVideos, replaceHiddenCurrentVideo, videos]);
 
   const resetSubmitForm = useCallback(() => {
     setShowSubmitForm(false);
@@ -970,27 +1012,30 @@ const CommunityVideoSelector = ({
       const result = await Utils.voteCommunityVideo(videoEntryId, voteType, trackUri);
       if (result) {
         // 투표 결과로 목록 업데이트
-        setVideos((prev) =>
-          prev
-            .map((v) => {
-              if (v.id === videoEntryId) {
-                return {
-                  ...v,
-                  likes: result.data.likes,
-                  dislikes: result.data.dislikes,
-                  score: result.data.score,
-                  userVote: voteType === 0 ? null : voteType,
-                };
-              }
-              return v;
-            })
-            .sort((a, b) => b.score - a.score)
-        );
+        const updatedVideos = videos
+          .map((v) => {
+            if (v.id === videoEntryId) {
+              return {
+                ...v,
+                likes: result.data.likes,
+                dislikes: result.data.dislikes,
+                score: result.data.score,
+                userVote: voteType === 0 ? null : voteType,
+              };
+            }
+            return v;
+          })
+          .sort((a, b) => b.score - a.score);
+        setVideos(updatedVideos);
         if (voteType === -1 && hideDislikedVideos) {
           const dislikedVideo = videos.find((video) => video.id === videoEntryId);
           if (dislikedVideo?.youtubeVideoId === previewVideoId) {
             setPreviewVideoId(null);
           }
+          await replaceHiddenCurrentVideo(
+            updatedVideos,
+            dislikedVideo?.youtubeVideoId
+          );
         }
       }
     } catch (e) {

@@ -178,11 +178,28 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         const handleRandomSettingChange = () => {
             setVideoLoadRevision((revision) => revision + 1);
         };
+        const handleHiddenCurrentVideo = (event) => {
+            const hiddenTrackUri = event?.detail?.trackUri;
+            const hiddenVideoId = event?.detail?.videoId;
+            const activeVideoInfo = window.ivLyricsActiveCommunityVideoInfo;
+            if (
+                hiddenTrackUri === trackUri &&
+                hiddenVideoId &&
+                activeVideoInfo?.trackUri === trackUri &&
+                activeVideoInfo?.youtubeVideoId === hiddenVideoId
+            ) {
+                setVideoLoadRevision((revision) => revision + 1);
+            }
+        };
 
         Spicetify.Player?.addEventListener?.("songchange", reloadCurrentTrack);
         window.addEventListener(
             "ivLyrics:communityVideoRandomChanged",
             handleRandomSettingChange
+        );
+        window.addEventListener(
+            "ivLyrics:communityVideoCurrentHidden",
+            handleHiddenCurrentVideo
         );
         return () => {
             Spicetify.Player?.removeEventListener?.("songchange", reloadCurrentTrack);
@@ -190,8 +207,24 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 "ivLyrics:communityVideoRandomChanged",
                 handleRandomSettingChange
             );
+            window.removeEventListener(
+                "ivLyrics:communityVideoCurrentHidden",
+                handleHiddenCurrentVideo
+            );
         };
     }, [trackUri]);
+
+    useEffect(() => {
+        window.ivLyricsActiveCommunityVideoInfo = videoInfo?.youtubeVideoId
+            ? { trackUri, ...videoInfo }
+            : null;
+
+        return () => {
+            if (window.ivLyricsActiveCommunityVideoInfo?.trackUri === trackUri) {
+                window.ivLyricsActiveCommunityVideoInfo = null;
+            }
+        };
+    }, [trackUri, videoInfo]);
 
     const reportVideoBackgroundStatus = useCallback((phase, details = {}) => {
         if (typeof onLoadingChange !== "function") return;
@@ -272,6 +305,20 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
             return undefined;
         }
 
+        if (externalVideoInfo?.suppressVideoBackground === true) {
+            if (playerRef.current) {
+                try {
+                    playerRef.current.destroy();
+                } catch (e) { }
+                playerRef.current = null;
+            }
+            setVideoInfo(null);
+            setStatusMessage("");
+            setIsPlayerReady(false);
+            reportVideoBackgroundStatus("idle");
+            return undefined;
+        }
+
         // 수동 선택은 일반 모드에서 우선하고, 무작위 모드에서는 새 후보를 계산
         if (
             !useRandomCommunityVideo &&
@@ -318,11 +365,23 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                             setStatusMessage("");
                             return;
                         }
+                        if (isMounted) {
+                            setVideoInfo(null);
+                            setStatusMessage("");
+                            reportVideoBackgroundStatus("idle");
+                            return;
+                        }
                     } catch (error) {
                         console.warn(
                             "[VideoBackground] Failed to select a random community video:",
                             error
                         );
+                        if (isMounted) {
+                            setVideoInfo(null);
+                            setStatusMessage("");
+                            reportVideoBackgroundStatus("idle");
+                            return;
+                        }
                     }
                 }
 

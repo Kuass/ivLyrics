@@ -3853,11 +3853,12 @@ function openCommunityVideoSelector(trackUri, currentVideoId, onVideoSelect, def
         trackUri: trackUri,
         currentVideoId: currentVideoId,
         defaultStartTime,
-        onVideoSelect: (newVideoInfo) => {
-          if (onVideoSelect) {
-            onVideoSelect(newVideoInfo);
+        onVideoSelect: async (newVideoInfo) => {
+          try {
+            await onVideoSelect?.(newVideoInfo);
+          } finally {
+            closeModal();
           }
-          closeModal();
         },
         onClose: closeModal
       }),
@@ -3872,9 +3873,13 @@ const CommunityVideoButton = react.memo(({ trackUri, videoInfo, onVideoSelect, d
   }
 
   const handleClick = () => {
+    const activeVideoInfo = window.ivLyricsActiveCommunityVideoInfo;
+    const activeVideoId = activeVideoInfo?.trackUri === trackUri
+      ? activeVideoInfo.youtubeVideoId
+      : null;
     openCommunityVideoSelector(
       trackUri,
-      videoInfo?.youtubeVideoId,
+      activeVideoId || videoInfo?.youtubeVideoId,
       onVideoSelect,
       defaultStartTime
     );
