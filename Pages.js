@@ -2967,6 +2967,18 @@ const getTrailingKaraokeInterludeInfo = (line, nextLine = null, lineIndex = -1, 
 	};
 };
 
+const isTrailingKaraokeInterludePositionActive = (interludeInfo, position) => {
+	if (position < interludeInfo.startTime) {
+		return false;
+	}
+
+	// A postlude has no following lyric line to take over. Spotify can report a
+	// position equal to or slightly beyond the track duration while handing off
+	// to the next song, so keep an already-reached outro marker visible until the
+	// new track resets the playback position.
+	return interludeInfo.kind === "postlude" || position < interludeInfo.endTime;
+};
+
 const createActiveTrailingKaraokeInterludeLine = ({
 	line,
 	nextLine = null,
@@ -2985,8 +2997,7 @@ const createActiveTrailingKaraokeInterludeLine = ({
 		!interludeInfo.isInterlude ||
 		interludeInfo.startTime === null ||
 		interludeInfo.endTime === null ||
-		position < interludeInfo.startTime ||
-		position >= interludeInfo.endTime
+		!isTrailingKaraokeInterludePositionActive(interludeInfo, position)
 	) {
 		return null;
 	}
