@@ -2166,7 +2166,13 @@ window.LANG_VI = {
       "tonearmFinishBlack": "Đen",
       "tonearmSizeLabel": "Kích thước cần",
       "tonearmSizeDesc": "Điều chỉnh kích thước cần máy hát trong chế độ đĩa than.",
-      "typographySubtitle": "Điều chỉnh riêng phông chữ cho lời gốc, phiên âm và bản dịch bên dưới đĩa."
+      "typographySubtitle": "Điều chỉnh riêng phông chữ cho lời gốc, phiên âm và bản dịch bên dưới đĩa.",
+      "videoStageTypographyTitle": "Lời bài hát trên sân khấu video",
+      "videoStageTypographySubtitle": "Đặt phông chữ riêng và nền chữ cho lời bài hát hiển thị trong Sân khấu video.",
+      "videoStageBackgroundColorLabel": "Màu nền lời bài hát",
+      "videoStageBackgroundColorDesc": "Chọn màu phía sau chữ lời bài hát trong Sân khấu video.",
+      "videoStageBackgroundOpacityLabel": "Độ mờ nền lời bài hát",
+      "videoStageBackgroundOpacityDesc": "Điều chỉnh độ mờ của nền chữ lời bài hát trong Sân khấu video."
     }
   },
   "tmi": {

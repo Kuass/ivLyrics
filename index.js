@@ -2292,6 +2292,24 @@ const getOrSeedVinylTypographySetting = (
   return seededValue;
 };
 
+const getOrSeedVideoStageTypographySetting = (
+  settingName,
+  fallback = "Pretendard Variable"
+) => {
+  const videoStageStorageKey = `${APP_NAME}:visual:fullscreen-video-stage-${settingName}`;
+  const storedVideoStageValue = String(
+    StorageManager.getItem(videoStageStorageKey) || ""
+  ).trim();
+  if (storedVideoStageValue) return storedVideoStageValue;
+
+  const inheritedVinylValue = String(
+    StorageManager.getItem(`${APP_NAME}:visual:fullscreen-vinyl-${settingName}`) ||
+      fallback
+  ).trim() || fallback;
+  StorageManager.setItem(videoStageStorageKey, inheritedVinylValue);
+  return inheritedVinylValue;
+};
+
 const CONFIG = {
   visual: {
     language:
@@ -3034,6 +3052,27 @@ const CONFIG = {
       StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-outline-width") || "0",
     "fullscreen-vinyl-translation-outline-color":
       StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-outline-color") || "#000000",
+    "fullscreen-video-stage-original-font-family":
+      getOrSeedVideoStageTypographySetting("original-font-family"),
+    "fullscreen-video-stage-phonetic-font-family":
+      getOrSeedVideoStageTypographySetting("phonetic-font-family"),
+    "fullscreen-video-stage-translation-font-family":
+      getOrSeedVideoStageTypographySetting("translation-font-family"),
+    "fullscreen-video-stage-cultural-font-family":
+      getOrSeedVideoStageTypographySetting(
+        "cultural-font-family",
+        StorageManager.getItem("ivLyrics:visual:cultural-annotations-vinyl-font-family") ||
+          "Pretendard Variable"
+      ),
+    "fullscreen-video-stage-lyric-background-color":
+      StorageManager.getItem("ivLyrics:visual:fullscreen-video-stage-lyric-background-color") ||
+      "#000000",
+    "fullscreen-video-stage-lyric-background-opacity": Number(
+      StorageManager.get(
+        "ivLyrics:visual:fullscreen-video-stage-lyric-background-opacity",
+        46
+      )
+    ),
     "fullscreen-title-size":
       StorageManager.getItem("ivLyrics:visual:fullscreen-title-size") ||
       "48",
@@ -10399,6 +10438,10 @@ class LyricsContainer extends react.Component {
   addFonts(CONFIG.visual["fullscreen-vinyl-original-font-family"]);
   addFonts(CONFIG.visual["fullscreen-vinyl-phonetic-font-family"]);
   addFonts(CONFIG.visual["fullscreen-vinyl-translation-font-family"]);
+  addFonts(CONFIG.visual["fullscreen-video-stage-original-font-family"]);
+  addFonts(CONFIG.visual["fullscreen-video-stage-phonetic-font-family"]);
+  addFonts(CONFIG.visual["fullscreen-video-stage-translation-font-family"]);
+  addFonts(CONFIG.visual["fullscreen-video-stage-cultural-font-family"]);
 
   // Google Fonts 로드
   fontsToLoad.forEach((font) => {

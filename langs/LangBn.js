@@ -2166,7 +2166,13 @@ window.LANG_BN = {
       "tonearmFinishBlack": "কালো",
       "tonearmSizeLabel": "টোনআর্মের আকার",
       "tonearmSizeDesc": "ভিনাইল মোডে টোনআর্মের আকার ঠিক করুন।",
-      "typographySubtitle": "ভিনাইলের নিচে মূল, উচ্চারণ ও অনুবাদের ফন্ট আলাদাভাবে ঠিক করুন।"
+      "typographySubtitle": "ভিনাইলের নিচে মূল, উচ্চারণ ও অনুবাদের ফন্ট আলাদাভাবে ঠিক করুন।",
+      "videoStageTypographyTitle": "ভিডিও স্টেজের লিরিক্স",
+      "videoStageTypographySubtitle": "ভিডিও স্টেজে দেখানো লিরিক্সের জন্য আলাদা ফন্ট ও টেক্সট ব্যাকগ্রাউন্ড সেট করুন।",
+      "videoStageBackgroundColorLabel": "লিরিক্স ব্যাকগ্রাউন্ডের রং",
+      "videoStageBackgroundColorDesc": "ভিডিও স্টেজের লিরিক্স টেক্সটের পেছনের রং বেছে নিন।",
+      "videoStageBackgroundOpacityLabel": "লিরিক্স ব্যাকগ্রাউন্ডের অস্বচ্ছতা",
+      "videoStageBackgroundOpacityDesc": "ভিডিও স্টেজের লিরিক্স টেক্সট ব্যাকগ্রাউন্ডের অস্বচ্ছতা সামঞ্জস্য করুন।"
     }
   },
   "tmi": {

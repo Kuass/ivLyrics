@@ -2165,7 +2165,13 @@ window.LANG_CS = {
       "tonearmFinishBlack": "Černá",
       "tonearmSizeLabel": "Velikost raménka",
       "tonearmSizeDesc": "Upravte velikost raménka ve vinylovém režimu.",
-      "typographySubtitle": "Samostatně upravte písma originálu, výslovnosti a překladu pod deskou."
+      "typographySubtitle": "Samostatně upravte písma originálu, výslovnosti a překladu pod deskou.",
+      "videoStageTypographyTitle": "Text ve video scéně",
+      "videoStageTypographySubtitle": "Nastavte samostatná písma a pozadí textu pro titulky ve video scéně.",
+      "videoStageBackgroundColorLabel": "Barva pozadí textu",
+      "videoStageBackgroundColorDesc": "Vyberte barvu za textem ve video scéně.",
+      "videoStageBackgroundOpacityLabel": "Krytí pozadí textu",
+      "videoStageBackgroundOpacityDesc": "Upravte krytí pozadí textu ve video scéně."
     }
   },
   "tmi": {

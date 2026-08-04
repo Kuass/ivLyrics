@@ -2175,7 +2175,13 @@ window.LANG_MS = {
       "tonearmFinishBlack": "Hitam",
       "tonearmSizeLabel": "Saiz lengan",
       "tonearmSizeDesc": "Laraskan saiz lengan pikap dalam mod vinil.",
-      "typographySubtitle": "Laraskan fon teks asal, sebutan dan terjemahan di bawah piring hitam secara berasingan."
+      "typographySubtitle": "Laraskan fon teks asal, sebutan dan terjemahan di bawah piring hitam secara berasingan.",
+      "videoStageTypographyTitle": "Lirik pentas video",
+      "videoStageTypographySubtitle": "Tetapkan fon berasingan dan latar teks untuk lirik yang dipaparkan dalam Pentas Video.",
+      "videoStageBackgroundColorLabel": "Warna latar lirik",
+      "videoStageBackgroundColorDesc": "Pilih warna di belakang teks lirik Pentas Video.",
+      "videoStageBackgroundOpacityLabel": "Kelegapan latar lirik",
+      "videoStageBackgroundOpacityDesc": "Laraskan kelegapan latar teks lirik Pentas Video."
     }
   },
   "tmi": {

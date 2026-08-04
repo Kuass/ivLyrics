@@ -2165,7 +2165,13 @@ window.LANG_ID = {
       "tonearmFinishBlack": "Hitam",
       "tonearmSizeLabel": "Ukuran lengan",
       "tonearmSizeDesc": "Sesuaikan ukuran lengan pemutar dalam mode vinil.",
-      "typographySubtitle": "Sesuaikan font teks asli, pelafalan, dan terjemahan di bawah piringan secara terpisah."
+      "typographySubtitle": "Sesuaikan font teks asli, pelafalan, dan terjemahan di bawah piringan secara terpisah.",
+      "videoStageTypographyTitle": "Lirik panggung video",
+      "videoStageTypographySubtitle": "Atur font terpisah dan latar teks untuk lirik yang tampil di Panggung Video.",
+      "videoStageBackgroundColorLabel": "Warna latar lirik",
+      "videoStageBackgroundColorDesc": "Pilih warna di belakang teks lirik Panggung Video.",
+      "videoStageBackgroundOpacityLabel": "Opasitas latar lirik",
+      "videoStageBackgroundOpacityDesc": "Sesuaikan opasitas latar teks lirik Panggung Video."
     }
   },
   "tmi": {

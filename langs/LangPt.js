@@ -2166,7 +2166,13 @@ window.LANG_PT = {
       "tonearmFinishBlack": "Preto",
       "tonearmSizeLabel": "Tamanho do braço",
       "tonearmSizeDesc": "Ajuste o tamanho do braço no modo vinil.",
-      "typographySubtitle": "Ajuste separadamente as fontes do original, da pronúncia e da tradução abaixo do vinil."
+      "typographySubtitle": "Ajuste separadamente as fontes do original, da pronúncia e da tradução abaixo do vinil.",
+      "videoStageTypographyTitle": "Letra do palco de vídeo",
+      "videoStageTypographySubtitle": "Defina fontes separadas e um fundo de texto para a letra exibida no Palco de Vídeo.",
+      "videoStageBackgroundColorLabel": "Cor de fundo da letra",
+      "videoStageBackgroundColorDesc": "Escolha a cor atrás do texto da letra no Palco de Vídeo.",
+      "videoStageBackgroundOpacityLabel": "Opacidade do fundo da letra",
+      "videoStageBackgroundOpacityDesc": "Ajuste a opacidade do fundo da letra no Palco de Vídeo."
     }
   },
   "tmi": {

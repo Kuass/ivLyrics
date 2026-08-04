@@ -2166,7 +2166,13 @@ window.LANG_ZH_TW = {
       "tonearmFinishBlack": "黑色",
       "tonearmSizeLabel": "唱臂大小",
       "tonearmSizeDesc": "調整黑膠模式中的唱臂大小。",
-      "typographySubtitle": "分別調整黑膠唱片下方原文、注音與翻譯的字型。"
+      "typographySubtitle": "分別調整黑膠唱片下方原文、注音與翻譯的字型。",
+      "videoStageTypographyTitle": "影片舞台歌詞",
+      "videoStageTypographySubtitle": "為影片舞台中顯示的歌詞個別設定字型與文字背景。",
+      "videoStageBackgroundColorLabel": "歌詞文字背景顏色",
+      "videoStageBackgroundColorDesc": "選擇影片舞台歌詞文字後方的背景顏色。",
+      "videoStageBackgroundOpacityLabel": "歌詞文字背景不透明度",
+      "videoStageBackgroundOpacityDesc": "調整影片舞台歌詞文字背景的不透明度。"
     }
   },
   "tmi": {

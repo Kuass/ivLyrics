@@ -2166,7 +2166,13 @@ window.LANG_ZH_CN = {
       "tonearmFinishBlack": "黑色",
       "tonearmSizeLabel": "唱臂大小",
       "tonearmSizeDesc": "调整黑胶模式中的唱臂大小。",
-      "typographySubtitle": "分别调整黑胶唱片下方原文、注音和翻译的字体。"
+      "typographySubtitle": "分别调整黑胶唱片下方原文、注音和翻译的字体。",
+      "videoStageTypographyTitle": "视频舞台歌词",
+      "videoStageTypographySubtitle": "为视频舞台中显示的歌词单独设置字体和文字背景。",
+      "videoStageBackgroundColorLabel": "歌词文字背景颜色",
+      "videoStageBackgroundColorDesc": "选择视频舞台歌词文字后方的背景颜色。",
+      "videoStageBackgroundOpacityLabel": "歌词文字背景不透明度",
+      "videoStageBackgroundOpacityDesc": "调整视频舞台歌词文字背景的不透明度。"
     }
   },
   "tmi": {

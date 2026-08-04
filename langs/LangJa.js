@@ -2166,7 +2166,13 @@ window.LANG_JA = {
       "tonearmFinishBlack": "ブラック",
       "tonearmSizeLabel": "トーンアームのサイズ",
       "tonearmSizeDesc": "LP モードのトーンアームのサイズを調整します。",
-      "typographySubtitle": "LP の下に表示する原文・発音・翻訳のフォントを個別に調整します。"
+      "typographySubtitle": "LP の下に表示する原文・発音・翻訳のフォントを個別に調整します。",
+      "videoStageTypographyTitle": "ビデオステージの歌詞",
+      "videoStageTypographySubtitle": "ビデオステージに表示する歌詞のフォントと文字背景を個別に設定します。",
+      "videoStageBackgroundColorLabel": "歌詞背景の色",
+      "videoStageBackgroundColorDesc": "ビデオステージの歌詞文字の後ろに表示する色を選択します。",
+      "videoStageBackgroundOpacityLabel": "歌詞背景の不透明度",
+      "videoStageBackgroundOpacityDesc": "ビデオステージの歌詞背景の不透明度を調整します。"
     }
   },
   "tmi": {

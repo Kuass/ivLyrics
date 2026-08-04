@@ -10387,7 +10387,12 @@ html.is-lp-view-exit::view-transition-new(root) {
   padding: 0.08em 0.32em;
   border: 0;
   border-radius: 0;
-  background: rgba(0, 0, 0, 0.46);
+  background: color-mix(in srgb,
+      var(--iv-video-stage-lyric-background-color, #000000)
+      var(--iv-video-stage-lyric-background-opacity, 46%),
+      transparent);
+  font-family: var(--iv-video-stage-original-font-family,
+      var(--iv-vinyl-original-font-family, 'Pretendard Variable')), Pretendard, sans-serif !important;
   text-shadow:
     0 1px 2px rgba(0, 0, 0, 0.62),
     0 2px 5px rgba(0, 0, 0, 0.2) !important;
@@ -10402,7 +10407,10 @@ html.is-lp-view-exit::view-transition-new(root) {
   padding: 0.08em 0.32em;
   border: 0;
   border-radius: 0;
-  background: rgba(0, 0, 0, 0.46);
+  background: color-mix(in srgb,
+      var(--iv-video-stage-lyric-background-color, #000000)
+      var(--iv-video-stage-lyric-background-opacity, 46%),
+      transparent);
   text-shadow:
     0 1px 2px rgba(0, 0, 0, 0.52) !important;
 }
@@ -10410,11 +10418,22 @@ html.is-lp-view-exit::view-transition-new(root) {
 .fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-culturalNote {
   position: relative;
   z-index: 1;
+  width: fit-content;
+  margin-inline: auto;
+  padding: 0.08em 0.32em;
+  background: color-mix(in srgb,
+      var(--iv-video-stage-lyric-background-color, #000000)
+      var(--iv-video-stage-lyric-background-opacity, 46%),
+      transparent);
+  font-family: var(--iv-video-stage-cultural-font-family,
+      var(--iv-vinyl-cultural-note-font-family, 'Pretendard Variable')), Pretendard, sans-serif !important;
   text-shadow:
     0 1px 2px rgba(0, 0, 0, 0.52) !important;
 }
 
 .fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-phonetic {
+  font-family: var(--iv-video-stage-phonetic-font-family,
+      var(--iv-vinyl-phonetic-font-family, 'Pretendard Variable')), Pretendard, sans-serif !important;
   font-size: max(var(--iv-vinyl-phonetic-font-size, 11px), 13px) !important;
   font-weight: max(var(--iv-vinyl-phonetic-font-weight, 100), 400) !important;
   margin-top: 3px;
@@ -10422,6 +10441,8 @@ html.is-lp-view-exit::view-transition-new(root) {
 }
 
 .fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-translation {
+  font-family: var(--iv-video-stage-translation-font-family,
+      var(--iv-vinyl-translation-font-family, 'Pretendard Variable')), Pretendard, sans-serif !important;
   font-size: max(var(--iv-vinyl-translation-font-size, 15px), 16px) !important;
   font-weight: max(var(--iv-vinyl-translation-font-weight, 300), 400) !important;
   margin-top: 3px;

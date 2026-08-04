@@ -2165,7 +2165,13 @@ window.LANG_FA = {
       "tonearmFinishBlack": "مشکی",
       "tonearmSizeLabel": "اندازهٔ بازو",
       "tonearmSizeDesc": "اندازهٔ بازوی گرامافون را در حالت وینیل تنظیم کنید.",
-      "typographySubtitle": "قلم متن اصلی، تلفظ و ترجمه زیر وینیل را جداگانه تنظیم کنید."
+      "typographySubtitle": "قلم متن اصلی، تلفظ و ترجمه زیر وینیل را جداگانه تنظیم کنید.",
+      "videoStageTypographyTitle": "متن ترانه در صحنه ویدیو",
+      "videoStageTypographySubtitle": "فونت‌های جداگانه و پس‌زمینه متن ترانه صحنه ویدیو را تنظیم کنید.",
+      "videoStageBackgroundColorLabel": "رنگ پس‌زمینه متن ترانه",
+      "videoStageBackgroundColorDesc": "رنگ پشت متن ترانه در صحنه ویدیو را انتخاب کنید.",
+      "videoStageBackgroundOpacityLabel": "شفافیت پس‌زمینه متن ترانه",
+      "videoStageBackgroundOpacityDesc": "شفافیت پس‌زمینه متن ترانه صحنه ویدیو را تنظیم کنید."
     }
   },
   "tmi": {

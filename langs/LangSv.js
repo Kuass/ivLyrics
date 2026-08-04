@@ -2165,7 +2165,13 @@ window.LANG_SV = {
       "tonearmFinishBlack": "Svart",
       "tonearmSizeLabel": "Tonarmsstorlek",
       "tonearmSizeDesc": "Justera tonarmens storlek i vinylläget.",
-      "typographySubtitle": "Justera typsnitten för original, uttal och översättning under skivan separat."
+      "typographySubtitle": "Justera typsnitten för original, uttal och översättning under skivan separat.",
+      "videoStageTypographyTitle": "Låttext på videoscenen",
+      "videoStageTypographySubtitle": "Ange separata typsnitt och en textbakgrund för låttexten på videoscenen.",
+      "videoStageBackgroundColorLabel": "Bakgrundsfärg för låttext",
+      "videoStageBackgroundColorDesc": "Välj färgen bakom låttexten på videoscenen.",
+      "videoStageBackgroundOpacityLabel": "Bakgrundens opacitet",
+      "videoStageBackgroundOpacityDesc": "Justera opaciteten för låttextens bakgrund på videoscenen."
     }
   },
   "tmi": {

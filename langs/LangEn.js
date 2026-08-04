@@ -2167,7 +2167,13 @@ window.LANG_EN = {
       "tonearmFinishBlack": "Black",
       "tonearmSizeLabel": "Tonearm size",
       "tonearmSizeDesc": "Adjust the tonearm size in vinyl mode.",
-      "typographySubtitle": "Adjust the fonts for the original, pronunciation, and translation shown below the LP."
+      "typographySubtitle": "Adjust the fonts for the original, pronunciation, and translation shown below the LP.",
+      "videoStageTypographyTitle": "Video stage lyrics",
+      "videoStageTypographySubtitle": "Set separate fonts and a text background for lyrics shown in Video Stage.",
+      "videoStageBackgroundColorLabel": "Lyric background color",
+      "videoStageBackgroundColorDesc": "Choose the color behind Video Stage lyric text.",
+      "videoStageBackgroundOpacityLabel": "Lyric background opacity",
+      "videoStageBackgroundOpacityDesc": "Adjust the opacity of the Video Stage lyric text background."
     }
   },
   "tmi": {

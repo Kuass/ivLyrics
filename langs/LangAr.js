@@ -2166,7 +2166,13 @@ window.LANG_AR = {
       "tonearmFinishBlack": "أسود",
       "tonearmSizeLabel": "حجم ذراع التشغيل",
       "tonearmSizeDesc": "اضبط حجم ذراع التشغيل في وضع الأسطوانة.",
-      "typographySubtitle": "اضبط خطوط النص الأصلي والنطق والترجمة الظاهرة أسفل الأسطوانة كلًا على حدة."
+      "typographySubtitle": "اضبط خطوط النص الأصلي والنطق والترجمة الظاهرة أسفل الأسطوانة كلًا على حدة.",
+      "videoStageTypographyTitle": "كلمات مسرح الفيديو",
+      "videoStageTypographySubtitle": "اضبط خطوطًا مستقلة وخلفية النص للكلمات المعروضة في مسرح الفيديو.",
+      "videoStageBackgroundColorLabel": "لون خلفية الكلمات",
+      "videoStageBackgroundColorDesc": "اختر لون الخلفية خلف نص كلمات مسرح الفيديو.",
+      "videoStageBackgroundOpacityLabel": "شفافية خلفية الكلمات",
+      "videoStageBackgroundOpacityDesc": "اضبط شفافية خلفية نص كلمات مسرح الفيديو."
     }
   },
   "tmi": {

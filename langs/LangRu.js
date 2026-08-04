@@ -2167,7 +2167,13 @@ window.LANG_RU = {
       "tonearmFinishBlack": "Чёрный",
       "tonearmSizeLabel": "Размер тонарма",
       "tonearmSizeDesc": "Настройте размер тонарма в режиме винила.",
-      "typographySubtitle": "Отдельно настройте шрифты оригинала, произношения и перевода под пластинкой."
+      "typographySubtitle": "Отдельно настройте шрифты оригинала, произношения и перевода под пластинкой.",
+      "videoStageTypographyTitle": "Текст на видеосцене",
+      "videoStageTypographySubtitle": "Настройте отдельные шрифты и фон текста для строк на видеосцене.",
+      "videoStageBackgroundColorLabel": "Цвет фона текста",
+      "videoStageBackgroundColorDesc": "Выберите цвет фона за текстом на видеосцене.",
+      "videoStageBackgroundOpacityLabel": "Непрозрачность фона текста",
+      "videoStageBackgroundOpacityDesc": "Настройте непрозрачность фона текста на видеосцене."
     }
   },
   "tmi": {

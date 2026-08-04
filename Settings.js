@@ -17547,6 +17547,79 @@ const ConfigModal = ({
           onChange: saveVinylSetting,
         }),
 
+        react.createElement(SectionTitle, {
+          title: I18n.t("vinyl.settings.videoStageTypographyTitle"),
+          subtitle: I18n.t("vinyl.settings.videoStageTypographySubtitle"),
+          sectionKey: "video-stage-typography",
+        }),
+        react.createElement(OptionList, {
+          items: [
+            {
+              desc: I18n.t("settingsAdvanced.originalStyle.fontFamily"),
+              info: I18n.t("settingsAdvanced.originalStyle.fontFamilyDesc"),
+              key: "fullscreen-video-stage-original-font-family",
+              type: ConfigFontSelector,
+              defaultValue:
+                CONFIG.visual["fullscreen-video-stage-original-font-family"] ||
+                CONFIG.visual["fullscreen-vinyl-original-font-family"] ||
+                "Pretendard Variable",
+            },
+            {
+              desc: I18n.t("settingsAdvanced.pronunciationStyle.title"),
+              info: I18n.t("settingsAdvanced.pronunciationStyle.fontFamilyDesc"),
+              key: "fullscreen-video-stage-phonetic-font-family",
+              type: ConfigFontSelector,
+              defaultValue:
+                CONFIG.visual["fullscreen-video-stage-phonetic-font-family"] ||
+                CONFIG.visual["fullscreen-vinyl-phonetic-font-family"] ||
+                "Pretendard Variable",
+            },
+            {
+              desc: I18n.t("settingsAdvanced.translationStyle.title"),
+              info: I18n.t("settingsAdvanced.translationStyle.fontFamilyDesc"),
+              key: "fullscreen-video-stage-translation-font-family",
+              type: ConfigFontSelector,
+              defaultValue:
+                CONFIG.visual["fullscreen-video-stage-translation-font-family"] ||
+                CONFIG.visual["fullscreen-vinyl-translation-font-family"] ||
+                "Pretendard Variable",
+            },
+            {
+              desc: I18n.t("settings.culturalAnnotations.fontFamily.label"),
+              info: I18n.t("settings.culturalAnnotations.fontFamily.desc"),
+              key: "fullscreen-video-stage-cultural-font-family",
+              type: ConfigFontSelector,
+              defaultValue:
+                CONFIG.visual["fullscreen-video-stage-cultural-font-family"] ||
+                CONFIG.visual["cultural-annotations-vinyl-font-family"] ||
+                "Pretendard Variable",
+            },
+            {
+              desc: I18n.t("vinyl.settings.videoStageBackgroundColorLabel"),
+              info: I18n.t("vinyl.settings.videoStageBackgroundColorDesc"),
+              key: "fullscreen-video-stage-lyric-background-color",
+              type: ConfigColorPicker,
+              defaultValue:
+                CONFIG.visual["fullscreen-video-stage-lyric-background-color"] ||
+                "#000000",
+            },
+            {
+              desc: I18n.t("vinyl.settings.videoStageBackgroundOpacityLabel"),
+              info: I18n.t("vinyl.settings.videoStageBackgroundOpacityDesc"),
+              key: "fullscreen-video-stage-lyric-background-opacity",
+              type: ConfigSliderRange,
+              min: 0,
+              max: 100,
+              step: 1,
+              unit: "%",
+              defaultValue:
+                CONFIG.visual["fullscreen-video-stage-lyric-background-opacity"] ??
+                46,
+            },
+          ],
+          onChange: saveVinylSetting,
+        }),
+
         // ===== 일반 모드 레이아웃 섹션 =====
         react.createElement(SectionTitle, {
           title: I18n.t("settingsAdvanced.normalMode.title"),

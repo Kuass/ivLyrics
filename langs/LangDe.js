@@ -2165,7 +2165,13 @@ window.LANG_DE = {
       "tonearmFinishBlack": "Schwarz",
       "tonearmSizeLabel": "Tonarmgröße",
       "tonearmSizeDesc": "Passe die Größe des Tonarms im Vinylmodus an.",
-      "typographySubtitle": "Passe die Schriften für Original, Aussprache und Übersetzung unter der Platte getrennt an."
+      "typographySubtitle": "Passe die Schriften für Original, Aussprache und Übersetzung unter der Platte getrennt an.",
+      "videoStageTypographyTitle": "Video-Stage-Liedtext",
+      "videoStageTypographySubtitle": "Lege eigene Schriften und einen Texthintergrund für den Liedtext der Video Stage fest.",
+      "videoStageBackgroundColorLabel": "Farbe des Liedtexthintergrunds",
+      "videoStageBackgroundColorDesc": "Wähle die Farbe hinter dem Liedtext der Video Stage.",
+      "videoStageBackgroundOpacityLabel": "Deckkraft des Liedtexthintergrunds",
+      "videoStageBackgroundOpacityDesc": "Passe die Deckkraft des Liedtexthintergrunds der Video Stage an."
     }
   },
   "tmi": {

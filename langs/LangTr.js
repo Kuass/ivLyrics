@@ -2166,7 +2166,13 @@ window.LANG_TR = {
       "tonearmFinishBlack": "Siyah",
       "tonearmSizeLabel": "Kol boyutu",
       "tonearmSizeDesc": "Plak modunda pikap kolunun boyutunu ayarlayın.",
-      "typographySubtitle": "Plağın altında görünen özgün metin, telaffuz ve çeviri yazı tiplerini ayrı ayrı ayarlayın."
+      "typographySubtitle": "Plağın altında görünen özgün metin, telaffuz ve çeviri yazı tiplerini ayrı ayrı ayarlayın.",
+      "videoStageTypographyTitle": "Video sahnesi şarkı sözleri",
+      "videoStageTypographySubtitle": "Video Sahnesinde gösterilen sözler için ayrı yazı tipleri ve metin arka planı ayarlayın.",
+      "videoStageBackgroundColorLabel": "Şarkı sözü arka plan rengi",
+      "videoStageBackgroundColorDesc": "Video Sahnesi sözlerinin arkasındaki rengi seçin.",
+      "videoStageBackgroundOpacityLabel": "Şarkı sözü arka plan opaklığı",
+      "videoStageBackgroundOpacityDesc": "Video Sahnesi sözlerinin arka plan opaklığını ayarlayın."
     }
   },
   "tmi": {

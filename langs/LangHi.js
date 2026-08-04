@@ -2165,7 +2165,13 @@ window.LANG_HI = {
       "tonearmFinishBlack": "काला",
       "tonearmSizeLabel": "टोनआर्म का आकार",
       "tonearmSizeDesc": "विनाइल मोड में टोनआर्म का आकार बदलें।",
-      "typographySubtitle": "विनाइल के नीचे दिखने वाले मूल, उच्चारण और अनुवाद के फ़ॉन्ट अलग-अलग बदलें।"
+      "typographySubtitle": "विनाइल के नीचे दिखने वाले मूल, उच्चारण और अनुवाद के फ़ॉन्ट अलग-अलग बदलें।",
+      "videoStageTypographyTitle": "वीडियो स्टेज के बोल",
+      "videoStageTypographySubtitle": "वीडियो स्टेज में दिखने वाले बोलों के लिए अलग फ़ॉन्ट और टेक्स्ट पृष्ठभूमि सेट करें।",
+      "videoStageBackgroundColorLabel": "बोलों की पृष्ठभूमि का रंग",
+      "videoStageBackgroundColorDesc": "वीडियो स्टेज के बोलों के पीछे का रंग चुनें।",
+      "videoStageBackgroundOpacityLabel": "बोलों की पृष्ठभूमि की अपारदर्शिता",
+      "videoStageBackgroundOpacityDesc": "वीडियो स्टेज के बोलों की पृष्ठभूमि की अपारदर्शिता समायोजित करें।"
     }
   },
   "tmi": {

@@ -1585,6 +1585,12 @@ const VinylPlayerMode = (() => {
                     vinylSettings.culturalOutlineWidth,
                     vinylSettings.culturalOutlineColor
                 ),
+                "--iv-video-stage-original-font-family": `'${String(vinylSettings.videoStageOriginalFontFamily || vinylSettings.originalFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
+                "--iv-video-stage-phonetic-font-family": `'${String(vinylSettings.videoStagePhoneticFontFamily || vinylSettings.phoneticFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
+                "--iv-video-stage-translation-font-family": `'${String(vinylSettings.videoStageTranslationFontFamily || vinylSettings.translationFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
+                "--iv-video-stage-cultural-font-family": `'${String(vinylSettings.videoStageCulturalFontFamily || vinylSettings.culturalFontFamily || "Pretendard Variable").replace(/'/g, "\\'")}'`,
+                "--iv-video-stage-lyric-background-color": String(vinylSettings.videoStageLyricBackgroundColor || "#000000"),
+                "--iv-video-stage-lyric-background-opacity": `${Math.min(100, Math.max(0, Number(vinylSettings.videoStageLyricBackgroundOpacity) || 0))}%`,
                 "--iv-vinyl-background-blur": `${backgroundBlur}px`
             }
         },

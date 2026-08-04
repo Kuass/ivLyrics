@@ -2521,7 +2521,13 @@ const FullscreenOverlay = (() => {
                     culturalFontWeight: CONFIG?.visual?.["cultural-annotations-vinyl-font-weight"] ?? 300,
                     culturalOpacity: CONFIG?.visual?.["cultural-annotations-vinyl-opacity"] ?? 60,
                     culturalOutlineWidth: CONFIG?.visual?.["cultural-annotations-vinyl-outline-width"] ?? 0,
-                    culturalOutlineColor: CONFIG?.visual?.["cultural-annotations-vinyl-outline-color"] || "#000000"
+                    culturalOutlineColor: CONFIG?.visual?.["cultural-annotations-vinyl-outline-color"] || "#000000",
+                    videoStageOriginalFontFamily: CONFIG?.visual?.["fullscreen-video-stage-original-font-family"] || CONFIG?.visual?.["fullscreen-vinyl-original-font-family"] || "Pretendard Variable",
+                    videoStagePhoneticFontFamily: CONFIG?.visual?.["fullscreen-video-stage-phonetic-font-family"] || CONFIG?.visual?.["fullscreen-vinyl-phonetic-font-family"] || "Pretendard Variable",
+                    videoStageTranslationFontFamily: CONFIG?.visual?.["fullscreen-video-stage-translation-font-family"] || CONFIG?.visual?.["fullscreen-vinyl-translation-font-family"] || "Pretendard Variable",
+                    videoStageCulturalFontFamily: CONFIG?.visual?.["fullscreen-video-stage-cultural-font-family"] || CONFIG?.visual?.["cultural-annotations-vinyl-font-family"] || "Pretendard Variable",
+                    videoStageLyricBackgroundColor: CONFIG?.visual?.["fullscreen-video-stage-lyric-background-color"] || "#000000",
+                    videoStageLyricBackgroundOpacity: CONFIG?.visual?.["fullscreen-video-stage-lyric-background-opacity"] ?? 46
                 },
                 onPrevious: () => Spicetify.Player.back(),
                 onSeek: (nextPosition) => {

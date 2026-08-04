@@ -2166,7 +2166,13 @@ window.LANG_TH = {
       "tonearmFinishBlack": "ดำ",
       "tonearmSizeLabel": "ขนาดโทนอาร์ม",
       "tonearmSizeDesc": "ปรับขนาดโทนอาร์มในโหมดแผ่นเสียง",
-      "typographySubtitle": "ปรับแบบอักษรต้นฉบับ คำอ่าน และคำแปลใต้แผ่นเสียงแยกกัน"
+      "typographySubtitle": "ปรับแบบอักษรต้นฉบับ คำอ่าน และคำแปลใต้แผ่นเสียงแยกกัน",
+      "videoStageTypographyTitle": "เนื้อเพลงบนเวทีวิดีโอ",
+      "videoStageTypographySubtitle": "ตั้งค่าแบบอักษรแยกและพื้นหลังข้อความสำหรับเนื้อเพลงที่แสดงบนเวทีวิดีโอ",
+      "videoStageBackgroundColorLabel": "สีพื้นหลังเนื้อเพลง",
+      "videoStageBackgroundColorDesc": "เลือกสีด้านหลังข้อความเนื้อเพลงบนเวทีวิดีโอ",
+      "videoStageBackgroundOpacityLabel": "ความทึบของพื้นหลังเนื้อเพลง",
+      "videoStageBackgroundOpacityDesc": "ปรับความทึบของพื้นหลังข้อความเนื้อเพลงบนเวทีวิดีโอ"
     }
   },
   "tmi": {

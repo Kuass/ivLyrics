@@ -2167,7 +2167,13 @@ window.LANG_KO = {
       "tonearmFinishBlack": "블랙",
       "tonearmSizeLabel": "톤암 크기",
       "tonearmSizeDesc": "LP 모드에서 톤암의 크기를 조절합니다.",
-      "typographySubtitle": "LP 아래에 표시되는 원문, 발음, 번역의 글꼴을 각각 조절합니다."
+      "typographySubtitle": "LP 아래에 표시되는 원문, 발음, 번역의 글꼴을 각각 조절합니다.",
+      "videoStageTypographyTitle": "비디오 스테이지 가사",
+      "videoStageTypographySubtitle": "비디오 스테이지에 표시되는 가사의 글꼴과 글자 배경을 별도로 설정합니다.",
+      "videoStageBackgroundColorLabel": "가사 글자 배경 색상",
+      "videoStageBackgroundColorDesc": "비디오 스테이지 가사 글자 뒤에 표시할 배경 색상을 선택합니다.",
+      "videoStageBackgroundOpacityLabel": "가사 글자 배경 불투명도",
+      "videoStageBackgroundOpacityDesc": "비디오 스테이지 가사 글자 배경의 불투명도를 조절합니다."
     }
   },
   "tmi": {

@@ -2166,7 +2166,13 @@ window.LANG_FR = {
       "tonearmFinishBlack": "Noir",
       "tonearmSizeLabel": "Taille du bras",
       "tonearmSizeDesc": "Ajustez la taille du bras de lecture en mode vinyle.",
-      "typographySubtitle": "Ajustez séparément les polices de l’original, de la prononciation et de la traduction sous le vinyle."
+      "typographySubtitle": "Ajustez séparément les polices de l’original, de la prononciation et de la traduction sous le vinyle.",
+      "videoStageTypographyTitle": "Paroles de la scène vidéo",
+      "videoStageTypographySubtitle": "Définissez des polices distinctes et un arrière-plan pour les paroles de la scène vidéo.",
+      "videoStageBackgroundColorLabel": "Couleur d’arrière-plan des paroles",
+      "videoStageBackgroundColorDesc": "Choisissez la couleur derrière les paroles de la scène vidéo.",
+      "videoStageBackgroundOpacityLabel": "Opacité de l’arrière-plan des paroles",
+      "videoStageBackgroundOpacityDesc": "Réglez l’opacité de l’arrière-plan des paroles de la scène vidéo."
     }
   },
   "tmi": {
