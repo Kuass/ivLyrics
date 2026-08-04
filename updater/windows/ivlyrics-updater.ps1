@@ -4,7 +4,23 @@ param(
 
 $ErrorActionPreference = "Stop"
 $InstallerUrl = "https://raw.githubusercontent.com/ivLis-Studio/ivLyrics/main/updater/install.ps1"
-$UpdaterRoot = Join-Path $env:LOCALAPPDATA "ivLyrics\Updater"
+
+function Get-IvLyricsUpdaterLocalAppDataDirectory {
+    $knownFolderPath = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+    if (-not [string]::IsNullOrWhiteSpace($knownFolderPath) -and
+        (Test-Path -LiteralPath $knownFolderPath -PathType Container -ErrorAction SilentlyContinue)) {
+        return [IO.Path]::GetFullPath($knownFolderPath)
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA) -and
+        (Test-Path -LiteralPath $env:LOCALAPPDATA -PathType Container -ErrorAction SilentlyContinue)) {
+        return [IO.Path]::GetFullPath($env:LOCALAPPDATA)
+    }
+
+    throw "Could not resolve the Windows Local AppData directory."
+}
+
+$UpdaterRoot = Join-Path (Get-IvLyricsUpdaterLocalAppDataDirectory) "ivLyrics\Updater"
 $LogPath = Join-Path $UpdaterRoot "updater.log"
 
 function Write-UpdaterLog {
@@ -53,20 +69,29 @@ function Get-UpdaterAction {
 function Start-IvLyricsUpdate {
     Write-UpdaterLog "Starting ivLyrics update."
 
-    $tempRoot = Join-Path $env:TEMP "ivLyrics-updater"
-    New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+    # Keep the bootstrap installer under the canonical LocalAppData path rather
+    # than TEMP, which can be a stale/nonexistent DOS 8.3 profile path.
+    $tempRoot = Join-Path $UpdaterRoot ("Temp\" + [Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Force -Path $tempRoot -ErrorAction Stop | Out-Null
     $installerPath = Join-Path $tempRoot "install.ps1"
 
-    Write-UpdaterLog "Downloading official installer."
-    Invoke-WebRequest -UseBasicParsing -Uri $InstallerUrl -OutFile $installerPath
+    try {
+        Write-UpdaterLog "Downloading official installer."
+        Invoke-WebRequest -UseBasicParsing -Uri $InstallerUrl -OutFile $installerPath
 
-    Write-UpdaterLog "Running installer."
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installerPath
-    if ($LASTEXITCODE -ne 0) {
-        throw "Installer exited with code $LASTEXITCODE."
+        Write-UpdaterLog "Running installer."
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installerPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "Installer exited with code $LASTEXITCODE."
+        }
+
+        Write-UpdaterLog "ivLyrics update completed."
     }
-
-    Write-UpdaterLog "ivLyrics update completed."
+    finally {
+        if (Test-Path -LiteralPath $tempRoot -ErrorAction SilentlyContinue) {
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 try {

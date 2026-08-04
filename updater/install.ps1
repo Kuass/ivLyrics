@@ -19,7 +19,7 @@ $TARGET_DIR = $LEGACY_TARGET_DIRS[0]
 $FINAL_APP_NAME = "ivLyrics"
 $PROXY_URL = "http://ivlis.kr/ivLyrics/proxy.php"
 $MAX_RETRIES = 3
-$SCRIPT_VERSION = "2.1.2"
+$SCRIPT_VERSION = "2.1.3"
 
 # --- Colors ---
 $script:Colors = @{
@@ -199,6 +199,85 @@ function Test-NetworkConnection {
         catch {
             return $false
         }
+    }
+}
+
+function Get-IvLyricsInstallerTempDirectory {
+    # Keep a valid custom TEMP/TMP setting, but fall back to the Windows
+    # known-folder API when an environment variable contains a stale DOS 8.3
+    # path (for example C:\Users\JAMIEG~1).
+    $candidates = @($env:TEMP, $env:TMP)
+    try {
+        $candidates += [IO.Path]::GetTempPath()
+    }
+    catch {
+        # GetTempPath can fail when TEMP/TMP points to an invalid short path.
+    }
+
+    $knownFolderTemp = $null
+    try {
+        $localAppData = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+        if (-not [string]::IsNullOrWhiteSpace($localAppData) -and
+            (Test-Path -LiteralPath $localAppData -PathType Container -ErrorAction SilentlyContinue)) {
+            $knownFolderTemp = Join-Path $localAppData "Temp"
+            $candidates += $knownFolderTemp
+        }
+    }
+    catch {
+        # Fall through to the validated environment candidates below.
+    }
+
+    $seenCandidates = @{}
+    foreach ($candidate in @($candidates)) {
+        try {
+            if ([string]::IsNullOrWhiteSpace([string]$candidate)) {
+                continue
+            }
+            $fullPath = [IO.Path]::GetFullPath(([string]$candidate).Trim().Trim('"'))
+            if ($seenCandidates.ContainsKey($fullPath)) {
+                continue
+            }
+            $seenCandidates[$fullPath] = $true
+
+            if (-not (Test-Path -LiteralPath $fullPath -PathType Container -ErrorAction SilentlyContinue)) {
+                $isKnownFolderFallback = -not [string]::IsNullOrWhiteSpace($knownFolderTemp) -and
+                    $fullPath.Equals(
+                        [IO.Path]::GetFullPath($knownFolderTemp),
+                        [StringComparison]::OrdinalIgnoreCase
+                    )
+                if (-not $isKnownFolderFallback) {
+                    continue
+                }
+                New-Item -ItemType Directory -Path $fullPath -Force -ErrorAction Stop | Out-Null
+            }
+
+            $probePath = Join-Path $fullPath (".ivlyrics-write-test-" + [Guid]::NewGuid().ToString("N") + ".tmp")
+            try {
+                [IO.File]::WriteAllText($probePath, "")
+            }
+            finally {
+                if ([IO.File]::Exists($probePath)) {
+                    [IO.File]::Delete($probePath)
+                }
+            }
+            return $fullPath
+        }
+        catch {
+            continue
+        }
+    }
+
+    throw "Could not find a writable temporary directory. Check the Windows TEMP and TMP settings."
+}
+
+function Remove-IvLyricsInstallerTemporaryPath {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return
+    }
+    if (Test-Path -LiteralPath $Path -ErrorAction SilentlyContinue) {
+        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -460,13 +539,15 @@ if (-not (Test-SpicetifyInstalled)) {
         Write-SubStep "This may take a minute..." "info"
         Write-Host ""
 
+        $spicetifyInstallerPath = $null
         try {
             # Download and run Spicetify installer
             # Save to temp file and run separately to avoid pipeline parameter conflict
-            $spicetifyInstallerPath = Join-Path $env:TEMP "spicetify_install.ps1"
+            $spicetifyInstallerPath = Join-Path (Get-IvLyricsInstallerTempDirectory) (
+                "spicetify_install_" + [Guid]::NewGuid().ToString("N") + ".ps1"
+            )
             Invoke-WebRequest -Uri "https://raw.githubusercontent.com/spicetify/cli/main/install.ps1" -UseBasicParsing -OutFile $spicetifyInstallerPath
             & $spicetifyInstallerPath
-            Remove-Item $spicetifyInstallerPath -ErrorAction SilentlyContinue
 
             # Refresh PATH
             $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
@@ -501,6 +582,9 @@ if (-not (Test-SpicetifyInstalled)) {
             Write-Colored "    iwr -useb https://raw.githubusercontent.com/spicetify/cli/main/install.ps1 | iex" $Colors.Primary
             Write-Host ""
             exit 1
+        }
+        finally {
+            Remove-IvLyricsInstallerTemporaryPath -Path $spicetifyInstallerPath
         }
     }
     else {
@@ -632,10 +716,18 @@ if ($IsUpdate -and $CurrentVersion -eq $VERSION_TAG -and -not $Force) {
 # Step 6: Download and extract
 Write-Step 6 7 "Downloading ivLyrics..." "running"
 
-$TEMP_ZIP = Join-Path $env:TEMP "ivLyrics_latest.zip"
-$TEMP_EXTRACT = Join-Path $env:TEMP "ivLyrics_extract"
+$TEMP_ROOT = $null
+$TEMP_ZIP = $null
+$TEMP_EXTRACT = $null
 
 try {
+    $TEMP_ROOT = Join-Path (Get-IvLyricsInstallerTempDirectory) (
+        "ivLyrics_install_" + [Guid]::NewGuid().ToString("N")
+    )
+    New-Item -ItemType Directory -Path $TEMP_ROOT -Force -ErrorAction Stop | Out-Null
+    $TEMP_ZIP = Join-Path $TEMP_ROOT "ivLyrics_latest.zip"
+    $TEMP_EXTRACT = Join-Path $TEMP_ROOT "ivLyrics_extract"
+
     # Download with retry
     Invoke-WithRetry -MaxRetries $MAX_RETRIES -ScriptBlock {
         # Progress simulation
@@ -647,7 +739,8 @@ try {
         $progressPreference = 'SilentlyContinue'
         Invoke-WebRequest -Uri $DOWNLOAD_URL -OutFile $TEMP_ZIP -UseBasicParsing -ErrorAction Stop
 
-        if (-not (Test-Path $TEMP_ZIP) -or (Get-Item $TEMP_ZIP).Length -lt 1000) {
+        if (-not (Test-Path -LiteralPath $TEMP_ZIP -PathType Leaf) -or
+            (Get-Item -LiteralPath $TEMP_ZIP).Length -lt 1000) {
             throw "Download failed or file too small"
         }
     }
@@ -659,13 +752,9 @@ try {
     # Extract
     Write-SubStep "Extracting files..." "info"
 
-    if (Test-Path $TEMP_EXTRACT) {
-        Remove-Item $TEMP_EXTRACT -Recurse -Force -ErrorAction SilentlyContinue
-    }
+    Expand-Archive -LiteralPath $TEMP_ZIP -DestinationPath $TEMP_EXTRACT -Force
 
-    Expand-Archive -Path $TEMP_ZIP -DestinationPath $TEMP_EXTRACT -Force
-
-    $EXTRACTED_DIR = Get-ChildItem -Path $TEMP_EXTRACT -Directory | Select-Object -First 1
+    $EXTRACTED_DIR = Get-ChildItem -LiteralPath $TEMP_EXTRACT -Directory | Select-Object -First 1
 
     if (-not $EXTRACTED_DIR) {
         throw "Extraction failed"
@@ -691,13 +780,10 @@ try {
 catch {
     Write-Step 6 7 "Download failed after $MAX_RETRIES attempts" "error"
     Write-SubStep $_.Exception.Message "error"
-    Remove-Item $TEMP_ZIP -ErrorAction SilentlyContinue
-    Remove-Item $TEMP_EXTRACT -Recurse -Force -ErrorAction SilentlyContinue
     exit 1
 }
 finally {
-    Remove-Item $TEMP_ZIP -ErrorAction SilentlyContinue
-    Remove-Item $TEMP_EXTRACT -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-IvLyricsInstallerTemporaryPath -Path $TEMP_ROOT
 }
 
 # Verify installation

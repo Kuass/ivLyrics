@@ -5,8 +5,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProtocolName = "ivlyrics-updater"
-$UpdaterRoot = Join-Path $env:LOCALAPPDATA "ivLyrics\Updater"
-$AppDirectoryStatePath = Join-Path $UpdaterRoot "app-directory-state.json"
 $PathUtilsScript = Join-Path $PSScriptRoot "updater-path-utils.ps1"
 if (-not (Test-Path -LiteralPath $PathUtilsScript -PathType Leaf)) {
     throw "Updater path utilities were not found: $PathUtilsScript"
@@ -16,6 +14,8 @@ if (-not (Test-Path -LiteralPath $SourceScript -PathType Leaf)) {
     throw "Updater script not found: $SourceScript"
 }
 . $PathUtilsScript
+$UpdaterRoot = Join-Path (Get-IvLyricsLocalAppDataDirectory) "ivLyrics\Updater"
+$AppDirectoryStatePath = Join-Path $UpdaterRoot "app-directory-state.json"
 
 if ([string]::IsNullOrWhiteSpace($AppDir)) {
     $AppDir = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)

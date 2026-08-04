@@ -1,12 +1,12 @@
 $ErrorActionPreference = "Stop"
 $ProtocolRoot = "HKCU:\Software\Classes\ivlyrics-updater"
-$UpdaterRoot = Join-Path $env:LOCALAPPDATA "ivLyrics\Updater"
-$AppDirectoryStatePath = Join-Path $UpdaterRoot "app-directory-state.json"
 $PathUtilsScript = Join-Path $PSScriptRoot "updater-path-utils.ps1"
 $ConnectionCleanupFailed = $false
 
 if (Test-Path -LiteralPath $PathUtilsScript -PathType Leaf) {
     . $PathUtilsScript
+    $UpdaterRoot = Join-Path (Get-IvLyricsLocalAppDataDirectory) "ivLyrics\Updater"
+    $AppDirectoryStatePath = Join-Path $UpdaterRoot "app-directory-state.json"
     $HadConnectionState = Test-Path -LiteralPath $AppDirectoryStatePath -PathType Leaf
     try {
         if (Remove-IvLyricsRecordedAppDirectory -StatePath $AppDirectoryStatePath -IncludeSynchronizedDirectory) {

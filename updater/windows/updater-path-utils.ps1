@@ -1,5 +1,20 @@
 $ErrorActionPreference = "Stop"
 
+function Get-IvLyricsLocalAppDataDirectory {
+    $knownFolderPath = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+    if (-not [string]::IsNullOrWhiteSpace($knownFolderPath) -and
+        (Test-Path -LiteralPath $knownFolderPath -PathType Container -ErrorAction SilentlyContinue)) {
+        return [IO.Path]::GetFullPath($knownFolderPath)
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA) -and
+        (Test-Path -LiteralPath $env:LOCALAPPDATA -PathType Container -ErrorAction SilentlyContinue)) {
+        return [IO.Path]::GetFullPath($env:LOCALAPPDATA)
+    }
+
+    throw "Could not resolve the Windows Local AppData directory."
+}
+
 function ConvertTo-IvLyricsNormalizedPath {
     param(
         [Parameter(Mandatory = $true)]
