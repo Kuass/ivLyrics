@@ -9304,7 +9304,7 @@ class LyricsContainer extends react.Component {
     // 미리보기 컴포넌트에서 사용할 수 있도록 첫 가사 시간을 전역으로 노출
     window.ivLyrics_firstLyricTime = this.state.currentLyrics && this.state.currentLyrics.length > 0
       ? this.state.currentLyrics[0].startTime
-      : 0;
+      : null;
 
     // Enhanced FAD container detection - try multiple selectors if main one fails
     let fadLyricsContainer = this._domCache?.fadContainer;
@@ -10100,7 +10100,7 @@ class LyricsContainer extends react.Component {
       ),
       shouldUseVideoBackground && window.VideoBackground && react.createElement(window.VideoBackground, {
         trackUri: this.state.uri,
-        firstLyricTime: this.state.currentLyrics && this.state.currentLyrics.length > 0 ? this.state.currentLyrics[0].startTime : 0,
+        firstLyricTime: this.state.currentLyrics && this.state.currentLyrics.length > 0 ? this.state.currentLyrics[0].startTime : null,
         brightness: isVideoStagePresentation
           ? 100
           : CONFIG.visual["background-brightness"],
