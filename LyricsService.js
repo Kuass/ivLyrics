@@ -8432,6 +8432,26 @@
     // Rust helper/overlay의 입력 형식은 정수 밀리초와 문자열만 허용한다.
     // pseudo-karaoke의 소수 타임스탬프나 객체형 보조 가사가 들어오면 422가 나므로
     // 두 sender가 같은 경계 정규화를 사용한다.
+    const normalizeOverlayProgressTiming = (position, duration) => {
+        const normalize = window.ivLyricsOverlayProtocol?.normalizeProgressTiming;
+        if (typeof normalize === 'function') {
+            return normalize(position, duration);
+        }
+
+        const toUnsignedMilliseconds = (value) => {
+            const numeric = Number(value);
+            if (!Number.isFinite(numeric)) return 0;
+            return Math.max(0, Math.round(numeric));
+        };
+        const normalizedPosition = toUnsignedMilliseconds(position);
+        const normalizedDuration = toUnsignedMilliseconds(duration);
+        return {
+            position: normalizedPosition,
+            duration: normalizedDuration,
+            remaining: (normalizedDuration - normalizedPosition) / 1000
+        };
+    };
+
     const mapLyricsForSender = (lyrics, offset) => {
         const safeOffset = Number(offset);
         const normalizedOffset = Number.isFinite(safeOffset) ? safeOffset : 0;
@@ -9266,9 +9286,11 @@
                 this._isSendingProgress = true;
                 try {
                     const playbackSnapshot = Utils.getPlayerPlaybackSnapshot();
-                    const position = playbackSnapshot.position || 0;
-                    const duration = playbackSnapshot.duration || Spicetify.Player.getDuration() || 0;
-                    const remaining = (duration - position) / 1000;
+                    const progressTiming = normalizeOverlayProgressTiming(
+                        playbackSnapshot.position,
+                        playbackSnapshot.duration || Spicetify.Player.getDuration()
+                    );
+                    const { position, duration, remaining } = progressTiming;
 
                     // 현재 트랙 정보 (트랙 변경 감지용)
                     let currentTrack = null;
@@ -10013,9 +10035,11 @@
                     this._isSendingProgress = true;
                     try {
                         const playbackSnapshot = Utils.getPlayerPlaybackSnapshot();
-                        const position = playbackSnapshot.position || 0;
-                        const duration = playbackSnapshot.duration || Spicetify.Player.getDuration() || 0;
-                        const remaining = (duration - position) / 1000;
+                        const progressTiming = normalizeOverlayProgressTiming(
+                            playbackSnapshot.position,
+                            playbackSnapshot.duration || Spicetify.Player.getDuration()
+                        );
+                        const { position, duration, remaining } = progressTiming;
 
                         let currentTrack = null;
                         const currentItem = Utils.resolveStablePlaybackTrack(null, playbackSnapshot);

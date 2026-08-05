@@ -68,6 +68,7 @@ jobs:
           python3 .github/scripts/set_release_version.py check "$RELEASE_VERSION"
           node --check Utils.js
           node --check NoticeSystem.js
+          node --test .github/scripts/overlay-protocol.test.cjs
           python3 -m json.tool manifest.json >/dev/null
           git diff --check
 
