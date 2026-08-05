@@ -3844,6 +3844,7 @@ function openCommunityVideoSelector(trackUri, currentVideoId, onVideoSelect, def
     shellClassName: "community-video-modal-shell",
     shellStyle: `
       max-width: 90vw;
+      height: min(70vh, 760px);
       max-height: 70vh;
       width: 560px;
     `,
