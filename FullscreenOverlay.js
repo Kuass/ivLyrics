@@ -2743,9 +2743,15 @@ const FullscreenOverlay = (() => {
                     )
                 ),
                 // TV Mode Controls & Progress (right side)
-                (tvShowControls || tvShowProgress) && react.createElement("div", {
+                (showLyricsProgress || tvShowControls || tvShowProgress) && react.createElement("div", {
                     className: `fullscreen-tv-controls-wrapper ${!uiVisible ? 'hidden' : ''}`
                 },
+                    // Keep lyric progress in the same stack so it cannot overlap TV controls.
+                    showLyricsProgress && react.createElement(LyricsProgress, {
+                        show: true,
+                        currentLine: currentLyricIndex,
+                        totalLines: totalLyrics
+                    }),
                     // TV Mode Controls
                     tvShowControls && react.createElement("div", {
                         className: "fullscreen-tv-controls"
@@ -3294,7 +3300,7 @@ const FullscreenOverlay = (() => {
                 react.createElement(ProgressBar, { show: true })
             ),
             // Lyrics progress (always at bottom right if enabled)
-            showLyricsProgress && react.createElement("div", {
+            !tvModeEnabled && showLyricsProgress && react.createElement("div", {
                 className: `fullscreen-lyrics-progress-container ${!uiVisible ? 'hidden' : ''}`
             },
                 react.createElement(LyricsProgress, {
