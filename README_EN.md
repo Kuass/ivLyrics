@@ -137,7 +137,7 @@ If you experience problems with settings or lyric display:
 
 If you would like to support development, buy me a coffee.
 
-<a href="https://www.buymeacoffee.com/ivlis" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+[<img width="400" height="200" alt="ivlisstudio-Sharable-Membership)-Horizontal" src="https://github.com/user-attachments/assets/130c5bf8-f8c3-493b-bbdb-b748e77babcd" />](https://ko-fi.com/ivlisstudio/tiers)
 
 ## Credits
 
