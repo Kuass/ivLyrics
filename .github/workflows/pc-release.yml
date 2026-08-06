@@ -70,6 +70,7 @@ jobs:
           node --check NoticeSystem.js
           node --test .github/scripts/overlay-protocol.test.cjs
           node --test .github/scripts/karaoke-italic-clipping.test.cjs
+          node --test .github/scripts/send_release_webhook.test.mjs
           python3 -m json.tool manifest.json >/dev/null
           git diff --check
 
@@ -195,3 +196,13 @@ jobs:
               --title "$RELEASE_TITLE" \
               --notes-file "$RELEASE_NOTES"
           fi
+
+      - name: Send PC release notes to Discord
+        if: ${{ inputs.dry_run == false }}
+        env:
+          RELEASE_WEBHOOK_URL: ${{ secrets.RELEASE_NOTES_WEBHOOK_URL }}
+          RELEASE_PLATFORM: pc
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.notes.outputs.release_title }}
+          RELEASE_NOTES_PATH: ${{ steps.notes.outputs.notes_path }}
+        run: node .github/scripts/send_release_webhook.mjs
