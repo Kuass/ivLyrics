@@ -140,7 +140,7 @@ curl -fsSL https://raw.githubusercontent.com/ivLis-Studio/ivLyrics/main/updater/
 
 개발을 지원해주시려면 커피 한 잔 사주세요.
 
-[<img width="1200" height="600" alt="ivlisstudio-Sharable-Membership)-Horizontal" src="https://github.com/user-attachments/assets/130c5bf8-f8c3-493b-bbdb-b748e77babcd" />](https://ko-fi.com/ivlisstudio/tiers)
+[<img width="400" height="200" alt="ivlisstudio-Sharable-Membership)-Horizontal" src="https://github.com/user-attachments/assets/130c5bf8-f8c3-493b-bbdb-b748e77babcd" />](https://ko-fi.com/ivlisstudio/tiers)
 
 
 
