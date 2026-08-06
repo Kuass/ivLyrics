@@ -69,6 +69,7 @@ jobs:
           node --check Utils.js
           node --check NoticeSystem.js
           node --test .github/scripts/overlay-protocol.test.cjs
+          node --test .github/scripts/karaoke-italic-clipping.test.cjs
           python3 -m json.tool manifest.json >/dev/null
           git diff --check
 

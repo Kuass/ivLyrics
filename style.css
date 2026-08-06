@@ -2089,6 +2089,10 @@ div.lyrics-tabBar-headerItemLink {
   line-height: 1.38;
   color: var(--lyrics-color-inactive);
   overflow: visible;
+  /* Keep one paint-order boundary for the complete lyric row. Creating a
+     separate isolated stacking context for every glyph can make Chromium's
+     video compositor punch rectangular holes through translated effect rows. */
+  isolation: isolate;
   /* Apply the configured shadow once per line instead of once per karaoke char. */
   filter: var(--lyrics-text-drop-shadow, none);
   text-shadow: none !important;
@@ -16773,8 +16777,6 @@ html.is-lp-view-exit::view-transition-new(root) {
 .lyrics-karaoke-char,
 .lyrics-karaoke-text-run-segment {
   position: relative;
-  z-index: 0;
-  isolation: isolate;
 }
 
 .lyrics-karaoke-char::before,
@@ -16783,17 +16785,27 @@ html.is-lp-view-exit::view-transition-new(root) {
   position: absolute;
   inset-block: 0;
   inset-inline: var(--karaoke-glyph-bleed-x, 0.16em);
-  z-index: 0;
+  z-index: -1;
   color: transparent;
   -webkit-text-fill-color: transparent;
   -webkit-text-stroke-width: var(--lyrics-current-original-outline-stroke-width, 0px);
   -webkit-text-stroke-color: var(--lyrics-current-original-outline-stroke-color, #000000);
+  text-shadow: none !important;
+  filter: none !important;
   pointer-events: none;
 }
 
 .lyrics-karaoke-glyph-fill {
+  display: inline-block;
   position: relative;
-  z-index: 1;
+  /* Expand only the paint box for slanted glyph overhang. Equal negative
+     margins cancel this padding in inline layout, so advance width, kerning
+     positions, word spacing and wrapping stay exactly unchanged. */
+  padding-inline: var(--karaoke-glyph-bleed-x, 0.16em);
+  margin-inline: calc(var(--karaoke-glyph-bleed-x, 0.16em) * -1);
+  overflow: visible;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 .lyrics-karaoke-char--done > .lyrics-karaoke-glyph-fill,
