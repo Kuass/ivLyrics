@@ -861,11 +861,6 @@ window.LANG_SV = {
     "topArtists": "Topp artister",
     "artistGroups": "Konstnärsgrupper",
     "noArtistStats": "Ingen artiststatistik ännu.",
-    "sortLabel": "Sortera",
-    "sortRecent": "Nyligen",
-    "sortPopular": "Populärt",
-    "sortTitle": "Titel",
-    "sortArtist": "Konstnär",
     "clearArtistFilter": "Rensa artistfilter",
     "filteredArtist": "Filtrerad artist"
   },

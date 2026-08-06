@@ -861,11 +861,6 @@ window.LANG_TR = {
     "topArtists": "En İyi Sanatçılar",
     "artistGroups": "Sanatçı Grupları",
     "noArtistStats": "Henüz sanatçı istatistiği yok.",
-    "sortLabel": "Sırala",
-    "sortRecent": "En Yeni",
-    "sortPopular": "Popüler",
-    "sortTitle": "Başlık",
-    "sortArtist": "Sanatçı",
     "clearArtistFilter": "Sanatçı filtresini temizle",
     "filteredArtist": "Filtrelenen sanatçı"
   },

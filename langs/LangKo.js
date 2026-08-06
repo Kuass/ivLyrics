@@ -861,11 +861,6 @@ window.LANG_KO = {
     "topArtists": "자주 등록한 아티스트",
     "artistGroups": "아티스트 수",
     "noArtistStats": "아직 아티스트 통계가 없습니다.",
-    "sortLabel": "정렬",
-    "sortRecent": "최신순",
-    "sortPopular": "인기순",
-    "sortTitle": "곡명순",
-    "sortArtist": "아티스트순",
     "clearArtistFilter": "아티스트 필터 해제",
     "filteredArtist": "필터 중인 아티스트"
   },

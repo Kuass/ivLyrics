@@ -861,11 +861,6 @@ window.LANG_CS = {
     "topArtists": "Nejlepší umělci",
     "artistGroups": "Skupiny umělců",
     "noArtistStats": "Zatím žádné statistiky interpreta.",
-    "sortLabel": "Seřadit",
-    "sortRecent": "Nedávné",
-    "sortPopular": "Populární",
-    "sortTitle": "Název",
-    "sortArtist": "Umělec",
     "clearArtistFilter": "Vymazat filtr interpreta",
     "filteredArtist": "Filtrovaný umělec"
   },

@@ -71,6 +71,7 @@ jobs:
           node --test .github/scripts/overlay-protocol.test.cjs
           node --test .github/scripts/karaoke-italic-clipping.test.cjs
           node --test .github/scripts/performance-frame-rate.test.cjs
+          node --test .github/scripts/creator-profile-sort-removal.test.cjs
           node --test .github/scripts/send_release_webhook.test.mjs
           python3 -m json.tool manifest.json >/dev/null
           git diff --check

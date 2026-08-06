@@ -861,11 +861,6 @@ window.LANG_HI = {
     "topArtists": "Top Artists",
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
-    "sortLabel": "Sort",
-    "sortRecent": "Recent",
-    "sortPopular": "लोकप्रिय",
-    "sortTitle": "Title",
-    "sortArtist": "Artist",
     "clearArtistFilter": "Clear artist filter",
     "filteredArtist": "Filtered artist"
   },

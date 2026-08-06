@@ -861,11 +861,6 @@ window.LANG_MS = {
     "topArtists": "Artis Paling Kerap Didaftarkan",
     "artistGroups": "Bilangan Artis",
     "noArtistStats": "Belum ada statistik artis.",
-    "sortLabel": "Isih",
-    "sortRecent": "Terbaharu",
-    "sortPopular": "Paling popular",
-    "sortTitle": "Mengikut Tajuk",
-    "sortArtist": "Mengikut Artis",
     "clearArtistFilter": "Kosongkan Penapis Artis",
     "filteredArtist": "Artis sedang ditapis"
   },

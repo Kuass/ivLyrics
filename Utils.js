@@ -2445,10 +2445,6 @@ const Utils = {
       params.set("offset", String(Math.floor(options.offset)));
     }
 
-    if (typeof options.sort === "string" && options.sort.trim()) {
-      params.set("sort", options.sort.trim());
-    }
-
     if (typeof options.artist === "string" && options.artist.trim()) {
       params.set("artist", options.artist.trim());
     }

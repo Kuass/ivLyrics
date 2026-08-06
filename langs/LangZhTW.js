@@ -861,11 +861,6 @@ window.LANG_ZH_TW = {
     "topArtists": "Top Artists",
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
-    "sortLabel": "Sort",
-    "sortRecent": "Recent",
-    "sortPopular": "熱門",
-    "sortTitle": "Title",
-    "sortArtist": "Artist",
     "clearArtistFilter": "Clear artist filter",
     "filteredArtist": "Filtered artist"
   },

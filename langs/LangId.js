@@ -861,11 +861,6 @@ window.LANG_ID = {
     "topArtists": "Top Artists",
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
-    "sortLabel": "Sort",
-    "sortRecent": "Recent",
-    "sortPopular": "Populer",
-    "sortTitle": "Title",
-    "sortArtist": "Artist",
     "clearArtistFilter": "Clear artist filter",
     "filteredArtist": "Filtered artist"
   },

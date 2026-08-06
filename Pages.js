@@ -33,11 +33,6 @@ function getCreatorProfileCopy() {
 		topArtists: I18n.t("creatorProfile.topArtists") || "Top Artists",
 		artistGroups: I18n.t("creatorProfile.artistGroups") || "Artist Groups",
 		noArtistStats: I18n.t("creatorProfile.noArtistStats") || "No artist stats yet.",
-		sortLabel: I18n.t("creatorProfile.sortLabel") || "Sort",
-		sortRecent: I18n.t("creatorProfile.sortRecent") || "Recent",
-		sortPopular: I18n.t("creatorProfile.sortPopular") || "Popular",
-		sortTitle: I18n.t("creatorProfile.sortTitle") || "Title",
-		sortArtist: I18n.t("creatorProfile.sortArtist") || "Artist",
 		clearArtistFilter: I18n.t("creatorProfile.clearArtistFilter") || "Clear artist filter",
 		filteredArtist: I18n.t("creatorProfile.filteredArtist") || "Filtered artist"
 	};
@@ -533,7 +528,6 @@ const CreatorProfileTrackCover = react.memo(({ title, artist }) => {
 });
 
 function createCreatorProfileShell(contributor, options = {}) {
-	const sort = typeof options.sort === "string" && options.sort.trim() ? options.sort.trim() : "recent";
 	const artist = typeof options.artist === "string" && options.artist.trim() ? options.artist.trim() : null;
 	const displayName = contributor?.name || "Anonymous";
 
@@ -557,7 +551,6 @@ function createCreatorProfileShell(contributor, options = {}) {
 			items: []
 		},
 		filters: {
-			sort,
 			artist
 		},
 		contributions: [],
@@ -586,9 +579,7 @@ const SyncCreatorProfileModal = react.memo(({
 	onSaveGreeting,
 	onLoadMore,
 	onTrackClick,
-	activeSortMode,
 	activeArtistFilter,
-	onSortChange,
 	onArtistFilterChange
 }) => {
 	const copy = getCreatorProfileCopy();
@@ -635,14 +626,9 @@ const SyncCreatorProfileModal = react.memo(({
 	const themeButtonTitle = isDarkTheme ? copy.switchToLight : copy.switchToDark;
 	const themeButtonLabel = isDarkTheme ? copy.themeLight : copy.themeDark;
 	const artistStats = Array.isArray(profileData.artistStats?.items) ? profileData.artistStats.items : [];
-	const sortMode = activeSortMode || profileData.filters?.sort || "recent";
 	const artistFilter = activeArtistFilter ?? profileData.filters?.artist ?? null;
 	const hasLoadedProfileData = !!profileData.stats;
 	const showSectionLoading = loading && !error && !hasLoadedProfileData;
-	const sortOptions = [
-		{ key: "recent", label: copy.sortRecent },
-		{ key: "popular", label: copy.sortPopular }
-	];
 	const handleGreetingSave = react.useCallback(async () => {
 		if (!canEditGreeting || typeof onSaveGreeting !== "function") {
 			return;
@@ -984,30 +970,10 @@ const SyncCreatorProfileModal = react.memo(({
 							{ className: "lyrics-creator-profile-empty lyrics-creator-profile-empty-compact" },
 							copy.noArtistStats
 						),
-					react.createElement(
+					artistFilter && react.createElement(
 						"div",
 						{ className: "lyrics-creator-profile-toolbar" },
 						react.createElement(
-							"div",
-							{ className: "lyrics-creator-profile-toolbar-group" },
-							react.createElement("span", { className: "lyrics-creator-profile-toolbar-label" }, copy.sortLabel),
-							react.createElement(
-								"div",
-								{ className: "lyrics-creator-profile-sort-controls" },
-								...sortOptions.map((option) => react.createElement(
-									"button",
-									{
-										type: "button",
-										key: option.key,
-										className: `lyrics-creator-profile-sort-btn ${sortMode === option.key ? "is-active" : ""}`.trim(),
-										onClick: () => onSortChange?.(option.key),
-										disabled: loadMorePending || listRefreshing
-									},
-									option.label
-								))
-							)
-						),
-						artistFilter && react.createElement(
 							"button",
 							{
 								type: "button",
@@ -1180,7 +1146,6 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 	const [greetingPending, setGreetingPending] = useState(false);
 	const [profileLoadingMore, setProfileLoadingMore] = useState(false);
 	const [profileListRefreshing, setProfileListRefreshing] = useState(false);
-	const [profileSort, setProfileSort] = useState("recent");
 	const [profileArtistFilter, setProfileArtistFilter] = useState(null);
 	const requestIdRef = useRef(0);
 	const greetingTranslationRequestIdRef = useRef(0);
@@ -1196,7 +1161,6 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 		setGreetingPending(false);
 		setProfileLoadingMore(false);
 		setProfileListRefreshing(false);
-		setProfileSort("recent");
 		setProfileArtistFilter(null);
 	}, []);
 
@@ -1285,7 +1249,6 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 
 		const {
 			offset = 0,
-			sort = "recent",
 			artist = null,
 			append = false,
 			preserveProfile = false
@@ -1306,7 +1269,6 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 			const data = await Utils.fetchSyncCreatorProfile(contributor.userHash, {
 				limit: CREATOR_PROFILE_PAGE_SIZE,
 				offset,
-				sort,
 				artist
 			});
 			if (requestIdRef.current !== requestId) {
@@ -1393,7 +1355,6 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 		setActiveContributor(contributor);
 		setProfileError(null);
 		setLikePending(false);
-		setProfileSort("recent");
 		setProfileArtistFilter(null);
 		setProfileListRefreshing(false);
 		// Do not render cached contributor identity before the profile endpoint
@@ -1402,7 +1363,6 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 		setCreatorProfile(null);
 		void loadCreatorProfile(contributor, {
 			offset: 0,
-			sort: "recent",
 			artist: null,
 			append: false
 		});
@@ -1415,26 +1375,10 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 
 		await loadCreatorProfile(activeContributor, {
 			offset: Number(creatorProfile.pagination?.nextOffset || creatorProfile.contributions?.length || 0),
-			sort: profileSort,
 			artist: profileArtistFilter,
 			append: true
 		});
-	}, [activeContributor, creatorProfile, loadCreatorProfile, profileArtistFilter, profileLoadingMore, profileSort]);
-
-	const handleSortChange = useCallback(async (nextSort) => {
-		if (!activeContributor?.userHash || !nextSort || nextSort === profileSort) {
-			return;
-		}
-
-		setProfileSort(nextSort);
-		void loadCreatorProfile(activeContributor, {
-			offset: 0,
-			sort: nextSort,
-			artist: profileArtistFilter,
-			append: false,
-			preserveProfile: true
-		});
-	}, [activeContributor, loadCreatorProfile, profileArtistFilter, profileSort]);
+	}, [activeContributor, creatorProfile, loadCreatorProfile, profileArtistFilter, profileLoadingMore]);
 
 	const handleArtistFilterChange = useCallback(async (nextArtist) => {
 		if (!activeContributor?.userHash) {
@@ -1452,12 +1396,11 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 		setProfileArtistFilter(normalizedArtist);
 		void loadCreatorProfile(activeContributor, {
 			offset: 0,
-			sort: profileSort,
 			artist: normalizedArtist,
 			append: false,
 			preserveProfile: true
 		});
-	}, [activeContributor, loadCreatorProfile, profileArtistFilter, profileSort]);
+	}, [activeContributor, loadCreatorProfile, profileArtistFilter]);
 
 	const handleToggleLike = useCallback(async () => {
 		if (!creatorProfile?.userHash) {
@@ -1670,9 +1613,7 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 			onSaveGreeting: handleSaveGreeting,
 			onLoadMore: handleLoadMore,
 			onTrackClick: handleTrackClick,
-			activeSortMode: profileSort,
 			activeArtistFilter: profileArtistFilter,
-			onSortChange: handleSortChange,
 			onArtistFilterChange: handleArtistFilterChange
 		})
 		: null;
