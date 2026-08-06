@@ -140,7 +140,8 @@ curl -fsSL https://raw.githubusercontent.com/ivLis-Studio/ivLyrics/main/updater/
 
 개발을 지원해주시려면 커피 한 잔 사주세요.
 
-<a href="https://www.buymeacoffee.com/ivlis" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+[<img width="400" height="200" alt="ivlisstudio-Sharable-Membership)-Horizontal" src="https://github.com/user-attachments/assets/130c5bf8-f8c3-493b-bbdb-b748e77babcd" />](https://ko-fi.com/ivlisstudio/tiers)
+
 
 
 ## 크레딧
