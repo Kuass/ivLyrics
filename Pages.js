@@ -1898,7 +1898,7 @@ const useGlobalSyncOffsetState = () => {
 // updates beyond the configured display rate only create redundant React work.
 const DEFAULT_TRACK_POSITION_FPS = 60;
 const MIN_TRACK_POSITION_FPS = 10;
-const MAX_TRACK_POSITION_FPS = 60;
+const MAX_TRACK_POSITION_FPS = 240;
 
 const getTrackPositionFPS = () => {
 	const configuredFPS = Number(CONFIG?.visual?.["performance-frame-rate"]);

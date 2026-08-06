@@ -15996,7 +15996,7 @@ const ConfigModal = ({
               type: ConfigSliderRange,
               defaultValue: Number(CONFIG.visual["performance-frame-rate"] ?? 60),
               min: 10,
-              max: 60,
+              max: 240,
               step: 1,
               unit: I18n.t("settingsAdvanced.performance.frameRate.unit"),
             },
