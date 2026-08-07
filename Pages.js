@@ -666,7 +666,10 @@ const CreatorDecorationEditor = react.memo(({
 				type: "color",
 				value: draft[key],
 				disabled: pending,
-				onChange: (event) => setDraft((current) => ({ ...current, [key]: event.currentTarget.value.toUpperCase() }))
+				onChange: (event) => {
+					const nextColor = event.currentTarget.value.toUpperCase();
+					setDraft((current) => ({ ...current, [key]: nextColor }));
+				}
 			}),
 			react.createElement("code", null, draft[key])
 		)
@@ -728,7 +731,10 @@ const CreatorDecorationEditor = react.memo(({
 						max: 360,
 						value: draft.gradientAngle,
 						disabled: pending,
-						onChange: (event) => setDraft((current) => ({ ...current, gradientAngle: Number(event.currentTarget.value) }))
+						onChange: (event) => {
+							const nextAngle = Number(event.currentTarget.value);
+							setDraft((current) => ({ ...current, gradientAngle: nextAngle }));
+						}
 					})
 				)
 			)
