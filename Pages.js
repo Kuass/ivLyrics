@@ -3740,29 +3740,6 @@ const getCompactSyncedOffset = (container, activeLine, isScrolling) => {
 
 const useSyncedLayoutEffect = react.useLayoutEffect || useEffect;
 
-const countKaraokeCharacters = (value) => {
-	const text = value || "";
-	if (typeof text !== "string") {
-		return Array.from(text).length;
-	}
-
-	let count = 0;
-	for (let index = 0; index < text.length; index++) {
-		const firstCodeUnit = text.charCodeAt(index);
-		if (
-			firstCodeUnit >= 0xD800 && firstCodeUnit <= 0xDBFF &&
-			index + 1 < text.length
-		) {
-			const secondCodeUnit = text.charCodeAt(index + 1);
-			if (secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF) {
-				index++;
-			}
-		}
-		count++;
-	}
-	return count;
-};
-
 const prepareGlobalCharTimeline = (lyrics) => {
 	const offsets = new Array(lyrics.length);
 	const chars = [];
@@ -3783,12 +3760,14 @@ const prepareGlobalCharTimeline = (lyrics) => {
 					: backgroundVocals[sourceIndex - 2]?.syllables;
 			if (!Array.isArray(syllables) || syllables.length === 0) continue;
 
+			const sourceChars = [];
 			const syllableCount = syllables.length;
 			for (let syllableIndex = 0; syllableIndex < syllableCount; syllableIndex++) {
 				const syllable = syllables[syllableIndex];
 				if (!syllable || !syllable.text) continue;
 
-				const charCount = countKaraokeCharacters(syllable.text);
+				const charArray = Array.from(syllable.text);
+				const charCount = charArray.length;
 				const syllableStart = syllable.startTime || 0;
 				const syllableEnd = syllable.endTime || syllableStart + 500;
 
@@ -3797,10 +3776,29 @@ const prepareGlobalCharTimeline = (lyrics) => {
 					const charStart = syllableStart + (charIdx * charDuration);
 					const charEnd = charStart + charDuration;
 
-					chars.push(charStart, charEnd, charDuration);
-					totalChars++;
+					sourceChars.push({
+						char: charArray[charIdx],
+						startTime: charStart,
+						endTime: charEnd,
+					});
 				}
 			}
+
+			const fillTimedChars = window.LyricsService?.applyLatinKaraokeFillTiming?.(sourceChars, {
+				getText: (charInfo) => charInfo?.char || "",
+				getStartTime: (charInfo) => charInfo?.startTime,
+				getEndTime: (charInfo) => charInfo?.endTime,
+			}) || sourceChars;
+			fillTimedChars.forEach((charInfo) => {
+				const charStart = Number.isFinite(charInfo?.karaokeFillStartTime)
+					? charInfo.karaokeFillStartTime
+					: charInfo.startTime;
+				const charEnd = Number.isFinite(charInfo?.karaokeFillEndTime)
+					? charInfo.karaokeFillEndTime
+					: charInfo.endTime;
+				chars.push(charStart, charEnd, Math.max(1, charEnd - charStart));
+				totalChars++;
+			});
 		}
 	}
 
@@ -4109,6 +4107,14 @@ const getKaraokeSegmentFill = (segment, position, isActive, isComplete) => {
 const buildKaraokeTextRunSegments = (timedChars) => {
 	if (!Array.isArray(timedChars) || timedChars.length === 0) {
 		return [];
+	}
+	const sharedSegments = window.LyricsService?.buildKaraokeWordSegments?.(timedChars, {
+		getText: (charInfo) => charInfo?.char || "",
+		getStartTime: (charInfo) => charInfo?.startTime,
+		getEndTime: (charInfo) => charInfo?.endTime,
+	});
+	if (Array.isArray(sharedSegments)) {
+		return sharedSegments;
 	}
 
 	const segments = [];
@@ -5537,8 +5543,12 @@ const getActiveKaraokeTimedCharIndex = (timedChars, position) => {
 
 	for (let index = 0; index < timedCharCount; index++) {
 		const charInfo = timedChars[index];
-		const charStart = Number.isFinite(charInfo?.startTime) ? charInfo.startTime : 0;
-		const charEnd = Number.isFinite(charInfo?.endTime) ? charInfo.endTime : charStart;
+		const charStart = Number.isFinite(charInfo?.karaokeFillStartTime)
+			? charInfo.karaokeFillStartTime
+			: (Number.isFinite(charInfo?.startTime) ? charInfo.startTime : 0);
+		const charEnd = Number.isFinite(charInfo?.karaokeFillEndTime)
+			? charInfo.karaokeFillEndTime
+			: (Number.isFinite(charInfo?.endTime) ? charInfo.endTime : charStart);
 
 		if (position >= charStart && position < charEnd) {
 			activeCharIndex = index;
@@ -5580,9 +5590,14 @@ const buildKaraokeVocalRowLine = (line, row) => ({
 
 const buildKaraokeVocalRowRenderData = (line, row, includeBounds) => {
 	const rowLine = buildKaraokeVocalRowLine(line, row);
+	const timedChars = applyKaraokeWhitespaceCompensation(buildKaraokeTimedChars(rowLine));
 	return {
 		line: rowLine,
-		timedChars: applyKaraokeWhitespaceCompensation(buildKaraokeTimedChars(rowLine)),
+		timedChars: window.LyricsService?.applyLatinKaraokeFillTiming?.(timedChars, {
+			getText: (charInfo) => charInfo?.char || "",
+			getStartTime: (charInfo) => charInfo?.startTime,
+			getEndTime: (charInfo) => charInfo?.endTime,
+		}) || timedChars,
 		bounds: includeBounds ? getKaraokeLineBounds(rowLine) : null,
 	};
 };
@@ -5695,24 +5710,20 @@ const getKaraokeBounceValues = (position, isActive, startTime, endTime, attenuat
 	}
 
 	const duration = Math.max(1, endTime - startTime);
-	const preLeadDuration = Math.max(70, Math.min(160, duration * 0.45));
 	const riseDuration = Math.max(180, Math.min(280, duration * 0.9));
 	const releaseDuration = Math.max(420, Math.min(820, duration * 2.4));
 	const totalWindow = riseDuration + releaseDuration;
 	const elapsed = position - startTime;
 
-	if (elapsed < -preLeadDuration || elapsed > totalWindow) {
+	if (elapsed < 0 || elapsed > totalWindow) {
 		return KARAOKE_BOUNCE_IDLE;
 	}
 
 	let waveStrength;
 
-	if (elapsed < 0) {
-		const preProgress = (elapsed + preLeadDuration) / preLeadDuration;
-		waveStrength = easeOutCubic(preProgress) * 0.22;
-	} else if (elapsed <= riseDuration) {
+	if (elapsed <= riseDuration) {
 		const riseProgress = elapsed / riseDuration;
-		waveStrength = 0.22 + (easeOutCubic(riseProgress) * 0.78);
+		waveStrength = easeOutCubic(riseProgress);
 	} else {
 		const fallProgress = Math.min(1, (elapsed - riseDuration) / Math.max(1, totalWindow - riseDuration));
 		waveStrength = Math.pow(1 - fallProgress, 1.28);
@@ -5866,13 +5877,18 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 			? ""
 			: Utils.applyFuriganaIfEnabled(rawLineText);
 		const compensatedTimedChars = applyKaraokeWhitespaceCompensation(buildKaraokeTimedChars(line));
+		const fillTimedChars = window.LyricsService?.applyLatinKaraokeFillTiming?.(compensatedTimedChars, {
+			getText: (charInfo) => charInfo?.char || "",
+			getStartTime: (charInfo) => charInfo?.startTime,
+			getEndTime: (charInfo) => charInfo?.endTime,
+		}) || compensatedTimedChars;
 		const detectedTextDirection = getKaraokeTextDirection(rawLineText);
 
 		return {
 			furiganaMap: furiganaMapOverride instanceof Map
 				? furiganaMapOverride
 				: buildKaraokeFuriganaMap(processedText),
-			timedChars: compensatedTimedChars,
+			timedChars: fillTimedChars,
 			endTime: compensatedTimedChars.reduce(
 				(maxEndTime, charInfo) => Math.max(maxEndTime, Number.isFinite(charInfo?.endTime) ? charInfo.endTime : 0),
 				getKaraokeLineBounds(line).endTime
@@ -5919,8 +5935,8 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 		const fillRatio = getKaraokeCharFill(
 			position,
 			isActive,
-			charInfo.startTime,
-			charInfo.endTime
+			Number.isFinite(charInfo?.karaokeFillStartTime) ? charInfo.karaokeFillStartTime : charInfo.startTime,
+			Number.isFinite(charInfo?.karaokeFillEndTime) ? charInfo.karaokeFillEndTime : charInfo.endTime
 		);
 		const charState = fillRatio <= 0 ? "pending" : fillRatio >= 1 ? "done" : "active";
 		const globalCharIndex = globalCharOffset + index;
@@ -5928,8 +5944,8 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 		const bounce = getKaraokeBounceValues(
 			position,
 			isActive,
-			charInfo.startTime,
-			charInfo.endTime,
+			Number.isFinite(charInfo?.karaokeFillStartTime) ? charInfo.karaokeFillStartTime : charInfo.startTime,
+			Number.isFinite(charInfo?.karaokeFillEndTime) ? charInfo.karaokeFillEndTime : charInfo.endTime,
 			bounceAttenuation
 		);
 		const karaokeStyle = {};

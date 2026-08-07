@@ -10,3 +10,4 @@ __pycache__/
 **/test/
 **/tests/*
 !tests/marketplace-direct-url.test.cjs
+!tests/karaoke-word-timing.test.cjs

@@ -1845,6 +1845,9 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
     const buildKaraokeTextRunSegments = (syllables) => {
         if (!Array.isArray(syllables) || syllables.length === 0) return [];
 
+        const sharedSegments = window.LyricsService?.buildKaraokeWordSegments?.(syllables);
+        if (Array.isArray(sharedSegments)) return sharedSegments;
+
         const segments = [];
         let currentSegment = null;
 
@@ -2748,7 +2751,10 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 }
 
                 const currentTime = window._ivLyricsPanelCurrentTime || 0;
-                const shouldBeSung = currentTime >= syllable.startTime;
+                const fillStartTime = Number.isFinite(syllable?.karaokeFillStartTime)
+                    ? syllable.karaokeFillStartTime
+                    : syllable.startTime;
+                const shouldBeSung = currentTime >= fillStartTime;
                 if (shouldBeSung === lastShouldBeSung) return;
 
                 if (shouldBeSung && !el.classList.contains('sung')) {
@@ -2988,8 +2994,9 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 );
             }
 
+            const fillTimedItems = window.LyricsService?.applyLatinKaraokeFillTiming?.(items) || items;
             const wrapByWord = shouldWrapKaraokeByWord(joinedText);
-            const wordElements = items.map((syllable, idx) =>
+            const wordElements = fillTimedItems.map((syllable, idx) =>
                 react.createElement(KaraokeWord, {
                     key: keyPrefix + "-" + idx,
                     syllable,
@@ -2999,7 +3006,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 })
             );
             const renderElements = wrapByWord
-                ? buildKaraokeWordGroupElements(items, wordElements, keyPrefix)
+                ? buildKaraokeWordGroupElements(fillTimedItems, wordElements, keyPrefix)
                 : wordElements;
 
             return react.createElement("div", {
