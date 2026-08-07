@@ -456,6 +456,241 @@ const MarketplacePage = (() => {
     });
 
     // ============================================
+    // Direct URL Install Modal
+    // ============================================
+
+    function getDirectInstallErrorMessage(error) {
+        const keyByCode = {
+            INVALID_URL: 'marketplace.directErrorUrl',
+            HTTPS_REQUIRED: 'marketplace.directErrorUrl',
+            JS_REQUIRED: 'marketplace.directErrorUrl',
+            DOWNLOAD_FAILED: 'marketplace.directErrorDownload',
+            ADDON_TOO_LARGE: 'marketplace.directErrorDownload',
+            EMPTY_ADDON: 'marketplace.directErrorDownload',
+            NOT_JAVASCRIPT: 'marketplace.directErrorUrl',
+            METADATA_INVALID: 'marketplace.directErrorMetadata',
+            REGISTRATION_FAILED: 'marketplace.directErrorMetadata',
+            ALREADY_INSTALLED: 'marketplace.directErrorDuplicate'
+        };
+        return I18n.t(keyByCode[error?.code] || 'marketplace.directErrorGeneric');
+    }
+
+    const DirectUrlInstallModal = react.memo(({ onInstall, onCancel }) => {
+        const [url, setUrl] = useState('');
+        const [consented, setConsented] = useState(false);
+        const [installing, setInstalling] = useState(false);
+        const [error, setError] = useState('');
+        const inputRef = useRef(null);
+        const titleId = 'ivlyrics-direct-url-title';
+
+        useEffect(() => {
+            inputRef.current?.focus();
+            const handleKey = (event) => {
+                if (event.key === 'Escape' && !installing) onCancel();
+            };
+            window.addEventListener('keydown', handleKey);
+            return () => window.removeEventListener('keydown', handleKey);
+        }, [installing, onCancel]);
+
+        const handleOverlayClick = useCallback((event) => {
+            if (event.target === event.currentTarget && !installing) onCancel();
+        }, [installing, onCancel]);
+
+        const handleSubmit = useCallback(async (event) => {
+            event.preventDefault();
+            if (!consented || !url.trim() || installing) return;
+
+            setInstalling(true);
+            setError('');
+            try {
+                await onInstall(url.trim());
+            } catch (installError) {
+                setError(getDirectInstallErrorMessage(installError));
+                setInstalling(false);
+            }
+        }, [consented, installing, onInstall, url]);
+
+        return react.createElement('div', {
+            className: 'ivlyrics-marketplace-confirm-overlay',
+            onClick: handleOverlayClick
+        },
+            react.createElement('form', {
+                className: 'ivlyrics-marketplace-confirm-modal ivlyrics-marketplace-direct-modal',
+                role: 'dialog',
+                'aria-modal': 'true',
+                'aria-labelledby': titleId,
+                onSubmit: handleSubmit
+            },
+                react.createElement('div', { className: 'ivlyrics-marketplace-direct-heading' },
+                    react.createElement('div', { className: 'ivlyrics-marketplace-disclaimer-icon' },
+                        react.createElement('svg', {
+                            width: 30, height: 30, viewBox: '0 0 24 24',
+                            fill: 'none', stroke: '#f59e0b', strokeWidth: 2
+                        },
+                            react.createElement('path', { d: 'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z' }),
+                            react.createElement('line', { x1: 12, y1: 9, x2: 12, y2: 13 }),
+                            react.createElement('line', { x1: 12, y1: 17, x2: 12.01, y2: 17 })
+                        )
+                    ),
+                    react.createElement('div', null,
+                        react.createElement('h2', { id: titleId, className: 'ivlyrics-marketplace-direct-title' },
+                            I18n.t('marketplace.directUrlTitle')
+                        )
+                    )
+                ),
+                react.createElement('div', { className: 'ivlyrics-marketplace-direct-warning', role: 'alert' },
+                    react.createElement('strong', null, I18n.t('marketplace.directWarningTitle')),
+                    react.createElement('p', null, I18n.t('marketplace.directWarningBody'))
+                ),
+                react.createElement('label', { className: 'ivlyrics-marketplace-direct-field' },
+                    react.createElement('span', null, I18n.t('marketplace.directUrlLabel')),
+                    react.createElement('input', {
+                        ref: inputRef,
+                        type: 'url',
+                        inputMode: 'url',
+                        autoComplete: 'off',
+                        spellCheck: false,
+                        required: true,
+                        disabled: installing,
+                        value: url,
+                        placeholder: I18n.t('marketplace.directUrlPlaceholder'),
+                        onChange: (event) => {
+                            setUrl(event.target.value);
+                            setError('');
+                        }
+                    })
+                ),
+                react.createElement('div', { className: 'ivlyrics-marketplace-direct-snapshot' },
+                    I18n.t('marketplace.directSnapshotNotice')
+                ),
+                react.createElement('label', { className: 'ivlyrics-marketplace-direct-consent' },
+                    react.createElement('input', {
+                        type: 'checkbox',
+                        checked: consented,
+                        disabled: installing,
+                        onChange: (event) => setConsented(event.target.checked)
+                    }),
+                    react.createElement('span', null, I18n.t('marketplace.directConsent'))
+                ),
+                error && react.createElement('div', {
+                    className: 'ivlyrics-marketplace-direct-error',
+                    role: 'alert'
+                }, error),
+                react.createElement('div', { className: 'ivlyrics-marketplace-confirm-buttons' },
+                    react.createElement('button', {
+                        type: 'button',
+                        className: 'ivlyrics-marketplace-confirm-btn ivlyrics-marketplace-confirm-btn-cancel',
+                        disabled: installing,
+                        onClick: onCancel
+                    }, I18n.t('buttons.cancel')),
+                    react.createElement('button', {
+                        type: 'submit',
+                        className: 'ivlyrics-marketplace-confirm-btn ivlyrics-marketplace-confirm-btn-ok ivlyrics-marketplace-confirm-btn-warn',
+                        disabled: installing || !consented || !url.trim()
+                    }, installing ? I18n.t('marketplace.installing') : I18n.t('marketplace.install'))
+                )
+            )
+        );
+    });
+
+    // ============================================
+    // Installed Addon Management
+    // ============================================
+
+    function formatInstalledDate(value) {
+        if (!value) return '';
+        try {
+            const language = window.I18n?.getCurrentLanguage?.() || 'en';
+            return new Intl.DateTimeFormat(language, {
+                year: 'numeric', month: 'short', day: 'numeric'
+            }).format(new Date(value));
+        } catch {
+            return String(value).slice(0, 10);
+        }
+    }
+
+    const InstalledAddonCard = react.memo(({ addon, marketplaceAddon, marketplaceStateKnown, removing, onRemove }) => {
+        const isDirect = addon.source === 'direct-url';
+        const isMissing = !isDirect && marketplaceStateKnown && !marketplaceAddon;
+        const sourceUrl = addon.githubUrl || addon.downloadUrl || '';
+        const openSource = useCallback(() => {
+            const safeUrl = Utils.sanitizeHttpUrl(sourceUrl);
+            if (safeUrl) window.open(safeUrl, '_blank', 'noopener,noreferrer');
+        }, [sourceUrl]);
+
+        return react.createElement('article', {
+            className: `ivlyrics-marketplace-installed-card${addon.loadStatus === 'failed' ? ' has-error' : ''}`
+        },
+            react.createElement('div', { className: 'ivlyrics-marketplace-installed-icon' },
+                addon.preview
+                    ? react.createElement('img', { src: addon.preview, alt: '' })
+                    : react.createElement('svg', {
+                        width: 26, height: 26, viewBox: '0 0 24 24',
+                        fill: 'none', stroke: 'currentColor', strokeWidth: 1.8
+                    },
+                        react.createElement('path', { d: 'M8 9l3 3-3 3M13 15h3' }),
+                        react.createElement('rect', { x: 3, y: 3, width: 18, height: 18, rx: 4 })
+                    )
+            ),
+            react.createElement('div', { className: 'ivlyrics-marketplace-installed-main' },
+                react.createElement('div', { className: 'ivlyrics-marketplace-installed-title-row' },
+                    react.createElement('h3', null, addon.name || addon.id),
+                    react.createElement('span', {
+                        className: `ivlyrics-marketplace-card-type ivlyrics-marketplace-card-type-${addon.type}`
+                    }, getAddonTypeLabel(addon.type)),
+                    react.createElement('span', {
+                        className: `ivlyrics-marketplace-source-badge ${isDirect ? 'is-direct' : isMissing ? 'is-missing' : ''}`
+                    }, I18n.t(isDirect
+                        ? 'marketplace.sourceDirect'
+                        : isMissing
+                            ? 'marketplace.sourceUnavailable'
+                            : 'marketplace.browseTab')),
+                    addon.loadStatus === 'failed' && react.createElement('span', {
+                        className: 'ivlyrics-marketplace-source-badge is-error'
+                    }, I18n.t('marketplace.loadFailed'))
+                ),
+                react.createElement('div', { className: 'ivlyrics-marketplace-installed-meta' },
+                    react.createElement('span', null, addon.author || '—'),
+                    react.createElement('span', null, I18n.t('marketplace.version', { version: addon.version || '0.0.0' })),
+                    addon.installedAt && react.createElement('span', null, formatInstalledDate(addon.installedAt))
+                ),
+                addon.loadStatus === 'failed' && react.createElement('p', { className: 'ivlyrics-marketplace-installed-warning' },
+                    I18n.t('marketplace.loadError')
+                ),
+                sourceUrl && react.createElement('button', {
+                    type: 'button',
+                    className: 'ivlyrics-marketplace-source-link',
+                    title: sourceUrl,
+                    onClick: openSource
+                },
+                    react.createElement('span', null, I18n.t('marketplace.viewSource')),
+                    react.createElement('svg', {
+                        width: 13, height: 13, viewBox: '0 0 24 24',
+                        fill: 'none', stroke: 'currentColor', strokeWidth: 2
+                    },
+                        react.createElement('path', { d: 'M14 3h7v7M10 14L21 3M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5' })
+                    )
+                )
+            ),
+            react.createElement('button', {
+                type: 'button',
+                className: 'ivlyrics-marketplace-installed-remove',
+                disabled: removing,
+                onClick: () => onRemove(addon),
+                'aria-label': `${I18n.t('marketplace.uninstall')} ${addon.name || addon.id}`
+            },
+                react.createElement('svg', {
+                    width: 17, height: 17, viewBox: '0 0 24 24',
+                    fill: 'none', stroke: 'currentColor', strokeWidth: 2
+                },
+                    react.createElement('path', { d: 'M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5' })
+                ),
+                react.createElement('span', null, removing ? I18n.t('marketplace.uninstalling') : I18n.t('marketplace.uninstall'))
+            )
+        );
+    });
+
+    // ============================================
     // AddonDetail Component
     // ============================================
 
@@ -755,13 +990,25 @@ const MarketplacePage = (() => {
 
     const MarketplacePageComponent = react.memo(({ onClose }) => {
         const [addons, setAddons] = useState([]);
+        const [installedAddons, setInstalledAddons] = useState([]);
         const [loading, setLoading] = useState(true);
         const [error, setError] = useState(null);
+        const [view, setView] = useState('browse');
         const [filter, setFilter] = useState(FILTER_ALL);
         const [searchQuery, setSearchQuery] = useState('');
         const [selectedAddon, setSelectedAddon] = useState(null);
         const [selectedAuthor, setSelectedAuthor] = useState(null);
+        const [disclaimerAddon, setDisclaimerAddon] = useState(null);
+        const [showDirectUrlModal, setShowDirectUrlModal] = useState(false);
+        const [uninstallTarget, setUninstallTarget] = useState(null);
+        const [uninstallingId, setUninstallingId] = useState(null);
         const searchInputRef = useRef(null);
+
+        const refreshInstalledAddons = useCallback(() => {
+            const installed = window.MarketplaceManager?.getInstalledAddons?.() || [];
+            installed.sort((a, b) => String(b.installedAt || '').localeCompare(String(a.installedAt || '')));
+            setInstalledAddons(installed);
+        }, []);
 
         const loadAddons = useCallback(async (forceRefresh = false) => {
             setLoading(true);
@@ -769,8 +1016,8 @@ const MarketplacePage = (() => {
             try {
                 const data = await window.MarketplaceManager.fetchAddonList(forceRefresh);
                 setAddons(data.addons || []);
-            } catch (e) {
-                setError(e.message);
+            } catch (loadError) {
+                setError(loadError.message);
                 setAddons([]);
             } finally {
                 setLoading(false);
@@ -778,19 +1025,25 @@ const MarketplacePage = (() => {
         }, []);
 
         useEffect(() => {
+            refreshInstalledAddons();
             loadAddons();
 
-            const handleChange = () => loadAddons(true);
-            const unsub1 = window.MarketplaceManager?.on('addon:installed', handleChange);
-            const unsub2 = window.MarketplaceManager?.on('addon:uninstalled', handleChange);
-            const unsub3 = window.MarketplaceManager?.on('addon:updated', handleChange);
-
-            return () => {
-                if (typeof unsub1 === 'function') unsub1();
-                if (typeof unsub2 === 'function') unsub2();
-                if (typeof unsub3 === 'function') unsub3();
+            const handleChange = () => {
+                refreshInstalledAddons();
+                loadAddons(true);
             };
-        }, [loadAddons]);
+            const handleInstallError = () => refreshInstalledAddons();
+            const unsubscribers = [
+                window.MarketplaceManager?.on('addon:installed', handleChange),
+                window.MarketplaceManager?.on('addon:uninstalled', handleChange),
+                window.MarketplaceManager?.on('addon:updated', handleChange),
+                window.MarketplaceManager?.on('addon:install-error', handleInstallError)
+            ];
+
+            return () => unsubscribers.forEach(unsubscribe => {
+                if (typeof unsubscribe === 'function') unsubscribe();
+            });
+        }, [loadAddons, refreshInstalledAddons]);
 
         const addonSearchTextById = useMemo(() => {
             return new Map(addons.map((addon) => {
@@ -799,29 +1052,39 @@ const MarketplacePage = (() => {
                     : typeof addon.description === 'object' && addon.description
                         ? Object.values(addon.description).join(' ')
                         : '';
-                const searchText = `${addon.name || ''} ${addon.author || ''} ${descriptionText}`.toLowerCase();
-                return [addon.id, searchText];
+                return [addon.id, `${addon.name || ''} ${addon.author || ''} ${descriptionText}`.toLowerCase()];
             }));
         }, [addons]);
 
         const filteredAddons = useMemo(() => {
             let result = addons;
-
-            if (filter !== FILTER_ALL) {
-                result = result.filter(a => a.type === filter);
-            }
-
+            if (filter !== FILTER_ALL) result = result.filter(addon => addon.type === filter);
             if (searchQuery.trim()) {
-                const q = searchQuery.trim().toLowerCase();
-                result = result.filter((addon) => addonSearchTextById.get(addon.id)?.includes(q));
+                const query = searchQuery.trim().toLowerCase();
+                result = result.filter(addon => addonSearchTextById.get(addon.id)?.includes(query));
             }
-
             return result;
         }, [addonSearchTextById, addons, filter, searchQuery]);
 
+        const filteredInstalledAddons = useMemo(() => {
+            let result = installedAddons;
+            if (filter !== FILTER_ALL) result = result.filter(addon => addon.type === filter);
+            if (searchQuery.trim()) {
+                const query = searchQuery.trim().toLowerCase();
+                result = result.filter(addon =>
+                    `${addon.name || ''} ${addon.author || ''} ${addon.runtimeId || ''} ${addon.downloadUrl || ''}`
+                        .toLowerCase()
+                        .includes(query)
+                );
+            }
+            return result;
+        }, [filter, installedAddons, searchQuery]);
+
+        const marketplaceAddonsById = useMemo(() => new Map(addons.map(addon => [addon.id, addon])), [addons]);
+        const marketplaceStateKnown = !loading && !error;
         const authorAddons = useMemo(() => {
             if (!selectedAuthor) return [];
-            return addons.filter(a => a.authorLogin === selectedAuthor);
+            return addons.filter(addon => addon.authorLogin === selectedAuthor);
         }, [addons, selectedAuthor]);
 
         const handleAuthorClick = useCallback((authorLogin) => {
@@ -829,24 +1092,27 @@ const MarketplacePage = (() => {
             setSelectedAddon(null);
         }, []);
 
-        const [disclaimerAddon, setDisclaimerAddon] = useState(null);
+        const handleViewChange = useCallback((nextView) => {
+            setView(nextView);
+            setSearchQuery('');
+            setFilter(FILTER_ALL);
+            setSelectedAddon(null);
+            setSelectedAuthor(null);
+        }, []);
 
         const doInstall = useCallback(async (addon) => {
             try {
                 await window.MarketplaceManager.installAddon(addon);
                 Toast.success(I18n.t('marketplace.installSuccess', { name: addon.name }));
-            } catch (e) {
+            } catch {
                 Toast.error(I18n.t('marketplace.installError'));
             }
         }, []);
 
         const handleInstall = useCallback((addon) => {
             const dismissed = localStorage.getItem(DISCLAIMER_STORAGE_KEY) === '1';
-            if (dismissed) {
-                doInstall(addon);
-            } else {
-                setDisclaimerAddon(addon);
-            }
+            if (dismissed) doInstall(addon);
+            else setDisclaimerAddon(addon);
         }, [doInstall]);
 
         const handleDisclaimerConfirm = useCallback(() => {
@@ -855,37 +1121,120 @@ const MarketplacePage = (() => {
             if (addon) doInstall(addon);
         }, [disclaimerAddon, doInstall]);
 
-        const handleDisclaimerCancel = useCallback(() => {
-            setDisclaimerAddon(null);
-        }, []);
+        const handleDirectUrlInstall = useCallback(async (url) => {
+            const addon = await window.MarketplaceManager.installAddonFromUrl(url);
+            Toast.success(I18n.t('marketplace.directInstallSuccess', { name: addon.name }));
+            refreshInstalledAddons();
+            setShowDirectUrlModal(false);
+            handleViewChange('installed');
+        }, [handleViewChange, refreshInstalledAddons]);
 
         const handleUninstall = useCallback(async (addonId) => {
+            setUninstallingId(addonId);
             try {
                 const addon = window.MarketplaceManager.getInstalledAddon(addonId);
                 await window.MarketplaceManager.uninstallAddon(addonId);
+                refreshInstalledAddons();
                 Toast.success(I18n.t('marketplace.uninstallSuccess', { name: addon?.name || addonId }));
-            } catch (e) {
-                Toast.error(I18n.t('marketplace.installError'));
+            } catch {
+                Toast.error(I18n.t('marketplace.uninstallError'));
+                throw new Error('uninstall-failed');
+            } finally {
+                setUninstallingId(null);
             }
-        }, []);
+        }, [refreshInstalledAddons]);
+
+        const confirmInstalledUninstall = useCallback(async () => {
+            const target = uninstallTarget;
+            setUninstallTarget(null);
+            if (!target) return;
+            try { await handleUninstall(target.id); } catch {}
+        }, [handleUninstall, uninstallTarget]);
 
         const handleUpdate = useCallback(async (addon) => {
             try {
                 await window.MarketplaceManager.updateAddon(addon);
                 Toast.success(I18n.t('marketplace.installSuccess', { name: addon.name }));
-            } catch (e) {
+            } catch {
                 Toast.error(I18n.t('marketplace.installError'));
             }
         }, []);
 
-        let pageContent = null;
+        const renderBrowseContent = () => {
+            if (loading) {
+                return react.createElement('div', { className: 'ivlyrics-marketplace-loading' },
+                    react.createElement('div', { className: 'ivlyrics-marketplace-spinner' }),
+                    react.createElement('span', null, I18n.t('marketplace.loading'))
+                );
+            }
+            if (error) {
+                return react.createElement('div', { className: 'ivlyrics-marketplace-error' },
+                    react.createElement('p', null, I18n.t('marketplace.loadError')),
+                    react.createElement('p', { className: 'ivlyrics-marketplace-error-detail' }, error),
+                    react.createElement('button', {
+                        className: 'ivlyrics-marketplace-btn ivlyrics-marketplace-btn-install',
+                        onClick: () => loadAddons(true)
+                    }, I18n.t('marketplace.retry'))
+                );
+            }
+            if (filteredAddons.length === 0) {
+                return react.createElement('div', { className: 'ivlyrics-marketplace-empty' },
+                    react.createElement('p', null, I18n.t('marketplace.noAddons'))
+                );
+            }
+            return react.createElement('div', { className: 'ivlyrics-marketplace-grid' },
+                filteredAddons.map(addon => react.createElement(AddonCard, {
+                    key: addon.id,
+                    addon,
+                    onClick: setSelectedAddon,
+                    onAuthorClick: handleAuthorClick
+                }))
+            );
+        };
 
+        const renderInstalledContent = () => {
+            if (installedAddons.length === 0) {
+                return react.createElement('div', { className: 'ivlyrics-marketplace-installed-empty' },
+                    react.createElement('div', { className: 'ivlyrics-marketplace-installed-empty-icon' },
+                        react.createElement('svg', {
+                            width: 32, height: 32, viewBox: '0 0 24 24',
+                            fill: 'none', stroke: 'currentColor', strokeWidth: 1.7
+                        },
+                            react.createElement('path', { d: 'M12 3v12M7 10l5 5 5-5' }),
+                            react.createElement('path', { d: 'M5 21h14' })
+                        )
+                    ),
+                    react.createElement('p', null, I18n.t('marketplace.installedEmpty')),
+                    react.createElement('button', {
+                        className: 'ivlyrics-marketplace-direct-add-btn',
+                        onClick: () => setShowDirectUrlModal(true)
+                    }, I18n.t('marketplace.addFromUrl'))
+                );
+            }
+            if (filteredInstalledAddons.length === 0) {
+                return react.createElement('div', { className: 'ivlyrics-marketplace-empty' },
+                    react.createElement('p', null, I18n.t('marketplace.noAddons'))
+                );
+            }
+            return react.createElement('div', { className: 'ivlyrics-marketplace-installed-list' },
+                filteredInstalledAddons.map(addon => react.createElement(InstalledAddonCard, {
+                    key: addon.id,
+                    addon,
+                    marketplaceAddon: marketplaceAddonsById.get(addon.id),
+                    marketplaceStateKnown,
+                    removing: uninstallingId === addon.id,
+                    onRemove: setUninstallTarget
+                }))
+            );
+        };
+
+        let pageContent = null;
         if (selectedAddon) {
-            const updatedAddon = addons.find(a => a.id === selectedAddon.id) || selectedAddon;
+            const updatedAddon = addons.find(addon => addon.id === selectedAddon.id) || selectedAddon;
             pageContent = react.createElement(AddonDetail, {
                 addon: updatedAddon,
                 allAddons: addons,
-                onBack: () => { setSelectedAddon(null); },
+                onBack: () => setSelectedAddon(null),
                 onInstall: handleInstall,
                 onUninstall: handleUninstall,
                 onUpdate: handleUpdate,
@@ -907,53 +1256,80 @@ const MarketplacePage = (() => {
                             react.createElement('button', {
                                 className: 'ivlyrics-marketplace-back-btn',
                                 onClick: onClose,
+                                'aria-label': I18n.t('marketplace.backToLyrics')
                             },
                                 react.createElement('svg', {
                                     width: 20, height: 20, viewBox: '0 0 24 24',
                                     fill: 'none', stroke: 'currentColor', strokeWidth: 2
-                                },
-                                    react.createElement('path', { d: 'M19 12H5m0 0l7 7m-7-7l7-7' })
-                                )
+                                }, react.createElement('path', { d: 'M19 12H5m0 0l7 7m-7-7l7-7' }))
                             ),
-                            react.createElement('h1', { className: 'ivlyrics-marketplace-title' },
-                                I18n.t('marketplace.title')
-                            )
+                            react.createElement('h1', { className: 'ivlyrics-marketplace-title' }, I18n.t('marketplace.title'))
                         ),
-                        react.createElement('div', { className: 'ivlyrics-marketplace-search-wrapper' },
-                            react.createElement('svg', {
-                                className: 'ivlyrics-marketplace-search-icon',
-                                width: 16, height: 16, viewBox: '0 0 24 24',
-                                fill: 'none', stroke: 'currentColor', strokeWidth: 2
+                        react.createElement('div', { className: 'ivlyrics-marketplace-header-actions' },
+                            react.createElement('button', {
+                                className: 'ivlyrics-marketplace-direct-add-btn',
+                                onClick: () => setShowDirectUrlModal(true)
                             },
-                                react.createElement('circle', { cx: 11, cy: 11, r: 8 }),
-                                react.createElement('path', { d: 'M21 21l-4.35-4.35' })
+                                react.createElement('svg', {
+                                    width: 16, height: 16, viewBox: '0 0 24 24',
+                                    fill: 'none', stroke: 'currentColor', strokeWidth: 2
+                                }, react.createElement('path', { d: 'M12 5v14M5 12h14' })),
+                                react.createElement('span', null, I18n.t('marketplace.addFromUrl'))
                             ),
-                            react.createElement('input', {
-                                ref: searchInputRef,
-                                className: 'ivlyrics-marketplace-search-input',
-                                type: 'text',
-                                placeholder: I18n.t('marketplace.search'),
-                                value: searchQuery,
-                                onChange: (e) => setSearchQuery(e.target.value),
-                            })
+                            react.createElement('div', { className: 'ivlyrics-marketplace-search-wrapper' },
+                                react.createElement('svg', {
+                                    className: 'ivlyrics-marketplace-search-icon',
+                                    width: 16, height: 16, viewBox: '0 0 24 24',
+                                    fill: 'none', stroke: 'currentColor', strokeWidth: 2
+                                },
+                                    react.createElement('circle', { cx: 11, cy: 11, r: 8 }),
+                                    react.createElement('path', { d: 'M21 21l-4.35-4.35' })
+                                ),
+                                react.createElement('input', {
+                                    ref: searchInputRef,
+                                    className: 'ivlyrics-marketplace-search-input',
+                                    type: 'text',
+                                    placeholder: I18n.t(view === 'installed' ? 'marketplace.searchInstalled' : 'marketplace.search'),
+                                    value: searchQuery,
+                                    onChange: event => setSearchQuery(event.target.value)
+                                })
+                            )
                         )
+                    ),
+                    react.createElement('div', {
+                        className: 'ivlyrics-marketplace-primary-tabs',
+                        role: 'tablist',
+                        'aria-label': I18n.t('marketplace.title')
+                    },
+                        [
+                            { key: 'browse', label: I18n.t('marketplace.browseTab') },
+                            { key: 'installed', label: I18n.t('marketplace.installedTab'), count: installedAddons.length }
+                        ].map(tab => react.createElement('button', {
+                            key: tab.key,
+                            role: 'tab',
+                            'aria-selected': view === tab.key,
+                            className: `ivlyrics-marketplace-primary-tab ${view === tab.key ? 'active' : ''}`,
+                            onClick: () => handleViewChange(tab.key)
+                        },
+                            react.createElement('span', null, tab.label),
+                            typeof tab.count === 'number' && react.createElement('span', {
+                                className: 'ivlyrics-marketplace-primary-tab-count'
+                            }, tab.count)
+                        ))
                     ),
                     react.createElement('div', { className: 'ivlyrics-marketplace-filter-tabs' },
                         [
                             { key: FILTER_ALL, label: I18n.t('marketplace.filterAll') },
                             { key: FILTER_LYRICS, label: I18n.t('marketplace.filterLyrics') },
                             { key: FILTER_AI, label: I18n.t('marketplace.filterAI') },
-                            { key: FILTER_STYLE, label: getAddonTypeLabel(FILTER_STYLE) },
-                        ].map(tab =>
-                            react.createElement('button', {
-                                key: tab.key,
-                                className: `ivlyrics-marketplace-filter-tab ${filter === tab.key ? 'active' : ''}`,
-                                onClick: () => setFilter(tab.key)
-                            }, tab.label)
-                        )
+                            { key: FILTER_STYLE, label: getAddonTypeLabel(FILTER_STYLE) }
+                        ].map(tab => react.createElement('button', {
+                            key: tab.key,
+                            className: `ivlyrics-marketplace-filter-tab ${filter === tab.key ? 'active' : ''}`,
+                            onClick: () => setFilter(tab.key)
+                        }, tab.label))
                     )
                 ),
-                // Disclaimer notice banner
                 react.createElement('div', { className: 'ivlyrics-marketplace-notice' },
                     react.createElement('svg', {
                         width: 16, height: 16, viewBox: '0 0 24 24',
@@ -964,38 +1340,14 @@ const MarketplacePage = (() => {
                         react.createElement('line', { x1: 12, y1: 16, x2: 12, y2: 12 }),
                         react.createElement('line', { x1: 12, y1: 8, x2: 12.01, y2: 8 })
                     ),
-                    react.createElement('span', null, I18n.t('marketplace.disclaimerNotice'))
+                    react.createElement('span', null, I18n.t(view === 'installed'
+                        ? 'marketplace.installedNotice'
+                        : 'marketplace.disclaimerNotice'))
                 ),
-                react.createElement('div', { className: 'ivlyrics-marketplace-content' },
-                    loading
-                        ? react.createElement('div', { className: 'ivlyrics-marketplace-loading' },
-                            react.createElement('div', { className: 'ivlyrics-marketplace-spinner' }),
-                            react.createElement('span', null, I18n.t('marketplace.installing'))
-                        )
-                        : error
-                            ? react.createElement('div', { className: 'ivlyrics-marketplace-error' },
-                                react.createElement('p', null, I18n.t('marketplace.loadError')),
-                                react.createElement('p', { className: 'ivlyrics-marketplace-error-detail' }, error),
-                                react.createElement('button', {
-                                    className: 'ivlyrics-marketplace-btn ivlyrics-marketplace-btn-install',
-                                    onClick: () => loadAddons(true)
-                                }, I18n.t('marketplace.retry'))
-                            )
-                            : filteredAddons.length === 0
-                                ? react.createElement('div', { className: 'ivlyrics-marketplace-empty' },
-                                    react.createElement('p', null, I18n.t('marketplace.noAddons'))
-                                )
-                                : react.createElement('div', { className: 'ivlyrics-marketplace-grid' },
-                                    filteredAddons.map(addon =>
-                                        react.createElement(AddonCard, {
-                                            key: addon.id,
-                                            addon,
-                                            onClick: setSelectedAddon,
-                                            onAuthorClick: handleAuthorClick
-                                        })
-                                    )
-                                )
-                )
+                react.createElement('div', {
+                    className: 'ivlyrics-marketplace-content',
+                    role: 'tabpanel'
+                }, view === 'installed' ? renderInstalledContent() : renderBrowseContent())
             );
         }
 
@@ -1003,7 +1355,16 @@ const MarketplacePage = (() => {
             pageContent,
             disclaimerAddon && react.createElement(DisclaimerModal, {
                 onConfirm: handleDisclaimerConfirm,
-                onCancel: handleDisclaimerCancel
+                onCancel: () => setDisclaimerAddon(null)
+            }),
+            showDirectUrlModal && react.createElement(DirectUrlInstallModal, {
+                onInstall: handleDirectUrlInstall,
+                onCancel: () => setShowDirectUrlModal(false)
+            }),
+            uninstallTarget && react.createElement(ConfirmModal, {
+                message: I18n.t('marketplace.uninstallConfirm', { name: uninstallTarget.name || uninstallTarget.id }),
+                onConfirm: confirmInstalledUninstall,
+                onCancel: () => setUninstallTarget(null)
             })
         );
     });

@@ -9,3 +9,4 @@ __pycache__/
 # Local test harnesses
 **/test/
 **/tests/*
+!tests/marketplace-direct-url.test.cjs

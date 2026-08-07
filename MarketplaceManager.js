@@ -48,6 +48,7 @@
     const STORE_NAME = 'addons';
     const STORAGE_PREFIX = 'ivLyrics:marketplace:';
     const FETCH_TIMEOUT = 15000;
+    const DIRECT_ADDON_MAX_BYTES = 2 * 1024 * 1024;
     const GITHUB_TOPIC = 'ivlyrics-addon';
     const GITHUB_SEARCH_URL = `https://api.github.com/search/repositories?q=topic:${encodeURIComponent(GITHUB_TOPIC)}&per_page=100&sort=stars&order=desc`;
     const BLACKLIST_URL_LOCAL = 'blacklist.json';
@@ -66,6 +67,7 @@
             this._blacklistCache = null;
             this._installedAddons = new Map(); // id -> { metadata, code }
             this._loadedScripts = new Map(); // id -> loaded script/style element
+            this._loadErrors = new Map(); // id -> startup/runtime load error
             this._events = new Map();
             this._onceEvents = new Map();
 
@@ -228,6 +230,14 @@
 
             marketplaceDebug(`[MarketplaceManager] Loading ${addons.length} marketplace addon(s)...`);
 
+            // Keep every persisted entry manageable, even when its code no longer
+            // loads. This is important for addons removed from GitHub and broken
+            // direct-URL installs: the Installed tab must always be able to remove
+            // the IndexedDB record.
+            for (const addon of addons) {
+                this._installedAddons.set(addon.id, addon);
+            }
+
             const loadPromises = addons.map(addon => this._executeAddonCode(addon));
             const results = await Promise.allSettled(loadPromises);
 
@@ -235,10 +245,11 @@
             let failed = 0;
             results.forEach((result, i) => {
                 if (result.status === 'fulfilled') {
-                    this._installedAddons.set(addons[i].id, addons[i]);
+                    this._loadErrors.delete(addons[i].id);
                     loaded++;
                 } else {
                     console.error(`[MarketplaceManager] Failed to load addon "${addons[i].id}":`, result.reason);
+                    this._loadErrors.set(addons[i].id, result.reason?.message || String(result.reason));
                     failed++;
                 }
             });
@@ -246,11 +257,13 @@
             // 매니저에 마켓플레이스 에드온으로 표시 (약간의 지연 - 에드온이 매니저에 등록될 시간 확보)
             setTimeout(() => {
                 for (const addon of addons) {
+                    if (this._loadErrors.has(addon.id)) continue;
                     const type = addon.metadata?.type;
+                    const runtimeId = addon.metadata?.runtimeId || addon.id;
                     if (type === 'lyrics' && window.LyricsAddonManager) {
-                        window.LyricsAddonManager.markAsMarketplaceAddon(addon.id);
+                        window.LyricsAddonManager.markAsMarketplaceAddon(runtimeId);
                     } else if (type === 'ai' && window.AIAddonManager) {
-                        window.AIAddonManager.markAsMarketplaceAddon(addon.id);
+                        window.AIAddonManager.markAsMarketplaceAddon(runtimeId);
                     }
                 }
             }, 500);
@@ -542,6 +555,168 @@
         // Install / Uninstall / Update
         // ============================================
 
+        _createError(code, message) {
+            const error = new Error(message);
+            error.code = code;
+            return error;
+        }
+
+        _validateDirectAddonUrl(rawUrl) {
+            let parsed;
+            try {
+                parsed = new URL(String(rawUrl || '').trim());
+            } catch {
+                throw this._createError('INVALID_URL', 'Enter a valid JavaScript URL');
+            }
+
+            if (parsed.protocol !== 'https:') {
+                throw this._createError('HTTPS_REQUIRED', 'Direct addon URLs must use HTTPS');
+            }
+            if (parsed.username || parsed.password) {
+                throw this._createError('INVALID_URL', 'URLs containing credentials are not allowed');
+            }
+            if (!/\.js$/i.test(parsed.pathname)) {
+                throw this._createError('JS_REQUIRED', 'The URL path must end in .js');
+            }
+
+            parsed.hash = '';
+            return parsed.href;
+        }
+
+        async _downloadAddonCode(downloadUrl, maxBytes = Infinity) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+
+            try {
+                const response = await fetch(downloadUrl, {
+                    signal: controller.signal,
+                    cache: 'no-cache'
+                });
+
+                if (!response.ok) {
+                    throw this._createError('DOWNLOAD_FAILED', `Download failed: HTTP ${response.status}`);
+                }
+
+                const contentLength = Number(response.headers?.get?.('content-length') || 0);
+                if (contentLength > maxBytes) {
+                    throw this._createError('ADDON_TOO_LARGE', 'Addon code exceeds the 2 MB size limit');
+                }
+
+                const code = await response.text();
+                if (!code || code.trim().length === 0) {
+                    throw this._createError('EMPTY_ADDON', 'Downloaded addon code is empty');
+                }
+                if (new Blob([code]).size > maxBytes) {
+                    throw this._createError('ADDON_TOO_LARGE', 'Addon code exceeds the 2 MB size limit');
+                }
+                if (/^\s*(?:<!doctype\s+html|<html\b)/i.test(code)) {
+                    throw this._createError('NOT_JAVASCRIPT', 'The URL returned an HTML page instead of JavaScript');
+                }
+
+                return code;
+            } catch (error) {
+                if (error?.name === 'AbortError') {
+                    throw this._createError('DOWNLOAD_FAILED', 'Addon download timed out');
+                }
+                if (error?.code) throw error;
+                throw this._createError('DOWNLOAD_FAILED', error?.message || 'Failed to download addon code');
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        _readMetadataTag(code, tagName) {
+            const escapedTag = String(tagName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const match = String(code).match(new RegExp(`@${escapedTag}\\s+([^\\r\\n*]+)`, 'i'));
+            if (!match) return '';
+            return match[1].trim().replace(/\s+[-–—]\s+.*$/, '').trim();
+        }
+
+        _readAddonInfoString(code, propertyName) {
+            const start = String(code).search(/\b(?:const|let|var)\s+ADDON_INFO\s*=\s*\{/);
+            if (start < 0) return '';
+            const block = String(code).slice(start, start + 24000);
+            const escapedProperty = String(propertyName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const match = block.match(new RegExp(`(?:^|[,{\\n\\r])\\s*${escapedProperty}\\s*:\\s*(['\"\\x60])([^'\"\\x60\\r\\n]+)\\1`, 'm'));
+            return match ? match[2].trim() : '';
+        }
+
+        _hashString(value) {
+            let hash = 0x811c9dc5;
+            const input = String(value);
+            for (let i = 0; i < input.length; i++) {
+                hash ^= input.charCodeAt(i);
+                hash = Math.imul(hash, 0x01000193);
+            }
+            return (hash >>> 0).toString(36);
+        }
+
+        _extractDirectAddonMetadata(code, downloadUrl) {
+            const taggedType = this._readMetadataTag(code, 'addon-type').toLowerCase();
+            const usesLyricsManager = /\bLyricsAddonManager\s*(?:\?\.|\.)\s*register\s*\(/.test(code);
+            const usesAIManager = /\bAIAddonManager\s*(?:\?\.|\.)\s*register\s*\(/.test(code);
+            const type = taggedType === 'lyrics' || taggedType === 'ai'
+                ? taggedType
+                : usesLyricsManager && !usesAIManager
+                    ? 'lyrics'
+                    : usesAIManager && !usesLyricsManager
+                        ? 'ai'
+                        : '';
+
+            if (!type) {
+                throw this._createError('METADATA_INVALID', 'Could not determine whether this is a Lyrics or AI addon');
+            }
+
+            const runtimeId = this._readMetadataTag(code, 'id') || this._readAddonInfoString(code, 'id');
+            if (!runtimeId || runtimeId.length > 128 || /[\u0000-\u001f]/.test(runtimeId)) {
+                throw this._createError('METADATA_INVALID', 'The addon must declare a valid @id or ADDON_INFO.id');
+            }
+
+            const url = new URL(downloadUrl);
+            const filename = decodeURIComponent(url.pathname.split('/').pop() || 'Direct addon').replace(/\.js$/i, '');
+            const name = this._readMetadataTag(code, 'name') || this._readAddonInfoString(code, 'name') || filename;
+            const author = this._readMetadataTag(code, 'author') || this._readAddonInfoString(code, 'author') || url.hostname;
+            const version = this._readMetadataTag(code, 'version') || this._readAddonInfoString(code, 'version') || '0.0.0';
+            const description = this._readMetadataTag(code, 'description') || `Installed directly from ${url.hostname}`;
+
+            return {
+                id: `direct-url:${this._hashString(downloadUrl)}`,
+                runtimeId,
+                name,
+                type,
+                author,
+                version,
+                description,
+                downloadUrl,
+                source: 'direct-url'
+            };
+        }
+
+        _getRuntimeManager(type) {
+            if (type === 'lyrics') return window.LyricsAddonManager || null;
+            if (type === 'ai') return window.AIAddonManager || null;
+            return null;
+        }
+
+        async _waitForAddonRegistration(runtimeId, type, timeoutMs = 1500) {
+            const manager = this._getRuntimeManager(type);
+            if (!manager?.getAddon) return false;
+            const startedAt = Date.now();
+            while (Date.now() - startedAt < timeoutMs) {
+                if (manager.getAddon(runtimeId)) return true;
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            return Boolean(manager.getAddon(runtimeId));
+        }
+
+        _removeLoadedElement(addonId) {
+            const loadedElement = this._loadedScripts.get(addonId);
+            if (loadedElement) {
+                loadedElement.remove();
+                this._loadedScripts.delete(addonId);
+            }
+        }
+
         async installAddon(addonInfo) {
             const { id, downloadUrl, type } = addonInfo;
 
@@ -553,26 +728,7 @@
             try {
                 this.emit('addon:installing', { id });
 
-                // JS 코드 다운로드
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-
-                const response = await fetch(downloadUrl, {
-                    signal: controller.signal,
-                    cache: 'no-cache'
-                });
-
-                clearTimeout(timeoutId);
-
-                if (!response.ok) {
-                    throw new Error(`Download failed: HTTP ${response.status}`);
-                }
-
-                const code = await response.text();
-
-                if (!code || code.trim().length === 0) {
-                    throw new Error('Downloaded addon code is empty');
-                }
+                const code = await this._downloadAddonCode(downloadUrl);
 
                 // IndexedDB에 저장
                 const entry = {
@@ -587,29 +743,40 @@
                         preview: addonInfo.preview,
                         downloadUrl: addonInfo.downloadUrl,
                         updated: addonInfo.updated,
-                        minAppVersion: addonInfo.minAppVersion
+                        minAppVersion: addonInfo.minAppVersion,
+                        source: addonInfo.source || 'marketplace',
+                        runtimeId: addonInfo.runtimeId || id,
+                        sourceRepo: addonInfo.sourceRepo || '',
+                        githubUrl: addonInfo.githubUrl || ''
                     },
                     installedAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 };
 
                 await this._dbPut(entry);
+                this._installedAddons.set(id, entry);
 
                 // 즉시 실행
-                await this._executeAddonCode(entry);
-                this._installedAddons.set(id, entry);
+                try {
+                    await this._executeAddonCode(entry);
+                    this._loadErrors.delete(id);
+                } catch (error) {
+                    this._loadErrors.set(id, error?.message || String(error));
+                    throw error;
+                }
 
                 // 매니저에 마켓플레이스 에드온으로 표시
                 setTimeout(() => {
+                    const runtimeId = entry.metadata.runtimeId || id;
                     if (type === 'lyrics' && window.LyricsAddonManager) {
-                        window.LyricsAddonManager.markAsMarketplaceAddon(id);
+                        window.LyricsAddonManager.markAsMarketplaceAddon(runtimeId);
                     } else if (type === 'ai' && window.AIAddonManager) {
-                        window.AIAddonManager.markAsMarketplaceAddon(id);
+                        window.AIAddonManager.markAsMarketplaceAddon(runtimeId);
                     }
                 }, 300);
 
                 // Provider 순서에 추가 (맨 앞에)
-                this._addToProviderOrder(id, type);
+                this._addToProviderOrder(entry.metadata.runtimeId || id, type);
 
                 // 캐시 무효화
                 this._addonListCacheTime = 0;
@@ -624,6 +791,89 @@
             }
         }
 
+        async installAddonFromUrl(rawUrl) {
+            const downloadUrl = this._validateDirectAddonUrl(rawUrl);
+            const existingSource = Array.from(this._installedAddons.values()).find(addon =>
+                addon?.metadata?.source === 'direct-url' && addon?.metadata?.downloadUrl === downloadUrl
+            );
+            if (existingSource) {
+                throw this._createError('ALREADY_INSTALLED', 'This JavaScript URL is already installed');
+            }
+
+            this.emit('addon:installing', { source: 'direct-url', downloadUrl });
+            const code = await this._downloadAddonCode(downloadUrl, DIRECT_ADDON_MAX_BYTES);
+            const addonInfo = this._extractDirectAddonMetadata(code, downloadUrl);
+            const runtimeManager = this._getRuntimeManager(addonInfo.type);
+
+            if (this._installedAddons.has(addonInfo.id)) {
+                throw this._createError('ALREADY_INSTALLED', 'This JavaScript URL is already installed');
+            }
+
+            const installedRuntimeConflict = Array.from(this._installedAddons.values()).some(addon =>
+                (addon?.metadata?.runtimeId || addon?.id) === addonInfo.runtimeId
+                && addon?.metadata?.type === addonInfo.type
+            );
+            if (installedRuntimeConflict || runtimeManager?.getAddon?.(addonInfo.runtimeId)) {
+                throw this._createError('ALREADY_INSTALLED', `An addon with ID "${addonInfo.runtimeId}" is already registered`);
+            }
+
+            const now = new Date().toISOString();
+            const entry = {
+                id: addonInfo.id,
+                code,
+                metadata: {
+                    name: addonInfo.name,
+                    type: addonInfo.type,
+                    author: addonInfo.author,
+                    version: addonInfo.version,
+                    description: addonInfo.description,
+                    preview: '',
+                    downloadUrl: addonInfo.downloadUrl,
+                    updated: '',
+                    minAppVersion: '',
+                    source: 'direct-url',
+                    runtimeId: addonInfo.runtimeId,
+                    sourceRepo: '',
+                    githubUrl: ''
+                },
+                installedAt: now,
+                updatedAt: now
+            };
+
+            try {
+                await this._dbPut(entry);
+                this._installedAddons.set(entry.id, entry);
+                await this._executeAddonCode(entry);
+
+                const registered = await this._waitForAddonRegistration(addonInfo.runtimeId, addonInfo.type);
+                if (!registered) {
+                    throw this._createError('REGISTRATION_FAILED', `Addon "${addonInfo.runtimeId}" did not register with ivLyrics`);
+                }
+
+                this._loadErrors.delete(entry.id);
+                runtimeManager?.markAsMarketplaceAddon?.(addonInfo.runtimeId);
+                this._addToProviderOrder(addonInfo.runtimeId, addonInfo.type);
+                this._addonListCacheTime = 0;
+                this.emit('addon:installed', {
+                    id: entry.id,
+                    runtimeId: addonInfo.runtimeId,
+                    name: addonInfo.name,
+                    type: addonInfo.type,
+                    source: 'direct-url'
+                });
+                marketplaceDebug(`[MarketplaceManager] Installed direct URL addon: ${entry.id}`);
+                return this.getInstalledAddon(entry.id);
+            } catch (error) {
+                runtimeManager?.unregister?.(addonInfo.runtimeId);
+                this._removeLoadedElement(entry.id);
+                this._installedAddons.delete(entry.id);
+                this._loadErrors.delete(entry.id);
+                try { await this._dbDelete(entry.id); } catch {}
+                this.emit('addon:install-error', { id: entry.id, error: error?.message, code: error?.code });
+                throw error;
+            }
+        }
+
         async uninstallAddon(addonId) {
             if (!this._installedAddons.has(addonId)) {
                 console.warn(`[MarketplaceManager] Addon "${addonId}" is not installed`);
@@ -633,28 +883,26 @@
             try {
                 const addon = this._installedAddons.get(addonId);
                 const type = addon?.metadata?.type;
+                const runtimeId = addon?.metadata?.runtimeId || addonId;
 
                 // IndexedDB에서 삭제
                 await this._dbDelete(addonId);
 
                 // 스크립트 태그 제거
-                const loadedElement = this._loadedScripts.get(addonId);
-                if (loadedElement) {
-                    loadedElement.remove();
-                    this._loadedScripts.delete(addonId);
-                }
+                this._removeLoadedElement(addonId);
 
                 // 매니저에서 등록 해제
                 if (type === 'lyrics' && window.LyricsAddonManager) {
-                    window.LyricsAddonManager.unregister(addonId);
+                    window.LyricsAddonManager.unregister(runtimeId);
                 } else if (type === 'ai' && window.AIAddonManager) {
-                    window.AIAddonManager.unregister(addonId);
+                    window.AIAddonManager.unregister(runtimeId);
                 }
 
                 // Provider 순서에서 제거
-                this._removeFromProviderOrder(addonId, type);
+                this._removeFromProviderOrder(runtimeId, type);
 
                 this._installedAddons.delete(addonId);
+                this._loadErrors.delete(addonId);
 
                 // 캐시 무효화
                 this._addonListCacheTime = 0;
@@ -680,36 +928,19 @@
                 this.emit('addon:updating', { id });
 
                 // 기존 스크립트 제거
-                const oldLoadedElement = this._loadedScripts.get(id);
-                if (oldLoadedElement) {
-                    oldLoadedElement.remove();
-                    this._loadedScripts.delete(id);
-                }
+                this._removeLoadedElement(id);
 
                 // 매니저에서 기존 등록 해제
                 const type = addonInfo.type;
+                const runtimeId = this._installedAddons.get(id)?.metadata?.runtimeId || id;
                 if (type === 'lyrics' && window.LyricsAddonManager) {
-                    window.LyricsAddonManager.unregister(id);
+                    window.LyricsAddonManager.unregister(runtimeId);
                 } else if (type === 'ai' && window.AIAddonManager) {
-                    window.AIAddonManager.unregister(id);
+                    window.AIAddonManager.unregister(runtimeId);
                 }
 
                 // 새 코드 다운로드
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-
-                const response = await fetch(addonInfo.downloadUrl, {
-                    signal: controller.signal,
-                    cache: 'no-cache'
-                });
-
-                clearTimeout(timeoutId);
-
-                if (!response.ok) {
-                    throw new Error(`Download failed: HTTP ${response.status}`);
-                }
-
-                const code = await response.text();
+                const code = await this._downloadAddonCode(addonInfo.downloadUrl);
 
                 // IndexedDB 업데이트
                 const entry = {
@@ -724,7 +955,11 @@
                         preview: addonInfo.preview,
                         downloadUrl: addonInfo.downloadUrl,
                         updated: addonInfo.updated,
-                        minAppVersion: addonInfo.minAppVersion
+                        minAppVersion: addonInfo.minAppVersion,
+                        source: addonInfo.source || this._installedAddons.get(id)?.metadata?.source || 'marketplace',
+                        runtimeId: addonInfo.runtimeId || runtimeId,
+                        sourceRepo: addonInfo.sourceRepo || this._installedAddons.get(id)?.metadata?.sourceRepo || '',
+                        githubUrl: addonInfo.githubUrl || this._installedAddons.get(id)?.metadata?.githubUrl || ''
                     },
                     installedAt: this._installedAddons.get(id)?.installedAt || new Date().toISOString(),
                     updatedAt: new Date().toISOString()
@@ -735,6 +970,7 @@
                 // 새 코드 실행
                 await this._executeAddonCode(entry);
                 this._installedAddons.set(id, entry);
+                this._loadErrors.delete(id);
 
                 // 캐시 무효화
                 this._addonListCacheTime = 0;
@@ -802,7 +1038,9 @@
                 id: a.id,
                 ...a.metadata,
                 installedAt: a.installedAt,
-                updatedAt: a.updatedAt
+                updatedAt: a.updatedAt,
+                loadStatus: this._loadErrors.has(a.id) ? 'failed' : 'loaded',
+                loadError: this._loadErrors.get(a.id) || ''
             }));
         }
 
@@ -813,7 +1051,9 @@
                 id: addon.id,
                 ...addon.metadata,
                 installedAt: addon.installedAt,
-                updatedAt: addon.updatedAt
+                updatedAt: addon.updatedAt,
+                loadStatus: this._loadErrors.has(addon.id) ? 'failed' : 'loaded',
+                loadError: this._loadErrors.get(addon.id) || ''
             };
         }
 
