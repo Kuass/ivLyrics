@@ -2114,6 +2114,100 @@ const Utils = {
     return "https://lyrics.api.ivl.is/user";
   },
 
+  getCloudSaveDeviceId() {
+    const storageKey = "ivLyrics:cloud-save-device-id";
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored && /^[A-Za-z0-9._-]{8,128}$/.test(stored)) return stored;
+      const value = `pc-${window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+      localStorage.setItem(storageKey, value);
+      return value;
+    } catch (error) {
+      return `pc-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+  },
+
+  async requestCloudSaveCapability(scope = "sync", options = {}) {
+    const normalizedScope = scope === "delete" ? "delete" : "sync";
+    const sessionToken = this.getAuthToken();
+    const cached = this._cloudSaveCapability;
+    if (
+      !options.forceRefresh &&
+      sessionToken &&
+      cached?.scope === normalizedScope &&
+      cached?.sessionToken === sessionToken &&
+      Number(cached.expiresAt) > Math.floor(Date.now() / 1000) + 60
+    ) {
+      return cached;
+    }
+
+    const response = await fetch(`${this.getAccountApiBase()}/cloud-save-token`, {
+      method: "POST",
+      cache: "no-store",
+      headers: this.getApiHeaders({ Accept: "application/json", "Content-Type": "application/json" }),
+      body: JSON.stringify({ scope: normalizedScope }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || !body?.success || !body?.data?.token) {
+      const error = new Error(body?.error?.message || body?.error || "Cloud save authorization failed.");
+      error.status = response.status;
+      error.code = body?.code || body?.error?.code || "";
+      throw error;
+    }
+    const capability = { ...body.data, scope: normalizedScope, sessionToken };
+    this._cloudSaveCapability = capability;
+    return capability;
+  },
+
+  async requestCloudSettings(method, payload = null, options = {}) {
+    const platform = options.platform || "pc";
+    const capability = await this.requestCloudSaveCapability(method === "DELETE" ? "delete" : "sync");
+    const response = await fetch(`${String(capability.apiBaseUrl).replace(/\/+$/, "")}/settings/${platform}`, {
+      method,
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${capability.token}`,
+        ...(payload ? { "Content-Type": "application/json" } : {}),
+        "X-ivLyrics-Client": "pc",
+        "X-ivLyrics-Client-Version": this.currentVersion || "unknown",
+      },
+      ...(payload ? { body: JSON.stringify(payload) } : {}),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (response.status === 404 && method === "GET") {
+      return { exists: false, revision: 0, data: null };
+    }
+    if (!response.ok || !body?.success) {
+      const error = new Error(body?.error?.message || body?.error || "Cloud settings request failed.");
+      error.status = response.status;
+      error.code = body?.error?.code || body?.code || "";
+      error.details = body?.error?.details || null;
+      throw error;
+    }
+    return { exists: true, revision: Number(body.data?.revision || 0), data: body.data };
+  },
+
+  async fetchCloudSettings() {
+    return await this.requestCloudSettings("GET");
+  },
+
+  async saveCloudSettings(settings, baseRevision = 0) {
+    return await this.requestCloudSettings("PUT", {
+      schemaVersion: 1,
+      baseRevision: Math.max(0, Number(baseRevision) || 0),
+      appVersion: this.currentVersion || "unknown",
+      deviceId: this.getCloudSaveDeviceId(),
+      settings,
+    });
+  },
+
+  async deleteCloudSettings() {
+    const result = await this.requestCloudSettings("DELETE");
+    this._cloudSaveCapability = null;
+    return result;
+  },
+
   getCreatorDecorationDefaults() {
     return {
       mode: "solid",

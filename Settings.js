@@ -3985,6 +3985,260 @@ const ConfigSettingsPresets = () => {
   );
 };
 
+const getCloudSyncText = (key, fallback) =>
+  I18n.t(`settingsAdvanced.cloudSync.${key}`) || fallback;
+
+const formatCloudSyncText = (key, fallback, replacements = {}) => {
+  let value = getCloudSyncText(key, fallback);
+  Object.entries(replacements).forEach(([name, replacement]) => {
+    value = value.split(`{${name}}`).join(String(replacement));
+  });
+  return value;
+};
+
+const ConfigCloudSync = () => {
+  const [cloud, setCloud] = useState({ loading: false, exists: false, revision: 0, updatedAt: null });
+  const [busyAction, setBusyAction] = useState("");
+  const [supportChecking, setSupportChecking] = useState(false);
+  const [message, setMessage] = useState(() =>
+    getCloudSyncText("monthlyRequired", "Cloud sync is available to Monthly Supporters only."));
+  const [messageType, setMessageType] = useState("info");
+
+  const describeError = useCallback((error) => {
+    if (error?.code === "monthly_supporter_required") {
+      return getCloudSyncText("monthlyRequired", "Cloud sync is available to Monthly Supporters only.");
+    }
+    if (error?.code === "revision_conflict") {
+      return getCloudSyncText("conflict", "Cloud settings changed on another device. Refresh before uploading again.");
+    }
+    if (error?.status === 401 || error?.code === "discord_login_required") {
+      return getCloudSyncText("loginRequired", "Sign in with Discord to use cloud sync.");
+    }
+    return formatCloudSyncText("failed", "Cloud sync failed: {error}", {
+      error: error?.message || String(error || "Unknown error"),
+    });
+  }, []);
+
+  const handleCloudFailure = useCallback((error) => {
+    if (error?.code === "monthly_supporter_required") {
+      const discordId = Utils.getUserHash();
+      Utils.setCachedDiscordSupportTier(discordId, "none");
+    }
+    const messageText = describeError(error);
+    setMessage(messageText);
+    setMessageType("error");
+    Toast?.error?.(messageText);
+  }, [describeError]);
+
+  const ensureMonthlySupporter = useCallback(async () => {
+    const authToken = Utils.getAuthToken();
+    const discordId = Utils.getUserHash();
+    if (!authToken || !Utils.isDiscordUserHash(discordId)) {
+      const loginMessage = getCloudSyncText("loginRequired", "Sign in with Discord to use cloud sync.");
+      setMessage(loginMessage);
+      setMessageType("warning");
+      Toast?.error?.(loginMessage);
+      return false;
+    }
+
+    setSupportChecking(true);
+    setMessage(getCloudSyncText("checking", "Checking cloud settings…"));
+    setMessageType("info");
+    try {
+      const tier = await Utils.fetchDiscordSupportTier(discordId, { forceRefresh: true });
+      if (tier !== "monthly") {
+        const monthlyMessage = getCloudSyncText("monthlyRequired", "Cloud sync is available to Monthly Supporters only.");
+        setMessage(monthlyMessage);
+        setMessageType("warning");
+        Toast?.error?.(monthlyMessage);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      const failureMessage = formatCloudSyncText("failed", "Cloud sync failed: {error}", {
+        error: error?.message || String(error || "Unknown error"),
+      });
+      setMessage(failureMessage);
+      setMessageType("error");
+      Toast?.error?.(failureMessage);
+      return false;
+    } finally {
+      setSupportChecking(false);
+    }
+  }, []);
+
+  const refresh = useCallback(async ({ quiet = false } = {}) => {
+    if (!await ensureMonthlySupporter()) return null;
+    if (!quiet) setCloud((current) => ({ ...current, loading: true }));
+    try {
+      const result = await Utils.fetchCloudSettings();
+      const next = {
+        loading: false,
+        exists: result.exists,
+        revision: result.revision,
+        updatedAt: result.data?.updatedAt || null,
+      };
+      setCloud(next);
+      if (!quiet) {
+        setMessage(result.exists
+          ? formatCloudSyncText("remoteFound", "Cloud revision {revision} is available.", { revision: result.revision })
+          : getCloudSyncText("empty", "No PC settings have been saved to the cloud yet."));
+        setMessageType("info");
+      }
+      return result;
+    } catch (error) {
+      setCloud((current) => ({ ...current, loading: false }));
+      handleCloudFailure(error);
+      return null;
+    }
+  }, [ensureMonthlySupporter, handleCloudFailure]);
+
+  const upload = useCallback(async () => {
+    setBusyAction("upload");
+    try {
+      const current = await refresh({ quiet: true });
+      if (!current) return;
+      const settings = await StorageManager.exportCloudConfig();
+      const saved = await Utils.saveCloudSettings(settings, current.revision);
+      setCloud({
+        loading: false,
+        exists: true,
+        revision: saved.revision,
+        updatedAt: saved.data?.updatedAt || null,
+      });
+      setMessage(formatCloudSyncText("uploaded", "PC settings uploaded as revision {revision}.", { revision: saved.revision }));
+      setMessageType("success");
+    } catch (error) {
+      handleCloudFailure(error);
+    } finally {
+      setBusyAction("");
+    }
+  }, [handleCloudFailure, refresh]);
+
+  const download = useCallback(async () => {
+    if (!await ensureMonthlySupporter()) return;
+    if (!window.confirm(getCloudSyncText("confirmDownload", "Apply cloud PC settings and reload ivLyrics?"))) return;
+    setBusyAction("download");
+    try {
+      const result = await Utils.fetchCloudSettings();
+      if (!result.exists || !result.data?.settings) {
+        setMessage(getCloudSyncText("empty", "No PC settings have been saved to the cloud yet."));
+        setMessageType("warning");
+        return;
+      }
+      await StorageManager.importCloudConfig(result.data.settings);
+      setMessage(getCloudSyncText("downloaded", "Cloud PC settings were applied. Reloading ivLyrics…"));
+      setMessageType("success");
+      queueReloadIntoIvLyrics({
+        reopenSettings: true,
+        initialTab: "advanced",
+        initialSettingKey: "cloud-sync",
+        delay: 700,
+      });
+    } catch (error) {
+      handleCloudFailure(error);
+    } finally {
+      setBusyAction("");
+    }
+  }, [ensureMonthlySupporter, handleCloudFailure]);
+
+  const remove = useCallback(async () => {
+    if (!window.confirm(getCloudSyncText("confirmDelete", "Permanently delete your cloud PC settings?"))) return;
+    setBusyAction("delete");
+    try {
+      await Utils.deleteCloudSettings();
+      setCloud({ loading: false, exists: false, revision: 0, updatedAt: null });
+      setMessage(getCloudSyncText("deleted", "Cloud PC settings were deleted."));
+      setMessageType("success");
+    } catch (error) {
+      handleCloudFailure(error);
+    } finally {
+      setBusyAction("");
+    }
+  }, [handleCloudFailure]);
+
+  const updatedLabel = cloud.updatedAt
+    ? formatCloudSyncText("updatedAt", "Updated {date}", {
+      date: formatSettingsPresetDate(Number(cloud.updatedAt) * 1000),
+    })
+    : getCloudSyncText("notSaved", "Not saved yet");
+  const disabled = Boolean(busyAction) || cloud.loading || supportChecking;
+  const deleteDisabled = disabled || !Utils.getAuthToken();
+
+  return react.createElement(
+    "div",
+    {
+      className: "setting-row",
+      "data-setting-key": "cloud-sync",
+      style: {
+        borderColor: "rgba(167, 139, 250, 0.42)",
+        background: "linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(236, 72, 153, 0.06))",
+        boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.025)",
+      },
+    },
+    react.createElement(
+      "div",
+      {
+        className: "setting-row-content",
+        style: { flexDirection: "column", alignItems: "stretch", gap: "14px" },
+      },
+      react.createElement(
+        "div",
+        { className: "setting-row-left" },
+        react.createElement("div", { className: "setting-name" }, getCloudSyncText("platform", "PC settings")),
+        react.createElement(
+          "div",
+          { className: "setting-description" },
+          `${updatedLabel}${cloud.exists ? ` · rev ${cloud.revision}` : ""}`
+        )
+      ),
+      react.createElement(
+        "div",
+        {
+          role: messageType === "warning" || messageType === "error" ? "alert" : "status",
+          "aria-live": messageType === "warning" || messageType === "error" ? "assertive" : "polite",
+          className: "setting-description",
+          style: {
+            padding: "10px 12px",
+            borderRadius: "8px",
+            border: `1px solid ${messageType === "error" ? "rgba(248,113,113,.42)" : messageType === "warning" ? "rgba(251,191,36,.42)" : messageType === "success" ? "rgba(74,222,128,.3)" : "rgba(255,255,255,.1)"}`,
+            background: messageType === "error" ? "rgba(127,29,29,.24)" : messageType === "warning" ? "rgba(120,53,15,.22)" : messageType === "success" ? "rgba(20,83,45,.18)" : "rgba(255,255,255,.04)",
+            color: messageType === "error" ? "#fecaca" : messageType === "warning" ? "#fde68a" : undefined,
+            fontWeight: messageType === "warning" || messageType === "error" ? "600" : undefined,
+          },
+        },
+        messageType === "warning" || messageType === "error"
+          ? react.createElement(
+            react.Fragment,
+            null,
+            react.createElement("span", { "aria-hidden": "true", style: { marginRight: "7px" } }, "⚠"),
+            cloud.loading ? getCloudSyncText("checking", "Checking cloud settings…") : message
+          )
+          : cloud.loading ? getCloudSyncText("checking", "Checking cloud settings…") : message
+      ),
+      react.createElement(
+        "div",
+        { style: { display: "flex", gap: "8px", flexWrap: "wrap" } },
+        react.createElement("button", { className: "btn", type: "button", disabled, onClick: upload },
+          busyAction === "upload" ? getCloudSyncText("uploading", "Uploading…") : getCloudSyncText("upload", "Upload current settings")),
+        react.createElement("button", { className: "btn", type: "button", disabled: disabled || !cloud.exists, onClick: download },
+          busyAction === "download" ? getCloudSyncText("downloading", "Applying…") : getCloudSyncText("download", "Apply cloud settings")),
+        react.createElement("button", { className: "btn", type: "button", disabled, onClick: () => refresh() },
+          getCloudSyncText("refresh", "Refresh")),
+        react.createElement("button", {
+          className: "btn",
+          type: "button",
+          disabled: deleteDisabled,
+          onClick: remove,
+          style: { background: "rgba(239,68,68,.14)", borderColor: "rgba(239,68,68,.28)", color: "#fca5a5" },
+        }, busyAction === "delete" ? getCloudSyncText("deleting", "Deleting…") : getCloudSyncText("delete", "Delete cloud data"))
+      ),
+      react.createElement("div", { className: "setting-description" },
+        getCloudSyncText("excluded", "API keys, account tokens, caches, presets, and per-track offsets stay on this device."))
+    )
+  );
+};
+
 // 비디오 헬퍼 토글 컴포넌트 (연결 상태 표시 포함)
 const VideoHelperToggle = ({ name, settingKey, defaultValue, disabled, onChange = () => { } }) => {
   const [enabled, setEnabled] = useState(defaultValue === "true" || defaultValue === true);
@@ -6779,6 +7033,14 @@ const ConfigModal = ({
       name: I18n.t("settingsAdvanced.languageDetection.title"),
       desc: I18n.t("settingsAdvanced.languageDetection.subtitle"),
       i18nKeys: ["tabs.advanced", "settingsAdvanced.languageDetection.title", "settingsAdvanced.languageDetection.subtitle"]
+    },
+    {
+      section: I18n.t("tabs.advanced"),
+      sectionKey: "advanced",
+      settingKey: "cloud-sync",
+      name: I18n.t("settingsAdvanced.cloudSync.title"),
+      desc: I18n.t("settingsAdvanced.cloudSync.monthlyRequired"),
+      i18nKeys: ["tabs.advanced", "settingsAdvanced.cloudSync.title", "settingsAdvanced.cloudSync.monthlyRequired"]
     },
     {
       section: I18n.t("tabs.advanced"),
@@ -16412,6 +16674,13 @@ const ConfigModal = ({
             );
           },
         }),
+
+        react.createElement(SectionTitle, {
+          title: I18n.t("settingsAdvanced.cloudSync.title"),
+          subtitle: I18n.t("settingsAdvanced.cloudSync.monthlyRequired"),
+          sectionKey: "cloud-sync",
+        }),
+        react.createElement(ConfigCloudSync),
 
         react.createElement(SectionTitle, {
           title: I18n.t("settingsAdvanced.exportImport.title"),

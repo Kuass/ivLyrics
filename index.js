@@ -1775,7 +1775,21 @@ const PRIVATE_OR_TRANSIENT_STORAGE_KEYS = new Set([
   `${APP_NAME}:discord-login-pending`,
   `${APP_NAME}:return-to-settings`,
   `${APP_NAME}:restore-route-after-reload`,
+  `${APP_NAME}:cloud-save-device-id`,
 ]);
+const CLOUD_SYNC_EXCLUDED_STORAGE_KEYS = new Set([
+  TRACK_SYNC_OFFSETS_STORAGE_KEY,
+  `${APP_NAME}:settings-presets`,
+]);
+const CLOUD_SYNC_FORBIDDEN_KEY_PATTERN = /(api.?keys?|auth.?token|access.?token|refresh.?token|password|secret|credential|spotify.?token|client.?id|user.?hash)/i;
+const isCloudSyncSettingKey = (key) => (
+  typeof key === "string" &&
+  key.startsWith(CURRENT_STORAGE_PREFIX) &&
+  !CLOUD_SYNC_EXCLUDED_STORAGE_KEYS.has(key) &&
+  !OBSOLETE_LEGACY_STORAGE_KEYS.has(key) &&
+  !PRIVATE_OR_TRANSIENT_STORAGE_KEYS.has(key) &&
+  !CLOUD_SYNC_FORBIDDEN_KEY_PATTERN.test(key)
+);
 const OBSOLETE_LEGACY_STORAGE_KEYS = new Set([
   `${APP_NAME}:provider:lrclib:on`,
   `${APP_NAME}:provider:ivlyrics:on`,
@@ -2094,6 +2108,32 @@ const StorageManager = {
     ivLyricsDebug("[ivLyrics] Exported config keys:", Object.keys(config));
 
     return config;
+  },
+  async exportCloudConfig() {
+    const config = {};
+    const exportKeys = new Set(StorageKeys);
+    try {
+      Object.keys(SettingsPersistence?.getSnapshot?.() || {}).forEach((key) => {
+        exportKeys.add(key);
+      });
+    } catch (error) {
+      console.warn("[ivLyrics] Failed to read the cloud settings snapshot.", error);
+    }
+
+    exportKeys.forEach((key) => {
+      if (!isCloudSyncSettingKey(key)) return;
+      const value = readPersistentSetting(key);
+      if (value !== null) config[key] = value;
+    });
+    return config;
+  },
+  async importCloudConfig(config) {
+    const normalized = normalizeImportedConfig(config);
+    Object.entries(normalized).forEach(([key, value]) => {
+      if (!isCloudSyncSettingKey(key)) return;
+      StorageManager.setItem(key, value);
+      saveStorageKeys(key);
+    });
   },
   async importConfig(config) {
     const importedConfig = normalizeImportedConfig(config);
