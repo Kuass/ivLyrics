@@ -2114,6 +2114,165 @@ const Utils = {
     return "https://lyrics.api.ivl.is/user";
   },
 
+  getCreatorDecorationDefaults() {
+    return {
+      mode: "solid",
+      solidColor: "#1ABC9C",
+      gradientStartColor: "#3498DB",
+      gradientEndColor: "#9B59B6",
+      gradientAngle: 90,
+    };
+  },
+
+  getCachedDiscordSupportTier(discordId, options = {}) {
+    if (!this.isDiscordUserHash(discordId)) return null;
+    try {
+      const raw = localStorage.getItem("ivLyrics:discord-support-tier-cache");
+      const cache = raw ? JSON.parse(raw) : {};
+      const entry = cache[String(discordId)];
+      if (
+        entry &&
+        ["none", "supporter", "monthly"].includes(entry.tier) &&
+        (options.allowExpired || Number(entry.expiresAt) > Date.now())
+      ) {
+        return entry;
+      }
+    } catch (error) {
+      console.warn("[ivLyrics] Failed to read Discord supporter cache:", error);
+    }
+    return null;
+  },
+
+  setCachedDiscordSupportTier(discordId, tier) {
+    if (!this.isDiscordUserHash(discordId) || !["none", "supporter", "monthly"].includes(tier)) {
+      return;
+    }
+    try {
+      const storageKey = "ivLyrics:discord-support-tier-cache";
+      const raw = localStorage.getItem(storageKey);
+      const cache = raw ? JSON.parse(raw) : {};
+      const now = Date.now();
+      for (const [key, entry] of Object.entries(cache)) {
+        if (!entry || Number(entry.expiresAt) < now - 24 * 60 * 60 * 1000) {
+          delete cache[key];
+        }
+      }
+      cache[String(discordId)] = {
+        tier,
+        expiresAt: now + 60 * 60 * 1000,
+      };
+      localStorage.setItem(storageKey, JSON.stringify(cache));
+    } catch (error) {
+      console.warn("[ivLyrics] Failed to update Discord supporter cache:", error);
+    }
+  },
+
+  async fetchDiscordSupportTier(discordId, options = {}) {
+    const normalizedId = String(discordId || "").trim();
+    if (!this.isDiscordUserHash(normalizedId)) return "none";
+
+    if (!options.forceRefresh) {
+      const cached = this.getCachedDiscordSupportTier(normalizedId);
+      if (cached) return cached.tier;
+    }
+
+    this._discordSupportTierRequests ||= new Map();
+    if (!options.forceRefresh && this._discordSupportTierRequests.has(normalizedId)) {
+      return await this._discordSupportTierRequests.get(normalizedId);
+    }
+
+    const request = (async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      try {
+        const response = await fetch(
+          `https://discord.ivl.is/v1/user/${encodeURIComponent(normalizedId)}`,
+          {
+            cache: "no-store",
+            headers: { Accept: "application/json" },
+            signal: controller.signal,
+          }
+        );
+        if (!response.ok) throw new Error(`Discord member lookup failed (${response.status})`);
+        const body = await response.json();
+        const roleIds = new Set(
+          (Array.isArray(body?.data?.roles) ? body.data.roles : []).map((role) => String(role?.id || ""))
+        );
+        const tier = roleIds.has("1530978173590966282")
+          ? "monthly"
+          : roleIds.has("1530978124073013478")
+            ? "supporter"
+            : "none";
+        this.setCachedDiscordSupportTier(normalizedId, tier);
+        return tier;
+      } catch (error) {
+        throw error;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    })();
+
+    this._discordSupportTierRequests.set(normalizedId, request);
+    try {
+      return await request;
+    } finally {
+      if (this._discordSupportTierRequests.get(normalizedId) === request) {
+        this._discordSupportTierRequests.delete(normalizedId);
+      }
+    }
+  },
+
+  async fetchCreatorDecorations(userHashes) {
+    const normalized = [...new Set((Array.isArray(userHashes) ? userHashes : [])
+      .map((value) => String(value || "").trim())
+      .filter((value) => this.isDiscordUserHash(value)))].slice(0, 10);
+    if (!normalized.length) return {};
+
+    const params = new URLSearchParams({ userHashes: normalized.join(",") });
+    const response = await fetch(`${this.getAccountApiBase()}/creator-decorations?${params.toString()}`, {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+    const body = await response.json();
+    if (!response.ok || !body?.success) {
+      throw new Error(body?.error || "Failed to load creator decoration.");
+    }
+    return Object.fromEntries((body?.data?.items || []).map((item) => [item.userHash, item.decoration]));
+  },
+
+  async saveOwnCreatorDecoration(decoration) {
+    const response = await fetch(`${this.getAccountApiBase()}/creator-decoration`, {
+      method: "PUT",
+      cache: "no-store",
+      headers: this.getApiHeaders({
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify(decoration),
+    });
+    const body = await response.json();
+    if (!response.ok || !body?.success) {
+      const error = new Error(body?.error || "Failed to save creator decoration.");
+      error.status = response.status;
+      error.code = body?.code || "";
+      throw error;
+    }
+    return body.data;
+  },
+
+  async resetOwnCreatorDecoration() {
+    const response = await fetch(`${this.getAccountApiBase()}/creator-decoration`, {
+      method: "DELETE",
+      cache: "no-store",
+      headers: this.getApiHeaders({ Accept: "application/json" }),
+    });
+    const body = await response.json();
+    if (!response.ok || !body?.success) {
+      throw new Error(body?.error || "Failed to reset creator decoration.");
+    }
+    return body.data;
+  },
+
   async fetchAccountProfile(options = {}) {
     const includeUserHash = options.includeUserHash !== false;
     const currentUserHash = this.getUserHash();

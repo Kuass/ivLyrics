@@ -862,7 +862,27 @@ window.LANG_EN = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "Supporter",
+    "monthlySupporter": "Monthly Supporter",
+    "nicknameStyle": "Nickname style",
+    "nicknameStyleDesc": "This color is used for your name in the sync creator credit below the lyrics.",
+    "solid": "Solid",
+    "gradient": "Gradient",
+    "solidColor": "Solid color",
+    "gradientStart": "Start color",
+    "gradientEnd": "End color",
+    "gradientAngle": "Gradient angle",
+    "decorationPreview": "Preview",
+    "saveDecoration": "Save color",
+    "resetDecoration": "Reset to default",
+    "refreshSupportRole": "Refresh supporter role",
+    "supportRoleNotFound": "No supporter role was found. Refresh after your Discord role is assigned.",
+    "monthlyOnlyGradient": "Gradients are available to Monthly Supporters only.",
+    "decorationSaved": "Nickname color saved.",
+    "decorationReset": "Nickname color reset.",
+    "decorationSaveFailed": "Failed to save nickname color.",
+    "supportRoleRefreshFailed": "Failed to refresh supporter role."
   },
   "settingsAdvanced": {
     "patchNotes": {

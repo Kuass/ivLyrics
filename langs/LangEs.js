@@ -862,7 +862,27 @@ window.LANG_ES = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "Colaborador",
+    "monthlySupporter": "Colaborador mensual",
+    "nicknameStyle": "Estilo del apodo",
+    "nicknameStyleDesc": "Este color se usa para tu nombre en el crédito del creador de sincronización bajo la letra.",
+    "solid": "Sólido",
+    "gradient": "Degradado",
+    "solidColor": "Color sólido",
+    "gradientStart": "Color inicial",
+    "gradientEnd": "Color final",
+    "gradientAngle": "Ángulo del degradado",
+    "decorationPreview": "Vista previa",
+    "saveDecoration": "Guardar color",
+    "resetDecoration": "Restablecer valores",
+    "refreshSupportRole": "Actualizar rol de colaborador",
+    "supportRoleNotFound": "No se encontró ningún rol de colaborador. Actualízalo después de recibir el rol en Discord.",
+    "monthlyOnlyGradient": "Los degradados solo están disponibles para colaboradores mensuales.",
+    "decorationSaved": "Color del apodo guardado.",
+    "decorationReset": "Color del apodo restablecido.",
+    "decorationSaveFailed": "No se pudo guardar el color del apodo.",
+    "supportRoleRefreshFailed": "No se pudo actualizar el rol de colaborador."
   },
   "settingsAdvanced": {
     "patchNotes": {

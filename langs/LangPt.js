@@ -862,7 +862,27 @@ window.LANG_PT = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "Apoiador",
+    "monthlySupporter": "Apoiador mensal",
+    "nicknameStyle": "Estilo do apelido",
+    "nicknameStyleDesc": "Esta cor é usada no seu nome no crédito do criador da sincronização abaixo da letra.",
+    "solid": "Sólido",
+    "gradient": "Gradiente",
+    "solidColor": "Cor sólida",
+    "gradientStart": "Cor inicial",
+    "gradientEnd": "Cor final",
+    "gradientAngle": "Ângulo do gradiente",
+    "decorationPreview": "Prévia",
+    "saveDecoration": "Salvar cor",
+    "resetDecoration": "Restaurar padrão",
+    "refreshSupportRole": "Atualizar cargo de apoiador",
+    "supportRoleNotFound": "Nenhum cargo de apoiador foi encontrado. Atualize depois que o cargo for atribuído no Discord.",
+    "monthlyOnlyGradient": "Gradientes estão disponíveis apenas para apoiadores mensais.",
+    "decorationSaved": "Cor do apelido salva.",
+    "decorationReset": "Cor do apelido restaurada.",
+    "decorationSaveFailed": "Não foi possível salvar a cor do apelido.",
+    "supportRoleRefreshFailed": "Não foi possível atualizar o cargo de apoiador."
   },
   "settingsAdvanced": {
     "patchNotes": {

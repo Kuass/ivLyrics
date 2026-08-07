@@ -862,7 +862,27 @@ window.LANG_TH = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "ผู้สนับสนุน",
+    "monthlySupporter": "ผู้สนับสนุนรายเดือน",
+    "nicknameStyle": "รูปแบบชื่อเล่น",
+    "nicknameStyleDesc": "สีนี้ใช้กับชื่อของคุณในเครดิตผู้สร้างซิงก์ใต้เนื้อเพลง",
+    "solid": "สีเดียว",
+    "gradient": "ไล่เฉดสี",
+    "solidColor": "สีเดียว",
+    "gradientStart": "สีเริ่มต้น",
+    "gradientEnd": "สีสิ้นสุด",
+    "gradientAngle": "มุมไล่เฉดสี",
+    "decorationPreview": "ตัวอย่าง",
+    "saveDecoration": "บันทึกสี",
+    "resetDecoration": "คืนค่าเริ่มต้น",
+    "refreshSupportRole": "รีเฟรชบทบาทผู้สนับสนุน",
+    "supportRoleNotFound": "ไม่พบบทบาทผู้สนับสนุน โปรดรีเฟรชหลังจากได้รับบทบาทใน Discord",
+    "monthlyOnlyGradient": "การไล่เฉดสีมีให้เฉพาะผู้สนับสนุนรายเดือนเท่านั้น",
+    "decorationSaved": "บันทึกสีชื่อเล่นแล้ว",
+    "decorationReset": "รีเซ็ตสีชื่อเล่นแล้ว",
+    "decorationSaveFailed": "บันทึกสีชื่อเล่นไม่สำเร็จ",
+    "supportRoleRefreshFailed": "รีเฟรชบทบาทผู้สนับสนุนไม่สำเร็จ"
   },
   "settingsAdvanced": {
     "patchNotes": {

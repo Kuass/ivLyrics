@@ -862,7 +862,27 @@ window.LANG_MS = {
     "artistGroups": "Bilangan Artis",
     "noArtistStats": "Belum ada statistik artis.",
     "clearArtistFilter": "Kosongkan Penapis Artis",
-    "filteredArtist": "Artis sedang ditapis"
+    "filteredArtist": "Artis sedang ditapis",
+    "supporter": "Penyokong",
+    "monthlySupporter": "Penyokong bulanan",
+    "nicknameStyle": "Gaya nama samaran",
+    "nicknameStyleDesc": "Warna ini digunakan untuk nama anda dalam kredit pencipta segerak di bawah lirik.",
+    "solid": "Pejal",
+    "gradient": "Gradien",
+    "solidColor": "Warna pejal",
+    "gradientStart": "Warna mula",
+    "gradientEnd": "Warna akhir",
+    "gradientAngle": "Sudut gradien",
+    "decorationPreview": "Pratonton",
+    "saveDecoration": "Simpan warna",
+    "resetDecoration": "Tetapkan semula kepada lalai",
+    "refreshSupportRole": "Segarkan peranan penyokong",
+    "supportRoleNotFound": "Peranan penyokong tidak ditemui. Segarkan selepas peranan Discord anda diberikan.",
+    "monthlyOnlyGradient": "Gradien hanya tersedia untuk penyokong bulanan.",
+    "decorationSaved": "Warna nama samaran disimpan.",
+    "decorationReset": "Warna nama samaran ditetapkan semula.",
+    "decorationSaveFailed": "Warna nama samaran gagal disimpan.",
+    "supportRoleRefreshFailed": "Peranan penyokong gagal disegarkan."
   },
   "settingsAdvanced": {
     "patchNotes": {

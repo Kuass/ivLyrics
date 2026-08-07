@@ -862,7 +862,27 @@ window.LANG_HI = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "समर्थक",
+    "monthlySupporter": "मासिक समर्थक",
+    "nicknameStyle": "उपनाम की शैली",
+    "nicknameStyleDesc": "यह रंग गीत के बोल के नीचे सिंक निर्माता श्रेय में आपके नाम पर दिखेगा।",
+    "solid": "एक रंग",
+    "gradient": "ग्रेडिएंट",
+    "solidColor": "एकल रंग",
+    "gradientStart": "शुरुआती रंग",
+    "gradientEnd": "अंतिम रंग",
+    "gradientAngle": "ग्रेडिएंट का कोण",
+    "decorationPreview": "पूर्वावलोकन",
+    "saveDecoration": "रंग सहेजें",
+    "resetDecoration": "डिफ़ॉल्ट पर रीसेट करें",
+    "refreshSupportRole": "समर्थक भूमिका रीफ़्रेश करें",
+    "supportRoleNotFound": "समर्थक भूमिका नहीं मिली। Discord भूमिका मिलने के बाद रीफ़्रेश करें।",
+    "monthlyOnlyGradient": "ग्रेडिएंट केवल मासिक समर्थकों के लिए उपलब्ध हैं।",
+    "decorationSaved": "उपनाम का रंग सहेजा गया।",
+    "decorationReset": "उपनाम का रंग रीसेट किया गया।",
+    "decorationSaveFailed": "उपनाम का रंग सहेजा नहीं जा सका।",
+    "supportRoleRefreshFailed": "समर्थक भूमिका रीफ़्रेश नहीं की जा सकी।"
   },
   "settingsAdvanced": {
     "patchNotes": {

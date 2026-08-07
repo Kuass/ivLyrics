@@ -862,7 +862,27 @@ window.LANG_RU = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "Спонсор",
+    "monthlySupporter": "Ежемесячный спонсор",
+    "nicknameStyle": "Стиль имени",
+    "nicknameStyleDesc": "Этот цвет используется для вашего имени в подписи автора синхронизации под текстом песни.",
+    "solid": "Однотонный",
+    "gradient": "Градиент",
+    "solidColor": "Однотонный цвет",
+    "gradientStart": "Начальный цвет",
+    "gradientEnd": "Конечный цвет",
+    "gradientAngle": "Угол градиента",
+    "decorationPreview": "Предпросмотр",
+    "saveDecoration": "Сохранить цвет",
+    "resetDecoration": "Сбросить настройки",
+    "refreshSupportRole": "Обновить роль спонсора",
+    "supportRoleNotFound": "Роль спонсора не найдена. Обновите после назначения роли в Discord.",
+    "monthlyOnlyGradient": "Градиенты доступны только ежемесячным спонсорам.",
+    "decorationSaved": "Цвет имени сохранён.",
+    "decorationReset": "Цвет имени сброшен.",
+    "decorationSaveFailed": "Не удалось сохранить цвет имени.",
+    "supportRoleRefreshFailed": "Не удалось обновить роль спонсора."
   },
   "settingsAdvanced": {
     "patchNotes": {

@@ -862,7 +862,27 @@ window.LANG_JA = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "サポーター",
+    "monthlySupporter": "月額サポーター",
+    "nicknameStyle": "ニックネームのスタイル",
+    "nicknameStyleDesc": "この色は歌詞下部の同期制作者クレジットに表示される名前に使用されます。",
+    "solid": "単色",
+    "gradient": "グラデーション",
+    "solidColor": "単色",
+    "gradientStart": "開始色",
+    "gradientEnd": "終了色",
+    "gradientAngle": "グラデーションの角度",
+    "decorationPreview": "プレビュー",
+    "saveDecoration": "色を保存",
+    "resetDecoration": "デフォルトに戻す",
+    "refreshSupportRole": "サポーターロールを更新",
+    "supportRoleNotFound": "サポーターロールが見つかりません。Discordでロールが付与された後に更新してください。",
+    "monthlyOnlyGradient": "グラデーションは月額サポーター限定です。",
+    "decorationSaved": "ニックネームの色を保存しました。",
+    "decorationReset": "ニックネームの色をリセットしました。",
+    "decorationSaveFailed": "ニックネームの色を保存できませんでした。",
+    "supportRoleRefreshFailed": "サポーターロールを更新できませんでした。"
   },
   "settingsAdvanced": {
     "patchNotes": {

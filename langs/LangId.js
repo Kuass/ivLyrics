@@ -862,7 +862,27 @@ window.LANG_ID = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "Pendukung",
+    "monthlySupporter": "Pendukung bulanan",
+    "nicknameStyle": "Gaya nama panggilan",
+    "nicknameStyleDesc": "Warna ini digunakan untuk namamu pada kredit kreator sinkronisasi di bawah lirik.",
+    "solid": "Polos",
+    "gradient": "Gradasi",
+    "solidColor": "Warna polos",
+    "gradientStart": "Warna awal",
+    "gradientEnd": "Warna akhir",
+    "gradientAngle": "Sudut gradasi",
+    "decorationPreview": "Pratinjau",
+    "saveDecoration": "Simpan warna",
+    "resetDecoration": "Atur ulang ke bawaan",
+    "refreshSupportRole": "Segarkan peran pendukung",
+    "supportRoleNotFound": "Peran pendukung tidak ditemukan. Segarkan setelah peran Discord diberikan.",
+    "monthlyOnlyGradient": "Gradasi hanya tersedia untuk pendukung bulanan.",
+    "decorationSaved": "Warna nama panggilan disimpan.",
+    "decorationReset": "Warna nama panggilan diatur ulang.",
+    "decorationSaveFailed": "Warna nama panggilan gagal disimpan.",
+    "supportRoleRefreshFailed": "Peran pendukung gagal disegarkan."
   },
   "settingsAdvanced": {
     "patchNotes": {

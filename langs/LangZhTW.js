@@ -862,7 +862,27 @@ window.LANG_ZH_TW = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "支持者",
+    "monthlySupporter": "每月支持者",
+    "nicknameStyle": "暱稱樣式",
+    "nicknameStyleDesc": "此顏色將用於歌詞下方同步創作者署名中的暱稱。",
+    "solid": "純色",
+    "gradient": "漸層",
+    "solidColor": "純色",
+    "gradientStart": "起始顏色",
+    "gradientEnd": "結束顏色",
+    "gradientAngle": "漸層角度",
+    "decorationPreview": "預覽",
+    "saveDecoration": "儲存顏色",
+    "resetDecoration": "恢復預設",
+    "refreshSupportRole": "重新整理支持者身分組",
+    "supportRoleNotFound": "找不到支持者身分組。請在 Discord 身分組指派後重新整理。",
+    "monthlyOnlyGradient": "漸層僅供每月支持者使用。",
+    "decorationSaved": "暱稱顏色已儲存。",
+    "decorationReset": "暱稱顏色已重設。",
+    "decorationSaveFailed": "無法儲存暱稱顏色。",
+    "supportRoleRefreshFailed": "無法重新整理支持者身分組。"
   },
   "settingsAdvanced": {
     "patchNotes": {
