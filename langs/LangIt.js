@@ -862,7 +862,27 @@ window.LANG_IT = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "Sostenitore",
+    "monthlySupporter": "Sostenitore mensile",
+    "nicknameStyle": "Stile del nickname",
+    "nicknameStyleDesc": "Questo colore viene usato per il tuo nome nel credito del creatore della sincronizzazione sotto il testo.",
+    "solid": "Tinta unita",
+    "gradient": "Gradiente",
+    "solidColor": "Colore uniforme",
+    "gradientStart": "Colore iniziale",
+    "gradientEnd": "Colore finale",
+    "gradientAngle": "Angolo del gradiente",
+    "decorationPreview": "Anteprima",
+    "saveDecoration": "Salva colore",
+    "resetDecoration": "Ripristina predefinito",
+    "refreshSupportRole": "Aggiorna ruolo sostenitore",
+    "supportRoleNotFound": "Nessun ruolo sostenitore trovato. Aggiorna dopo l’assegnazione del ruolo su Discord.",
+    "monthlyOnlyGradient": "I gradienti sono disponibili solo per i sostenitori mensili.",
+    "decorationSaved": "Colore del nickname salvato.",
+    "decorationReset": "Colore del nickname reimpostato.",
+    "decorationSaveFailed": "Impossibile salvare il colore del nickname.",
+    "supportRoleRefreshFailed": "Impossibile aggiornare il ruolo sostenitore."
   },
   "settingsAdvanced": {
     "patchNotes": {

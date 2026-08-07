@@ -862,7 +862,27 @@ window.LANG_AR = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "داعم",
+    "monthlySupporter": "داعم شهري",
+    "nicknameStyle": "نمط الاسم المستعار",
+    "nicknameStyleDesc": "يُستخدم هذا اللون لاسمك في رصيد صانع المزامنة أسفل كلمات الأغنية.",
+    "solid": "موحّد",
+    "gradient": "تدرّج",
+    "solidColor": "لون موحّد",
+    "gradientStart": "لون البداية",
+    "gradientEnd": "لون النهاية",
+    "gradientAngle": "زاوية التدرّج",
+    "decorationPreview": "معاينة",
+    "saveDecoration": "حفظ اللون",
+    "resetDecoration": "إعادة الضبط إلى الافتراضي",
+    "refreshSupportRole": "تحديث دور الداعم",
+    "supportRoleNotFound": "لم يتم العثور على دور داعم. حدّث بعد تعيين دورك في Discord.",
+    "monthlyOnlyGradient": "التدرّجات متاحة للداعمين الشهريين فقط.",
+    "decorationSaved": "تم حفظ لون الاسم المستعار.",
+    "decorationReset": "تمت إعادة ضبط لون الاسم المستعار.",
+    "decorationSaveFailed": "تعذر حفظ لون الاسم المستعار.",
+    "supportRoleRefreshFailed": "تعذر تحديث دور الداعم."
   },
   "settingsAdvanced": {
     "patchNotes": {

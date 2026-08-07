@@ -34,8 +34,59 @@ function getCreatorProfileCopy() {
 		artistGroups: I18n.t("creatorProfile.artistGroups") || "Artist Groups",
 		noArtistStats: I18n.t("creatorProfile.noArtistStats") || "No artist stats yet.",
 		clearArtistFilter: I18n.t("creatorProfile.clearArtistFilter") || "Clear artist filter",
-		filteredArtist: I18n.t("creatorProfile.filteredArtist") || "Filtered artist"
+		filteredArtist: I18n.t("creatorProfile.filteredArtist") || "Filtered artist",
+		supporter: I18n.t("creatorProfile.supporter") || "Supporter",
+		monthlySupporter: I18n.t("creatorProfile.monthlySupporter") || "Monthly Supporter",
+		nicknameStyle: I18n.t("creatorProfile.nicknameStyle") || "Nickname style",
+		nicknameStyleDesc: I18n.t("creatorProfile.nicknameStyleDesc") || "This color is used for your name in the sync creator credit below the lyrics.",
+		solid: I18n.t("creatorProfile.solid") || "Solid",
+		gradient: I18n.t("creatorProfile.gradient") || "Gradient",
+		solidColor: I18n.t("creatorProfile.solidColor") || "Solid color",
+		gradientStart: I18n.t("creatorProfile.gradientStart") || "Start color",
+		gradientEnd: I18n.t("creatorProfile.gradientEnd") || "End color",
+		gradientAngle: I18n.t("creatorProfile.gradientAngle") || "Gradient angle",
+		decorationPreview: I18n.t("creatorProfile.decorationPreview") || "Preview",
+		saveDecoration: I18n.t("creatorProfile.saveDecoration") || "Save color",
+		resetDecoration: I18n.t("creatorProfile.resetDecoration") || "Reset to default",
+		refreshSupportRole: I18n.t("creatorProfile.refreshSupportRole") || "Refresh supporter role",
+		supportRoleNotFound: I18n.t("creatorProfile.supportRoleNotFound") || "No supporter role was found. Refresh after your Discord role is assigned.",
+		monthlyOnlyGradient: I18n.t("creatorProfile.monthlyOnlyGradient") || "Gradients are available to Monthly Supporters only.",
+		decorationSaved: I18n.t("creatorProfile.decorationSaved") || "Nickname color saved.",
+		decorationReset: I18n.t("creatorProfile.decorationReset") || "Nickname color reset.",
+		decorationSaveFailed: I18n.t("creatorProfile.decorationSaveFailed") || "Failed to save nickname color.",
+		supportRoleRefreshFailed: I18n.t("creatorProfile.supportRoleRefreshFailed") || "Failed to refresh supporter role."
 	};
+}
+
+function getSupportBadgeLabel(tier, copy = getCreatorProfileCopy()) {
+	if (tier === "monthly") return copy.monthlySupporter;
+	if (tier === "supporter") return copy.supporter;
+	return "";
+}
+
+function getEffectiveCreatorDecoration(tier, decoration) {
+	if ((tier !== "supporter" && tier !== "monthly") || !decoration) {
+		return null;
+	}
+	if (tier === "monthly" && decoration.mode === "gradient") {
+		return { ...decoration, mode: "gradient" };
+	}
+	return { ...decoration, mode: "solid" };
+}
+
+function getCreatorDecorationStyle(tier, decoration) {
+	const effective = getEffectiveCreatorDecoration(tier, decoration);
+	if (!effective) return null;
+	if (effective.mode === "gradient") {
+		return {
+			backgroundImage: `linear-gradient(${Number(effective.gradientAngle) || 0}deg, ${effective.gradientStartColor}, ${effective.gradientEndColor})`,
+			WebkitBackgroundClip: "text",
+			backgroundClip: "text",
+			WebkitTextFillColor: "transparent",
+			color: effective.gradientStartColor
+		};
+	}
+	return { color: effective.solidColor };
 }
 
 function mergeCreatorProfileContributions(currentItems, nextItems) {
@@ -565,6 +616,144 @@ function createCreatorProfileShell(contributor, options = {}) {
 	};
 }
 
+const CreatorDecorationEditor = react.memo(({
+	displayName,
+	tier,
+	decoration,
+	pending,
+	onSave,
+	onReset,
+	onRefresh
+}) => {
+	const copy = getCreatorProfileCopy();
+	const defaults = Utils.getCreatorDecorationDefaults();
+	const source = decoration ? { ...defaults, ...decoration } : defaults;
+	const [draft, setDraft] = react.useState(source);
+	const [notice, setNotice] = react.useState("");
+
+	react.useEffect(() => {
+		setDraft(decoration ? { ...defaults, ...decoration } : defaults);
+		setNotice("");
+	}, [decoration?.mode, decoration?.solidColor, decoration?.gradientStartColor, decoration?.gradientEndColor, decoration?.gradientAngle, tier]);
+
+	if (tier !== "supporter" && tier !== "monthly") {
+		return null;
+	}
+
+	const previewDecoration = {
+		...draft,
+		mode: tier === "monthly" ? draft.mode : "solid"
+	};
+	const previewStyle = getCreatorDecorationStyle(tier, previewDecoration) || {};
+	const chooseMode = (mode) => {
+		if (mode === "gradient" && tier !== "monthly") {
+			setNotice(copy.monthlyOnlyGradient);
+			Toast.warning(copy.monthlyOnlyGradient);
+			return;
+		}
+		setNotice("");
+		setDraft((current) => ({ ...current, mode }));
+	};
+
+	const colorField = (label, key) => react.createElement(
+		"label",
+		{ className: "lyrics-creator-decoration-field" },
+		react.createElement("span", null, label),
+		react.createElement(
+			"span",
+			{ className: "lyrics-creator-decoration-color-control" },
+			react.createElement("input", {
+				type: "color",
+				value: draft[key],
+				disabled: pending,
+				onChange: (event) => setDraft((current) => ({ ...current, [key]: event.currentTarget.value.toUpperCase() }))
+			}),
+			react.createElement("code", null, draft[key])
+		)
+	);
+
+	return react.createElement(
+		"section",
+		{ className: "lyrics-creator-decoration-editor", "aria-label": copy.nicknameStyle },
+		react.createElement(
+			"div",
+			{ className: "lyrics-creator-decoration-heading" },
+			react.createElement(
+				"div",
+				null,
+				react.createElement("h3", null, copy.nicknameStyle),
+				react.createElement("p", null, copy.nicknameStyleDesc)
+			),
+			react.createElement("span", { className: `lyrics-creator-support-badge is-${tier}` }, getSupportBadgeLabel(tier, copy))
+		),
+		react.createElement(
+			"div",
+			{ className: "lyrics-creator-decoration-modes" },
+			react.createElement("button", {
+				type: "button",
+				className: draft.mode === "solid" || tier !== "monthly" ? "is-active" : "",
+				"aria-pressed": draft.mode === "solid" || tier !== "monthly",
+				disabled: pending,
+				onClick: () => chooseMode("solid")
+			}, copy.solid),
+			react.createElement("button", {
+				type: "button",
+				className: `${draft.mode === "gradient" && tier === "monthly" ? "is-active" : ""} ${tier !== "monthly" ? "is-locked" : ""}`.trim(),
+				"aria-pressed": draft.mode === "gradient" && tier === "monthly",
+				"aria-describedby": tier !== "monthly" ? "lyrics-creator-decoration-notice" : undefined,
+				disabled: pending,
+				onClick: () => chooseMode("gradient")
+			}, `${copy.gradient}${tier !== "monthly" ? ` · ${copy.monthlySupporter}` : ""}`)
+		),
+		react.createElement("div", {
+			id: "lyrics-creator-decoration-notice",
+			className: "lyrics-creator-decoration-notice",
+			role: "status",
+			"aria-live": "polite",
+			hidden: !notice
+		}, notice),
+		draft.mode === "gradient" && tier === "monthly"
+			? react.createElement(
+				"div",
+				{ className: "lyrics-creator-decoration-fields" },
+				colorField(copy.gradientStart, "gradientStartColor"),
+				colorField(copy.gradientEnd, "gradientEndColor"),
+				react.createElement(
+					"label",
+					{ className: "lyrics-creator-decoration-field" },
+					react.createElement("span", null, `${copy.gradientAngle} · ${draft.gradientAngle}°`),
+					react.createElement("input", {
+						type: "range",
+						min: 0,
+						max: 360,
+						value: draft.gradientAngle,
+						disabled: pending,
+						onChange: (event) => setDraft((current) => ({ ...current, gradientAngle: Number(event.currentTarget.value) }))
+					})
+				)
+			)
+			: react.createElement("div", { className: "lyrics-creator-decoration-fields" }, colorField(copy.solidColor, "solidColor")),
+		react.createElement(
+			"div",
+			{ className: "lyrics-creator-decoration-preview" },
+			react.createElement("span", { className: "lyrics-creator-decoration-preview-label" }, copy.decorationPreview),
+			react.createElement("strong", { style: previewStyle }, displayName)
+		),
+		react.createElement(
+			"div",
+			{ className: "lyrics-creator-decoration-actions" },
+			react.createElement("button", { type: "button", disabled: pending, onClick: onRefresh }, copy.refreshSupportRole),
+			react.createElement("button", { type: "button", disabled: pending, onClick: onReset }, copy.resetDecoration),
+			react.createElement("button", {
+				type: "button",
+				className: "is-primary",
+				disabled: pending,
+				onClick: () => onSave({ ...draft, mode: tier === "monthly" ? draft.mode : "solid" })
+			}, pending ? "..." : copy.saveDecoration)
+		)
+	);
+});
+
 const SyncCreatorProfileModal = react.memo(({
 	contributor,
 	profile,
@@ -580,7 +769,12 @@ const SyncCreatorProfileModal = react.memo(({
 	onLoadMore,
 	onTrackClick,
 	activeArtistFilter,
-	onArtistFilterChange
+	onArtistFilterChange,
+	supportInfo,
+	decorationPending,
+	onSaveDecoration,
+	onResetDecoration,
+	onRefreshSupport
 }) => {
 	const copy = getCreatorProfileCopy();
 	const [uiTheme, setUiTheme] = react.useState(getCreatorProfileUiTheme);
@@ -618,6 +812,8 @@ const SyncCreatorProfileModal = react.memo(({
 	const showGreetingTranslationStatus = greetingTranslationStatus === "loading" && !!rawGreeting.trim();
 	const canEditGreeting = isOwnProfile && typeof onSaveGreeting === "function";
 	const publicProfileUrl = getCreatorPublicProfileUrl(profileData, contributor);
+	const supportTier = supportInfo?.tier || "none";
+	const supportBadgeLabel = getSupportBadgeLabel(supportTier, copy);
 	const likeButtonLabel = likePending ? "..." : liked ? copy.liked : copy.like;
 	const likeButtonTitle = !profileData.viewer?.authenticated && !isOwnProfile
 		? copy.likeLoginRequired
@@ -793,7 +989,12 @@ const SyncCreatorProfileModal = react.memo(({
 					react.createElement(
 						"div",
 						{ className: "lyrics-creator-profile-title-block" },
-						react.createElement("h2", { className: "lyrics-creator-profile-name" }, displayName),
+						react.createElement(
+							"div",
+							{ className: "lyrics-creator-profile-name-with-badge" },
+							react.createElement("h2", { className: "lyrics-creator-profile-name" }, displayName),
+							supportBadgeLabel && react.createElement("span", { className: `lyrics-creator-support-badge is-${supportTier}` }, supportBadgeLabel)
+						),
 						subtitle && react.createElement("div", { className: "lyrics-creator-profile-handle" }, subtitle)
 					),
 				react.createElement(
@@ -825,6 +1026,40 @@ const SyncCreatorProfileModal = react.memo(({
 					)
 				)
 				),
+			isOwnProfile && (supportTier !== "none"
+				? react.createElement(CreatorDecorationEditor, {
+					displayName,
+					tier: supportTier,
+					decoration: supportInfo?.decoration || null,
+					pending: decorationPending,
+					onSave: onSaveDecoration,
+					onReset: onResetDecoration,
+					onRefresh: onRefreshSupport
+				})
+				: react.createElement(
+					"section",
+					{ className: "lyrics-creator-decoration-editor is-role-missing", "aria-label": copy.nicknameStyle },
+					react.createElement(
+						"div",
+						{ className: "lyrics-creator-decoration-heading" },
+						react.createElement(
+							"div",
+							null,
+							react.createElement("h3", null, copy.nicknameStyle),
+							react.createElement("p", null, copy.supportRoleNotFound)
+						),
+						react.createElement(
+							"button",
+							{
+								type: "button",
+								className: "lyrics-creator-decoration-refresh-role",
+								disabled: decorationPending,
+								onClick: onRefreshSupport
+							},
+							copy.refreshSupportRole
+						)
+					)
+				)),
 			(greeting || canEditGreeting) && react.createElement(
 				"div",
 				{ className: "lyrics-creator-profile-greeting-block" },
@@ -1138,6 +1373,10 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 		() => getDisplayContributors(contributors, 3, copy.anonymous),
 		[contributors, copy.anonymous]
 	);
+	const visibleContributorSignature = useMemo(
+		() => visibleContributors.map((contributor) => contributor.userHash || contributor.key).join("|"),
+		[visibleContributors]
+	);
 	const [activeContributor, setActiveContributor] = useState(null);
 	const [creatorProfile, setCreatorProfile] = useState(null);
 	const [profileLoading, setProfileLoading] = useState(false);
@@ -1147,8 +1386,41 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 	const [profileLoadingMore, setProfileLoadingMore] = useState(false);
 	const [profileListRefreshing, setProfileListRefreshing] = useState(false);
 	const [profileArtistFilter, setProfileArtistFilter] = useState(null);
+	const [supportByUserHash, setSupportByUserHash] = useState({});
+	const [decorationPending, setDecorationPending] = useState(false);
 	const requestIdRef = useRef(0);
 	const greetingTranslationRequestIdRef = useRef(0);
+
+	useEffect(() => {
+		const discordIds = visibleContributors
+			.filter((contributor) => contributor.linked && Utils.isDiscordUserHash(contributor.userHash))
+			.map((contributor) => contributor.userHash);
+		if (!discordIds.length) return undefined;
+
+		let cancelled = false;
+		Promise.all([
+			Utils.fetchCreatorDecorations(discordIds).catch(() => ({})),
+			Promise.all(discordIds.map(async (userHash) => {
+				try {
+					return [userHash, await Utils.fetchDiscordSupportTier(userHash)];
+				} catch (error) {
+					console.warn("[ivLyrics] Failed to load supporter role:", error);
+					return [userHash, "none"];
+				}
+			}))
+		]).then(([decorations, tiers]) => {
+			if (cancelled) return;
+			setSupportByUserHash((current) => {
+				const next = { ...current };
+				for (const [userHash, tier] of tiers) {
+					next[userHash] = { tier, decoration: decorations[userHash] || null };
+				}
+				return next;
+			});
+		});
+
+		return () => { cancelled = true; };
+	}, [visibleContributorSignature]);
 
 	const closeProfile = useCallback(() => {
 		requestIdRef.current += 1;
@@ -1479,6 +1751,68 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 		}
 	}, [copy.greetingSaveFailed, copy.greetingSaveSuccess, creatorProfile, loadCreatorGreetingTranslation]);
 
+	const handleSaveDecoration = useCallback(async (decoration) => {
+		if (!activeContributor?.userHash) return;
+		setDecorationPending(true);
+		try {
+			const result = await Utils.saveOwnCreatorDecoration(decoration);
+			Utils.setCachedDiscordSupportTier(activeContributor.userHash, result.tier);
+			setSupportByUserHash((current) => ({
+				...current,
+				[activeContributor.userHash]: { tier: result.tier, decoration: result.decoration }
+			}));
+			Toast.success(copy.decorationSaved);
+		} catch (error) {
+			const message = error?.code === "monthly_supporter_required"
+				? copy.monthlyOnlyGradient
+				: error?.code === "supporter_required"
+					? copy.supportRoleNotFound
+					: copy.decorationSaveFailed;
+			Toast.error(message);
+		} finally {
+			setDecorationPending(false);
+		}
+	}, [activeContributor, copy.decorationSaveFailed, copy.decorationSaved]);
+
+	const handleResetDecoration = useCallback(async () => {
+		if (!activeContributor?.userHash) return;
+		setDecorationPending(true);
+		try {
+			await Utils.resetOwnCreatorDecoration();
+			setSupportByUserHash((current) => ({
+				...current,
+				[activeContributor.userHash]: {
+					tier: current[activeContributor.userHash]?.tier || "none",
+					decoration: null
+				}
+			}));
+			Toast.success(copy.decorationReset);
+		} catch (error) {
+			Toast.error(error?.message || copy.decorationSaveFailed);
+		} finally {
+			setDecorationPending(false);
+		}
+	}, [activeContributor, copy.decorationReset, copy.decorationSaveFailed]);
+
+	const handleRefreshSupport = useCallback(async () => {
+		if (!activeContributor?.userHash) return;
+		setDecorationPending(true);
+		try {
+			const tier = await Utils.fetchDiscordSupportTier(activeContributor.userHash, { forceRefresh: true });
+			setSupportByUserHash((current) => ({
+				...current,
+				[activeContributor.userHash]: {
+					tier,
+					decoration: current[activeContributor.userHash]?.decoration || null
+				}
+			}));
+		} catch (error) {
+			Toast.error(copy.supportRoleRefreshFailed);
+		} finally {
+			setDecorationPending(false);
+		}
+	}, [activeContributor, copy.supportRoleRefreshFailed]);
+
 	const handleTrackClick = useCallback((trackId) => {
 		if (!trackId) {
 			return;
@@ -1550,13 +1884,19 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 						"span",
 						{ className: "lyrics-credit-footer-value lyrics-credit-footer-contributors" },
 						...visibleContributors.flatMap((contributor, index) => {
+							const supportInfo = contributor.userHash ? supportByUserHash[contributor.userHash] : null;
+							const decorationStyle = getCreatorDecorationStyle(supportInfo?.tier, supportInfo?.decoration);
+							const decorationClass = decorationStyle
+								? ` is-supporter${supportInfo?.tier === "monthly" ? " is-monthly" : ""}${supportInfo?.decoration?.mode === "gradient" && supportInfo?.tier === "monthly" ? " is-gradient" : ""}`
+								: "";
 							const node = contributor.profileAvailable
 								? react.createElement(
 									"button",
 									{
 										type: "button",
 										key: contributor.key,
-										className: "lyrics-credit-footer-link",
+										className: `lyrics-credit-footer-link${decorationClass}`,
+										style: decorationStyle || undefined,
 										onPointerDown: (event) => event.stopPropagation(),
 										onMouseDown: (event) => event.stopPropagation(),
 										onClick: (event) => {
@@ -1571,7 +1911,8 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 									"span",
 									{
 										key: contributor.key,
-										className: "lyrics-credit-footer-name"
+										className: `lyrics-credit-footer-name${decorationClass}`,
+										style: decorationStyle || undefined
 									},
 									contributor.name
 								);
@@ -1614,7 +1955,12 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 			onLoadMore: handleLoadMore,
 			onTrackClick: handleTrackClick,
 			activeArtistFilter: profileArtistFilter,
-			onArtistFilterChange: handleArtistFilterChange
+			onArtistFilterChange: handleArtistFilterChange,
+			supportInfo: activeContributor?.userHash ? supportByUserHash[activeContributor.userHash] : null,
+			decorationPending,
+			onSaveDecoration: handleSaveDecoration,
+			onResetDecoration: handleResetDecoration,
+			onRefreshSupport: handleRefreshSupport
 		})
 		: null;
 

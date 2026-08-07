@@ -862,7 +862,27 @@ window.LANG_SV = {
     "artistGroups": "Konstnärsgrupper",
     "noArtistStats": "Ingen artiststatistik ännu.",
     "clearArtistFilter": "Rensa artistfilter",
-    "filteredArtist": "Filtrerad artist"
+    "filteredArtist": "Filtrerad artist",
+    "supporter": "Supporter",
+    "monthlySupporter": "Månadssupporter",
+    "nicknameStyle": "Stil för smeknamn",
+    "nicknameStyleDesc": "Den här färgen används för ditt namn i krediteringen av synkskaparen under låttexten.",
+    "solid": "Enfärgad",
+    "gradient": "Toning",
+    "solidColor": "Enfärgad färg",
+    "gradientStart": "Startfärg",
+    "gradientEnd": "Slutfärg",
+    "gradientAngle": "Toningsvinkel",
+    "decorationPreview": "Förhandsvisning",
+    "saveDecoration": "Spara färg",
+    "resetDecoration": "Återställ standard",
+    "refreshSupportRole": "Uppdatera supporterroll",
+    "supportRoleNotFound": "Ingen supporterroll hittades. Uppdatera efter att din Discord-roll har tilldelats.",
+    "monthlyOnlyGradient": "Toningar är endast tillgängliga för månadssupportrar.",
+    "decorationSaved": "Smeknamnsfärgen har sparats.",
+    "decorationReset": "Smeknamnsfärgen har återställts.",
+    "decorationSaveFailed": "Det gick inte att spara smeknamnsfärgen.",
+    "supportRoleRefreshFailed": "Det gick inte att uppdatera supporterrollen."
   },
   "settingsAdvanced": {
     "patchNotes": {

@@ -862,7 +862,27 @@ window.LANG_FA = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "حامی",
+    "monthlySupporter": "حامی ماهانه",
+    "nicknameStyle": "سبک نام مستعار",
+    "nicknameStyleDesc": "این رنگ برای نام شما در بخش سازنده همگام‌سازی زیر متن ترانه استفاده می‌شود.",
+    "solid": "یکدست",
+    "gradient": "گرادیان",
+    "solidColor": "رنگ یکدست",
+    "gradientStart": "رنگ آغاز",
+    "gradientEnd": "رنگ پایان",
+    "gradientAngle": "زاویه گرادیان",
+    "decorationPreview": "پیش‌نمایش",
+    "saveDecoration": "ذخیره رنگ",
+    "resetDecoration": "بازنشانی به پیش‌فرض",
+    "refreshSupportRole": "تازه‌سازی نقش حامی",
+    "supportRoleNotFound": "نقش حامی پیدا نشد. پس از اختصاص نقش در Discord آن را تازه‌سازی کنید.",
+    "monthlyOnlyGradient": "گرادیان فقط برای حامیان ماهانه در دسترس است.",
+    "decorationSaved": "رنگ نام مستعار ذخیره شد.",
+    "decorationReset": "رنگ نام مستعار بازنشانی شد.",
+    "decorationSaveFailed": "ذخیره رنگ نام مستعار انجام نشد.",
+    "supportRoleRefreshFailed": "تازه‌سازی نقش حامی انجام نشد."
   },
   "settingsAdvanced": {
     "patchNotes": {

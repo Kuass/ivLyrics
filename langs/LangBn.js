@@ -862,7 +862,27 @@ window.LANG_BN = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "সমর্থক",
+    "monthlySupporter": "মাসিক সমর্থক",
+    "nicknameStyle": "ডাকনামের ধরন",
+    "nicknameStyleDesc": "গানের কথার নিচে সিঙ্ক নির্মাতার ক্রেডিটে আপনার নামের জন্য এই রং ব্যবহার করা হবে।",
+    "solid": "একক রং",
+    "gradient": "গ্রেডিয়েন্ট",
+    "solidColor": "একক রং",
+    "gradientStart": "শুরুর রং",
+    "gradientEnd": "শেষের রং",
+    "gradientAngle": "গ্রেডিয়েন্টের কোণ",
+    "decorationPreview": "প্রিভিউ",
+    "saveDecoration": "রং সংরক্ষণ করুন",
+    "resetDecoration": "ডিফল্টে ফিরিয়ে নিন",
+    "refreshSupportRole": "সমর্থকের ভূমিকা রিফ্রেশ করুন",
+    "supportRoleNotFound": "সমর্থকের ভূমিকা পাওয়া যায়নি। Discord-এ ভূমিকা দেওয়ার পর রিফ্রেশ করুন।",
+    "monthlyOnlyGradient": "গ্রেডিয়েন্ট শুধু মাসিক সমর্থকদের জন্য উপলভ্য।",
+    "decorationSaved": "ডাকনামের রং সংরক্ষিত হয়েছে।",
+    "decorationReset": "ডাকনামের রং রিসেট করা হয়েছে।",
+    "decorationSaveFailed": "ডাকনামের রং সংরক্ষণ করা যায়নি।",
+    "supportRoleRefreshFailed": "সমর্থকের ভূমিকা রিফ্রেশ করা যায়নি।"
   },
   "settingsAdvanced": {
     "patchNotes": {

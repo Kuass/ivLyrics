@@ -862,7 +862,27 @@ window.LANG_FR = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "Soutien",
+    "monthlySupporter": "Soutien mensuel",
+    "nicknameStyle": "Style du pseudo",
+    "nicknameStyleDesc": "Cette couleur est utilisée pour ton nom dans le crédit du créateur de sync sous les paroles.",
+    "solid": "Uni",
+    "gradient": "Dégradé",
+    "solidColor": "Couleur unie",
+    "gradientStart": "Couleur de début",
+    "gradientEnd": "Couleur de fin",
+    "gradientAngle": "Angle du dégradé",
+    "decorationPreview": "Aperçu",
+    "saveDecoration": "Enregistrer la couleur",
+    "resetDecoration": "Rétablir par défaut",
+    "refreshSupportRole": "Actualiser le rôle de soutien",
+    "supportRoleNotFound": "Aucun rôle de soutien trouvé. Actualise-le après l’attribution de ton rôle Discord.",
+    "monthlyOnlyGradient": "Les dégradés sont réservés aux soutiens mensuels.",
+    "decorationSaved": "Couleur du pseudo enregistrée.",
+    "decorationReset": "Couleur du pseudo réinitialisée.",
+    "decorationSaveFailed": "Impossible d’enregistrer la couleur du pseudo.",
+    "supportRoleRefreshFailed": "Impossible d’actualiser le rôle de soutien."
   },
   "settingsAdvanced": {
     "patchNotes": {

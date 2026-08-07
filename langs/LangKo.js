@@ -862,7 +862,27 @@ window.LANG_KO = {
     "artistGroups": "아티스트 수",
     "noArtistStats": "아직 아티스트 통계가 없습니다.",
     "clearArtistFilter": "아티스트 필터 해제",
-    "filteredArtist": "필터 중인 아티스트"
+    "filteredArtist": "필터 중인 아티스트",
+    "supporter": "후원자",
+    "monthlySupporter": "월간 후원자",
+    "nicknameStyle": "닉네임 스타일",
+    "nicknameStyleDesc": "가사 하단 싱크 제작자 영역에 표시될 닉네임 색상입니다.",
+    "solid": "단색",
+    "gradient": "그라데이션",
+    "solidColor": "단색 색상",
+    "gradientStart": "시작 색상",
+    "gradientEnd": "끝 색상",
+    "gradientAngle": "그라데이션 각도",
+    "decorationPreview": "미리보기",
+    "saveDecoration": "색상 저장",
+    "resetDecoration": "기본값으로 초기화",
+    "refreshSupportRole": "후원 역할 새로고침",
+    "supportRoleNotFound": "후원 역할을 찾지 못했습니다. 디스코드 역할이 지급된 뒤 새로고침하세요.",
+    "monthlyOnlyGradient": "그라데이션은 월간 후원자 전용 기능입니다.",
+    "decorationSaved": "닉네임 색상을 저장했습니다.",
+    "decorationReset": "닉네임 색상을 초기화했습니다.",
+    "decorationSaveFailed": "닉네임 색상을 저장하지 못했습니다.",
+    "supportRoleRefreshFailed": "후원 역할을 새로고침하지 못했습니다."
   },
   "settingsAdvanced": {
     "patchNotes": {

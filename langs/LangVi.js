@@ -862,7 +862,27 @@ window.LANG_VI = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "Người ủng hộ",
+    "monthlySupporter": "Người ủng hộ hằng tháng",
+    "nicknameStyle": "Kiểu biệt danh",
+    "nicknameStyleDesc": "Màu này được dùng cho tên của bạn trong phần ghi công người tạo bản đồng bộ bên dưới lời bài hát.",
+    "solid": "Màu đơn",
+    "gradient": "Chuyển sắc",
+    "solidColor": "Màu đơn",
+    "gradientStart": "Màu bắt đầu",
+    "gradientEnd": "Màu kết thúc",
+    "gradientAngle": "Góc chuyển sắc",
+    "decorationPreview": "Xem trước",
+    "saveDecoration": "Lưu màu",
+    "resetDecoration": "Đặt lại mặc định",
+    "refreshSupportRole": "Làm mới vai trò người ủng hộ",
+    "supportRoleNotFound": "Không tìm thấy vai trò người ủng hộ. Hãy làm mới sau khi bạn được cấp vai trò trên Discord.",
+    "monthlyOnlyGradient": "Chuyển sắc chỉ dành cho người ủng hộ hằng tháng.",
+    "decorationSaved": "Đã lưu màu biệt danh.",
+    "decorationReset": "Đã đặt lại màu biệt danh.",
+    "decorationSaveFailed": "Không thể lưu màu biệt danh.",
+    "supportRoleRefreshFailed": "Không thể làm mới vai trò người ủng hộ."
   },
   "settingsAdvanced": {
     "patchNotes": {

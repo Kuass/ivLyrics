@@ -862,7 +862,27 @@ window.LANG_CS = {
     "artistGroups": "Skupiny umělců",
     "noArtistStats": "Zatím žádné statistiky interpreta.",
     "clearArtistFilter": "Vymazat filtr interpreta",
-    "filteredArtist": "Filtrovaný umělec"
+    "filteredArtist": "Filtrovaný umělec",
+    "supporter": "Podporovatel",
+    "monthlySupporter": "Měsíční podporovatel",
+    "nicknameStyle": "Vzhled přezdívky",
+    "nicknameStyleDesc": "Tato barva se použije pro vaše jméno v údaji o autorovi synchronizace pod textem.",
+    "solid": "Jednobarevné",
+    "gradient": "Přechod",
+    "solidColor": "Jedna barva",
+    "gradientStart": "Počáteční barva",
+    "gradientEnd": "Koncová barva",
+    "gradientAngle": "Úhel přechodu",
+    "decorationPreview": "Náhled",
+    "saveDecoration": "Uložit barvu",
+    "resetDecoration": "Obnovit výchozí",
+    "refreshSupportRole": "Obnovit roli podporovatele",
+    "supportRoleNotFound": "Role podporovatele nebyla nalezena. Po přidělení role na Discordu ji obnovte.",
+    "monthlyOnlyGradient": "Přechody jsou dostupné pouze měsíčním podporovatelům.",
+    "decorationSaved": "Barva přezdívky byla uložena.",
+    "decorationReset": "Barva přezdívky byla obnovena.",
+    "decorationSaveFailed": "Barvu přezdívky se nepodařilo uložit.",
+    "supportRoleRefreshFailed": "Roli podporovatele se nepodařilo obnovit."
   },
   "settingsAdvanced": {
     "patchNotes": {

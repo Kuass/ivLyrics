@@ -862,7 +862,27 @@ window.LANG_TR = {
     "artistGroups": "Sanatçı Grupları",
     "noArtistStats": "Henüz sanatçı istatistiği yok.",
     "clearArtistFilter": "Sanatçı filtresini temizle",
-    "filteredArtist": "Filtrelenen sanatçı"
+    "filteredArtist": "Filtrelenen sanatçı",
+    "supporter": "Destekçi",
+    "monthlySupporter": "Aylık destekçi",
+    "nicknameStyle": "Takma ad stili",
+    "nicknameStyleDesc": "Bu renk, şarkı sözlerinin altındaki senkron oluşturucu bilgisinde adınız için kullanılır.",
+    "solid": "Düz",
+    "gradient": "Geçiş",
+    "solidColor": "Düz renk",
+    "gradientStart": "Başlangıç rengi",
+    "gradientEnd": "Bitiş rengi",
+    "gradientAngle": "Geçiş açısı",
+    "decorationPreview": "Önizleme",
+    "saveDecoration": "Rengi kaydet",
+    "resetDecoration": "Varsayılana sıfırla",
+    "refreshSupportRole": "Destekçi rolünü yenile",
+    "supportRoleNotFound": "Destekçi rolü bulunamadı. Discord rolünüz atandıktan sonra yenileyin.",
+    "monthlyOnlyGradient": "Geçişler yalnızca aylık destekçilere açıktır.",
+    "decorationSaved": "Takma ad rengi kaydedildi.",
+    "decorationReset": "Takma ad rengi sıfırlandı.",
+    "decorationSaveFailed": "Takma ad rengi kaydedilemedi.",
+    "supportRoleRefreshFailed": "Destekçi rolü yenilenemedi."
   },
   "settingsAdvanced": {
     "patchNotes": {

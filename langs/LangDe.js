@@ -862,7 +862,27 @@ window.LANG_DE = {
     "artistGroups": "Artist Groups",
     "noArtistStats": "No artist stats yet.",
     "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist"
+    "filteredArtist": "Filtered artist",
+    "supporter": "Unterstützer",
+    "monthlySupporter": "Monatlicher Unterstützer",
+    "nicknameStyle": "Spitznamen-Stil",
+    "nicknameStyleDesc": "Diese Farbe wird für deinen Namen im Hinweis zum Sync-Ersteller unter den Lyrics verwendet.",
+    "solid": "Einfarbig",
+    "gradient": "Farbverlauf",
+    "solidColor": "Einfarbig",
+    "gradientStart": "Startfarbe",
+    "gradientEnd": "Endfarbe",
+    "gradientAngle": "Verlaufswinkel",
+    "decorationPreview": "Vorschau",
+    "saveDecoration": "Farbe speichern",
+    "resetDecoration": "Auf Standard zurücksetzen",
+    "refreshSupportRole": "Unterstützerrolle aktualisieren",
+    "supportRoleNotFound": "Keine Unterstützerrolle gefunden. Aktualisiere sie, nachdem dir die Discord-Rolle zugewiesen wurde.",
+    "monthlyOnlyGradient": "Farbverläufe sind nur für monatliche Unterstützer verfügbar.",
+    "decorationSaved": "Spitznamenfarbe gespeichert.",
+    "decorationReset": "Spitznamenfarbe zurückgesetzt.",
+    "decorationSaveFailed": "Spitznamenfarbe konnte nicht gespeichert werden.",
+    "supportRoleRefreshFailed": "Unterstützerrolle konnte nicht aktualisiert werden."
   },
   "settingsAdvanced": {
     "patchNotes": {
