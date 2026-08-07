@@ -170,7 +170,10 @@ function normalizeContributorEntry(contributor, options = {}) {
 		profileAvailable: !identityHidden && (contributor.profileAvailable ?? !!userHash),
 		anonymous: isAnonymous,
 		isPrivate,
-		identityRedacted
+		identityRedacted,
+		decoration: !identityHidden && contributor.decoration && typeof contributor.decoration === "object"
+			? contributor.decoration
+			: null
 	};
 }
 
@@ -1380,7 +1383,9 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 		[contributors, copy.anonymous]
 	);
 	const visibleContributorSignature = useMemo(
-		() => visibleContributors.map((contributor) => contributor.userHash || contributor.key).join("|"),
+		() => visibleContributors.map((contributor) => (
+			`${contributor.userHash || contributor.key}:${contributor.decoration?.updatedAt || 0}`
+		)).join("|"),
 		[visibleContributors]
 	);
 	const [activeContributor, setActiveContributor] = useState(null);
@@ -1404,22 +1409,20 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 		if (!discordIds.length) return undefined;
 
 		let cancelled = false;
-		Promise.all([
-			Utils.fetchCreatorDecorations(discordIds).catch(() => ({})),
-			Promise.all(discordIds.map(async (userHash) => {
+		Promise.all(discordIds.map(async (userHash) => {
 				try {
 					return [userHash, await Utils.fetchDiscordSupportTier(userHash)];
 				} catch (error) {
 					console.warn("[ivLyrics] Failed to load supporter role:", error);
 					return [userHash, "none"];
 				}
-			}))
-		]).then(([decorations, tiers]) => {
+			})).then((tiers) => {
 			if (cancelled) return;
 			setSupportByUserHash((current) => {
 				const next = { ...current };
 				for (const [userHash, tier] of tiers) {
-					next[userHash] = { tier, decoration: decorations[userHash] || null };
+					const contributor = visibleContributors.find((item) => item.userHash === userHash);
+					next[userHash] = { tier, decoration: contributor?.decoration || null };
 				}
 				return next;
 			});

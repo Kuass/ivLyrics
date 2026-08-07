@@ -2222,24 +2222,6 @@ const Utils = {
     }
   },
 
-  async fetchCreatorDecorations(userHashes) {
-    const normalized = [...new Set((Array.isArray(userHashes) ? userHashes : [])
-      .map((value) => String(value || "").trim())
-      .filter((value) => this.isDiscordUserHash(value)))].slice(0, 10);
-    if (!normalized.length) return {};
-
-    const params = new URLSearchParams({ userHashes: normalized.join(",") });
-    const response = await fetch(`${this.getAccountApiBase()}/creator-decorations?${params.toString()}`, {
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    });
-    const body = await response.json();
-    if (!response.ok || !body?.success) {
-      throw new Error(body?.error || "Failed to load creator decoration.");
-    }
-    return Object.fromEntries((body?.data?.items || []).map((item) => [item.userHash, item.decoration]));
-  },
-
   async saveOwnCreatorDecoration(decoration) {
     const response = await fetch(`${this.getAccountApiBase()}/creator-decoration`, {
       method: "PUT",
