@@ -7908,7 +7908,7 @@ const ConfigModal = ({
               type: "button",
               onClick: () =>
                 window.open(
-                  "https://ko-fi.com/ivlisstudio",
+                  "https://buymeacoffee.com/ivlis",
                   "_blank"
                 ),
               title: I18n.t("settingsAdvanced.donate.title"),
