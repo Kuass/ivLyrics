@@ -4,6 +4,7 @@ const { resolve } = require('node:path');
 const test = require('node:test');
 
 const pagesSource = readFileSync(resolve(__dirname, '..', '..', 'Pages.js'), 'utf8');
+const utilsSource = readFileSync(resolve(__dirname, '..', '..', 'Utils.js'), 'utf8');
 
 function getDecorationEditorSource() {
   const start = pagesSource.indexOf('const CreatorDecorationEditor');
@@ -25,4 +26,21 @@ test('creator decoration inputs snapshot DOM values before functional state upda
     /setDraft\(\(current\) => \([^)]*event\.currentTarget/s,
     'React event objects must not be read from deferred state updater callbacks'
   );
+});
+
+test('creator decorations come from sync contributors without an extra Worker request', () => {
+  assert.match(
+    pagesSource,
+    /decoration: !identityHidden && contributor\.decoration/,
+    'sync contributor decorations must survive display normalization'
+  );
+  assert.match(
+    pagesSource,
+    /decoration: contributor\?\.decoration \|\| null/,
+    'support presentation must use the embedded contributor decoration'
+  );
+  assert.doesNotMatch(pagesSource, /fetchCreatorDecorations/);
+  assert.doesNotMatch(utilsSource, /creator-decorations/);
+  assert.match(utilsSource, /discord\.ivl\.is\/v1\/user/);
+  assert.match(utilsSource, /expiresAt: now \+ 60 \* 60 \* 1000/);
 });
