@@ -86,7 +86,6 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
     };
     const [videoInfo, setVideoInfo] = useState(null);
     const [isPlayerReady, setIsPlayerReady] = useState(false);
-    const [statusMessage, setStatusMessage] = useState("");
     const [videoLoadRevision, setVideoLoadRevision] = useState(0);
 
     const [stats, setStats] = useState({
@@ -135,22 +134,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
     const trackOffsetMsRef = useRef(trackOffsetMs);
     const abortDownloadRef = useRef(null); // abort function for helper download
     const playerInitRetryRef = useRef(null);
-    const statusMessageTimeoutRef = useRef(null);
     const lastCaptionDisableRef = useRef(0);
-    const clearStatusMessageTimeout = useCallback(() => {
-        if (statusMessageTimeoutRef.current) {
-            clearTimeout(statusMessageTimeoutRef.current);
-            statusMessageTimeoutRef.current = null;
-        }
-    }, []);
-    const setTemporaryStatusMessage = useCallback((message, duration = 5000) => {
-        clearStatusMessageTimeout();
-        setStatusMessage(message);
-        statusMessageTimeoutRef.current = setTimeout(() => {
-            setStatusMessage((currentMessage) => currentMessage === message ? "" : currentMessage);
-            statusMessageTimeoutRef.current = null;
-        }, duration);
-    }, [clearStatusMessageTimeout]);
     const brightnessValue = Math.min(Math.max(Number(brightness) || 0, 0), 100);
     const brightnessRatio = brightnessValue / 100;
     const blurValue = Math.min(Math.max(Number(blurAmount) || 0, 0), 80);
@@ -191,10 +175,6 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         window.addEventListener("ivLyrics:videoHelperChanged", handleHelperChange);
         return () => window.removeEventListener("ivLyrics:videoHelperChanged", handleHelperChange);
     }, []);
-
-    useEffect(() => {
-        return () => clearStatusMessageTimeout();
-    }, [clearStatusMessageTimeout]);
 
     useEffect(() => {
         const reloadCurrentTrack = (event) => {
@@ -265,6 +245,11 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         });
     }, [onLoadingChange, trackUri]);
 
+    const showVideoBackgroundError = useCallback((message) => {
+        Toast.error(message);
+        reportVideoBackgroundStatus("error");
+    }, [reportVideoBackgroundStatus]);
+
     // Clear the pill when this background instance is removed or its track changes.
     useEffect(() => {
         return () => reportVideoBackgroundStatus("idle");
@@ -274,7 +259,6 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
     useEffect(() => {
         if (externalVideoInfo && externalVideoInfo.youtubeVideoId) {
             setVideoInfo(externalVideoInfo);
-            setStatusMessage("");
             setIsPlayerReady(false);
             reportVideoBackgroundStatus("loading", {
                 label: I18n.t("settings.videoBackground.label") || I18n.t("videoBackground.loading"),
@@ -343,7 +327,6 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 playerRef.current = null;
             }
             setVideoInfo(null);
-            setStatusMessage("");
             setIsPlayerReady(false);
             reportVideoBackgroundStatus("idle");
             return undefined;
@@ -356,7 +339,6 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
             externalVideoInfo.youtubeVideoId
         ) {
             setVideoInfo(externalVideoInfo);
-            setStatusMessage("");
             setIsPlayerReady(false);
             return undefined;
         }
@@ -370,7 +352,6 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         }
 
         const trackId = Utils.extractTrackId(trackUri);
-        setStatusMessage("");
         setVideoInfo(null);
         setIsPlayerReady(false);
         reportVideoBackgroundStatus("loading", {
@@ -392,12 +373,10 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                                 `[VideoBackground] Using random community video: ${randomVideo.youtubeVideoId}`
                             );
                             setVideoInfo(randomVideo);
-                            setStatusMessage("");
                             return;
                         }
                         if (isMounted) {
                             setVideoInfo(null);
-                            setStatusMessage("");
                             reportVideoBackgroundStatus("idle");
                             return;
                         }
@@ -408,7 +387,6 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                         );
                         if (isMounted) {
                             setVideoInfo(null);
-                            setStatusMessage("");
                             reportVideoBackgroundStatus("idle");
                             return;
                         }
@@ -428,7 +406,6 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                             communityEntryId: savedVideo.communityEntryId,
                             isAutoGenerated: savedVideo.isAutoGenerated
                         });
-                        setStatusMessage("");
                         return;
                     }
                 } catch (error) {
@@ -438,8 +415,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 if (!trackId) {
                     if (!isMounted) return;
                     setVideoInfo(null);
-                    setStatusMessage(I18n.t("videoBackground.localTrackNeedsVideo") || "로컬 곡은 영상 버튼에서 YouTube URL을 직접 지정하세요.");
-                    reportVideoBackgroundStatus("error");
+                    showVideoBackgroundError(I18n.t("videoBackground.localTrackNeedsVideo") || "로컬 곡은 영상 버튼에서 YouTube URL을 직접 지정하세요.");
                     return;
                 }
 
@@ -450,7 +426,6 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                     // 프리페치된 데이터 사용
                     videoBackgroundDebug(`[VideoBackground] Using prefetched video info for trackId: ${trackId}`);
                     setVideoInfo(prefetchedInfo);
-                    setStatusMessage("");
                     return;
                 }
 
@@ -470,8 +445,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 if (!trackIsrc) {
                     if (!isMounted) return;
                     setVideoInfo(null);
-                    setStatusMessage("이 곡의 ISRC를 확인할 수 없어 영상 배경을 불러올 수 없습니다.");
-                    reportVideoBackgroundStatus("error");
+                    showVideoBackgroundError("이 곡의 ISRC를 확인할 수 없어 영상 배경을 불러올 수 없습니다.");
                     return;
                 }
 
@@ -488,7 +462,6 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                             });
                         }
                         setVideoInfo(cachedYouTube);
-                        setStatusMessage("");
                         return;
                     }
                 } catch (error) {
@@ -555,22 +528,19 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                         LyricsCache.setYouTube(resolvedCacheIsrc, data.data).catch(() => { });
                     }
                     setVideoInfo(data.data);
-                    setStatusMessage("");
                 } else {
                     // 실패 로깅
                     if (window.ApiTracker && logId) {
                         window.ApiTracker.logResponse(logId, null, 'error', 'Video not found');
                     }
-                    setStatusMessage(I18n.t("videoBackground.notFound"));
                     setVideoInfo(null);
-                    reportVideoBackgroundStatus("error");
+                    showVideoBackgroundError(I18n.t("videoBackground.notFound"));
                 }
             } catch (error) {
                 if (!isMounted) return;
                 console.error('[VideoBackground] Failed to load video info:', error);
-                setStatusMessage(I18n.t("videoBackground.error"));
                 setVideoInfo(null);
-                reportVideoBackgroundStatus("error");
+                showVideoBackgroundError(I18n.t("videoBackground.error"));
             }
         };
 
@@ -586,7 +556,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 playerRef.current = null;
             }
         };
-    }, [trackUri, externalVideoInfo, reportVideoBackgroundStatus, videoLoadRevision]);
+    }, [trackUri, externalVideoInfo, reportVideoBackgroundStatus, showVideoBackgroundError, videoLoadRevision]);
 
     // Track-specific sync offset handling
     useEffect(() => {
@@ -670,9 +640,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                     setHelperStatus("not-connected");
 
                     clearTimeout(preparingToastTimeout);
-                    setTemporaryStatusMessage(I18n.t("videoBackground.helperNotConnected"));
-                    Toast.error(I18n.t("videoBackground.helperNotConnected"));
-                    reportVideoBackgroundStatus("error");
+                    showVideoBackgroundError(I18n.t("videoBackground.helperNotConnected"));
                     return;
                 }
 
@@ -769,15 +737,11 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                         // URL 유효성 확인
                         if (!url || typeof url !== 'string' || !url.startsWith('http')) {
                             console.error(`[VideoBackground] Invalid video URL received: ${url}`);
-                            setTemporaryStatusMessage(I18n.t("videoBackground.helperError"));
-                            Toast.error(I18n.t("videoBackground.helperError"));
-                            reportVideoBackgroundStatus("error");
+                            showVideoBackgroundError(I18n.t("videoBackground.helperError"));
                             return;
                         }
 
                         setHelperVideoUrl(url);
-                        clearStatusMessageTimeout();
-                        setStatusMessage("");
                         const message = I18n.t("videoBackground.processing");
                         reportVideoBackgroundStatus("loading", {
                             label: message,
@@ -792,17 +756,14 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
 
                         // 에러 메시지 번역
                         const translatedError = translateHelperMessage(message) || I18n.t("videoBackground.helperError");
-                        setTemporaryStatusMessage(translatedError);
-                        Toast.error(translatedError);
-                        reportVideoBackgroundStatus("error");
+                        showVideoBackgroundError(translatedError);
                     },
                 });
             } catch (e) {
                 if (!isActive) return;
                 clearTimeout(preparingToastTimeout);
                 console.error("[VideoBackground] Helper request failed:", e);
-                setTemporaryStatusMessage(I18n.t("videoBackground.helperError"));
-                reportVideoBackgroundStatus("error");
+                showVideoBackgroundError(I18n.t("videoBackground.helperError"));
             }
         };
 
@@ -816,7 +777,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 abortDownloadRef.current = null;
             }
         };
-    }, [useHelper, videoInfo, setTemporaryStatusMessage, clearStatusMessageTimeout, reportVideoBackgroundStatus]);
+    }, [useHelper, videoInfo, reportVideoBackgroundStatus, showVideoBackgroundError]);
 
     // 헬퍼 모드: HTML5 video 재생 및 동기화
     useEffect(() => {
@@ -888,9 +849,8 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 readinessTimeout = null;
             }
             console.error("[VideoBackground] Helper video error:", e, "src:", video.src);
-            setTemporaryStatusMessage(I18n.t("videoBackground.helperError"));
             setIsPlayerReady(false);
-            reportVideoBackgroundStatus("error");
+            showVideoBackgroundError(I18n.t("videoBackground.helperError"));
         };
 
         const handleLoadStart = () => {
@@ -908,8 +868,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         readinessTimeout = setTimeout(() => {
             readinessTimeout = null;
             setIsPlayerReady(false);
-            setTemporaryStatusMessage(I18n.t("videoBackground.helperError"));
-            reportVideoBackgroundStatus("error");
+            showVideoBackgroundError(I18n.t("videoBackground.helperError"));
         }, 15000);
 
         video.load();
@@ -927,7 +886,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
             video.removeAttribute('src');
             video.load();
         };
-    }, [useHelper, helperVideoUrl, videoInfo, setTemporaryStatusMessage, reportVideoBackgroundStatus]);
+    }, [useHelper, helperVideoUrl, videoInfo, reportVideoBackgroundStatus, showVideoBackgroundError]);
 
 
     // 통계 업데이트
@@ -1144,8 +1103,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 console.error("[VideoBackground] YouTube player failed:", error);
             }
             setIsPlayerReady(false);
-            setTemporaryStatusMessage(I18n.t("videoBackground.error"));
-            reportVideoBackgroundStatus("error");
+            showVideoBackgroundError(I18n.t("videoBackground.error"));
         };
         const markPlayerReady = (player) => {
             if (isCancelled || playerLifecycleFailed || !player) return false;
@@ -1275,7 +1233,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
             }
         };
 
-    }, [useHelper, videoInfo, setTemporaryStatusMessage, reportVideoBackgroundStatus]);
+    }, [useHelper, videoInfo, reportVideoBackgroundStatus, showVideoBackgroundError]);
 
     // 일반 모드 (YouTube IFrame): Sync Logic
     useEffect(() => {
@@ -1358,23 +1316,8 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 transform: "translateZ(0) scale(1.1)",
                 ...blurCompositeStyle,
                 zIndex: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
             },
-        }, statusMessage ? react.createElement("div", {
-            style: {
-                color: "white",
-                fontSize: "24px",
-                fontWeight: "bold",
-                textShadow: "0 2px 4px rgba(0,0,0,0.5)",
-                zIndex: 10,
-                background: "rgba(0,0,0,0.3)",
-                padding: "20px",
-                borderRadius: "10px",
-                backdropFilter: "blur(10px)"
-            }
-        }, statusMessage) : null);
+        });
     };
 
     // 헬퍼 모드용 video 태그 스타일
