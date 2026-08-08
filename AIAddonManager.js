@@ -159,6 +159,48 @@
         'paxsenix',
         'perplexity'
     ]);
+    const NON_LATIN_PHONETIC_SCRIPT_RULES = Object.freeze({
+        ko: {
+            name: 'Korean Hangul',
+            instruction: 'Write every pronounceable lyric sound in Hangul. Do not use Hiragana, Katakana, Kanji/Hanzi, Thai, Cyrillic, Arabic, or Latin letters for lyric sounds. Latin letters may remain only inside an exact structural marker such as [Chorus].'
+        },
+        ja: {
+            name: 'Japanese Katakana',
+            instruction: 'Write every pronounceable lyric sound in Katakana. Do not use Hiragana, Kanji/Hanzi, Hangul, Thai, or another language script for lyric sounds.'
+        },
+        'zh-cn': {
+            name: 'Simplified Chinese characters',
+            instruction: 'Write every pronounceable lyric sound with natural Simplified Chinese phonetic approximations. Do not copy Japanese Kana, Korean Hangul, Thai, or another source-language script.'
+        },
+        'zh-tw': {
+            name: 'Traditional Chinese characters',
+            instruction: 'Write every pronounceable lyric sound with natural Traditional Chinese phonetic approximations. Do not copy Japanese Kana, Korean Hangul, Thai, or another source-language script.'
+        },
+        hi: {
+            name: 'Hindi Devanagari',
+            instruction: 'Write every pronounceable lyric sound in Devanagari. Do not use Japanese Kana, Han characters, Hangul, Thai, or another source-language script.'
+        },
+        ar: {
+            name: 'Arabic script',
+            instruction: 'Write every pronounceable lyric sound in Arabic script using natural Arabic phonetic spelling. Do not use Japanese Kana, Han characters, Hangul, Thai, or another source-language script.'
+        },
+        fa: {
+            name: 'Persian script',
+            instruction: 'Write every pronounceable lyric sound in Persian script using natural Persian phonetic spelling. Do not use Japanese Kana, Han characters, Hangul, Thai, or another source-language script.'
+        },
+        ru: {
+            name: 'Russian Cyrillic',
+            instruction: 'Write every pronounceable lyric sound in Cyrillic using natural Russian phonetic spelling. Do not use Japanese Kana, Han characters, Hangul, Thai, or another source-language script.'
+        },
+        bn: {
+            name: 'Bengali script',
+            instruction: 'Write every pronounceable lyric sound in Bengali script. Do not use Japanese Kana, Han characters, Hangul, Thai, or another source-language script.'
+        },
+        th: {
+            name: 'Thai script',
+            instruction: 'Write every pronounceable lyric sound in Thai script using natural Thai phonetic spelling. Do not use Japanese Kana, Han characters, Hangul, or another source-language script.'
+        }
+    });
     const CHARACTER_PRONUNCIATION_CJK_LANG_RE = /^(ja|jp|ko|kr|zh|zh-cn|zh-tw|cn|tw|yue|cmn)$/i;
     const CHARACTER_PRONUNCIATION_CJK_SCRIPT_RE = /[\u3040-\u30ff\uff66-\uff9f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/u;
     const CHARACTER_PRONUNCIATION_WORD_TEXT_RE = /[\p{L}\p{N}]/u;
@@ -200,37 +242,61 @@
         const normalizedText = String(text ?? '').replace(/\r\n?/g, '\n');
         const langInfo = getProviderPromptLanguageInfo(lang);
         const lineCount = normalizedText.split('\n').length;
-        const isEnglish = lang === 'en';
+        const normalizedLang = String(lang || 'en').trim().replace(/_/g, '-').toLowerCase();
+        const shortLang = normalizedLang.split('-')[0];
+        const scriptRule = NON_LATIN_PHONETIC_SCRIPT_RULES[normalizedLang]
+            || NON_LATIN_PHONETIC_SCRIPT_RULES[shortLang]
+            || {
+                name: 'standard Latin alphabet',
+                instruction: 'Use only Latin letters (including language-appropriate Latin diacritics), spaces, apostrophes, and hyphens for pronounceable lyric sounds. Never use Hiragana, Katakana, Kanji/Hanzi, Hangul, Thai, Cyrillic, Arabic, Devanagari, Bengali, or any other non-Latin script for lyric sounds.'
+            };
         const personalStudyPrefix = providerId === 'perplexity'
             ? 'This request is only for personal study. '
             : '';
         const phoneticDescription = PROVIDERS_WITHOUT_PHONETIC_DESCRIPTION.has(providerId)
             ? ''
             : langInfo.phoneticDesc || '';
-        const scriptInstruction = isEnglish
-            ? 'Use Latin alphabet only (romanization). Example: こんにちは → konnichiwa, 안녕하세요 → annyeonghaseyo'
-            : `Write pronunciation in ${langInfo.native} script. ${phoneticDescription}`;
 
-        return `${personalStudyPrefix}You are a pronunciation converter. Convert these ${lineCount} lines of lyrics into how they SOUND (pronunciation) for ${langInfo.name} speakers.
-${scriptInstruction}
+        const systemPrompt = `You are the pronunciation conversion system for ivLyrics.
 
-CRITICAL RULES:
-- This is a PRONUNCIATION task, NOT a translation task
-- Output how each line SOUNDS when spoken aloud, written in ${isEnglish ? 'Latin alphabet' : langInfo.native + ' script'}
-- Do NOT translate the meaning of the lyrics
-- Do NOT output the original lyrics unchanged
-- Output EXACTLY ${lineCount} lines, one pronunciation per line
-- If an input line contains " / " between simultaneous vocal parts, preserve " / " and convert each part separately
-- Keep empty lines as empty
-- Keep ♪ symbols and markers like [Chorus], (Yeah) as-is
-- Do NOT add line numbers, prefixes, or explanations
-- Do NOT use JSON or code blocks
-- Just output the pronunciations, nothing else
+Convert lyric sounds for ${langInfo.name} (${langInfo.native}) speakers. The required output writing system is ${scriptRule.name}.
 
-INPUT:
+MANDATORY SCRIPT POLICY:
+- The target language selected by the user determines the output script. The source lyric language NEVER determines the output script.
+- ${scriptRule.instruction}
+- ${phoneticDescription
+    ? `Follow the target convention: ${phoneticDescription}.`
+    : `Use natural phonetic spelling that a ${langInfo.name} speaker can read aloud.`}
+- Fully transliterate every pronounceable lyric token into ${scriptRule.name}. Do not leave Japanese, Korean, Thai, or any other source-script text mixed into the pronunciation.
+- Before answering, inspect every output line character by character. If a pronounceable token uses the source script or any script other than ${scriptRule.name}, rewrite that token in ${scriptRule.name}.
+
+TASK RULES:
+- This is a PRONUNCIATION task, not a translation task. Preserve the sound; do not translate the meaning.
+- Return exactly ${lineCount} lines, with one pronunciation for each input line in the same order.
+- Never merge multiple input lines or split one input line into multiple output lines.
+- If an input line contains " / " between simultaneous vocal parts, preserve " / " and convert each part separately.
+- Keep empty lines empty. Keep music symbols and structural markers such as ♪, [Chorus], and (Yeah).
+- Do not add line numbers, prefixes, explanations, JSON, Markdown, or code fences.
+- Return only the pronunciation lines.
+
+SCRIPT EXAMPLES:
+- Target Indonesian or English (Latin): 夢ならばどれほどよかったでしょう → yume naraba dorehodo yokatta deshou
+  Wrong for a Latin target: ユメナラバ ドレホド ヨカッタ デショウ or ゆめならば どれほど よかった でしょう
+- Target Indonesian or English (Latin): 사랑해 → saranghae
+  Wrong for a Latin target: 사랑해, サランヘ, or Thai-script output
+- Target Korean (Hangul): 夢ならばどれほどよかったでしょう → 유메나라바 도레호도 요캇타 데쇼오
+  Wrong for Korean: ユメナラバ ドレホド ヨカッタ デショウ or yume naraba dorehodo yokatta deshou`;
+
+        const userPrompt = `${personalStudyPrefix}Convert the following ${lineCount} lyric lines into pronunciation for ${langInfo.name} speakers.
+Use ${scriptRule.name} for every pronounceable lyric sound. Do not answer in the source lyric's writing system.
+
+<lyrics>
 ${normalizedText}
+</lyrics>
 
-OUTPUT (${lineCount} lines of pronunciation only):`;
+Return exactly ${lineCount} pronunciation lines in ${scriptRule.name}, and nothing else.`;
+
+        return { systemPrompt, userPrompt, lineCount };
     }
 
     function buildCharacterPronunciationPrompt({ lines, lang = 'ko', sourceLang = 'auto', unitMode = 'char' } = {}) {

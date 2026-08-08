@@ -7912,6 +7912,7 @@
     // 전역 요청 상태 관리 (중복 요청 방지)
     const _translatorInflightRequests = new Map();
     const _translatorPendingRetries = new Map();
+    const PHONETIC_PROMPT_CACHE_VERSION = 2;
 
     // 진행 중인 요청 키 생성
     function getTranslatorRequestKey(trackId, wantSmartPhonetic, lang, provider = null, sourceHash = null) {
@@ -8261,9 +8262,11 @@
             const translationStyle = wantSmartPhonetic
                 ? null
                 : (window.AIAddonManager?.getTranslationStyle?.() || 'natural');
-            const sourceHash = !wantSmartPhonetic && translationStyle !== 'natural'
-                ? `${sourceTextHash}:style=${translationStyle}`
-                : sourceTextHash;
+            const sourceHash = wantSmartPhonetic
+                ? `${sourceTextHash}:phonetic-prompt=${PHONETIC_PROMPT_CACHE_VERSION}`
+                : (translationStyle !== 'natural'
+                    ? `${sourceTextHash}:style=${translationStyle}`
+                    : sourceTextHash);
 
             let finalTrackId = trackId;
             if (!finalTrackId) {
