@@ -396,7 +396,12 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   font-family: var(--ivlyrics-panel-font-family) !important;
 }
 
-/* 가사 래퍼 - 슬라이드 업 애니메이션 */
+/*
+ * Keep the Now Playing renderer self-contained: Pages.js is a route subfile,
+ * while this module is loaded as a global extension. The layout below mirrors
+ * the main synced-lyrics flow with one persistent line stack and one centering
+ * transform. Lines never swap between clamped and expanded display modes.
+ */
 .ivlyrics-panel-lyrics-wrapper {
   display: block !important;
   flex: 1 1 auto !important;
@@ -405,8 +410,24 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   min-height: 0 !important;
   overflow: hidden !important;
   position: relative !important;
-  mask-image: none !important;
-  -webkit-mask-image: none !important;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.45) 6%,
+    #000 14%,
+    #000 86%,
+    rgba(0, 0, 0, 0.45) 94%,
+    transparent 100%
+  ) !important;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.45) 6%,
+    #000 14%,
+    #000 86%,
+    rgba(0, 0, 0, 0.45) 94%,
+    transparent 100%
+  ) !important;
 }
 
 .ivlyrics-panel-lines-stack {
@@ -431,6 +452,12 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   overflow: visible !important;
 }
 
+.ivlyrics-panel-line-cell.layout-hidden {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 .ivlyrics-panel-lyrics-section.motion-reduced .ivlyrics-panel-lines-stack {
   transition-duration: 1ms !important;
 }
@@ -448,6 +475,41 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   height: auto !important;
   overflow: visible !important;
   animation: none !important;
+}
+
+.ivlyrics-panel-line-cell .ivlyrics-panel-line-text,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line-phonetic,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line-translation {
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+  -webkit-box-orient: initial !important;
+  overflow: visible !important;
+}
+
+.ivlyrics-panel-line-cell .ivlyrics-panel-line-karaoke,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line-karaoke-stack,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line-karaoke-row,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line-karaoke-part {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.effect,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.adlib,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.pulse,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.wave,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.sparkle,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.echo,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.whisper,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.bounce,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.sway,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.glow,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.glitch,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.flicker,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.float,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.blur,
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.pop {
+  margin-block: 0 !important;
 }
 
 .ivlyrics-panel-line-cell .ivlyrics-panel-line.vocal-stack {
@@ -556,12 +618,14 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   height: var(--ivlyrics-panel-line-slot-height, 68px) !important;
   padding: 3px 0 !important;
   border-radius: 0 !important;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition:
+    color 0.3s var(--iv-motion-ease-standard, ease),
+    opacity 0.4s var(--iv-motion-ease-standard, ease) !important;
   background: transparent !important;
   text-align: left !important;
   font-family: var(--ivlyrics-panel-font-family) !important;
   overflow: hidden !important;
-  animation: ivlyrics-slide-up 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+  animation: none !important;
 }
 
 .ivlyrics-panel-line.effect:not(.active):not(.vocal-stack),
@@ -606,7 +670,7 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
 
 .ivlyrics-panel-current-line .ivlyrics-panel-line {
   flex: 0 0 auto !important;
-  min-height: var(--ivlyrics-panel-line-slot-height, 56px) !important;
+  min-height: 0 !important;
   height: auto !important;
   overflow: visible !important;
   animation: none !important;
@@ -626,7 +690,7 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
 
 .ivlyrics-panel-current-line .ivlyrics-panel-line.vocal-stack {
   flex-basis: auto !important;
-  min-height: var(--ivlyrics-panel-vocal-stack-line-height, 126px) !important;
+  min-height: 0 !important;
   height: auto !important;
 }
 
@@ -784,9 +848,14 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   text-shadow: var(--ivlyrics-panel-original-outline-shadow, 0 0 0 transparent) !important;
 }
 
+p.ivlyrics-panel-line-text {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
 .ivlyrics-panel-line.active .ivlyrics-panel-line-text {
   color: #ffffff !important;
-  font-weight: 800 !important;
+  font-weight: 700 !important;
 }
 
 .ivlyrics-panel-current-line .ivlyrics-panel-line-text,
@@ -3163,7 +3232,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
     // ============================================
     const NormalLine = memo(({ displayText, phonetic, translation, lineClass, lineStyle }) => {
         return react.createElement("div", { className: lineClass, style: lineStyle },
-            react.createElement("div", {
+            react.createElement("p", {
                 className: "ivlyrics-panel-line-text",
                 dangerouslySetInnerHTML: displayText ? { __html: displayText } : undefined
             }, displayText ? undefined : " "),
@@ -3337,8 +3406,10 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const [isPlaybackPaused, setIsPlaybackPaused] = useState(getPlaybackPaused);
         const containerRef = useRef(null);
         const scrollRef = useRef(null);
-        const pendingLineTransitionRef = useRef(null);
-        const lineTransitionAnimationsRef = useRef(new Map());
+        const previousLyricsLayoutRef = useRef(initialLyrics);
+        const suppressLayoutShiftRef = useRef(false);
+        const layoutShiftFramesRef = useRef({ first: null, second: null });
+        const hasPositionedStackRef = useRef(false);
         const lastTrackUri = useRef(
             hasCompleteInitialPresentation
                 ? initialTrackUri
@@ -3351,25 +3422,6 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
 
         const isActiveLoad = useCallback((loadSeq, trackUri) => {
             return loadSeqRef.current === loadSeq && Spicetify.Player.data?.item?.uri === trackUri;
-        }, []);
-
-        const capturePanelLineTransition = useCallback(() => {
-            if (isPanelMotionReduced()) {
-                pendingLineTransitionRef.current = null;
-                return;
-            }
-
-            const wrapper = scrollRef.current;
-            if (!wrapper) {
-                pendingLineTransitionRef.current = null;
-                return;
-            }
-
-            const positions = new Map();
-            wrapper.querySelectorAll('.ivlyrics-panel-line-cell[data-panel-line-key]').forEach((cell) => {
-                positions.set(cell.getAttribute('data-panel-line-key'), cell.getBoundingClientRect().top);
-            });
-            pendingLineTransitionRef.current = positions.size > 0 ? { positions } : null;
         }, []);
 
         const loadTrackOffset = useCallback(async (trackUri) => {
@@ -4362,10 +4414,6 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 const lineChanged = newIndex !== lastIndex;
                 const trailingInterludeChanged = nextTrailingInterludeKey !== lastTrailingInterludeKey;
 
-                if (lineChanged || trailingInterludeChanged) {
-                    capturePanelLineTransition();
-                }
-
                 // 라인이 변경될 때만 상태 업데이트 (리렌더링 최소화)
                 if (lineChanged) {
                     lastIndex = newIndex;
@@ -4394,7 +4442,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 // 전역 변수 정리
                 window._ivLyricsPanelCurrentTime = 0;
             };
-        }, [lyrics, isEnabled, trackOffset, globalOffset, karaokeSource, pseudoKaraokeAdvanceMs, autoInstrumentalBreakEnabled, capturePanelLineTransition]); // currentIndex 의존성 제거
+        }, [lyrics, isEnabled, trackOffset, globalOffset, karaokeSource, pseudoKaraokeAdvanceMs, autoInstrumentalBreakEnabled]); // currentIndex 의존성 제거
 
         // 스크롤 애니메이션 비활성화 - Now Playing 탭 스크롤 문제 방지
         // useEffect(() => {
@@ -4410,14 +4458,14 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
 
         const visibleLineCount = DEFAULT_LINES;
 
-        // 표시할 가사 라인들 계산
-        // 노래방 가사는 line 객체에 syllables 또는 vocals 포함
-        // 항상 홀수 개수만큼 표시 (빈 줄은 투명 placeholder로)하여 현재 가사가 가운데에 오도록 함
-        const visibleLines = useMemo(() => {
+        // Keep one persistent lyric list, matching the main lyrics page. The
+        // previous sliding window removed and recreated rows on every advance,
+        // so line-height changes and the compensating FLIP animation fought each
+        // other. Rows outside the panel window stay in layout but are hidden.
+        const panelLines = useMemo(() => {
             if (!lyrics || lyrics.length === 0) return [];
 
             const halfLines = Math.floor(visibleLineCount / 2);
-            const lines = [];
             const displayableLyrics = lyrics
                 .map((line, index) => ({
                     line,
@@ -4461,53 +4509,27 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     : entry.index === currentIndex)
             );
 
-            // 항상 visibleLineCount 개수만큼 표시
-            for (let offset = -halfLines; offset <= halfLines; offset++) {
-                const displayIndex = currentDisplayIndex + offset;
-                const entry = displayableLyrics[displayIndex];
+            return displayableLyrics.map((entry, displayIndex) => {
+                const i = entry.sourceIndex ?? entry.index;
+                const line = entry.line;
+                const isVirtualTrailingInterlude = entry.isVirtualTrailingInterlude === true;
+                const relativeIndex = displayIndex - currentDisplayIndex;
 
-                if (!entry) {
-                    // 범위 밖: 빈 placeholder 추가 (높이 유지)
-                    lines.push({
-                        index: `placeholder-${offset}`,
-                        line: { text: '\u00A0' }, // non-breaking space
-                        lineIndex: -1,
-                        lineCount: lyrics.length,
-                        originalText: '\u00A0',
-                        phonetic: '',
-                        translation: '',
-                        isActive: false,
-                        isPast: offset < 0,
-                        isFuture: offset > 0,
-                        isPlaceholder: true
-                    });
-                } else {
-                    const i = entry.sourceIndex ?? entry.index;
-                    const line = entry.line;
-                    const isVirtualTrailingInterlude = entry.isVirtualTrailingInterlude === true;
-                    // originalText = 원어, text = 발음, text2 = 번역
-                    const originalText = line?.originalText || line?.text || '';
-                    const phonetic = line?.phoneticText || ((line?.originalText && line?.text !== line?.originalText) ? line?.text : '');
-                    const translation = line?.text2 || '';
-
-                    lines.push({
-                        index: entry.index,
-                        line: line, // 노래방 가사용 전체 line 객체
-                        lineIndex: i,
-                        lineCount: lyrics.length,
-                        originalText: originalText,
-                        phonetic: phonetic,
-                        translation: translation,
-                        isActive: isVirtualTrailingInterlude || (i === currentIndex && !activeTrailingInterludeKey),
-                        isPast: !isVirtualTrailingInterlude && (i < currentIndex || (i === currentIndex && !!activeTrailingInterludeKey)),
-                        isFuture: i > currentIndex,
-                        isPlaceholder: false
-                    });
-
-                }
-            }
-
-            return lines;
+                return {
+                    index: entry.index,
+                    line,
+                    lineIndex: i,
+                    lineCount: lyrics.length,
+                    originalText: line?.originalText || line?.text || '',
+                    phonetic: line?.phoneticText || ((line?.originalText && line?.text !== line?.originalText) ? line?.text : ''),
+                    translation: line?.text2 || '',
+                    isActive: isVirtualTrailingInterlude || (i === currentIndex && !activeTrailingInterludeKey),
+                    isPast: !isVirtualTrailingInterlude && (i < currentIndex || (i === currentIndex && !!activeTrailingInterludeKey)),
+                    isFuture: i > currentIndex,
+                    isPlaceholder: false,
+                    isLayoutHidden: Math.abs(relativeIndex) > halfLines
+                };
+            });
         }, [lyrics, currentIndex, visibleLineCount, activeTrailingInterludeKey, autoInstrumentalBreakEnabled]);
 
         // currentTime은 더 이상 상태로 관리하지 않음 (전역 변수 window._ivLyricsPanelCurrentTime 사용)
@@ -4549,88 +4571,62 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 })
             ))
             : null;
-        const activeVisibleIndex = visibleLines.findIndex((visLine) => visLine.isActive);
-        const currentVisibleIndex = activeVisibleIndex >= 0 ? activeVisibleIndex : Math.floor(visibleLines.length / 2);
+        // Match the main lyrics page: advancing playback only changes the one
+        // stack offset. Height corrections caused by streamed presentation data
+        // are applied synchronously for two frames, so they cannot look like a
+        // second lyric transition.
         useLayoutEffect(() => {
-            const pendingTransition = pendingLineTransitionRef.current;
-            pendingLineTransitionRef.current = null;
-            if (!pendingTransition) return undefined;
-
             const wrapper = scrollRef.current;
             const stack = wrapper?.querySelector('.ivlyrics-panel-lines-stack');
             if (!wrapper || !stack) return undefined;
 
-            lineTransitionAnimationsRef.current.forEach((animation) => animation.cancel());
-            lineTransitionAnimationsRef.current.clear();
+            const lyricsLayoutChanged = previousLyricsLayoutRef.current !== lyrics;
+            previousLyricsLayoutRef.current = lyrics;
+            const frames = layoutShiftFramesRef.current;
+            if (frames.first !== null) cancelAnimationFrame(frames.first);
+            if (frames.second !== null) cancelAnimationFrame(frames.second);
+            frames.first = null;
+            frames.second = null;
 
-            // The visible window drops one row as the next one enters. Position
-            // the new window first, then visually continue each shared row from
-            // its exact pre-update location instead of letting the layout snap.
-            stack.style.setProperty('transition', 'none', 'important');
-            updatePanelStackPosition(wrapper);
-            void stack.offsetHeight;
-
-            if (!reducePanelMotion) {
-                wrapper.querySelectorAll('.ivlyrics-panel-line-cell[data-panel-line-key]').forEach((cell) => {
-                    const lineKey = cell.getAttribute('data-panel-line-key');
-                    const previousTop = pendingTransition.positions.get(lineKey);
-                    if (!Number.isFinite(previousTop) || typeof cell.animate !== 'function') return;
-
-                    const nextTop = cell.getBoundingClientRect().top;
-                    const deltaY = previousTop - nextTop;
-                    if (Math.abs(deltaY) < 0.5) return;
-
-                    const animation = cell.animate([
-                        { transform: `translate3d(0, ${deltaY}px, 0)` },
-                        { transform: 'translate3d(0, 0, 0)' }
-                    ], {
-                        duration: PANEL_LINE_TRANSITION_DURATION_MS,
-                        easing: PANEL_LINE_TRANSITION_EASING,
-                        fill: 'both'
-                    });
-                    lineTransitionAnimationsRef.current.set(lineKey, animation);
-                    animation.onfinish = () => {
-                        if (lineTransitionAnimationsRef.current.get(lineKey) !== animation) return;
-                        lineTransitionAnimationsRef.current.delete(lineKey);
-                        animation.cancel();
-                    };
-                    animation.oncancel = () => {
-                        if (lineTransitionAnimationsRef.current.get(lineKey) === animation) {
-                            lineTransitionAnimationsRef.current.delete(lineKey);
-                        }
-                    };
-                });
+            const suppressTransition = reducePanelMotion || lyricsLayoutChanged ||
+                suppressLayoutShiftRef.current || !hasPositionedStackRef.current;
+            suppressLayoutShiftRef.current = suppressTransition;
+            if (suppressTransition) {
+                stack.style.setProperty('transition', 'none', 'important');
             }
 
-            const restoreTransitionFrame = requestAnimationFrame(() => {
-                stack.style.removeProperty('transition');
+            updatePanelStackPosition(wrapper);
+            hasPositionedStackRef.current = true;
+
+            if (!suppressTransition) return undefined;
+
+            frames.first = requestAnimationFrame(() => {
+                frames.first = null;
+                frames.second = requestAnimationFrame(() => {
+                    frames.second = null;
+                    suppressLayoutShiftRef.current = false;
+                    stack.style.removeProperty('transition');
+                });
             });
 
             return () => {
-                cancelAnimationFrame(restoreTransitionFrame);
+                if (frames.first !== null) cancelAnimationFrame(frames.first);
+                if (frames.second !== null) cancelAnimationFrame(frames.second);
+                frames.first = null;
+                frames.second = null;
                 stack.style.removeProperty('transition');
             };
         }, [
-            visibleLines,
-            currentVisibleIndex,
+            panelLines,
+            lyrics,
+            currentIndex,
+            activeTrailingInterludeKey,
             fontScale,
             panelLineSlotHeight,
             instrumentalBreakRevision,
             textEffectRevision,
             reducePanelMotion
         ]);
-
-        useEffect(() => {
-            if (!reducePanelMotion) return;
-            pendingLineTransitionRef.current = null;
-            lineTransitionAnimationsRef.current.forEach((animation) => animation.cancel());
-            lineTransitionAnimationsRef.current.clear();
-        }, [reducePanelMotion]);
-
-        useEffect(() => () => {
-            lineTransitionAnimationsRef.current.forEach((animation) => animation.cancel());
-            lineTransitionAnimationsRef.current.clear();
-        }, []);
 
         useEffect(() => {
             const wrapper = scrollRef.current;
@@ -4640,6 +4636,10 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             let lastAnchorLayoutKey = null;
             const updateStackPosition = () => {
                 frameId = null;
+                const stack = wrapper.querySelector('.ivlyrics-panel-lines-stack');
+                if (stack && suppressLayoutShiftRef.current) {
+                    stack.style.setProperty('transition', 'none', 'important');
+                }
                 updatePanelStackPosition(wrapper);
             };
             const scheduleUpdate = () => {
@@ -4688,18 +4688,18 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 window.removeEventListener('resize', scheduleUpdate);
                 window.removeEventListener('ivlyrics-panel-anchor-update', scheduleAnchorUpdate);
             };
-        }, [visibleLines, currentVisibleIndex, fontScale, panelLineSlotHeight, instrumentalBreakRevision, textEffectRevision]);
-        const renderVisibleLine = (visLine, keyPrefix) => react.createElement(LyricLine, {
-            key: `${keyPrefix}-${visLine.index}`,
-            line: visLine.line,
-            lineIndex: visLine.lineIndex,
-            lineCount: visLine.lineCount,
-            isActive: visLine.isActive,
-            isPast: visLine.isPast,
-            isFuture: visLine.isFuture,
-            translation: visLine.translation,
-            phonetic: visLine.phonetic,
-            isPlaceholder: visLine.isPlaceholder,
+        }, [panelLines, currentIndex, activeTrailingInterludeKey, fontScale, panelLineSlotHeight, instrumentalBreakRevision, textEffectRevision]);
+        const renderPanelLine = (panelLine, keyPrefix) => react.createElement(LyricLine, {
+            key: `${keyPrefix}-${panelLine.index}`,
+            line: panelLine.line,
+            lineIndex: panelLine.lineIndex,
+            lineCount: panelLine.lineCount,
+            isActive: panelLine.isActive,
+            isPast: panelLine.isPast,
+            isFuture: panelLine.isFuture,
+            translation: panelLine.translation,
+            phonetic: panelLine.phonetic,
+            isPlaceholder: panelLine.isPlaceholder,
             instrumentalBreakRevision,
             textEffectRevision
         });
@@ -4740,13 +4740,13 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 ref: scrollRef
             },
                 react.createElement("div", { className: "ivlyrics-panel-lines-stack" },
-                    visibleLines.map((visLine) =>
+                    panelLines.map((panelLine) =>
                         react.createElement("div", {
-                            key: `cell-${visLine.index}`,
-                            className: `ivlyrics-panel-line-cell${visLine.isActive ? " current ivlyrics-panel-current-line" : ""}`,
-                            "data-panel-line-key": String(visLine.index)
+                            key: `cell-${panelLine.index}`,
+                            className: `ivlyrics-panel-line-cell${panelLine.isActive ? " current ivlyrics-panel-current-line" : ""}${panelLine.isLayoutHidden ? " layout-hidden" : ""}`,
+                            "data-panel-line-key": String(panelLine.index)
                         },
-                            renderVisibleLine(visLine, "stack")
+                            renderPanelLine(panelLine, "stack")
                         )
                     )
                 )

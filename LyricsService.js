@@ -535,7 +535,7 @@
     // Utils - 유틸리티 함수들 (Extension 전용)
     // ============================================
     const IVLYRICS_PROGRESS_GUARD_KEY = "__ivLyricsPlaybackProgressGuard";
-    const IVLYRICS_PROGRESS_GUARD_VERSION = 2;
+    const IVLYRICS_PROGRESS_GUARD_VERSION = 3;
 
     const clampPlayerProgress = (value) => {
         const num = Number(value);

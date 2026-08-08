@@ -12,9 +12,10 @@
 })(typeof window !== "undefined" ? window : globalThis, function createPlaybackClockApi() {
     "use strict";
 
-    const VERSION = 1;
+    const VERSION = 2;
     const DEFAULT_SNAP_THRESHOLD_MS = 500;
     const DEFAULT_DISCONTINUITY_THRESHOLD_MS = 1000;
+    const DEFAULT_DISCONTINUITY_CONFIRMATION_MS = 120;
     const DEFAULT_SMOOTHING_TIME_CONSTANT_MS = 300;
     const DEFAULT_LOCAL_SAMPLE_INTERVAL_MS = 50;
     const DEFAULT_IDLE_SAMPLE_INTERVAL_MS = 500;
@@ -143,6 +144,10 @@
             options.discontinuityThresholdMs,
             DEFAULT_DISCONTINUITY_THRESHOLD_MS
         );
+        const discontinuityConfirmationMs = toNonNegativeNumber(
+            options.discontinuityConfirmationMs,
+            DEFAULT_DISCONTINUITY_CONFIRMATION_MS
+        );
         const smoothingTimeConstantMs = Math.max(1, toNonNegativeNumber(
             options.smoothingTimeConstantMs,
             DEFAULT_SMOOTHING_TIME_CONSTANT_MS
@@ -163,6 +168,7 @@
         let currentIdentityKey = "";
         let localAnchor = null;
         let lastStateReading = null;
+        let pendingStateDiscontinuity = null;
         let predictedProgress = null;
         let lastSnapshot = null;
         let forceSnap = false;
@@ -239,12 +245,16 @@
                 localAnchor = null;
             }
             lastStateReading = null;
+            pendingStateDiscontinuity = null;
             predictedProgress = null;
             forceSnap = true;
         };
 
-        const observeStateProgress = (context, position, sampledAt) => {
-            if (!Number.isFinite(position)) return;
+        const observeStateProgress = (context, position, sampledAt, publicProgress) => {
+            if (!Number.isFinite(position)) {
+                pendingStateDiscontinuity = null;
+                return { position, guarded: false };
+            }
 
             if (
                 !lastStateReading ||
@@ -256,25 +266,74 @@
                     sampledAt,
                     isPlaying: context.isPlaying
                 };
-                return;
+                pendingStateDiscontinuity = null;
+                return { position, guarded: false };
             }
 
             const elapsed = Math.max(0, sampledAt - lastStateReading.sampledAt);
             const expected = lastStateReading.position + (
                 lastStateReading.isPlaying && context.isPlaying ? elapsed : 0
             );
-            if (Math.abs(position - expected) >= discontinuityThresholdMs) {
+            const drift = position - expected;
+            if (Math.abs(drift) < discontinuityThresholdMs) {
+                lastStateReading = {
+                    identityKey: context.identityKey,
+                    position,
+                    sampledAt,
+                    isPlaying: context.isPlaying
+                };
+                pendingStateDiscontinuity = null;
+                return { position, guarded: false };
+            }
+
+            const direction = Math.sign(drift);
+            const pendingElapsed = pendingStateDiscontinuity?.identityKey === context.identityKey
+                ? Math.max(0, sampledAt - pendingStateDiscontinuity.detectedAt)
+                : 0;
+            const pendingExpected = pendingStateDiscontinuity?.identityKey === context.identityKey
+                ? pendingStateDiscontinuity.position + (
+                    pendingStateDiscontinuity.isPlaying && context.isPlaying
+                        ? Math.max(0, sampledAt - pendingStateDiscontinuity.sampledAt)
+                        : 0
+                )
+                : Number.NaN;
+            const matchesPending = (
+                pendingStateDiscontinuity?.identityKey === context.identityKey &&
+                pendingStateDiscontinuity.direction === direction &&
+                Number.isFinite(pendingExpected) &&
+                Math.abs(position - pendingExpected) < discontinuityThresholdMs
+            );
+            const publicCorroborates = Number.isFinite(publicProgress) &&
+                Math.abs(publicProgress - position) < snapThresholdMs;
+            const discontinuityConfirmed = forceSnap || publicCorroborates || (
+                matchesPending && pendingElapsed >= discontinuityConfirmationMs
+            );
+
+            if (discontinuityConfirmed) {
                 localAnchor = null;
                 predictedProgress = null;
                 forceSnap = true;
+                lastStateReading = {
+                    identityKey: context.identityKey,
+                    position,
+                    sampledAt,
+                    isPlaying: context.isPlaying
+                };
+                pendingStateDiscontinuity = null;
+                return { position, guarded: false };
             }
 
-            lastStateReading = {
+            pendingStateDiscontinuity = {
                 identityKey: context.identityKey,
                 position,
                 sampledAt,
+                detectedAt: matchesPending
+                    ? pendingStateDiscontinuity.detectedAt
+                    : sampledAt,
+                direction,
                 isPlaying: context.isPlaying
             };
+            return { position: clampToDuration(expected, context.duration), guarded: true };
         };
 
         const getLocalAnchorProgress = (context, sampledAt) => {
@@ -341,17 +400,24 @@
             }
 
             const stateProgress = getStateProgress(context, currentWallTime);
-            observeStateProgress(context, stateProgress, sampledAt);
+            const publicProgress = getPublicProgress(context);
+            const stateObservation = observeStateProgress(
+                context,
+                stateProgress,
+                sampledAt,
+                publicProgress
+            );
             const localProgress = context.isLocal
                 ? getLocalAnchorProgress(context, sampledAt)
                 : Number.NaN;
-            const publicProgress = getPublicProgress(context);
 
             let measured = localProgress;
             let source = "local-position-state";
             if (!Number.isFinite(measured)) {
-                measured = stateProgress;
-                source = "player-state";
+                measured = stateObservation.position;
+                source = stateObservation.guarded
+                    ? "guarded-player-state"
+                    : "player-state";
             }
             if (!Number.isFinite(measured)) {
                 measured = publicProgress;
@@ -447,6 +513,7 @@
         const invalidate = () => {
             localAnchor = null;
             lastStateReading = null;
+            pendingStateDiscontinuity = null;
             predictedProgress = null;
             forceSnap = true;
         };
@@ -463,6 +530,7 @@
             }
             localAnchor = null;
             lastStateReading = null;
+            pendingStateDiscontinuity = null;
             predictedProgress = null;
             lastSnapshot = null;
         };
