@@ -763,6 +763,7 @@ const CommunityVideoSelector = ({
   const [submitSkipSegments, setSubmitSkipSegments] = useState([]);
   const [skipSegmentStart, setSkipSegmentStart] = useState("");
   const [skipSegmentEnd, setSkipSegmentEnd] = useState("");
+  const [editingSkipSegmentIndex, setEditingSkipSegmentIndex] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [votingId, setVotingId] = useState(null);
   const [previewVideoId, setPreviewVideoId] = useState(null); // 목록에서 미리보기 중인 영상
@@ -906,6 +907,7 @@ const CommunityVideoSelector = ({
     setSubmitSkipSegments([]);
     setSkipSegmentStart("");
     setSkipSegmentEnd("");
+    setEditingSkipSegmentIndex(null);
     setSubmitVideoTitle("");
     setFormPreviewVideoId(null);
     setEditingVideo(null);
@@ -931,6 +933,7 @@ const CommunityVideoSelector = ({
     setSubmitSkipSegments(Utils.normalizeVideoSkipSegments(video?.skipSegments));
     setSkipSegmentStart("");
     setSkipSegmentEnd("");
+    setEditingSkipSegmentIndex(null);
     setSubmitVideoTitle(video?.youtubeTitle || "");
     setFormPreviewVideoId(video?.youtubeVideoId || null);
     setIsLoadingTitle(false);
@@ -986,7 +989,7 @@ const CommunityVideoSelector = ({
     }
   }, [hideDislikedVideos, previewVideoId, videos]);
 
-  const addSkipSegment = useCallback(() => {
+  const saveSkipSegment = useCallback(() => {
     const parseTime = (value) => Number.parseFloat(String(value ?? "").trim().replace(",", "."));
     const start = parseTime(skipSegmentStart);
     const end = parseTime(skipSegmentEnd);
@@ -1000,24 +1003,50 @@ const CommunityVideoSelector = ({
       Toast.error(I18n.t("communityVideo.skipSegmentInvalid"));
       return;
     }
-    if (submitSkipSegments.length >= COMMUNITY_VIDEO_MAX_SKIP_SEGMENTS) {
+    if (
+      editingSkipSegmentIndex === null &&
+      submitSkipSegments.length >= COMMUNITY_VIDEO_MAX_SKIP_SEGMENTS
+    ) {
       Toast.error(I18n.t("communityVideo.skipSegmentLimit", {
         count: COMMUNITY_VIDEO_MAX_SKIP_SEGMENTS,
       }));
       return;
     }
 
+    const nextSegments = editingSkipSegmentIndex === null
+      ? [...submitSkipSegments, { start, end }]
+      : submitSkipSegments.map((segment, index) =>
+        index === editingSkipSegmentIndex ? { start, end } : segment
+      );
     setSubmitSkipSegments(Utils.normalizeVideoSkipSegments(
-      [...submitSkipSegments, { start, end }],
+      nextSegments,
       COMMUNITY_VIDEO_MAX_SKIP_SEGMENTS
     ));
     setSkipSegmentStart("");
     setSkipSegmentEnd("");
-  }, [skipSegmentStart, skipSegmentEnd, submitSkipSegments]);
+    setEditingSkipSegmentIndex(null);
+  }, [editingSkipSegmentIndex, skipSegmentStart, skipSegmentEnd, submitSkipSegments]);
+
+  const editSkipSegment = useCallback((segment, index) => {
+    setEditingSkipSegmentIndex(index);
+    setSkipSegmentStart(String(segment.start));
+    setSkipSegmentEnd(String(segment.end));
+  }, []);
+
+  const cancelSkipSegmentEdit = useCallback(() => {
+    setEditingSkipSegmentIndex(null);
+    setSkipSegmentStart("");
+    setSkipSegmentEnd("");
+  }, []);
 
   const removeSkipSegment = useCallback((index) => {
     setSubmitSkipSegments((segments) => segments.filter((_, segmentIndex) => segmentIndex !== index));
-  }, []);
+    if (editingSkipSegmentIndex === index) {
+      cancelSkipSegmentEdit();
+    } else if (editingSkipSegmentIndex !== null && index < editingSkipSegmentIndex) {
+      setEditingSkipSegmentIndex(editingSkipSegmentIndex - 1);
+    }
+  }, [cancelSkipSegmentEdit, editingSkipSegmentIndex]);
 
   // 투표 처리
   const handleVote = async (videoEntryId, currentVote, newVote) => {
@@ -1885,15 +1914,30 @@ const CommunityVideoSelector = ({
                         `${formatTime(segment.start)} → ${formatTime(segment.end)}`
                       ),
                       react.createElement(
-                        "button",
-                        {
-                          type: "button",
-                          className: "community-video-skip-remove",
-                          onClick: () => removeSkipSegment(index),
-                          title: I18n.t("communityVideo.removeSkipSegment"),
-                          "aria-label": I18n.t("communityVideo.removeSkipSegment"),
-                        },
-                        "×"
+                        "div",
+                        { className: "community-video-skip-actions" },
+                        react.createElement(
+                          "button",
+                          {
+                            type: "button",
+                            className: `community-video-skip-edit ${editingSkipSegmentIndex === index ? "active" : ""}`,
+                            onClick: () => editSkipSegment(segment, index),
+                            title: I18n.t("communityVideo.edit"),
+                            "aria-label": `${I18n.t("communityVideo.edit")}: ${formatTime(segment.start)} → ${formatTime(segment.end)}`,
+                          },
+                          I18n.t("communityVideo.edit")
+                        ),
+                        react.createElement(
+                          "button",
+                          {
+                            type: "button",
+                            className: "community-video-skip-remove",
+                            onClick: () => removeSkipSegment(index),
+                            title: I18n.t("communityVideo.removeSkipSegment"),
+                            "aria-label": I18n.t("communityVideo.removeSkipSegment"),
+                          },
+                          "×"
+                        )
                       )
                     )
                   )
@@ -1940,21 +1984,39 @@ const CommunityVideoSelector = ({
                       onKeyDown: (event) => {
                         if (event.key === "Enter") {
                           event.preventDefault();
-                          addSkipSegment();
+                          saveSkipSegment();
                         }
                       },
                       placeholder: "90.0",
                     })
                   ),
                   react.createElement(
-                    "button",
-                    {
-                      type: "button",
-                      className: "community-video-skip-add",
-                      onClick: addSkipSegment,
-                      disabled: submitSkipSegments.length >= COMMUNITY_VIDEO_MAX_SKIP_SEGMENTS,
-                    },
-                    I18n.t("communityVideo.addSkipSegment")
+                    "div",
+                    { className: "community-video-skip-form-actions" },
+                    editingSkipSegmentIndex !== null &&
+                    react.createElement(
+                      "button",
+                      {
+                        type: "button",
+                        className: "community-video-skip-cancel",
+                        onClick: cancelSkipSegmentEdit,
+                      },
+                      I18n.t("cancel")
+                    ),
+                    react.createElement(
+                      "button",
+                      {
+                        type: "button",
+                        className: "community-video-skip-add",
+                        onClick: saveSkipSegment,
+                        disabled:
+                          editingSkipSegmentIndex === null &&
+                          submitSkipSegments.length >= COMMUNITY_VIDEO_MAX_SKIP_SEGMENTS,
+                      },
+                      editingSkipSegmentIndex === null
+                        ? I18n.t("communityVideo.addSkipSegment")
+                        : I18n.t("communityVideo.updateAction")
+                    )
                   )
                 )
               ),

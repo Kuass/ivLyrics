@@ -7270,8 +7270,18 @@ ruby rt {
   font-variant-numeric: tabular-nums;
 }
 
+.community-video-skip-actions,
+.community-video-skip-form-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.community-video-skip-edit,
 .community-video-skip-remove,
-.community-video-skip-add {
+.community-video-skip-add,
+.community-video-skip-cancel {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -7280,6 +7290,19 @@ ruby rt {
   color: inherit;
   cursor: pointer;
   border-radius: 8px;
+}
+
+.community-video-skip-edit {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.community-video-skip-edit:hover,
+.community-video-skip-edit.active {
+  border-color: rgba(var(--spice-rgb-accent, 30, 215, 96), 0.4);
+  background: rgba(var(--spice-rgb-accent, 30, 215, 96), 0.14);
 }
 
 .community-video-skip-remove {
@@ -7336,6 +7359,18 @@ ruby rt {
   font-weight: 650;
 }
 
+.community-video-skip-cancel {
+  min-height: 39px;
+  padding: 7px 10px;
+  color: rgba(248, 250, 252, 0.72);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.community-video-skip-cancel:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .community-video-skip-add:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.1);
 }
@@ -7350,8 +7385,13 @@ ruby rt {
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   }
 
-  .community-video-skip-add {
+  .community-video-skip-form-actions {
     grid-column: 1 / -1;
+  }
+
+  .community-video-skip-add,
+  .community-video-skip-cancel {
+    flex: 1;
   }
 }
 
@@ -7465,13 +7505,21 @@ ruby rt {
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-submit-btn,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-add-btn,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-open-external,
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-skip-edit,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-skip-remove,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-skip-add,
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-skip-cancel,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .video-title-preview .video-title-text,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .confirm-dialog,
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .confirm-dialog-btn {
   background: rgba(15, 23, 42, 0.04);
   color: #0f172a;
+}
+
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-skip-edit:hover,
+#ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-skip-edit.active {
+  border-color: rgba(var(--spice-rgb-accent, 30, 215, 96), 0.42);
+  background: rgba(var(--spice-rgb-accent, 30, 215, 96), 0.12);
 }
 
 #ivLyrics-community-video-overlay[data-ui-theme="light"] .community-video-loading,
@@ -17299,8 +17347,10 @@ html.is-lp-view-exit::view-transition-new(root) {
 }
 
 .community-video-submit-form input:focus-visible,
+.community-video-skip-edit:focus-visible,
 .community-video-skip-remove:focus-visible,
 .community-video-skip-add:focus-visible,
+.community-video-skip-cancel:focus-visible,
 .community-video-close:focus-visible,
 .community-video-actions button:focus-visible,
 .community-video-submit-btn:focus-visible,
