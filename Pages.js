@@ -812,6 +812,7 @@ const SyncCreatorProfileModal = react.memo(({
 	const greetingTranslationLocale = profileData.greetingTranslationLocale || getCreatorProfileLocale();
 	const [isEditingGreeting, setIsEditingGreeting] = react.useState(false);
 	const [greetingDraft, setGreetingDraft] = react.useState(rawGreeting);
+	const [isDecorationEditorOpen, setIsDecorationEditorOpen] = react.useState(false);
 	const canLike = !!profileData.viewer?.canLike;
 	const liked = !!profileData.viewer?.liked;
 	const isOwnProfile = !!profileData.viewer?.isOwnProfile;
@@ -913,6 +914,24 @@ const SyncCreatorProfileModal = react.memo(({
 			"aria-hidden": "true"
 		},
 		react.createElement("path", { d: "M8 13.4 2.9 8.6a3.2 3.2 0 0 1 4.5-4.5L8 4.7l.6-.6a3.2 3.2 0 1 1 4.5 4.5L8 13.4Z" })
+		);
+	const decorationSettingsIcon = react.createElement(
+		"svg",
+		{
+			width: 16,
+			height: 16,
+			viewBox: "0 0 24 24",
+			fill: "none",
+			stroke: "currentColor",
+			strokeWidth: 1.8,
+			strokeLinecap: "round",
+			strokeLinejoin: "round",
+			"aria-hidden": "true"
+		},
+		react.createElement("path", { d: "M4 6h3m4 0h9M4 12h9m4 0h3M4 18h1m4 0h11" }),
+		react.createElement("circle", { cx: 9, cy: 6, r: 2 }),
+		react.createElement("circle", { cx: 15, cy: 12, r: 2 }),
+		react.createElement("circle", { cx: 7, cy: 18, r: 2 })
 	);
 
 	const maybeLoadMore = react.useCallback(() => {
@@ -951,6 +970,10 @@ const SyncCreatorProfileModal = react.memo(({
 			setIsEditingGreeting(false);
 		}
 	}, [canEditGreeting, isEditingGreeting]);
+
+	react.useEffect(() => {
+		setIsDecorationEditorOpen(false);
+	}, [contributor?.userHash]);
 
 	react.useEffect(() => {
 		try {
@@ -1032,43 +1055,64 @@ const SyncCreatorProfileModal = react.memo(({
 						},
 						likeIcon,
 						react.createElement("span", null, likeButtonLabel)
+					),
+					isOwnProfile && react.createElement(
+						"button",
+						{
+							type: "button",
+							className: `lyrics-creator-profile-decoration-toggle ${isDecorationEditorOpen ? "is-active" : ""}`.trim(),
+							onClick: () => setIsDecorationEditorOpen((current) => !current),
+							title: copy.nicknameStyle,
+							"aria-label": copy.nicknameStyle,
+							"aria-expanded": isDecorationEditorOpen,
+							"aria-controls": "lyrics-creator-decoration-panel"
+						},
+						decorationSettingsIcon
 					)
 				)
 				),
-			isOwnProfile && (supportTier !== "none"
-				? react.createElement(CreatorDecorationEditor, {
-					displayName,
-					tier: supportTier,
-					decoration: supportInfo?.decoration || null,
-					pending: decorationPending,
-					onSave: onSaveDecoration,
-					onReset: onResetDecoration,
-					onRefresh: onRefreshSupport
-				})
-				: react.createElement(
-					"section",
-					{ className: "lyrics-creator-decoration-editor is-role-missing", "aria-label": copy.nicknameStyle },
-					react.createElement(
-						"div",
-						{ className: "lyrics-creator-decoration-heading" },
+			isOwnProfile && react.createElement(
+				"div",
+				{
+					id: "lyrics-creator-decoration-panel",
+					className: "lyrics-creator-decoration-panel",
+					hidden: !isDecorationEditorOpen
+				},
+				supportTier !== "none"
+					? react.createElement(CreatorDecorationEditor, {
+						displayName,
+						tier: supportTier,
+						decoration: supportInfo?.decoration || null,
+						pending: decorationPending,
+						onSave: onSaveDecoration,
+						onReset: onResetDecoration,
+						onRefresh: onRefreshSupport
+					})
+					: react.createElement(
+						"section",
+						{ className: "lyrics-creator-decoration-editor is-role-missing", "aria-label": copy.nicknameStyle },
 						react.createElement(
 							"div",
-							null,
-							react.createElement("h3", null, copy.nicknameStyle),
-							react.createElement("p", null, copy.supportRoleNotFound)
-						),
-						react.createElement(
-							"button",
-							{
-								type: "button",
-								className: "lyrics-creator-decoration-refresh-role",
-								disabled: decorationPending,
-								onClick: onRefreshSupport
-							},
-							copy.refreshSupportRole
+							{ className: "lyrics-creator-decoration-heading" },
+							react.createElement(
+								"div",
+								null,
+								react.createElement("h3", null, copy.nicknameStyle),
+								react.createElement("p", null, copy.supportRoleNotFound)
+							),
+							react.createElement(
+								"button",
+								{
+									type: "button",
+									className: "lyrics-creator-decoration-refresh-role",
+									disabled: decorationPending,
+									onClick: onRefreshSupport
+								},
+								copy.refreshSupportRole
+							)
 						)
 					)
-				)),
+			),
 			(greeting || canEditGreeting) && react.createElement(
 				"div",
 				{ className: "lyrics-creator-profile-greeting-block" },

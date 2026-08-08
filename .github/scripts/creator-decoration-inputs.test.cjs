@@ -5,6 +5,7 @@ const test = require('node:test');
 
 const pagesSource = readFileSync(resolve(__dirname, '..', '..', 'Pages.js'), 'utf8');
 const utilsSource = readFileSync(resolve(__dirname, '..', '..', 'Utils.js'), 'utf8');
+const stylesSource = readFileSync(resolve(__dirname, '..', '..', 'style.css'), 'utf8');
 
 function getDecorationEditorSource() {
   const start = pagesSource.indexOf('const CreatorDecorationEditor');
@@ -43,4 +44,18 @@ test('creator decorations come from sync contributors without an extra Worker re
   assert.doesNotMatch(utilsSource, /creator-decorations/);
   assert.match(utilsSource, /discord\.ivl\.is\/v1\/user/);
   assert.match(utilsSource, /expiresAt: now \+ 60 \* 60 \* 1000/);
+});
+
+test('nickname style editor is collapsed behind an accessible profile settings button', () => {
+  assert.match(
+    pagesSource,
+    /const \[isDecorationEditorOpen, setIsDecorationEditorOpen\] = react\.useState\(false\)/,
+    'nickname styling must start collapsed'
+  );
+  assert.match(pagesSource, /className: `lyrics-creator-profile-decoration-toggle/);
+  assert.match(pagesSource, /"aria-expanded": isDecorationEditorOpen/);
+  assert.match(pagesSource, /"aria-controls": "lyrics-creator-decoration-panel"/);
+  assert.match(pagesSource, /hidden: !isDecorationEditorOpen/);
+  assert.match(stylesSource, /\.lyrics-creator-decoration-panel\[hidden\]\s*\{\s*display: none;/);
+  assert.match(stylesSource, /\.lyrics-creator-profile-decoration-toggle[\s\S]*?width: 40px;[\s\S]*?height: 40px;/);
 });
