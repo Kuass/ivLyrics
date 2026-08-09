@@ -8,7 +8,17 @@ const root = path.resolve(__dirname, '..');
 
 test('PC cloud snapshots exclude credentials and device-specific settings', () => {
   const source = fs.readFileSync(path.join(root, 'index.js'), 'utf8');
-  assert.match(source, /CLOUD_SYNC_FORBIDDEN_KEY_PATTERN[\s\S]*api\.\?keys/);
+  const policyStart = source.indexOf('const CLOUD_SYNC_FORBIDDEN_KEY_PATTERN');
+  const policyEnd = source.indexOf('const isCloudSyncSettingKey', policyStart);
+  assert.ok(policyStart >= 0 && policyEnd > policyStart, 'cloud credential policy is missing');
+  const policy = source.slice(policyStart, policyEnd);
+  const sandbox = {};
+  vm.runInNewContext(`${policy}\nthis.checkCloudKey = isCloudSyncCredentialLikeKey;`, sandbox);
+
+  assert.equal(sandbox.checkCloudKey('ivLyrics:ai:addon:groq:adv-maxTokens-value'), false);
+  assert.equal(sandbox.checkCloudKey('ivLyrics:ai:addon:gemini:adv-maxOutputTokens-enabled'), false);
+  assert.equal(sandbox.checkCloudKey('ivLyrics:ai:addon:chatgpt:api-keys'), true);
+  assert.equal(sandbox.checkCloudKey('ivLyrics:ai:addon:test:accessTokenMaxTokens'), true);
   assert.match(source, /CLOUD_SYNC_EXCLUDED_STORAGE_KEYS[\s\S]*TRACK_SYNC_OFFSETS_STORAGE_KEY/);
   assert.match(source, /CLOUD_SYNC_EXCLUDED_STORAGE_KEYS[\s\S]*settings-presets/);
   assert.match(source, /PRIVATE_OR_TRANSIENT_STORAGE_KEYS[\s\S]*cloud-save-device-id/);

@@ -1781,14 +1781,21 @@ const CLOUD_SYNC_EXCLUDED_STORAGE_KEYS = new Set([
   TRACK_SYNC_OFFSETS_STORAGE_KEY,
   `${APP_NAME}:settings-presets`,
 ]);
-const CLOUD_SYNC_FORBIDDEN_KEY_PATTERN = /(api.?keys?|auth.?token|access.?token|refresh.?token|password|secret|credential|spotify.?token|client.?id|user.?hash)/i;
+const CLOUD_SYNC_FORBIDDEN_KEY_PATTERN = /(apikey|token|password|secret|credential|clientid|userhash)/i;
+const CLOUD_SYNC_SAFE_TOKEN_LIMIT_PATTERN = /max(?:output)?tokens?/gi;
+const isCloudSyncCredentialLikeKey = (key) => {
+  if (typeof key !== "string") return false;
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const credentialCandidate = normalized.replace(CLOUD_SYNC_SAFE_TOKEN_LIMIT_PATTERN, "");
+  return CLOUD_SYNC_FORBIDDEN_KEY_PATTERN.test(credentialCandidate);
+};
 const isCloudSyncSettingKey = (key) => (
   typeof key === "string" &&
   key.startsWith(CURRENT_STORAGE_PREFIX) &&
   !CLOUD_SYNC_EXCLUDED_STORAGE_KEYS.has(key) &&
   !OBSOLETE_LEGACY_STORAGE_KEYS.has(key) &&
   !PRIVATE_OR_TRANSIENT_STORAGE_KEYS.has(key) &&
-  !CLOUD_SYNC_FORBIDDEN_KEY_PATTERN.test(key)
+  !isCloudSyncCredentialLikeKey(key)
 );
 const OBSOLETE_LEGACY_STORAGE_KEYS = new Set([
   `${APP_NAME}:provider:lrclib:on`,
