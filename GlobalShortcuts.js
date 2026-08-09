@@ -12,7 +12,8 @@
         ivLyricsHandler: null,
         storageHandler: null,
         focusHandler: null,
-        visibilityHandler: null
+        visibilityHandler: null,
+        settingsShortcutHandler: null
     });
 
     if (moduleState.initialized) {
@@ -180,11 +181,60 @@
     };
 
     // 입력 필드 체크
-    const isInputFocused = () => {
-        const activeElement = document.activeElement;
-        const tagName = activeElement?.tagName?.toLowerCase();
-        const isEditable = activeElement?.isContentEditable;
-        return tagName === 'input' || tagName === 'textarea' || tagName === 'select' || isEditable;
+    const isEditableElement = (element) => {
+        const tagName = element?.tagName?.toLowerCase();
+        const role = element?.getAttribute?.('role');
+        return tagName === 'input'
+            || tagName === 'textarea'
+            || tagName === 'select'
+            || element?.isContentEditable
+            || role === 'textbox'
+            || role === 'combobox';
+    };
+
+    const isInputFocused = (eventTarget = null) => {
+        return isEditableElement(eventTarget) || isEditableElement(document.activeElement);
+    };
+
+    const hasOpenIvLyricsDialog = () => Boolean(
+        document.getElementById('ivLyrics-settings-overlay')
+        || document.getElementById('ivLyrics-sync-creator-overlay')
+        || document.querySelector(
+            '.ivlyrics-fluent-overlay:not([aria-hidden="true"]), '
+            + '.lyrics-sync-adjust-floating [role="dialog"], '
+            + '.community-video-overlay, '
+            + '.ivlyrics-cache-edit-overlay, '
+            + '.notice-modal-overlay, '
+            + '.ivlyrics-marketplace-confirm-overlay, '
+            + '.confirm-dialog-overlay, '
+            + '.ivLyrics-update-banner, '
+            + '.ivlyrics-study-panel'
+        )
+    );
+
+    const handleSettingsShortcut = (event) => {
+        const isSettingsKey = event.code === 'KeyS'
+            || String(event.key || '').toLowerCase() === 's';
+        if (
+            !isSettingsKey
+            || event.defaultPrevented
+            || event.repeat
+            || event.isComposing
+            || event.metaKey
+            || event.ctrlKey
+            || event.altKey
+            || event.shiftKey
+            || isInputFocused(event.target)
+            || hasOpenIvLyricsDialog()
+            || (!isOnLyricsPage() && !isInFullscreenMode())
+            || typeof window.ivLyricsOpenConfig !== 'function'
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation?.();
+        window.ivLyricsOpenConfig();
     };
 
     // 단축키 바인딩 업데이트
@@ -303,6 +353,9 @@
         // 초기 바인딩
         updateKeyBinding();
         updateTvModeKey();
+
+        moduleState.settingsShortcutHandler = handleSettingsShortcut;
+        document.addEventListener('keydown', moduleState.settingsShortcutHandler, true);
 
         // 페이지 이동 감지하여 orphaned fullscreen container 정리
         // Spicetify History 이벤트 리스너 등록

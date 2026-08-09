@@ -11,6 +11,7 @@ const googleProviderSource = fs.readFileSync(path.join(root, 'Addon_AI_GoogleTra
 const managerSource = fs.readFileSync(path.join(root, 'AIAddonManager.js'), 'utf8');
 const settingsSource = fs.readFileSync(path.join(root, 'Settings.js'), 'utf8');
 const optionsSource = fs.readFileSync(path.join(root, 'OptionsMenu.js'), 'utf8');
+const globalShortcutsSource = fs.readFileSync(path.join(root, 'GlobalShortcuts.js'), 'utf8');
 const testBingOrigin = ['https://www', 'bing', 'com'].join('.');
 const testProxyOrigin = ['https://cors-proxy', 'spicetify', 'app'].join('.');
 
@@ -311,6 +312,20 @@ test('offers light, dark, and system-following settings themes in every locale',
             assert.notEqual(languageTable.settingsUi.theme[key].trim(), '', `${file}: ${key}`);
         }
     }
+});
+
+test('reserves plain S for settings on lyric and fullscreen views', () => {
+    assert.match(globalShortcutsSource, /event\.code === 'KeyS'/);
+    assert.match(globalShortcutsSource, /event\.metaKey[\s\S]*event\.ctrlKey[\s\S]*event\.altKey[\s\S]*event\.shiftKey/);
+    assert.match(globalShortcutsSource, /isInputFocused\(event\.target\)/);
+    assert.match(globalShortcutsSource, /\(!isOnLyricsPage\(\) && !isInFullscreenMode\(\)\)/);
+    assert.match(globalShortcutsSource, /window\.ivLyricsOpenConfig\(\)/);
+    assert.match(globalShortcutsSource, /document\.addEventListener\('keydown', moduleState\.settingsShortcutHandler, true\)/);
+    assert.equal(
+        globalShortcutsSource.includes('[role="dialog"][aria-modal="true"]'),
+        false,
+        'Spotify dialogs and fullscreen presentations must not block the ivLyrics shortcut'
+    );
 });
 
 test('shows the AI provider hint only when translation is limited to keyless providers', () => {
