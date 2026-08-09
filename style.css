@@ -183,7 +183,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(0, 0, 0, 0.58);
+  background: rgba(0, 0, 0, 0.46);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   opacity: 1;
@@ -194,7 +194,7 @@
 
 .ivlyrics-settings-overlay.is-open {
   opacity: 1;
-  background: rgba(0, 0, 0, 0.58);
+  background: rgba(0, 0, 0, 0.46);
 }
 
 .ivlyrics-settings-overlay.is-closing {
@@ -237,15 +237,9 @@ body.ivlyrics-settings-open .lyrics-lyricsContainer-LyricsContainer * {
   animation-play-state: paused !important;
 }
 
-/* The dialog is an opaque, top-level workspace. Removing Spotify's painted
-   application tree while it is open prevents hidden lyric/native animations
-   from consuming renderer/GPU time or flashing above the modal. Playback and
-   application state continue normally and the tree is restored on close. */
-body.ivlyrics-settings-open > #main,
-body.ivlyrics-settings-open > .body-drag-top,
-body.ivlyrics-settings-open > .sync-creator-hint--portal {
-  display: none !important;
-}
+/* Keep Spotify visible below the dimmed settings scrim. The overlay owns all
+   pointer interaction, while the animation-pause rules above keep decorative
+   lyric layers from spending GPU time behind the dialog. */
 
 /* 좁은 화면: 오버레이/모달 반응형 */
 @media (max-width: 800px) {
@@ -12032,9 +12026,14 @@ html.is-lp-view-exit::view-transition-new(root) {
   transform: scale(1.02);
 }
 
+/* Keep both TV overlay rails anchored to the same viewport/page edges. */
+.fullscreen-tv-song-info,
+.fullscreen-tv-controls-wrapper {
+  --fullscreen-tv-edge-offset: 48px;
+}
+
 /* TV Mode Song Info - Bottom Left */
 .fullscreen-tv-song-info {
-  --fullscreen-tv-edge-offset: 48px;
   position: fixed;
   bottom: var(--fullscreen-tv-edge-offset);
   left: var(--fullscreen-tv-edge-offset);
@@ -12166,15 +12165,23 @@ html.is-lp-view-exit::view-transition-new(root) {
 
 /* TV Mode - Responsive adjustments */
 @media (max-width: 1200px) {
-  .fullscreen-tv-song-info {
+  .fullscreen-tv-song-info,
+  .fullscreen-tv-controls-wrapper {
     --fullscreen-tv-edge-offset: 36px;
+  }
+
+  .fullscreen-tv-song-info {
     gap: 16px;
   }
 }
 
 @media (max-width: 768px) {
-  .fullscreen-tv-song-info {
+  .fullscreen-tv-song-info,
+  .fullscreen-tv-controls-wrapper {
     --fullscreen-tv-edge-offset: 24px;
+  }
+
+  .fullscreen-tv-song-info {
     gap: 12px;
   }
 
@@ -12214,6 +12221,7 @@ html.is-lp-view-exit::view-transition-new(root) {
   position: fixed;
   right: var(--fullscreen-tv-edge-offset);
   bottom: var(--fullscreen-tv-edge-offset);
+  z-index: 100;
   display: flex;
   flex-direction: column;
   align-items: center;

@@ -2640,106 +2640,108 @@ const FullscreenOverlay = (() => {
                     })
             ),
             // Bottom-left: TV Mode Song Info OR Context info
-            tvModeEnabled ? react.createElement("div", {
-                className: "fullscreen-tv-song-info"
-            },
-                // TV mode keeps the plain album artwork. Context click or hold opens TMI.
+            tvModeEnabled ? react.createElement(react.Fragment, null,
                 react.createElement("div", {
-                    ...albumInteractionProps,
-                    className: "fullscreen-tv-album-wrapper clickable-album-container",
-                    style: {
-                        width: `${tvAlbumSize}px`,
-                        height: `${tvAlbumSize}px`,
-                        position: 'relative',
-                        cursor: 'pointer',
-                        borderRadius: `${albumRadius}px`,
-                        flexShrink: 0
-                    }
+                    className: "fullscreen-tv-song-info"
                 },
-                    renderAlbumVisual({
-                        coverClassName: "fullscreen-tv-album ivlyrics-fullscreen-shared-album",
-                        coverStyle: {
-                            width: '100%',
-                            height: '100%',
-                            borderRadius: `${albumRadius}px`
+                    // TV mode keeps the plain album artwork. Context click or hold opens TMI.
+                    react.createElement("div", {
+                        ...albumInteractionProps,
+                        className: "fullscreen-tv-album-wrapper clickable-album-container",
+                        style: {
+                            width: `${tvAlbumSize}px`,
+                            height: `${tvAlbumSize}px`,
+                            position: 'relative',
+                            cursor: 'pointer',
+                            borderRadius: `${albumRadius}px`,
+                            flexShrink: 0
                         }
-                    })
-                ),
-                // Track info (Title, Artist, Album)
-                react.createElement("div", { className: "fullscreen-tv-track-info" },
-                    // Title (based on display mode - TV mode shows single line with best available)
-                    react.createElement("div", {
-                        ...createNavigationProps(currentTrackUri, "fullscreen-tv-title"),
-                        style: { fontSize: `${Math.round(tvAlbumSize * 0.26)}px` }
                     },
-                        (() => {
-                            const mode = CONFIG?.visual?.["translate-metadata-mode"] || "translated";
-                            const originalTitle = title || Spicetify.Player.data?.item?.metadata?.title;
-                            const translatedTitle = translatedMetadata?.translated?.title;
-                            const romanizedTitle = translatedMetadata?.romanized?.title;
-                            const applyTrim = (text) => trimTitleEnabled ? trimTitle(text) : text;
-
-                            let result;
-                            switch (mode) {
-                                case "translated":
-                                case "original-translated":
-                                case "all":
-                                    // 번역이 있으면 번역, 없으면 원어
-                                    result = translatedTitle || originalTitle;
-                                    break;
-                                case "romanized":
-                                case "original-romanized":
-                                    // 발음이 있으면 발음, 없으면 원어
-                                    result = romanizedTitle || originalTitle;
-                                    break;
-                                default:
-                                    result = originalTitle;
+                        renderAlbumVisual({
+                            coverClassName: "fullscreen-tv-album ivlyrics-fullscreen-shared-album",
+                            coverStyle: {
+                                width: '100%',
+                                height: '100%',
+                                borderRadius: `${albumRadius}px`
                             }
-                            return applyTrim(result);
-                        })()
+                        })
                     ),
-                    // Artist (based on display mode - TV mode shows single line with best available)
-                    react.createElement("div", {
-                        ...createNavigationProps(currentArtistUri, "fullscreen-tv-artist"),
-                        style: { fontSize: `${Math.round(tvAlbumSize * 0.16)}px` }
-                    },
-                        (() => {
-                            const mode = CONFIG?.visual?.["translate-metadata-mode"] || "translated";
-                            const originalArtist = artist || Spicetify.Player.data?.item?.metadata?.artist_name;
-                            const translatedArtist = translatedMetadata?.translated?.artist;
-                            const romanizedArtist = translatedMetadata?.romanized?.artist;
-                            const applyTrim = (text) => trimTitleEnabled ? trimTitle(text) : text;
+                    // Track info (Title, Artist, Album)
+                    react.createElement("div", { className: "fullscreen-tv-track-info" },
+                        // Title (based on display mode - TV mode shows single line with best available)
+                        react.createElement("div", {
+                            ...createNavigationProps(currentTrackUri, "fullscreen-tv-title"),
+                            style: { fontSize: `${Math.round(tvAlbumSize * 0.26)}px` }
+                        },
+                            (() => {
+                                const mode = CONFIG?.visual?.["translate-metadata-mode"] || "translated";
+                                const originalTitle = title || Spicetify.Player.data?.item?.metadata?.title;
+                                const translatedTitle = translatedMetadata?.translated?.title;
+                                const romanizedTitle = translatedMetadata?.romanized?.title;
+                                const applyTrim = (text) => trimTitleEnabled ? trimTitle(text) : text;
 
-                            let result;
-                            switch (mode) {
-                                case "translated":
-                                case "original-translated":
-                                case "all":
-                                    // 번역이 있으면 번역, 없으면 원어
-                                    result = translatedArtist || originalArtist;
-                                    break;
-                                case "romanized":
-                                case "original-romanized":
-                                    // 발음이 있으면 발음, 없으면 원어
-                                    result = romanizedArtist || originalArtist;
-                                    break;
-                                default:
-                                    result = originalArtist;
-                            }
-                            return applyTrim(result);
-                        })()
-                    ),
-                    // Album name (from context)
-                    tvShowAlbumName && react.createElement("div", createNavigationProps(currentAlbumUri, "fullscreen-tv-album-name"),
-                        (() => {
-                            try {
-                                const albumName = Spicetify.Player.data?.item?.metadata?.album_title;
-                                const releaseYear = Spicetify.Player.data?.item?.metadata?.album_disc_number
-                                    ? ""
-                                    : (Spicetify.Player.data?.item?.metadata?.year || "");
-                                return albumName ? `${albumName}${releaseYear ? ` • ${releaseYear}` : ''}` : '';
-                            } catch (e) { return ''; }
-                        })()
+                                let result;
+                                switch (mode) {
+                                    case "translated":
+                                    case "original-translated":
+                                    case "all":
+                                        // 번역이 있으면 번역, 없으면 원어
+                                        result = translatedTitle || originalTitle;
+                                        break;
+                                    case "romanized":
+                                    case "original-romanized":
+                                        // 발음이 있으면 발음, 없으면 원어
+                                        result = romanizedTitle || originalTitle;
+                                        break;
+                                    default:
+                                        result = originalTitle;
+                                }
+                                return applyTrim(result);
+                            })()
+                        ),
+                        // Artist (based on display mode - TV mode shows single line with best available)
+                        react.createElement("div", {
+                            ...createNavigationProps(currentArtistUri, "fullscreen-tv-artist"),
+                            style: { fontSize: `${Math.round(tvAlbumSize * 0.16)}px` }
+                        },
+                            (() => {
+                                const mode = CONFIG?.visual?.["translate-metadata-mode"] || "translated";
+                                const originalArtist = artist || Spicetify.Player.data?.item?.metadata?.artist_name;
+                                const translatedArtist = translatedMetadata?.translated?.artist;
+                                const romanizedArtist = translatedMetadata?.romanized?.artist;
+                                const applyTrim = (text) => trimTitleEnabled ? trimTitle(text) : text;
+
+                                let result;
+                                switch (mode) {
+                                    case "translated":
+                                    case "original-translated":
+                                    case "all":
+                                        // 번역이 있으면 번역, 없으면 원어
+                                        result = translatedArtist || originalArtist;
+                                        break;
+                                    case "romanized":
+                                    case "original-romanized":
+                                        // 발음이 있으면 발음, 없으면 원어
+                                        result = romanizedArtist || originalArtist;
+                                        break;
+                                    default:
+                                        result = originalArtist;
+                                }
+                                return applyTrim(result);
+                            })()
+                        ),
+                        // Album name (from context)
+                        tvShowAlbumName && react.createElement("div", createNavigationProps(currentAlbumUri, "fullscreen-tv-album-name"),
+                            (() => {
+                                try {
+                                    const albumName = Spicetify.Player.data?.item?.metadata?.album_title;
+                                    const releaseYear = Spicetify.Player.data?.item?.metadata?.album_disc_number
+                                        ? ""
+                                        : (Spicetify.Player.data?.item?.metadata?.year || "");
+                                    return albumName ? `${albumName}${releaseYear ? ` • ${releaseYear}` : ''}` : '';
+                                } catch (e) { return ''; }
+                            })()
+                        )
                     )
                 ),
                 // TV Mode Controls & Progress (right side)
