@@ -71,7 +71,10 @@ window.LANG_SV = {
       "light": "Växla till ljusläge",
       "dark": "Växla till mörkt läge",
       "lightShort": "Ljus",
-      "darkShort": "Mörkt"
+      "darkShort": "Mörkt",
+      "auto": "Använd systemets tema",
+      "autoShort": "Auto",
+      "selector": "Inställningstema"
     }
   },
   "sections": {

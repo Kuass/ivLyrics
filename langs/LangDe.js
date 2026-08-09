@@ -71,7 +71,10 @@ window.LANG_DE = {
       "light": "In den hellen Modus wechseln",
       "dark": "In den dunklen Modus wechseln",
       "lightShort": "Hell",
-      "darkShort": "Dunkel"
+      "darkShort": "Dunkel",
+      "auto": "Systemdesign verwenden",
+      "autoShort": "Auto",
+      "selector": "Einstellungsdesign"
     }
   },
   "sections": {

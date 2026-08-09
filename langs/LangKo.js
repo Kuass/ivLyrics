@@ -71,7 +71,10 @@ window.LANG_KO = {
       "light": "라이트 모드로 전환",
       "dark": "다크 모드로 전환",
       "lightShort": "라이트",
-      "darkShort": "다크"
+      "darkShort": "다크",
+      "auto": "시스템 테마 사용",
+      "autoShort": "자동",
+      "selector": "설정 테마"
     }
   },
   "sections": {

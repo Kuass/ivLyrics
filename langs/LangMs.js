@@ -71,7 +71,10 @@ window.LANG_MS = {
       "light": "Tukar ke Mod Cerah",
       "dark": "Tukar ke Mod Gelap",
       "lightShort": "Cerah",
-      "darkShort": "Gelap"
+      "darkShort": "Gelap",
+      "auto": "Gunakan tema sistem",
+      "autoShort": "Auto",
+      "selector": "Tema tetapan"
     }
   },
   "sections": {

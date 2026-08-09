@@ -290,6 +290,29 @@ test('uses drag handles for both provider lists and keeps cultural details colla
     assert.match(settingsSource, /onKeyDown:[\s\S]*event\.key !== "ArrowUp"[\s\S]*event\.key !== "ArrowDown"/);
 });
 
+test('offers light, dark, and system-following settings themes in every locale', () => {
+    assert.match(settingsSource, /storedTheme === "light" \|\| storedTheme === "dark" \|\| storedTheme === "auto"/);
+    assert.match(settingsSource, /return "auto";/);
+    assert.match(settingsSource, /getEffectiveSettingsUiTheme[\s\S]*themePreference === "auto" \? systemTheme : themePreference/);
+    assert.match(settingsSource, /matchMedia\("\(prefers-color-scheme: light\)"\)/);
+    assert.match(settingsSource, /addEventListener\("change", handleSystemThemeChange\)/);
+    assert.match(settingsSource, /removeEventListener\("change", handleSystemThemeChange\)/);
+    assert.match(settingsSource, /"aria-pressed": uiThemePreference === themeOption\.id/);
+    assert.match(settingsSource, /"data-ui-theme-preference": uiThemePreference/);
+
+    const languageFiles = fs.readdirSync(path.join(root, 'langs'))
+        .filter(file => /^Lang.*\.js$/.test(file));
+    for (const file of languageFiles) {
+        const sandbox = { window: {} };
+        vm.runInNewContext(fs.readFileSync(path.join(root, 'langs', file), 'utf8'), sandbox, { filename: file });
+        const languageTable = Object.values(sandbox.window)[0];
+        for (const key of ['lightShort', 'darkShort', 'auto', 'autoShort', 'selector']) {
+            assert.equal(typeof languageTable.settingsUi.theme[key], 'string', `${file}: ${key}`);
+            assert.notEqual(languageTable.settingsUi.theme[key].trim(), '', `${file}: ${key}`);
+        }
+    }
+});
+
 test('shows the AI provider hint only when translation is limited to keyless providers', () => {
     assert.match(optionsSource, /FIRST_LANGUAGE_KEYLESS_PROVIDER_IDS[\s\S]*bing-translate[\s\S]*google-translate/);
     assert.match(optionsSource, /enabledTranslationProviders\.every[\s\S]*FIRST_LANGUAGE_KEYLESS_PROVIDER_IDS\.has/);

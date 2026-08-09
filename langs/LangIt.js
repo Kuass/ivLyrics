@@ -71,7 +71,10 @@ window.LANG_IT = {
       "light": "Passa alla modalità chiara",
       "dark": "Passa alla modalità scura",
       "lightShort": "Chiaro",
-      "darkShort": "Scuro"
+      "darkShort": "Scuro",
+      "auto": "Usa il tema di sistema",
+      "autoShort": "Auto",
+      "selector": "Tema delle impostazioni"
     }
   },
   "sections": {

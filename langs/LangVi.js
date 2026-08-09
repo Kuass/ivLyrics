@@ -71,7 +71,10 @@ window.LANG_VI = {
       "light": "Chuyển sang chế độ sáng",
       "dark": "Chuyển sang chế độ tối",
       "lightShort": "Sáng",
-      "darkShort": "Tối"
+      "darkShort": "Tối",
+      "auto": "Dùng giao diện hệ thống",
+      "autoShort": "Tự động",
+      "selector": "Giao diện cài đặt"
     }
   },
   "sections": {

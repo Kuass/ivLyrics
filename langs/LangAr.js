@@ -71,7 +71,10 @@ window.LANG_AR = {
       "light": "التبديل إلى الوضع الفاتح",
       "dark": "التبديل إلى الوضع الداكن",
       "lightShort": "فاتح",
-      "darkShort": "داكن"
+      "darkShort": "داكن",
+      "auto": "استخدام سمة النظام",
+      "autoShort": "تلقائي",
+      "selector": "سمة الإعدادات"
     }
   },
   "sections": {

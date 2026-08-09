@@ -71,7 +71,10 @@ window.LANG_ID = {
       "light": "Beralih ke mode terang",
       "dark": "Beralih ke mode gelap",
       "lightShort": "Terang",
-      "darkShort": "Gelap"
+      "darkShort": "Gelap",
+      "auto": "Gunakan tema sistem",
+      "autoShort": "Otomatis",
+      "selector": "Tema pengaturan"
     }
   },
   "sections": {

@@ -71,7 +71,10 @@ window.LANG_JA = {
       "light": "ライトモードに切り替え",
       "dark": "ダークモードに切り替え",
       "lightShort": "ライト",
-      "darkShort": "ダーク"
+      "darkShort": "ダーク",
+      "auto": "システムテーマを使用",
+      "autoShort": "自動",
+      "selector": "設定テーマ"
     }
   },
   "sections": {

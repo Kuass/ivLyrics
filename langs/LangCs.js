@@ -71,7 +71,10 @@ window.LANG_CS = {
       "light": "Přepněte do světelného režimu",
       "dark": "Přepněte do tmavého režimu",
       "lightShort": "Světlý",
-      "darkShort": "Tmavý"
+      "darkShort": "Tmavý",
+      "auto": "Použít systémový motiv",
+      "autoShort": "Automaticky",
+      "selector": "Motiv nastavení"
     }
   },
   "sections": {

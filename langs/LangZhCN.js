@@ -71,7 +71,10 @@ window.LANG_ZH_CN = {
       "light": "切换到浅色模式",
       "dark": "切换到深色模式",
       "lightShort": "浅色",
-      "darkShort": "深色"
+      "darkShort": "深色",
+      "auto": "跟随系统主题",
+      "autoShort": "自动",
+      "selector": "设置主题"
     }
   },
   "sections": {

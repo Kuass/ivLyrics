@@ -71,7 +71,10 @@ window.LANG_PT = {
       "light": "Alternar para o modo claro",
       "dark": "Alternar para o modo escuro",
       "lightShort": "Claro",
-      "darkShort": "Escuro"
+      "darkShort": "Escuro",
+      "auto": "Usar o tema do sistema",
+      "autoShort": "Automático",
+      "selector": "Tema das configurações"
     }
   },
   "sections": {

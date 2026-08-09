@@ -6347,13 +6347,19 @@ const getSettingsText = (key, fallback) => {
   return !value || value === key ? fallback : value;
 };
 
+const SETTINGS_UI_THEME_STORAGE_KEY = "ivLyrics:settings-ui-theme";
+
 const getSettingsUiTheme = () => {
-  const storedTheme = window.ivLyricsStoragePersistence?.getItem("ivLyrics:settings-ui-theme")
-    ?? localStorage.getItem("ivLyrics:settings-ui-theme");
-  if (storedTheme === "light" || storedTheme === "dark") {
+  const storedTheme = window.ivLyricsStoragePersistence?.getItem(SETTINGS_UI_THEME_STORAGE_KEY)
+    ?? localStorage.getItem(SETTINGS_UI_THEME_STORAGE_KEY);
+  if (storedTheme === "light" || storedTheme === "dark" || storedTheme === "auto") {
     return storedTheme;
   }
 
+  return "auto";
+};
+
+const getSystemSettingsUiTheme = () => {
   try {
     return window.matchMedia?.("(prefers-color-scheme: light)")?.matches
       ? "light"
@@ -6363,11 +6369,14 @@ const getSettingsUiTheme = () => {
   }
 };
 
+const getEffectiveSettingsUiTheme = (themePreference, systemTheme) =>
+  themePreference === "auto" ? systemTheme : themePreference;
+
 const persistSettingsUiTheme = (theme) => {
   if (window.ivLyricsStoragePersistence) {
-    window.ivLyricsStoragePersistence.setItem("ivLyrics:settings-ui-theme", theme);
+    window.ivLyricsStoragePersistence.setItem(SETTINGS_UI_THEME_STORAGE_KEY, theme);
   } else {
-    localStorage.setItem("ivLyrics:settings-ui-theme", theme);
+    localStorage.setItem(SETTINGS_UI_THEME_STORAGE_KEY, theme);
   }
 };
 
@@ -6743,7 +6752,9 @@ const ConfigModal = ({
   const [searchQuery, setSearchQuery] = react.useState("");
   const searchOriginTabRef = react.useRef(initialTab || "general");
   const shouldReduceMotion = getEffectiveReducedMotionPreference();
-  const [uiTheme, setUiTheme] = react.useState(getSettingsUiTheme);
+  const [uiThemePreference, setUiThemePreference] = react.useState(getSettingsUiTheme);
+  const [systemUiTheme, setSystemUiTheme] = react.useState(getSystemSettingsUiTheme);
+  const uiTheme = getEffectiveSettingsUiTheme(uiThemePreference, systemUiTheme);
 
   // 검색어 변경 시 검색 결과 탭으로 자동 전환
   const handleSearchChange = (e) => {
@@ -6769,11 +6780,40 @@ const ConfigModal = ({
   };
 
   react.useEffect(() => {
-    persistSettingsUiTheme(uiTheme);
-    document
-      .getElementById("ivLyrics-settings-overlay")
-      ?.setAttribute("data-ui-theme", uiTheme);
-  }, [uiTheme]);
+    persistSettingsUiTheme(uiThemePreference);
+  }, [uiThemePreference]);
+
+  react.useEffect(() => {
+    const overlay = document.getElementById("ivLyrics-settings-overlay");
+    overlay?.setAttribute("data-ui-theme", uiTheme);
+    overlay?.setAttribute("data-ui-theme-preference", uiThemePreference);
+  }, [uiTheme, uiThemePreference]);
+
+  react.useEffect(() => {
+    if (uiThemePreference !== "auto" || !window.matchMedia) {
+      return undefined;
+    }
+
+    let systemThemeQuery;
+    try {
+      systemThemeQuery = window.matchMedia("(prefers-color-scheme: light)");
+    } catch (error) {
+      return undefined;
+    }
+
+    const handleSystemThemeChange = (event) => {
+      setSystemUiTheme(event.matches ? "light" : "dark");
+    };
+    handleSystemThemeChange(systemThemeQuery);
+
+    if (systemThemeQuery.addEventListener) {
+      systemThemeQuery.addEventListener("change", handleSystemThemeChange);
+      return () => systemThemeQuery.removeEventListener("change", handleSystemThemeChange);
+    }
+
+    systemThemeQuery.addListener?.(handleSystemThemeChange);
+    return () => systemThemeQuery.removeListener?.(handleSystemThemeChange);
+  }, [uiThemePreference]);
 
   const settingsContentRef = react.useRef(null);
   const settingsSidebarRef = react.useRef(null);
@@ -8256,6 +8296,27 @@ const ConfigModal = ({
 	  }, [activeTab, uiTheme]);
 
   const HeaderSection = () => {
+    const themeOptions = [
+      {
+        id: "light",
+        label: getSettingsText("settingsUi.theme.lightShort", "Light"),
+        title: getSettingsText("settingsUi.theme.light", "Switch to light mode"),
+        icon: '<circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2M12 19.5v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2.5 12h2M19.5 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path>',
+      },
+      {
+        id: "dark",
+        label: getSettingsText("settingsUi.theme.darkShort", "Dark"),
+        title: getSettingsText("settingsUi.theme.dark", "Switch to dark mode"),
+        icon: '<path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5 8.5 8.5 0 1 0 20.5 14.3z"></path>',
+      },
+      {
+        id: "auto",
+        label: getSettingsText("settingsUi.theme.autoShort", "Auto"),
+        title: getSettingsText("settingsUi.theme.auto", "Use system theme"),
+        icon: '<rect x="3" y="4" width="18" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path>',
+      },
+    ];
+
     return react.createElement(
       "div",
       { className: "settings-header" },
@@ -8276,45 +8337,38 @@ const ConfigModal = ({
           "div",
           { className: "settings-buttons" },
           react.createElement(
-            "button",
+            "div",
             {
-              className: "settings-theme-btn",
-              type: "button",
-              onClick: () =>
-                setUiTheme((currentTheme) =>
-                  currentTheme === "dark" ? "light" : "dark"
-                ),
-              title:
-                uiTheme === "dark"
-                  ? getSettingsText("settingsUi.theme.light", "Switch to light mode")
-                  : getSettingsText("settingsUi.theme.dark", "Switch to dark mode"),
-              "aria-label":
-                uiTheme === "dark"
-                  ? getSettingsText("settingsUi.theme.light", "Switch to light mode")
-                  : getSettingsText("settingsUi.theme.dark", "Switch to dark mode"),
+              className: "settings-theme-control",
+              role: "group",
+              "aria-label": getSettingsText("settingsUi.theme.selector", "Settings theme"),
             },
-            react.createElement("svg", {
-              width: 16,
-              height: 16,
-              viewBox: "0 0 24 24",
-              fill: "none",
-              stroke: "currentColor",
-              strokeWidth: 1.9,
-              strokeLinecap: "round",
-              strokeLinejoin: "round",
-              dangerouslySetInnerHTML: {
-                __html:
-                  uiTheme === "dark"
-                    ? '<circle cx="12" cy="12" r="4.5"></circle><path d="M12 2.5v2.2M12 19.3v2.2M4.93 4.93l1.56 1.56M17.51 17.51l1.56 1.56M2.5 12h2.2M19.3 12h2.2M4.93 19.07l1.56-1.56M17.51 6.49l1.56-1.56"></path>'
-                    : '<path d="M21 12.8A8.7 8.7 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>',
-              },
-            }),
-            react.createElement(
-              "span",
-              null,
-              uiTheme === "dark"
-                ? getSettingsText("settingsUi.theme.darkShort", "Dark")
-                : getSettingsText("settingsUi.theme.lightShort", "Light")
+            themeOptions.map((themeOption) =>
+              react.createElement(
+                "button",
+                {
+                  key: themeOption.id,
+                  className: `settings-theme-option${uiThemePreference === themeOption.id ? " active" : ""}`,
+                  type: "button",
+                  title: themeOption.title,
+                  "aria-label": themeOption.label,
+                  "aria-pressed": uiThemePreference === themeOption.id,
+                  onClick: () => setUiThemePreference(themeOption.id),
+                },
+                react.createElement("svg", {
+                  width: 14,
+                  height: 14,
+                  viewBox: "0 0 24 24",
+                  fill: "none",
+                  stroke: "currentColor",
+                  strokeWidth: 1.8,
+                  strokeLinecap: "round",
+                  strokeLinejoin: "round",
+                  "aria-hidden": "true",
+                  dangerouslySetInnerHTML: { __html: themeOption.icon },
+                }),
+                react.createElement("span", null, themeOption.label)
+              )
             )
           ),
           react.createElement(
@@ -9441,6 +9495,7 @@ const ConfigModal = ({
       id: `${APP_NAME}-config-container`,
       className: shouldReduceMotion ? "motion-reduced" : "",
       "data-ui-theme": uiTheme,
+      "data-ui-theme-preference": uiThemePreference,
     },
     react.createElement("style", {
       dangerouslySetInnerHTML: {
@@ -15721,6 +15776,48 @@ const ConfigModal = ({
     -webkit-backdrop-filter: none !important;
 }
 
+#${APP_NAME}-config-container .settings-theme-control {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    height: 36px;
+    padding: 2px;
+    border: 0.5px solid var(--settings-border) !important;
+    border-radius: 8px !important;
+    background: var(--settings-surface-1) !important;
+}
+
+#${APP_NAME}-config-container .settings-theme-option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-width: 62px;
+    height: 30px;
+    padding: 0 9px;
+    border: 0 !important;
+    border-radius: 6px !important;
+    background: transparent !important;
+    color: var(--text-tertiary);
+    font-size: 11.5px;
+    font-weight: 500;
+    line-height: 1;
+}
+
+#${APP_NAME}-config-container .settings-theme-option:hover {
+    background: var(--settings-surface-2) !important;
+    color: var(--text-primary);
+}
+
+#${APP_NAME}-config-container .settings-theme-option.active {
+    background: var(--accent-primary-light) !important;
+    color: var(--accent-primary);
+}
+
+#${APP_NAME}-config-container .settings-theme-option svg {
+    flex: 0 0 auto;
+}
+
 #${APP_NAME}-config-container .settings-theme-btn,
 #${APP_NAME}-config-container .settings-github-btn,
 #${APP_NAME}-config-container .settings-discord-btn,
@@ -16453,6 +16550,23 @@ const ConfigModal = ({
     #${APP_NAME}-config-container {
         height: 100vh;
         border-radius: 0 !important;
+    }
+
+    #${APP_NAME}-config-container .settings-theme-option {
+        width: 32px;
+        min-width: 32px;
+        padding: 0;
+    }
+
+    #${APP_NAME}-config-container .settings-theme-option span {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
     }
 
     #${APP_NAME}-config-container .settings-coffee-btn span {

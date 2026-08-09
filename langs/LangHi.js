@@ -71,7 +71,10 @@ window.LANG_HI = {
       "light": "लाइट मोड में बदलें",
       "dark": "डार्क मोड में बदलें",
       "lightShort": "लाइट",
-      "darkShort": "डार्क"
+      "darkShort": "डार्क",
+      "auto": "सिस्टम थीम का उपयोग करें",
+      "autoShort": "ऑटो",
+      "selector": "सेटिंग थीम"
     }
   },
   "sections": {

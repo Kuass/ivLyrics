@@ -71,7 +71,10 @@ window.LANG_EN = {
       "light": "Switch to light mode",
       "dark": "Switch to dark mode",
       "lightShort": "Light",
-      "darkShort": "Dark"
+      "darkShort": "Dark",
+      "auto": "Use system theme",
+      "autoShort": "Auto",
+      "selector": "Settings theme"
     }
   },
   "sections": {

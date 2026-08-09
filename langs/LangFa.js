@@ -71,7 +71,10 @@ window.LANG_FA = {
       "light": "تغییر به حالت روشن",
       "dark": "تغییر به حالت تیره",
       "lightShort": "روشن",
-      "darkShort": "تیره"
+      "darkShort": "تیره",
+      "auto": "استفاده از پوسته سیستم",
+      "autoShort": "خودکار",
+      "selector": "پوسته تنظیمات"
     }
   },
   "sections": {

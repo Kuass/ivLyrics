@@ -71,7 +71,10 @@ window.LANG_TH = {
       "light": "สลับเป็นโหมดสว่าง",
       "dark": "สลับเป็นโหมดมืด",
       "lightShort": "สว่าง",
-      "darkShort": "มืด"
+      "darkShort": "มืด",
+      "auto": "ใช้ธีมของระบบ",
+      "autoShort": "อัตโนมัติ",
+      "selector": "ธีมการตั้งค่า"
     }
   },
   "sections": {

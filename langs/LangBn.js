@@ -71,7 +71,10 @@ window.LANG_BN = {
       "light": "লাইট মোডে পরিবর্তন করুন",
       "dark": "ডার্ক মোডে পরিবর্তন করুন",
       "lightShort": "লাইট",
-      "darkShort": "ডার্ক"
+      "darkShort": "ডার্ক",
+      "auto": "সিস্টেম থিম ব্যবহার করুন",
+      "autoShort": "স্বয়ংক্রিয়",
+      "selector": "সেটিংস থিম"
     }
   },
   "sections": {

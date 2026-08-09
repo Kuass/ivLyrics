@@ -71,7 +71,10 @@ window.LANG_TR = {
       "light": "Açık temaya geç",
       "dark": "Koyu temaya geç",
       "lightShort": "Açık",
-      "darkShort": "Koyu"
+      "darkShort": "Koyu",
+      "auto": "Sistem temasını kullan",
+      "autoShort": "Otomatik",
+      "selector": "Ayarlar teması"
     }
   },
   "sections": {
