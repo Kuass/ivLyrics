@@ -45,7 +45,7 @@
         supports: {
             translate: true,
             pronunciation: false,
-            metadata: false,
+            metadata: true,
             tmi: false,
             lyricsStudy: false,
             characterPronunciation: false,
@@ -443,6 +443,13 @@
         return null;
     }
 
+    async function translateMetadataFields(fields, targetLanguage) {
+        const translatedText = await requestTranslation(fields.join('\n'), targetLanguage);
+        const translatedFields = splitTranslatedLines(translatedText, fields.length);
+        if (translatedFields) return translatedFields;
+        return Promise.all(fields.map(field => requestTranslation(field, targetLanguage)));
+    }
+
     async function translateChunk(lines, targetLanguage) {
         if (lines.length === 0) return [];
         if (lines.every(line => !line.trim())) return lines.map(() => '');
@@ -534,6 +541,32 @@
             const targetLanguage = normalizeTargetLanguage(lang);
             const translation = await translateLyricsLines(text, targetLanguage, onLine);
             return { translation };
+        },
+
+        async translateMetadata({ title, artist, lang }) {
+            if (!title?.trim() || !artist?.trim()) {
+                throw new Error('[Bing Translate] Title and artist are required');
+            }
+
+            const targetLanguage = normalizeTargetLanguage(lang);
+            const translation = await translateMetadataFields(
+                [title.trim(), artist.trim()],
+                targetLanguage
+            );
+            if (!Array.isArray(translation) || translation.length !== 2) {
+                throw new Error('[Bing Translate] Invalid metadata translation response');
+            }
+
+            return {
+                translated: {
+                    title: translation[0]?.trim() || title.trim(),
+                    artist: translation[1]?.trim() || artist.trim()
+                },
+                romanized: {
+                    title: title.trim(),
+                    artist: artist.trim()
+                }
+            };
         }
     };
 

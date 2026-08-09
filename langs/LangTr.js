@@ -1522,7 +1522,7 @@ window.LANG_TR = {
     },
     "translateMetadata": {
       "desc": "Başlığı/Sanatçıyı Çevir",
-      "info": "Yabancı şarkı başlıklarını ve sanatçı isimlerini çevir (Gemini API Anahtarı gerektirir)"
+      "info": "Yabancı şarkı başlıklarını ve sanatçı isimlerini çevir"
     },
     "translateMetadataMode": {
       "desc": "Çeviri Görüntüleme Modu",

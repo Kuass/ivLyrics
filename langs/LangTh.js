@@ -1522,7 +1522,7 @@ window.LANG_TH = {
       },
       "translateMetadata": {
         "desc": "แปลชื่อ/ศิลปิน",
-        "info": "แปลชื่อเพลงและชื่อศิลปินต่างประเทศ (ต้องใช้ Gemini API Key)"
+        "info": "แปลชื่อเพลงและชื่อศิลปินต่างประเทศ"
       },
       "translateMetadataMode": {
         "desc": "รูปแบบการแสดงคำแปล",

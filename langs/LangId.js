@@ -1522,7 +1522,7 @@ window.LANG_ID = {
       },
       "translateMetadata": {
         "desc": "Terjemahkan Judul/Artis",
-        "info": "Terjemahkan judul lagu dan nama artis asing (Membutuhkan Kunci API Gemini)"
+        "info": "Terjemahkan judul lagu dan nama artis asing"
       },
       "translateMetadataMode": {
         "desc": "Mode Tampilan Terjemahan",

@@ -1522,7 +1522,7 @@ window.LANG_FA = {
       },
       "translateMetadata": {
         "desc": "ترجمه عنوان/هنرمند",
-        "info": "ترجمه نام آهنگ‌ها و هنرمندان خارجی (نیاز به کلید Gemini API)"
+        "info": "ترجمه نام آهنگ‌ها و هنرمندان خارجی"
       },
       "translateMetadataMode": {
         "desc": "روش نمایش ترجمه",

@@ -1522,7 +1522,7 @@ window.LANG_ZH_TW = {
       },
       "translateMetadata": {
         "desc": "翻譯標題/藝人",
-        "info": "翻譯並顯示外語曲名與藝人名稱 (需要 Gemini API 金鑰)"
+        "info": "翻譯並顯示外語曲名與藝人名稱"
       },
       "translateMetadataMode": {
         "desc": "翻譯顯示方式",

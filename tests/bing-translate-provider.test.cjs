@@ -129,7 +129,28 @@ test('registers as a translation-only provider', () => {
     assert.equal(addon.id, 'bing-translate');
     assert.equal(addon.supports.translate, true);
     assert.equal(addon.supports.pronunciation, false);
+    assert.equal(addon.supports.metadata, true);
     assert.equal(addon.getSettingsUI(), null);
+});
+
+test('translates title and artist metadata with the keyless provider', async () => {
+    const { addon } = createHarness();
+    const result = await addon.translateMetadata({
+        title: '[Chorus]',
+        artist: '世界',
+        lang: 'ko'
+    });
+
+    assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+        translated: {
+            title: '[합창]',
+            artist: '세계'
+        },
+        romanized: {
+            title: '[Chorus]',
+            artist: '世界'
+        }
+    });
 });
 
 test('localizes provider descriptions and first-language prompts for every supported UI locale', () => {
@@ -140,6 +161,10 @@ test('localizes provider descriptions and first-language prompts for every suppo
     const bingAddon = readAddonMetadata(providerSource, 'Addon_AI_BingTranslate.js');
     const googleAddon = readAddonMetadata(googleProviderSource, 'Addon_AI_GoogleTranslate.js');
 
+    assert.equal(bingAddon.supports.metadata, true);
+    assert.equal(googleAddon.supports.metadata, true);
+    assert.equal(typeof bingAddon.translateMetadata, 'function');
+    assert.equal(typeof googleAddon.translateMetadata, 'function');
     assert.deepEqual(Object.keys(bingAddon.description).sort(), [...supportedLocales].sort());
     assert.deepEqual(Object.keys(googleAddon.description).sort(), [...supportedLocales].sort());
     for (const addon of [bingAddon, googleAddon]) {

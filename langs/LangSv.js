@@ -1522,7 +1522,7 @@ window.LANG_SV = {
       },
       "translateMetadata": {
         "desc": "Översätt titel/artist",
-        "info": "Översätt utländska låttitlar och artistnamn (kräver Gemini API Key)"
+        "info": "Översätt utländska låttitlar och artistnamn"
       },
       "translateMetadataMode": {
         "desc": "Översättningsvisningsläge",

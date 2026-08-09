@@ -1522,7 +1522,7 @@ window.LANG_KO = {
       },
       "translateMetadata": {
         "desc": "제목/아티스트 번역",
-        "info": "외국어 곡 제목과 아티스트 이름을 번역하여 표시합니다 (Gemini API 키 필요)"
+        "info": "외국어 곡 제목과 아티스트 이름을 번역하여 표시합니다"
       },
       "translateMetadataMode": {
         "desc": "번역 표시 방식",

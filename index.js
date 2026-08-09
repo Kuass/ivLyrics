@@ -5629,6 +5629,9 @@ class LyricsContainer extends react.Component {
       return;
     }
 
+    const loadingToken = this.startTranslationLoading();
+    let completed = false;
+
     try {
       const result = await window.Translator.translateMetadata({
         trackId,
@@ -5639,6 +5642,7 @@ class LyricsContainer extends react.Component {
 
       // 현재 트랙이 여전히 같은지 확인
       if (this.currentTrackUri === uri && result) {
+        completed = true;
         this.setState({ translatedMetadata: result });
 
         // 오버레이로 번역된 메타데이터 전송
@@ -5648,6 +5652,8 @@ class LyricsContainer extends react.Component {
       }
     } catch (error) {
       console.warn('[ivLyrics] Metadata translation failed:', error);
+    } finally {
+      this.clearTranslationLoading(loadingToken, { completed });
     }
   }
 

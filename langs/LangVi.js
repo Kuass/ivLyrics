@@ -1522,7 +1522,7 @@ window.LANG_VI = {
       },
       "translateMetadata": {
         "desc": "Dịch Tiêu đề/Nghệ sĩ",
-        "info": "Dịch tên bài hát và tên nghệ sĩ nước ngoài (Cần Gemini API Key)"
+        "info": "Dịch tên bài hát và tên nghệ sĩ nước ngoài"
       },
       "translateMetadataMode": {
         "desc": "Cách hiển thị bản dịch",

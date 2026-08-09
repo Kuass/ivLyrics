@@ -1522,7 +1522,7 @@ window.LANG_CS = {
       },
       "translateMetadata": {
         "desc": "Přeložit název/interpret",
-        "info": "Překlad cizích názvů skladeb a jmen interpretů (vyžaduje klíč API Gemini)"
+        "info": "Překlad cizích názvů skladeb a jmen interpretů"
       },
       "translateMetadataMode": {
         "desc": "Režim zobrazení překladu",

@@ -1522,7 +1522,7 @@ window.LANG_JA = {
       },
       "translateMetadata": {
         "desc": "タイトル/アーティスト翻訳",
-        "info": "外国語の曲のタイトルとアーティスト名を翻訳して表示します (Gemini APIキーが必要)"
+        "info": "外国語の曲のタイトルとアーティスト名を翻訳して表示します"
       },
       "translateMetadataMode": {
         "desc": "翻訳表示方式",

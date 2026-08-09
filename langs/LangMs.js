@@ -1522,7 +1522,7 @@ window.LANG_MS = {
       },
       "translateMetadata": {
         "desc": "Terjemah Tajuk/Artis",
-        "info": "Terjemah tajuk lagu asing dan nama artis untuk dipaparkan (Memerlukan Kunci Gemini API)"
+        "info": "Terjemah dan paparkan tajuk lagu serta nama artis asing"
       },
       "translateMetadataMode": {
         "desc": "Kaedah Paparan Terjemahan",
