@@ -715,6 +715,20 @@ window.LANG_BN = {
     "traditionalChineseTW": "ঐতিহ্যবাহী চীনা (তাইওয়ান)",
     "pinyin": "পিনয়িন"
   },
+  "firstLanguagePrompt": {
+    "title": "আপনি প্রথমবার {language} ভাষার গান চালাচ্ছেন",
+    "description": "এই গানটি কীভাবে অনুবাদ করা হবে?",
+    "original": "শুধু মূল লেখা",
+    "originalDescription": "উচ্চারণ বা অনুবাদ ছাড়া শুধু মূল গানের কথা দেখান।",
+    "pronunciation": "উচ্চারণ",
+    "pronunciationDescription": "মূল গানের কথার সঙ্গে উচ্চারণ নির্দেশিকা দেখান।",
+    "translation": "অনুবাদ",
+    "translationDescription": "মূল গানের কথার সঙ্গে অনুবাদ দেখান।",
+    "both": "উচ্চারণ + অনুবাদ",
+    "bothDescription": "উচ্চারণ নির্দেশিকা ও অনুবাদ দুটিই দেখান।",
+    "notNow": "সেট আপ করবেন না",
+    "apply": "এই সেটিংস প্রয়োগ করুন"
+  },
   "lyricsCacheEditor": {
     "title": "সংরক্ষিত উচ্চারণ / অনুবাদ লিরিক্স সম্পাদনা",
     "unknownTrack": "অজানা ট্র্যাক",

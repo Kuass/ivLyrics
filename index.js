@@ -7259,6 +7259,27 @@ class LyricsContainer extends react.Component {
     // For Gemini mode, use generic keys if no specific language detected
     const modeKey = friendlyLanguage || "gemini";
 
+    const firstLanguagePrompt = window.ivLyricsFirstLanguagePrompt?.maybePrompt?.({
+      sourceLang: originalLanguage,
+      targetLang: getCurrentTranslationTargetLanguage(),
+      modeKey,
+    });
+    if (firstLanguagePrompt) {
+      const originalLyrics = this.optimizeTranslations(lyrics, null, null, null, null);
+      if (isActivePresentation()) {
+        this.setState({
+          currentLyrics: Array.isArray(originalLyrics) ? originalLyrics : [],
+        });
+      }
+      firstLanguagePrompt.finally(() => {
+        if (isActivePresentation()) {
+          this._dmResults = {};
+          this.lyricsSource(lyricsState, mode);
+        }
+      });
+      return;
+    }
+
     const displayMode1 = CONFIG.visual[`translation-mode:${modeKey}`];
     const displayMode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
 

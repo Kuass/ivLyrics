@@ -715,6 +715,20 @@ window.LANG_VI = {
     "traditionalChineseTW": "Tiếng Trung Phồn thể (Đài Loan)",
     "pinyin": "Pinyin (Bính âm)"
   },
+  "firstLanguagePrompt": {
+    "title": "Đây là lần đầu bạn phát một bài hát bằng {language}",
+    "description": "Bạn muốn dịch bài hát này như thế nào?",
+    "original": "Chỉ lời gốc",
+    "originalDescription": "Chỉ hiển thị lời gốc, không có cách phát âm hoặc bản dịch.",
+    "pronunciation": "Cách phát âm",
+    "pronunciationDescription": "Hiển thị lời gốc kèm hướng dẫn phát âm.",
+    "translation": "Bản dịch",
+    "translationDescription": "Hiển thị lời gốc kèm bản dịch.",
+    "both": "Cách phát âm + bản dịch",
+    "bothDescription": "Hiển thị cả hướng dẫn phát âm và bản dịch.",
+    "notNow": "Không thiết lập",
+    "apply": "Áp dụng các cài đặt này"
+  },
   "lyricsCacheEditor": {
     "title": "Chỉnh sửa phiên âm / bản dịch đã lưu",
     "unknownTrack": "Bài hát không xác định",

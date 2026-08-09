@@ -715,6 +715,20 @@ window.LANG_SV = {
     "traditionalChineseTW": "Traditionell kinesiska (TW)",
     "pinyin": "Pinyin"
   },
+  "firstLanguagePrompt": {
+    "title": "Första gången du spelar en låt på {language}",
+    "description": "Hur ska den här låten översättas?",
+    "original": "Endast original",
+    "originalDescription": "Visa endast originaltexten utan uttal eller översättning.",
+    "pronunciation": "Uttal",
+    "pronunciationDescription": "Visa originaltexten med en uttalsguide.",
+    "translation": "Översättning",
+    "translationDescription": "Visa originaltexten med en översättning.",
+    "both": "Uttal + översättning",
+    "bothDescription": "Visa både uttalsguiden och översättningen.",
+    "notNow": "Konfigurera inte",
+    "apply": "Tillämpa dessa inställningar"
+  },
   "lyricsCacheEditor": {
     "title": "Redigera cachelagrat uttal/översättning",
     "unknownTrack": "Okänt spår",

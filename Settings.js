@@ -67,6 +67,48 @@ function buildOrderedProviderList(providers, providerOrder) {
   return sortedProviders;
 }
 
+function reorderProviderList(providers, providerOrder, sourceId, targetId, position = "before") {
+  const orderedIds = buildOrderedProviderList(providers, providerOrder).map((provider) => provider.id);
+  if (!sourceId || !targetId || sourceId === targetId) return orderedIds;
+
+  const sourceIndex = orderedIds.indexOf(sourceId);
+  if (sourceIndex === -1) return orderedIds;
+  orderedIds.splice(sourceIndex, 1);
+
+  const targetIndex = orderedIds.indexOf(targetId);
+  if (targetIndex === -1) return orderedIds;
+  orderedIds.splice(targetIndex + (position === "after" ? 1 : 0), 0, sourceId);
+  return orderedIds;
+}
+
+const ProviderDragHandle = ({ provider, label, onDragStart, onDragEnd, onMove }) =>
+  react.createElement("button", {
+    type: "button",
+    className: "provider-drag-handle",
+    draggable: true,
+    title: label,
+    "aria-label": label,
+    onDragStart: (event) => onDragStart(event, provider.id),
+    onDragEnd,
+    onKeyDown: (event) => {
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      event.preventDefault();
+      onMove(provider.id, event.key === "ArrowUp" ? "up" : "down");
+    },
+  },
+    react.createElement("svg", {
+      width: 16,
+      height: 20,
+      viewBox: "0 0 16 20",
+      fill: "currentColor",
+      "aria-hidden": "true",
+    },
+      [4, 10, 16].flatMap((y) => [5, 11].map((x) =>
+        react.createElement("circle", { key: `${x}-${y}`, cx: x, cy: y, r: 1.35 })
+      ))
+    )
+  );
+
 // 데스크탑 오버레이 설정 컴포넌트
 const OverlaySettings = () => {
   const [enabled, setEnabled] = useState(window.OverlaySender?.enabled ?? false);
@@ -1475,6 +1517,7 @@ const LyricsProvidersTab = () => {
   const [enabledProviders, setEnabledProviders] = useState({});
   const [expandedProviders, setExpandedProviders] = useState(new Set());
   const [refreshKey, setRefreshKey] = useState(0);
+  const [dragState, setDragState] = useState({ sourceId: null, targetId: null, position: "before" });
   const preferSyncDataProviderEnabled =
     window.LyricsAddonManager?.isPreferSyncDataProviderEnabled?.()
     ?? (CONFIG.visual["prefer-sync-data-provider"] !== false);
@@ -1522,21 +1565,53 @@ const LyricsProvidersTab = () => {
     });
   };
 
-  // 드래그 앤 드롭으로 순서 변경 (간단한 위/아래 버튼으로 대체)
   const moveProvider = (providerId, direction) => {
-    const currentIndex = providerOrder.indexOf(providerId);
+    const currentOrder = buildOrderedProviderList(providers, providerOrder).map((provider) => provider.id);
+    const currentIndex = currentOrder.indexOf(providerId);
     if (currentIndex === -1) return;
 
     const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex < 0 || newIndex >= providerOrder.length) return;
+    if (newIndex < 0 || newIndex >= currentOrder.length) return;
 
-    const newOrder = [...providerOrder];
+    const newOrder = [...currentOrder];
     [newOrder[currentIndex], newOrder[newIndex]] = [newOrder[newIndex], newOrder[currentIndex]];
 
     setProviderOrder(newOrder);
     if (window.LyricsAddonManager) {
       window.LyricsAddonManager.setProviderOrder(newOrder);
     }
+  };
+
+  const handleDragStart = (event, providerId) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", providerId);
+    setDragState({ sourceId: providerId, targetId: null, position: "before" });
+  };
+
+  const handleDragOver = (event, targetId) => {
+    if (!dragState.sourceId || dragState.sourceId === targetId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const position = event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
+    if (dragState.targetId !== targetId || dragState.position !== position) {
+      setDragState((current) => ({ ...current, targetId, position }));
+    }
+  };
+
+  const handleDrop = (event, targetId) => {
+    event.preventDefault();
+    const sourceId = dragState.sourceId || event.dataTransfer.getData("text/plain");
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const position = event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
+    const newOrder = reorderProviderList(providers, providerOrder, sourceId, targetId, position);
+    setProviderOrder(newOrder);
+    window.LyricsAddonManager?.setProviderOrder?.(newOrder);
+    setDragState({ sourceId: null, targetId: null, position: "before" });
+  };
+
+  const clearDragState = () => {
+    setDragState({ sourceId: null, targetId: null, position: "before" });
   };
 
   // 정렬된 provider 목록
@@ -1586,31 +1661,24 @@ const LyricsProvidersTab = () => {
 
       // Provider 목록
       providers.length > 0 && react.createElement("div", { className: "lyrics-providers-list" },
-        sortedProviders.map((provider, index) =>
-          react.createElement("div", { key: provider.id, className: "lyrics-provider-item" },
-            // 순서 변경 버튼
-            react.createElement("div", { className: "lyrics-provider-order-buttons" },
-              react.createElement("button", {
-                className: "order-btn",
-                disabled: index === 0,
-                onClick: () => moveProvider(provider.id, 'up'),
-                title: I18n.t("settings.lyricsProviders.moveUp") || "Move Up"
-              },
-                react.createElement("svg", { width: 12, height: 12, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" },
-                  react.createElement("polyline", { points: "18 15 12 9 6 15" })
-                )
-              ),
-              react.createElement("button", {
-                className: "order-btn",
-                disabled: index === sortedProviders.length - 1,
-                onClick: () => moveProvider(provider.id, 'down'),
-                title: I18n.t("settings.lyricsProviders.moveDown") || "Move Down"
-              },
-                react.createElement("svg", { width: 12, height: 12, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" },
-                  react.createElement("polyline", { points: "6 9 12 15 18 9" })
-                )
-              )
-            ),
+        sortedProviders.map((provider) =>
+          react.createElement("div", {
+            key: provider.id,
+            className: [
+              "lyrics-provider-item",
+              dragState.sourceId === provider.id ? "dragging" : "",
+              dragState.targetId === provider.id ? `drag-over-${dragState.position}` : "",
+            ].filter(Boolean).join(" "),
+            onDragOver: (event) => handleDragOver(event, provider.id),
+            onDrop: (event) => handleDrop(event, provider.id),
+          },
+            react.createElement(ProviderDragHandle, {
+              provider,
+              label: `${provider.name || provider.id}: ${I18n.t("settings.lyricsProviders.moveUp") || "Move Up"} / ${I18n.t("settings.lyricsProviders.moveDown") || "Move Down"}`,
+              onDragStart: handleDragStart,
+              onDragEnd: clearDragState,
+              onMove: moveProvider,
+            }),
             // Provider 카드
             react.createElement(LyricsProviderCard, {
               provider: provider,
@@ -1662,16 +1730,18 @@ const AIProvidersTab = () => {
   const [enabledProviders, setEnabledProviders] = useState({});
   const [expandedProviders, setExpandedProviders] = useState(new Set());
   const [refreshKey, setRefreshKey] = useState(0);
+  const [dragState, setDragState] = useState({ sourceId: null, targetId: null, position: "before" });
   const [translationStyle, setTranslationStyle] = useState(
     () => window.AIAddonManager?.getTranslationStyle?.() || "natural"
   );
   const [providerRetryCount, setProviderRetryCount] = useState(
     () => window.AIAddonManager?.getProviderRetryCount?.() ?? 2
   );
-  const areCulturalAnnotationsEnabled = () => {
+  const [culturalAnnotationsEnabled, setCulturalAnnotationsEnabled] = useState(() => {
     const value = CONFIG.visual["cultural-annotations-enabled"];
     return value === true || value === "true";
-  };
+  });
+  const [culturalDetailsExpanded, setCulturalDetailsExpanded] = useState(false);
   const vinylModeLabel = I18n.t("vinyl.mode") || "LP";
 
   useEffect(() => {
@@ -1763,21 +1833,68 @@ const AIProvidersTab = () => {
     });
   };
 
-  // 위/아래 버튼으로 순서 변경
   const moveProvider = (providerId, direction) => {
-    const currentIndex = providerOrder.indexOf(providerId);
+    const currentOrder = buildOrderedProviderList(providers, providerOrder).map((provider) => provider.id);
+    const currentIndex = currentOrder.indexOf(providerId);
     if (currentIndex === -1) return;
 
     const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex < 0 || newIndex >= providerOrder.length) return;
+    if (newIndex < 0 || newIndex >= currentOrder.length) return;
 
-    const newOrder = [...providerOrder];
+    const newOrder = [...currentOrder];
     [newOrder[currentIndex], newOrder[newIndex]] = [newOrder[newIndex], newOrder[currentIndex]];
 
     setProviderOrder(newOrder);
     if (window.AIAddonManager) {
       window.AIAddonManager.setProviderOrder(newOrder);
     }
+  };
+
+  const handleDragStart = (event, providerId) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", providerId);
+    setDragState({ sourceId: providerId, targetId: null, position: "before" });
+  };
+
+  const handleDragOver = (event, targetId) => {
+    if (!dragState.sourceId || dragState.sourceId === targetId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const position = event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
+    if (dragState.targetId !== targetId || dragState.position !== position) {
+      setDragState((current) => ({ ...current, targetId, position }));
+    }
+  };
+
+  const handleDrop = (event, targetId) => {
+    event.preventDefault();
+    const sourceId = dragState.sourceId || event.dataTransfer.getData("text/plain");
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const position = event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
+    const newOrder = reorderProviderList(providers, providerOrder, sourceId, targetId, position);
+    setProviderOrder(newOrder);
+    window.AIAddonManager?.setProviderOrder?.(newOrder);
+    setDragState({ sourceId: null, targetId: null, position: "before" });
+  };
+
+  const clearDragState = () => {
+    setDragState({ sourceId: null, targetId: null, position: "before" });
+  };
+
+  const handleCulturalSettingChange = (name, value) => {
+    CONFIG.visual[name] = value;
+    StorageManager.saveConfig(name, value);
+    if (name === "cultural-annotations-enabled") {
+      const enabled = value === true || value === "true";
+      setCulturalAnnotationsEnabled(enabled);
+      if (!enabled) setCulturalDetailsExpanded(false);
+    }
+    if (name.endsWith("font-family")) loadGoogleFontFamily(value);
+    lyricContainerUpdate?.();
+    window.dispatchEvent(new CustomEvent("ivLyrics", {
+      detail: { type: "config", name, value },
+    }));
   };
 
   // 정렬된 provider 목록
@@ -1862,13 +1979,40 @@ const AIProvidersTab = () => {
             type: ConfigSlider,
             defaultValue: CONFIG.visual["cultural-annotations-enabled"] ?? false,
           },
+        ],
+        onChange: handleCulturalSettingChange,
+      }),
+      culturalAnnotationsEnabled && react.createElement("button", {
+        type: "button",
+        className: `cultural-details-toggle${culturalDetailsExpanded ? " expanded" : ""}`,
+        "aria-expanded": culturalDetailsExpanded,
+        "aria-controls": "cultural-annotation-details",
+        onClick: () => setCulturalDetailsExpanded((expanded) => !expanded),
+      },
+        react.createElement("span", null, I18n.t("shareImage.advancedSettings") || "Detailed settings"),
+        react.createElement("svg", {
+          width: 16,
+          height: 16,
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          strokeWidth: 2,
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          "aria-hidden": "true",
+        }, react.createElement("polyline", { points: "6 9 12 15 18 9" }))
+      ),
+      culturalAnnotationsEnabled && culturalDetailsExpanded && react.createElement("div", {
+        id: "cultural-annotation-details",
+        className: "cultural-annotation-details",
+      }, react.createElement(OptionList, {
+        items: [
           {
             desc: I18n.t("settings.culturalAnnotations.fontFamily.label"),
             key: "cultural-annotations-font-family",
             info: I18n.t("settings.culturalAnnotations.fontFamily.desc"),
             type: ConfigFontSelector,
             defaultValue: CONFIG.visual["cultural-annotations-font-family"] || "Pretendard Variable",
-            when: () => areCulturalAnnotationsEnabled(),
           },
           {
             desc: I18n.t("settings.culturalAnnotations.fontSize.label"),
@@ -1879,14 +2023,12 @@ const AIProvidersTab = () => {
             max: 48,
             step: 1,
             unit: "px",
-            when: () => areCulturalAnnotationsEnabled(),
           },
           {
             desc: I18n.t("settings.culturalAnnotations.fontWeight.label"),
             key: "cultural-annotations-font-weight",
             info: I18n.t("settings.culturalAnnotations.fontWeight.desc"),
             type: ConfigFontWeightSlider,
-            when: () => areCulturalAnnotationsEnabled(),
           },
           {
             desc: I18n.t("settings.culturalAnnotations.opacity.label"),
@@ -1897,18 +2039,14 @@ const AIProvidersTab = () => {
             max: 100,
             step: 1,
             unit: "%",
-            when: () => areCulturalAnnotationsEnabled(),
           },
-          ...createTextOutlineSettingItems("cultural-annotations", {
-            when: () => areCulturalAnnotationsEnabled(),
-          }),
+          ...createTextOutlineSettingItems("cultural-annotations"),
           {
             desc: `${vinylModeLabel} · ${I18n.t("settings.culturalAnnotations.fontFamily.label")}`,
             key: "cultural-annotations-vinyl-font-family",
             info: `${vinylModeLabel}: ${I18n.t("settings.culturalAnnotations.fontFamily.desc")}`,
             type: ConfigFontSelector,
             defaultValue: CONFIG.visual["cultural-annotations-vinyl-font-family"] || "Pretendard Variable",
-            when: () => areCulturalAnnotationsEnabled(),
           },
           {
             desc: `${vinylModeLabel} · ${I18n.t("settings.culturalAnnotations.fontSize.label")}`,
@@ -1919,14 +2057,12 @@ const AIProvidersTab = () => {
             max: 32,
             step: 1,
             unit: "px",
-            when: () => areCulturalAnnotationsEnabled(),
           },
           {
             desc: `${vinylModeLabel} · ${I18n.t("settings.culturalAnnotations.fontWeight.label")}`,
             key: "cultural-annotations-vinyl-font-weight",
             info: `${vinylModeLabel}: ${I18n.t("settings.culturalAnnotations.fontWeight.desc")}`,
             type: ConfigFontWeightSlider,
-            when: () => areCulturalAnnotationsEnabled(),
           },
           {
             desc: `${vinylModeLabel} · ${I18n.t("settings.culturalAnnotations.opacity.label")}`,
@@ -1937,51 +2073,34 @@ const AIProvidersTab = () => {
             max: 100,
             step: 1,
             unit: "%",
-            when: () => areCulturalAnnotationsEnabled(),
           },
           ...createTextOutlineSettingItems("cultural-annotations-vinyl", {
             labelPrefix: `${vinylModeLabel} · `,
             infoPrefix: `${vinylModeLabel}: `,
-            when: () => areCulturalAnnotationsEnabled(),
           }),
         ],
-        onChange: (name, value) => {
-          CONFIG.visual[name] = value;
-          StorageManager.saveConfig(name, value);
-          if (name.endsWith("font-family")) loadGoogleFontFamily(value);
-          lyricContainerUpdate?.();
-          window.dispatchEvent(new CustomEvent("ivLyrics", {
-            detail: { type: "config", name, value },
-          }));
-        },
-      }),
+        onChange: handleCulturalSettingChange,
+      })),
       // Provider 목록
       providers.length > 0 && react.createElement("div", { className: "lyrics-providers-list" },
-        sortedProviders.map((provider, index) =>
-          react.createElement("div", { key: provider.id, className: "lyrics-provider-item" },
-            // 순서 변경 버튼
-            react.createElement("div", { className: "lyrics-provider-order-buttons" },
-              react.createElement("button", {
-                className: "order-btn",
-                disabled: index === 0,
-                onClick: () => moveProvider(provider.id, 'up'),
-                title: I18n.t("settings.aiProviders.moveUp") || "Move Up"
-              },
-                react.createElement("svg", { width: 12, height: 12, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" },
-                  react.createElement("polyline", { points: "18 15 12 9 6 15" })
-                )
-              ),
-              react.createElement("button", {
-                className: "order-btn",
-                disabled: index === sortedProviders.length - 1,
-                onClick: () => moveProvider(provider.id, 'down'),
-                title: I18n.t("settings.aiProviders.moveDown") || "Move Down"
-              },
-                react.createElement("svg", { width: 12, height: 12, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" },
-                  react.createElement("polyline", { points: "6 9 12 15 18 9" })
-                )
-              )
-            ),
+        sortedProviders.map((provider) =>
+          react.createElement("div", {
+            key: provider.id,
+            className: [
+              "lyrics-provider-item",
+              dragState.sourceId === provider.id ? "dragging" : "",
+              dragState.targetId === provider.id ? `drag-over-${dragState.position}` : "",
+            ].filter(Boolean).join(" "),
+            onDragOver: (event) => handleDragOver(event, provider.id),
+            onDrop: (event) => handleDrop(event, provider.id),
+          },
+            react.createElement(ProviderDragHandle, {
+              provider,
+              label: `${provider.name || provider.id}: ${I18n.t("settings.aiProviders.moveUp") || "Move Up"} / ${I18n.t("settings.aiProviders.moveDown") || "Move Down"}`,
+              onDragStart: handleDragStart,
+              onDragEnd: clearDragState,
+              onMove: moveProvider,
+            }),
             // Provider 카드
             react.createElement(AddonSettingsCard, {
               addon: provider,
@@ -15087,6 +15206,103 @@ const ConfigModal = ({
     height: 1px;
     background: var(--settings-row-divider);
     pointer-events: none;
+}
+
+#${APP_NAME}-config-container .provider-drag-handle {
+    align-self: stretch;
+    flex: 0 0 40px;
+    width: 40px;
+    min-width: 40px;
+    margin: 8px 0;
+    padding: 0;
+    border: 0 !important;
+    border-radius: 8px !important;
+    background: transparent;
+    color: var(--text-tertiary);
+    cursor: grab;
+    touch-action: none;
+}
+
+#${APP_NAME}-config-container .provider-drag-handle:hover {
+    border: 0 !important;
+    background: var(--settings-section-surface-hover);
+    color: var(--text-primary);
+}
+
+#${APP_NAME}-config-container .provider-drag-handle:active {
+    cursor: grabbing;
+}
+
+#${APP_NAME}-config-container .provider-drag-handle:focus-visible,
+#${APP_NAME}-config-container .cultural-details-toggle:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: -2px;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-item.dragging {
+    opacity: 0.48;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-item.drag-over-before::after,
+#${APP_NAME}-config-container .lyrics-provider-item.drag-over-after::after {
+    content: "";
+    position: absolute;
+    z-index: 5;
+    left: 8px;
+    right: 8px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--accent-primary);
+    pointer-events: none;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-item.drag-over-before::after {
+    top: 0;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-item.drag-over-after::after {
+    bottom: 0;
+}
+
+#${APP_NAME}-config-container .cultural-details-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 44px;
+    margin: -8px 0 0;
+    padding: 10px 14px;
+    border: 1px solid var(--settings-section-outline) !important;
+    border-radius: 10px !important;
+    background: var(--settings-section-surface);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 650;
+    text-align: left;
+}
+
+#${APP_NAME}-config-container .cultural-details-toggle:hover {
+    border-color: var(--settings-section-outline) !important;
+    background: var(--settings-section-surface-hover);
+    color: var(--text-primary);
+}
+
+#${APP_NAME}-config-container .cultural-details-toggle svg {
+    transition: transform 160ms ease;
+}
+
+#${APP_NAME}-config-container .cultural-details-toggle.expanded svg {
+    transform: rotate(180deg);
+}
+
+#${APP_NAME}-config-container .cultural-annotation-details {
+    min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #${APP_NAME}-config-container .cultural-details-toggle svg {
+        transition: none;
+    }
 }
 
 #${APP_NAME}-config-container .lyrics-provider-order-buttons {

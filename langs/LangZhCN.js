@@ -715,6 +715,20 @@ window.LANG_ZH_CN = {
     "traditionalChineseTW": "繁体中文 (台湾)",
     "pinyin": "拼音"
   },
+  "firstLanguagePrompt": {
+    "title": "第一次播放{language}歌曲",
+    "description": "要如何翻译这首歌？",
+    "original": "仅原文",
+    "originalDescription": "仅显示原文歌词，不显示发音或翻译。",
+    "pronunciation": "发音",
+    "pronunciationDescription": "显示原文歌词和发音标注。",
+    "translation": "翻译",
+    "translationDescription": "显示原文歌词和翻译。",
+    "both": "发音 + 翻译",
+    "bothDescription": "同时显示发音标注和翻译。",
+    "notNow": "不进行设置",
+    "apply": "应用这些设置"
+  },
   "lyricsCacheEditor": {
     "title": "编辑已保存的发音 / 翻译歌词",
     "unknownTrack": "未知曲目",

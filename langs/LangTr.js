@@ -715,6 +715,20 @@ window.LANG_TR = {
     "traditionalChineseTW": "Geleneksel Çince (TW)",
     "pinyin": "Pinyin"
   },
+  "firstLanguagePrompt": {
+    "title": "İlk kez {language} dilinde bir şarkı çalıyorsunuz",
+    "description": "Bu şarkı nasıl çevrilsin?",
+    "original": "Yalnızca orijinal",
+    "originalDescription": "Telaffuz veya çeviri olmadan yalnızca orijinal şarkı sözlerini gösterir.",
+    "pronunciation": "Telaffuz",
+    "pronunciationDescription": "Orijinal şarkı sözlerini telaffuz kılavuzuyla gösterir.",
+    "translation": "Çeviri",
+    "translationDescription": "Orijinal şarkı sözlerini çeviriyle gösterir.",
+    "both": "Telaffuz + çeviri",
+    "bothDescription": "Hem telaffuz kılavuzunu hem de çeviriyi gösterir.",
+    "notNow": "Ayarlama",
+    "apply": "Bu ayarları uygula"
+  },
   "lyricsCacheEditor": {
     "title": "Önbelleğe Alınmış Okunuşu / Çeviriyi Düzenle",
     "unknownTrack": "Bilinmeyen Parça",

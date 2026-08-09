@@ -715,6 +715,20 @@ window.LANG_KO = {
     "traditionalChineseTW": "번체 중국어 (대만)",
     "pinyin": "병음"
   },
+  "firstLanguagePrompt": {
+    "title": "{language} 곡을 처음 재생하시네요",
+    "description": "이 노래는 어떻게 번역할까요?",
+    "original": "원문만",
+    "originalDescription": "발음이나 번역 없이 원문 가사만 표시합니다.",
+    "pronunciation": "발음",
+    "pronunciationDescription": "원문 가사와 함께 발음 표기를 표시합니다.",
+    "translation": "번역",
+    "translationDescription": "원문 가사와 함께 번역을 표시합니다.",
+    "both": "발음 + 번역",
+    "bothDescription": "발음 표기와 번역을 모두 표시합니다.",
+    "notNow": "설정하지 않기",
+    "apply": "이 설정으로 적용"
+  },
   "lyricsCacheEditor": {
     "title": "저장된 발음 / 번역 가사 수정",
     "unknownTrack": "알 수 없는 곡",

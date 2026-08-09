@@ -715,6 +715,20 @@ window.LANG_AR = {
     "traditionalChineseTW": "صينية تقليدية (تايوان)",
     "pinyin": "بينيين"
   },
+  "firstLanguagePrompt": {
+    "title": "هذه أول مرة تشغّل فيها أغنية باللغة {language}",
+    "description": "كيف تريد ترجمة هذه الأغنية؟",
+    "original": "النص الأصلي فقط",
+    "originalDescription": "عرض كلمات الأغنية الأصلية فقط من دون نطق أو ترجمة.",
+    "pronunciation": "النطق",
+    "pronunciationDescription": "عرض كلمات الأغنية الأصلية مع دليل للنطق.",
+    "translation": "الترجمة",
+    "translationDescription": "عرض كلمات الأغنية الأصلية مع ترجمة.",
+    "both": "النطق + الترجمة",
+    "bothDescription": "عرض دليل النطق والترجمة معًا.",
+    "notNow": "عدم الإعداد",
+    "apply": "تطبيق هذه الإعدادات"
+  },
   "lyricsCacheEditor": {
     "title": "تعديل كلمات النطق / الترجمة المحفوظة",
     "unknownTrack": "مقطع غير معروف",

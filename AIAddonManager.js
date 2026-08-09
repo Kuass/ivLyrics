@@ -150,8 +150,8 @@
         }
     };
 
-    // 기본 활성화 Addon (모든 AI Addon은 API 키 설정 후 활성화 권장)
-    const DEFAULT_ENABLED_ADDONS = [];
+    // 키가 필요 없는 번역 전용 Addon은 첫 실행부터 활성화한다.
+    const DEFAULT_ENABLED_ADDONS = ["bing-translate", "google-translate"];
     const PROVIDERS_WITHOUT_PHONETIC_DESCRIPTION = new Set([
         'claude',
         'groq',
@@ -1438,10 +1438,13 @@ ${normalizedText}
          * @returns {Promise<Object|null>}
          */
         async translateLyrics(params) {
-            const providers = this.getEnabledProvidersFor('translate');
+            const translationProviders = this.getEnabledProvidersFor('translate');
+            const providers = params.wantSmartPhonetic
+                ? translationProviders.filter(addon => addon.supports?.pronunciation !== false)
+                : translationProviders;
 
             if (providers.length === 0) {
-                console.warn('[AIAddonManager] No translate providers enabled');
+                console.warn(`[AIAddonManager] No ${params.wantSmartPhonetic ? 'pronunciation' : 'translate'} providers enabled`);
                 throw new Error(this._t('aiProviders.noEnabledProviders', 'No AI providers enabled. Please enable at least one provider in settings.'));
             }
 

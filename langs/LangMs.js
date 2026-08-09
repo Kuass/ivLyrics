@@ -715,6 +715,20 @@ window.LANG_MS = {
     "traditionalChineseTW": "Cina Tradisional (Taiwan)",
     "pinyin": "Pinyin"
   },
+  "firstLanguagePrompt": {
+    "title": "Kali pertama memainkan lagu dalam bahasa {language}",
+    "description": "Bagaimanakah lagu ini harus diterjemahkan?",
+    "original": "Asal sahaja",
+    "originalDescription": "Paparkan lirik asal sahaja tanpa sebutan atau terjemahan.",
+    "pronunciation": "Sebutan",
+    "pronunciationDescription": "Paparkan lirik asal dengan panduan sebutan.",
+    "translation": "Terjemahan",
+    "translationDescription": "Paparkan lirik asal dengan terjemahan.",
+    "both": "Sebutan + terjemahan",
+    "bothDescription": "Paparkan panduan sebutan dan terjemahan.",
+    "notNow": "Jangan sediakan",
+    "apply": "Gunakan tetapan ini"
+  },
   "lyricsCacheEditor": {
     "title": "Sunting Sebutan / Terjemahan Lirik Disimpan",
     "unknownTrack": "Trek Tidak Diketahui",

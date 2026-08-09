@@ -28,7 +28,12 @@ function createFluentModalHost({
   overlayClassName = "",
   shellClassName = "",
   shellStyle = "",
+  mountNode = document.body,
   removeExisting = true,
+  modal = true,
+  closeOnBackdrop = modal,
+  trapFocus = modal,
+  autoFocus = modal,
   onBeforeClose = null,
 }) {
   if (removeExisting && overlayId) {
@@ -60,7 +65,7 @@ function createFluentModalHost({
     .join(" ");
   shell.dataset.uiTheme = uiTheme;
   shell.setAttribute("role", "dialog");
-  shell.setAttribute("aria-modal", "true");
+  shell.setAttribute("aria-modal", modal ? "true" : "false");
   if (shellStyle) {
     shell.style.cssText = shellStyle;
   }
@@ -100,7 +105,7 @@ function createFluentModalHost({
   )).filter((element) => !element.hidden && element.getAttribute("aria-hidden") !== "true");
 
   const handleKeydown = (event) => {
-    if (event.key === "Escape") {
+    if (event.key === "Escape" && (modal || shell.contains(document.activeElement))) {
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation?.();
@@ -108,7 +113,7 @@ function createFluentModalHost({
       return;
     }
 
-    if (event.key === "Tab") {
+    if (event.key === "Tab" && trapFocus) {
       const focusable = getFocusableElements();
       if (!focusable.length) {
         event.preventDefault();
@@ -128,20 +133,24 @@ function createFluentModalHost({
     }
   };
 
-  overlay.addEventListener("click", (event) => {
-    if (event.target === overlay) {
-      closeModal();
-    }
-  });
+  if (closeOnBackdrop) {
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) {
+        closeModal();
+      }
+    });
+  }
   document.addEventListener("keydown", handleKeydown, true);
 
   overlay.appendChild(shell);
-  document.body.appendChild(overlay);
+  const resolvedMountNode = mountNode?.isConnected ? mountNode : document.body;
+  resolvedMountNode.appendChild(overlay);
   overlay.__ivLyricsCloseModal = closeModal;
   shell.tabIndex = -1;
 
   requestAnimationFrame(() => {
     overlay.classList.add("is-open");
+    if (!autoFocus) return;
     const focusTarget = shell.querySelector(
       ".ivlyrics-fluent-close, button, input, select, textarea, [tabindex]:not([tabindex='-1'])"
     );
@@ -149,6 +158,15 @@ function createFluentModalHost({
   });
 
   return { overlay, shell, closeModal };
+}
+
+function resolveFirstLanguagePromptMountNode() {
+  const lyricsSurface = document.querySelector(
+    ".lyrics-lyricsContainer-LyricsContainer"
+  );
+  return lyricsSurface?.closest("#lyrics-fullscreen-container, .Root__main-view")
+    ?? document.querySelector(".Root__main-view")
+    ?? document.body;
 }
 
 function openFluentReactModal({
@@ -366,6 +384,198 @@ function ensureFluentModalStyles() {
   color: #0f172a;
   background: rgba(15, 23, 42, 0.08);
   border-color: rgba(15, 23, 42, 0.18);
+}
+
+.ivlyrics-first-language-overlay {
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 20px 24px 108px;
+  background: transparent !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  pointer-events: none;
+}
+
+.ivlyrics-first-language-shell {
+  width: min(440px, calc(100vw - 32px));
+  max-height: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px !important;
+  background: rgba(24, 24, 27, 0.98);
+  box-shadow: 0 20px 64px rgba(0, 0, 0, 0.44);
+  color: #f8fafc;
+  pointer-events: auto;
+}
+
+.ivlyrics-first-language-shell[data-ui-theme="light"] {
+  border-color: rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 20px 56px rgba(15, 23, 42, 0.18);
+  color: #111827;
+}
+
+.ivlyrics-first-language-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 30px 18px;
+  text-align: center;
+}
+
+.ivlyrics-first-language-icon {
+  width: 58px;
+  height: 58px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  border-radius: 50%;
+  background: rgba(96, 165, 250, 0.22);
+  color: #93c5fd;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.12em;
+}
+
+.ivlyrics-first-language-shell[data-ui-theme="light"] .ivlyrics-first-language-icon {
+  background: #dbeafe;
+  color: #1d4f91;
+}
+
+.ivlyrics-first-language-title {
+  margin: 0;
+  color: inherit;
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  line-height: 1.35;
+}
+
+.ivlyrics-first-language-description {
+  margin: 5px 0 0;
+  color: rgba(248, 250, 252, 0.58);
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.ivlyrics-first-language-shell[data-ui-theme="light"] .ivlyrics-first-language-description {
+  color: rgba(17, 24, 39, 0.64);
+}
+
+.ivlyrics-first-language-body {
+  padding: 0 28px;
+}
+
+.ivlyrics-first-language-toggle-row {
+  width: 100%;
+  min-height: 58px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ivlyrics-first-language-toggle-row:last-child {
+  border-bottom: 0;
+}
+
+.ivlyrics-first-language-shell[data-ui-theme="light"] .ivlyrics-first-language-toggle-row {
+  border-bottom-color: rgba(15, 23, 42, 0.1);
+}
+
+.ivlyrics-first-language-row-icon {
+  width: 24px;
+  color: rgba(248, 250, 252, 0.62);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.ivlyrics-first-language-shell[data-ui-theme="light"] .ivlyrics-first-language-row-icon {
+  color: rgba(17, 24, 39, 0.68);
+}
+
+.ivlyrics-first-language-row-label {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.ivlyrics-first-language-switch {
+  width: 50px;
+  height: 28px;
+  padding: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.ivlyrics-first-language-switch.is-on {
+  justify-content: flex-end;
+  border-color: #2f7ddd;
+  background: #2f7ddd;
+}
+
+.ivlyrics-first-language-switch-knob {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+}
+
+.ivlyrics-first-language-shell[data-ui-theme="light"] .ivlyrics-first-language-switch {
+  border-color: rgba(15, 23, 42, 0.14);
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.ivlyrics-first-language-shell[data-ui-theme="light"] .ivlyrics-first-language-switch.is-on {
+  border-color: #2f7ddd;
+  background: #2f7ddd;
+}
+
+.ivlyrics-first-language-action {
+  width: calc(100% - 56px);
+  min-height: 48px;
+  margin: 16px 28px 22px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(248, 250, 252, 0.62);
+  font-size: 15px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.ivlyrics-first-language-action.has-selection {
+  background: #2f7ddd;
+  color: #ffffff;
+}
+
+.ivlyrics-first-language-shell[data-ui-theme="light"] .ivlyrics-first-language-action {
+  color: rgba(17, 24, 39, 0.55);
+}
+
+.ivlyrics-first-language-shell[data-ui-theme="light"] .ivlyrics-first-language-action.has-selection {
+  color: #ffffff;
+}
+
+.ivlyrics-first-language-toggle-row:focus-visible,
+.ivlyrics-first-language-action:focus-visible,
+.ivlyrics-fluent-btn:focus-visible,
+.ivlyrics-fluent-close:focus-visible {
+  outline: 2px solid var(--spice-accent, #1ed760);
+  outline-offset: 2px;
 }
 
 .ivlyrics-adjust-btn {
@@ -1324,6 +1534,14 @@ function ensureFluentModalStyles() {
   .lyrics-sync-adjust-quick {
     flex-wrap: wrap;
   }
+
+  .ivlyrics-first-language-overlay {
+    padding: 12px 12px 96px;
+  }
+
+  .ivlyrics-first-language-shell {
+    width: min(420px, calc(100vw - 24px));
+  }
 }
 
 /* Compact glass surface shared by toolbar popups and editors */
@@ -1611,6 +1829,38 @@ function ensureFluentModalStyles() {
   color: var(--spice-accent, #1ed760);
 }
 
+/* The first-language card is non-modal and contained by the current ivLyrics page. */
+.ivlyrics-fluent-overlay.ivlyrics-first-language-overlay {
+  position: absolute;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 20px 24px 24px;
+  background: transparent !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  pointer-events: none;
+}
+
+.ivlyrics-fluent-shell.ivlyrics-first-language-shell {
+  width: min(440px, 100%);
+  max-height: none;
+  background: rgba(24, 24, 27, 0.98) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 20px 64px rgba(0, 0, 0, 0.44) !important;
+  backdrop-filter: blur(20px) saturate(130%);
+  -webkit-backdrop-filter: blur(20px) saturate(130%);
+  color: #f8fafc;
+  pointer-events: auto;
+}
+
+.ivlyrics-fluent-shell.ivlyrics-first-language-shell[data-ui-theme="light"] {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+  box-shadow: 0 20px 56px rgba(15, 23, 42, 0.18) !important;
+  color: #111827;
+}
+
 @media (max-width: 840px) {
   .ivlyrics-fluent-overlay {
     padding: 10px;
@@ -1629,6 +1879,16 @@ function ensureFluentModalStyles() {
     right: 12px;
     left: 12px;
     bottom: 12px;
+  }
+
+  .ivlyrics-fluent-overlay.ivlyrics-first-language-overlay {
+    padding: 12px;
+  }
+
+  .ivlyrics-fluent-shell.ivlyrics-first-language-shell {
+    width: min(420px, 100%);
+    max-height: calc(100% - 24px);
+    border-radius: 22px !important;
   }
 }
 
@@ -2160,6 +2420,215 @@ function openOptionsModal(title, items, onChange, eventType = null) {
   reactDom.render(container, body);
   return host.closeModal;
 }
+
+const FIRST_LANGUAGE_PROMPT_STORAGE_PREFIX = `${APP_NAME}:first-language-prompted:v1:`;
+const firstLanguagePromptPromises = new Map();
+
+function readFirstLanguagePromptStorage(key) {
+  try {
+    const persisted = window.ivLyricsStoragePersistence?.getItem?.(key);
+    if (persisted !== undefined && persisted !== null) return persisted;
+  } catch {}
+  try {
+    const persisted = Spicetify?.LocalStorage?.get?.(key);
+    if (persisted !== undefined && persisted !== null) return persisted;
+  } catch {}
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeFirstLanguagePromptStorage(key, value) {
+  try {
+    window.ivLyricsStoragePersistence?.setItem?.(key, value);
+  } catch {}
+  try {
+    Spicetify?.LocalStorage?.set?.(key, value);
+  } catch {}
+  try {
+    localStorage.setItem(key, value);
+  } catch {}
+}
+
+function normalizeFirstLanguagePromptCode(language) {
+  const normalized = String(language || "")
+    .trim()
+    .replaceAll("_", "-")
+    .toLowerCase();
+  if (["", "auto", "default", "unknown", "und"].includes(normalized)) return "";
+  if (normalized === "jp") return "ja";
+  if (normalized === "kr") return "ko";
+  if (["cn", "zh", "zh-hans", "zh-cn", "zh-sg"].includes(normalized)) return "zh-hans";
+  if (["tw", "hk", "zh-hant", "zh-tw", "zh-hk"].includes(normalized)) return "zh-hant";
+  return normalized.split("-")[0];
+}
+
+function firstLanguagePromptDisplayName(language) {
+  try {
+    const uiLanguage = I18n.getCurrentLanguage?.() || "en";
+    return new Intl.DisplayNames([uiLanguage], { type: "language" }).of(language) || language;
+  } catch {
+    return language;
+  }
+}
+
+function hasExplicitFirstLanguageModes(modeKey) {
+  const firstKey = `${APP_NAME}:visual:translation-mode:${modeKey}`;
+  const secondKey = `${APP_NAME}:visual:translation-mode-2:${modeKey}`;
+  return readFirstLanguagePromptStorage(firstKey) !== null
+    || readFirstLanguagePromptStorage(secondKey) !== null;
+}
+
+function openFirstLanguagePrompt({ sourceLang, modeKey }) {
+  const normalizedSource = normalizeFirstLanguagePromptCode(sourceLang);
+  if (!normalizedSource) return null;
+
+  const pending = firstLanguagePromptPromises.get(normalizedSource);
+  if (pending) return pending;
+
+  const promptedKey = `${FIRST_LANGUAGE_PROMPT_STORAGE_PREFIX}${normalizedSource}`;
+  if (readFirstLanguagePromptStorage(promptedKey) === "1") return null;
+  if (hasExplicitFirstLanguageModes(modeKey)) return null;
+
+  // Mark on presentation, including Escape/backdrop/close, so it never nags on every track.
+  writeFirstLanguagePromptStorage(promptedKey, "1");
+
+  const promise = new Promise((resolve) => {
+    let settled = false;
+    const finish = (choice = "dismissed") => {
+      if (settled) return;
+      settled = true;
+      firstLanguagePromptPromises.delete(normalizedSource);
+      resolve(choice);
+    };
+
+    const host = createFluentModalHost({
+      overlayId: "ivLyrics-first-language-overlay",
+      overlayClassName: "ivlyrics-first-language-overlay",
+      shellClassName: "ivlyrics-first-language-shell",
+      mountNode: resolveFirstLanguagePromptMountNode(),
+      modal: false,
+      closeOnBackdrop: false,
+      trapFocus: false,
+      autoFocus: true,
+      onBeforeClose: () => finish(),
+    });
+
+    const languageName = firstLanguagePromptDisplayName(normalizedSource);
+    const titleId = "ivLyrics-first-language-title";
+    const descriptionId = "ivLyrics-first-language-description";
+    host.shell.setAttribute("aria-labelledby", titleId);
+    host.shell.setAttribute("aria-describedby", descriptionId);
+    host.shell.setAttribute("aria-live", "polite");
+
+    const header = document.createElement("div");
+    header.className = "ivlyrics-first-language-header";
+    const icon = document.createElement("span");
+    icon.className = "ivlyrics-first-language-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "文A";
+    const title = document.createElement("h2");
+    title.id = titleId;
+    title.className = "ivlyrics-first-language-title";
+    title.textContent = I18n.t("firstLanguagePrompt.title", { language: languageName });
+    const description = document.createElement("p");
+    description.id = descriptionId;
+    description.className = "ivlyrics-first-language-description";
+    description.textContent = I18n.t("firstLanguagePrompt.description");
+    header.append(icon, title, description);
+
+    const body = document.createElement("div");
+    body.className = "ivlyrics-first-language-body";
+    const draft = {
+      pronunciation: false,
+      translation: false,
+    };
+    const action = document.createElement("button");
+    action.type = "button";
+    action.className = "ivlyrics-first-language-action";
+
+    const updateAction = () => {
+      const hasSelection = draft.pronunciation || draft.translation;
+      action.classList.toggle("has-selection", hasSelection);
+      action.textContent = I18n.t(
+        hasSelection ? "firstLanguagePrompt.apply" : "firstLanguagePrompt.notNow"
+      );
+    };
+
+    const createToggleRow = ({ key, iconText, label }) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "ivlyrics-first-language-toggle-row";
+      row.setAttribute("role", "switch");
+      row.setAttribute("aria-checked", "false");
+
+      const rowIcon = document.createElement("span");
+      rowIcon.className = "ivlyrics-first-language-row-icon";
+      rowIcon.setAttribute("aria-hidden", "true");
+      rowIcon.textContent = iconText;
+      const rowLabel = document.createElement("span");
+      rowLabel.className = "ivlyrics-first-language-row-label";
+      rowLabel.textContent = label;
+      const switchTrack = document.createElement("span");
+      switchTrack.className = "ivlyrics-first-language-switch";
+      switchTrack.setAttribute("aria-hidden", "true");
+      const switchKnob = document.createElement("span");
+      switchKnob.className = "ivlyrics-first-language-switch-knob";
+      switchTrack.appendChild(switchKnob);
+      row.append(rowIcon, rowLabel, switchTrack);
+
+      row.addEventListener("click", () => {
+        draft[key] = !draft[key];
+        row.setAttribute("aria-checked", draft[key] ? "true" : "false");
+        switchTrack.classList.toggle("is-on", draft[key]);
+        updateAction();
+      });
+      return row;
+    };
+
+    body.append(
+      createToggleRow({
+        key: "pronunciation",
+        iconText: "Abc",
+        label: I18n.t("firstLanguagePrompt.pronunciation"),
+      }),
+      createToggleRow({
+        key: "translation",
+        iconText: "文A",
+        label: I18n.t("firstLanguagePrompt.translation"),
+      })
+    );
+
+    action.addEventListener("click", () => {
+      if (draft.pronunciation || draft.translation) {
+        const pronunciationMode = draft.pronunciation ? "gemini_romaji" : "none";
+        const translationMode = draft.translation ? "gemini_ko" : "none";
+        CONFIG.visual[`translation-mode:${modeKey}`] = pronunciationMode;
+        CONFIG.visual[`translation-mode-2:${modeKey}`] = translationMode;
+        StorageManager.setItem(`${APP_NAME}:visual:translation-mode:${modeKey}`, pronunciationMode);
+        StorageManager.setItem(`${APP_NAME}:visual:translation-mode-2:${modeKey}`, translationMode);
+        finish("configured");
+      }
+      host.closeModal();
+    });
+    updateAction();
+    host.shell.append(header, body, action);
+  });
+
+  firstLanguagePromptPromises.set(normalizedSource, promise);
+  return promise;
+}
+
+window.ivLyricsFirstLanguagePrompt = {
+  maybePrompt({ sourceLang, targetLang, modeKey }) {
+    const source = normalizeFirstLanguagePromptCode(sourceLang);
+    const target = normalizeFirstLanguagePromptCode(targetLang);
+    if (!source || (target && source === target)) return null;
+    return openFirstLanguagePrompt({ sourceLang: source, modeKey });
+  },
+};
 
 const formatLrclibCandidateDuration = (duration) => {
   const seconds = Number(duration);

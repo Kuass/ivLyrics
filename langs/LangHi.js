@@ -715,6 +715,20 @@ window.LANG_HI = {
     "traditionalChineseTW": "पारंपरिक चीनी (TW)",
     "pinyin": "पिनयिन"
   },
+  "firstLanguagePrompt": {
+    "title": "आप पहली बार {language} गीत चला रहे हैं",
+    "description": "इस गीत का अनुवाद कैसे किया जाए?",
+    "original": "केवल मूल",
+    "originalDescription": "उच्चारण या अनुवाद के बिना केवल मूल गीत के बोल दिखाएँ।",
+    "pronunciation": "उच्चारण",
+    "pronunciationDescription": "मूल बोल के साथ उच्चारण मार्गदर्शिका दिखाएँ।",
+    "translation": "अनुवाद",
+    "translationDescription": "मूल बोल के साथ अनुवाद दिखाएँ।",
+    "both": "उच्चारण + अनुवाद",
+    "bothDescription": "उच्चारण मार्गदर्शिका और अनुवाद दोनों दिखाएँ।",
+    "notNow": "सेट न करें",
+    "apply": "ये सेटिंग लागू करें"
+  },
   "lyricsCacheEditor": {
     "title": "सहेजे गए उच्चारण / अनुवाद गीत संपादित करें",
     "unknownTrack": "अज्ञात ट्रैक",

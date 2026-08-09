@@ -715,6 +715,20 @@ window.LANG_IT = {
     "traditionalChineseTW": "Cinese Tradizionale (TW)",
     "pinyin": "Pinyin"
   },
+  "firstLanguagePrompt": {
+    "title": "È la prima volta che riproduci un brano in {language}",
+    "description": "Come vuoi tradurre questo brano?",
+    "original": "Solo originale",
+    "originalDescription": "Mostra solo il testo originale, senza pronuncia né traduzione.",
+    "pronunciation": "Pronuncia",
+    "pronunciationDescription": "Mostra il testo originale con una guida alla pronuncia.",
+    "translation": "Traduzione",
+    "translationDescription": "Mostra il testo originale con una traduzione.",
+    "both": "Pronuncia + traduzione",
+    "bothDescription": "Mostra sia la guida alla pronuncia sia la traduzione.",
+    "notNow": "Non configurare",
+    "apply": "Applica queste impostazioni"
+  },
   "lyricsCacheEditor": {
     "title": "Modifica pronuncia / traduzione salvata",
     "unknownTrack": "Brano sconosciuto",

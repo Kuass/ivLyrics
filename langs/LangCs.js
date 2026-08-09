@@ -715,6 +715,20 @@ window.LANG_CS = {
     "traditionalChineseTW": "tradiční čínština (TW)",
     "pinyin": "Pchin-jin"
   },
+  "firstLanguagePrompt": {
+    "title": "Poprvé přehráváte skladbu v jazyce {language}",
+    "description": "Jak se má tato skladba přeložit?",
+    "original": "Pouze originál",
+    "originalDescription": "Zobrazí pouze původní text bez výslovnosti a překladu.",
+    "pronunciation": "Výslovnost",
+    "pronunciationDescription": "Zobrazí původní text s průvodcem výslovností.",
+    "translation": "Překlad",
+    "translationDescription": "Zobrazí původní text s překladem.",
+    "both": "Výslovnost + překlad",
+    "bothDescription": "Zobrazí průvodce výslovností i překlad.",
+    "notNow": "Nenastavovat",
+    "apply": "Použít tato nastavení"
+  },
   "lyricsCacheEditor": {
     "title": "Upravit výslovnost / překlad uloženou v mezipaměti",
     "unknownTrack": "Neznámá stopa",

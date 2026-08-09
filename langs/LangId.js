@@ -715,6 +715,20 @@ window.LANG_ID = {
     "traditionalChineseTW": "Mandarin Tradisional (TW)",
     "pinyin": "Pinyin"
   },
+  "firstLanguagePrompt": {
+    "title": "Pertama kali memutar lagu berbahasa {language}",
+    "description": "Bagaimana lagu ini akan diterjemahkan?",
+    "original": "Hanya lirik asli",
+    "originalDescription": "Tampilkan hanya lirik asli tanpa pelafalan atau terjemahan.",
+    "pronunciation": "Pelafalan",
+    "pronunciationDescription": "Tampilkan lirik asli dengan panduan pelafalan.",
+    "translation": "Terjemahan",
+    "translationDescription": "Tampilkan lirik asli dengan terjemahan.",
+    "both": "Pelafalan + terjemahan",
+    "bothDescription": "Tampilkan panduan pelafalan dan terjemahan.",
+    "notNow": "Jangan siapkan",
+    "apply": "Terapkan pengaturan ini"
+  },
   "lyricsCacheEditor": {
     "title": "Edit pelafalan / terjemahan yang disimpan",
     "unknownTrack": "Lagu tidak dikenal",

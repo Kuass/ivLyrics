@@ -715,6 +715,20 @@ window.LANG_FA = {
     "traditionalChineseTW": "چینی سنتی (تایوان)",
     "pinyin": "پین‌یین"
   },
+  "firstLanguagePrompt": {
+    "title": "این نخستین بار است که آهنگی به زبان {language} پخش می‌کنید",
+    "description": "این آهنگ چگونه ترجمه شود؟",
+    "original": "فقط متن اصلی",
+    "originalDescription": "فقط متن اصلی ترانه را بدون تلفظ یا ترجمه نمایش می‌دهد.",
+    "pronunciation": "تلفظ",
+    "pronunciationDescription": "متن اصلی ترانه را همراه با راهنمای تلفظ نمایش می‌دهد.",
+    "translation": "ترجمه",
+    "translationDescription": "متن اصلی ترانه را همراه با ترجمه نمایش می‌دهد.",
+    "both": "تلفظ + ترجمه",
+    "bothDescription": "راهنمای تلفظ و ترجمه را با هم نمایش می‌دهد.",
+    "notNow": "تنظیم نشود",
+    "apply": "اعمال این تنظیمات"
+  },
   "lyricsCacheEditor": {
     "title": "ویرایش آوانویسی / ترجمه ذخیره‌شده",
     "unknownTrack": "آهنگ نامشخص",

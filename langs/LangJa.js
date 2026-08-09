@@ -715,6 +715,20 @@ window.LANG_JA = {
     "traditionalChineseTW": "繁体字中国語 (台湾)",
     "pinyin": "ピンイン"
   },
+  "firstLanguagePrompt": {
+    "title": "{language}の曲を初めて再生しています",
+    "description": "この曲をどのように翻訳しますか？",
+    "original": "原文のみ",
+    "originalDescription": "発音ガイドや翻訳を表示せず、原文の歌詞のみを表示します。",
+    "pronunciation": "発音",
+    "pronunciationDescription": "原文の歌詞と発音ガイドを表示します。",
+    "translation": "翻訳",
+    "translationDescription": "原文の歌詞と翻訳を表示します。",
+    "both": "発音 + 翻訳",
+    "bothDescription": "発音ガイドと翻訳の両方を表示します。",
+    "notNow": "設定しない",
+    "apply": "この設定を適用"
+  },
   "lyricsCacheEditor": {
     "title": "保存された発音 / 翻訳歌詞を編集",
     "unknownTrack": "不明な曲",

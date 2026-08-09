@@ -715,6 +715,20 @@ window.LANG_TH = {
     "traditionalChineseTW": "จีนตัวเต็ม (ไต้หวัน)",
     "pinyin": "พินอิน"
   },
+  "firstLanguagePrompt": {
+    "title": "นี่เป็นครั้งแรกที่คุณเล่นเพลงภาษา{language}",
+    "description": "ต้องการแปลเพลงนี้อย่างไร?",
+    "original": "ต้นฉบับเท่านั้น",
+    "originalDescription": "แสดงเฉพาะเนื้อเพลงต้นฉบับโดยไม่มีคำอ่านหรือคำแปล",
+    "pronunciation": "คำอ่าน",
+    "pronunciationDescription": "แสดงเนื้อเพลงต้นฉบับพร้อมคำแนะนำการออกเสียง",
+    "translation": "คำแปล",
+    "translationDescription": "แสดงเนื้อเพลงต้นฉบับพร้อมคำแปล",
+    "both": "คำอ่าน + คำแปล",
+    "bothDescription": "แสดงทั้งคำแนะนำการออกเสียงและคำแปล",
+    "notNow": "ไม่ต้องตั้งค่า",
+    "apply": "ใช้การตั้งค่าเหล่านี้"
+  },
   "lyricsCacheEditor": {
     "title": "แก้ไขคำอ่าน / คำแปลที่บันทึกไว้",
     "unknownTrack": "แทร็กที่ไม่รู้จัก",
