@@ -778,12 +778,12 @@ window.LANG_VI = {
     "exportSuccessDesc": "Tệp cài đặt đã được lưu.",
     "exportFailed": "Xuất cài đặt thất bại",
     "importSuccessDesc": "Trang sẽ được tải lại sau giây lát...",
-    "dbExportSuccess": "Database export successful",
+    "dbExportSuccess": "Đã xuất cơ sở dữ liệu thành công",
     "dbExportSuccessDesc": "Tệp cơ sở dữ liệu đã được lưu.",
-    "dbExportFailed": "Database export failed",
-    "dbImportSuccess": "Database import successful",
-    "dbImportSuccessDesc": "Page will refresh shortly...",
-    "dbImportFailed": "Database import failed",
+    "dbExportFailed": "Xuất cơ sở dữ liệu thất bại",
+    "dbImportSuccess": "Đã nhập cơ sở dữ liệu thành công",
+    "dbImportSuccessDesc": "Trang sẽ sớm được tải lại...",
+    "dbImportFailed": "Nhập cơ sở dữ liệu thất bại",
     "resetSuccess": "Đã hoàn tất đặt lại",
     "resetSuccessDesc": "Trang sẽ được tải lại sau giây lát...",
     "resetFailed": "Đặt lại thất bại",
@@ -874,11 +874,11 @@ window.LANG_VI = {
     "noContributions": "Chưa có bản đồng bộ nào được thêm.",
     "unknownTrack": "Bài hát không xác định",
     "updated": "Cập nhật",
-    "topArtists": "Top Artists",
-    "artistGroups": "Artist Groups",
-    "noArtistStats": "No artist stats yet.",
-    "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist",
+    "topArtists": "Nghệ sĩ được thêm nhiều nhất",
+    "artistGroups": "Số nghệ sĩ",
+    "noArtistStats": "Chưa có số liệu thống kê về nghệ sĩ.",
+    "clearArtistFilter": "Xóa bộ lọc nghệ sĩ",
+    "filteredArtist": "Nghệ sĩ đang lọc",
     "supporter": "Người ủng hộ",
     "monthlySupporter": "Người ủng hộ hằng tháng",
     "nicknameStyle": "Kiểu biệt danh",
@@ -1048,7 +1048,7 @@ window.LANG_VI = {
     "originalStyle": {
       "title": "Kiểu văn bản gốc",
       "subtitle": "Cài đặt phông chữ cho lời gốc",
-      "fontFamily": "Font Family",
+      "fontFamily": "Họ phông chữ",
       "fontFamilyDesc": "Chọn phông chữ cho lời gốc. Nhập nhiều phông cách nhau bằng dấu phẩy (,) để áp dụng theo thứ tự ưu tiên.",
       "fontSize": {
         "label": "Cỡ chữ",
@@ -1070,7 +1070,7 @@ window.LANG_VI = {
     "pronunciationStyle": {
       "title": "Kiểu phát âm",
       "subtitle": "Cài đặt phông chữ cho phần phát âm (Romaji, Pinyin...)",
-      "fontFamily": "Font Family",
+      "fontFamily": "Họ phông chữ",
       "fontFamilyDesc": "Chọn phông chữ cho phần phát âm. Nhập nhiều phông cách nhau bằng dấu phẩy (,) để áp dụng theo thứ tự ưu tiên.",
       "fontSize": {
         "label": "Cỡ chữ",
@@ -1105,7 +1105,7 @@ window.LANG_VI = {
     "translationStyle": {
       "title": "Kiểu văn bản dịch",
       "subtitle": "Cài đặt phông chữ cho lời dịch",
-      "fontFamily": "Font Family",
+      "fontFamily": "Họ phông chữ",
       "fontFamilyDesc": "Chọn phông chữ cho lời dịch. Nhập nhiều phông cách nhau bằng dấu phẩy (,) để áp dụng theo thứ tự ưu tiên.",
       "fontSize": {
         "label": "Cỡ chữ",
@@ -1456,18 +1456,18 @@ window.LANG_VI = {
       "excludedSecrets": "Cài đặt giao diện và hành vi hiện tại sẽ được lưu. Khóa API được loại trừ."
     },
     "dbExportImport": {
-      "title": "Export/Import Database",
-      "subtitle": "Transfer translations, lyrics cache and all data",
+      "title": "Xuất/nhập cơ sở dữ liệu",
+      "subtitle": "Chuyển bản dịch, bộ nhớ đệm lời bài hát và toàn bộ dữ liệu",
       "export": {
-        "label": "Export Database",
+        "label": "Xuất cơ sở dữ liệu",
         "button": "Export",
-        "processing": "Exporting..."
+        "processing": "Đang xuất..."
       },
       "import": {
-        "label": "Import Database",
+        "label": "Nhập cơ sở dữ liệu",
         "button": "Import",
-        "processing": "Importing...",
-        "confirm": "All existing DB data will be overwritten. Continue?"
+        "processing": "Đang nhập...",
+        "confirm": "Toàn bộ dữ liệu hiện có trong cơ sở dữ liệu sẽ bị ghi đè. Tiếp tục?"
       }
     },
     "resetSettings": {
@@ -1740,24 +1740,24 @@ window.LANG_VI = {
           "loginRequired": "Cần đăng nhập Discord để quản lý quyền riêng tư của hồ sơ người tạo."
         },
         "backup": {
-          "title": "Backup & Restore",
-          "enterName": "Please enter a backup name.",
-          "success": "Settings backed up.",
-          "fail": "Backup failed",
-          "error": "Error during backup",
-          "restoreSuccess": "Settings restored. Please restart the app to apply.",
-          "invalidFormat": "Invalid settings format.",
-          "downloadFail": "Failed to download settings",
-          "downloadError": "Error during download",
-          "deleteConfirm": "Are you sure you want to delete this backup?",
-          "deleted": "Backup deleted.",
-          "deleteFail": "Delete failed",
-          "deleteError": "Error during deletion",
-          "placeholder": "Backup name (e.g. PC Settings)",
-          "backupBtn": "Backup",
-          "restoreBtn": "Restore",
-          "deleteBtn": "Delete",
-          "noBackups": "No backups saved."
+          "title": "Sao lưu và khôi phục cài đặt",
+          "enterName": "Vui lòng nhập tên cài đặt.",
+          "success": "Đã sao lưu cài đặt.",
+          "fail": "Sao lưu thất bại",
+          "error": "Đã xảy ra lỗi khi sao lưu",
+          "restoreSuccess": "Đã khôi phục cài đặt. Hãy khởi động lại ứng dụng để áp dụng.",
+          "invalidFormat": "Định dạng tệp cài đặt không hợp lệ.",
+          "downloadFail": "Không thể tải cài đặt xuống",
+          "downloadError": "Đã xảy ra lỗi khi tải xuống",
+          "deleteConfirm": "Bạn có chắc muốn xóa bản sao lưu này không?",
+          "deleted": "Đã xóa bản sao lưu.",
+          "deleteFail": "Xóa thất bại",
+          "deleteError": "Đã xảy ra lỗi khi xóa",
+          "placeholder": "Tên bản sao lưu (ví dụ: Cài đặt PC)",
+          "backupBtn": "Sao lưu",
+          "restoreBtn": "Khôi phục",
+          "deleteBtn": "Xóa",
+          "noBackups": "Không có bản sao lưu nào đã lưu."
         }
       },
       "appInfo": {
@@ -1882,7 +1882,7 @@ window.LANG_VI = {
     "communityUnavailableLocal": "Không thể gửi độ lệch cộng đồng cho bài hát cục bộ không có Spotify trackId."
   },
   "playbarButton": {
-    "label": "Lyrics Plus"
+    "label": "Lời bài hát Plus"
   },
   "generationStatus": {
     "complete": "Hoàn tất!",
@@ -1968,6 +1968,7 @@ window.LANG_VI = {
     "submitting": "Đang đăng ký...",
     "submitted": "Video đã được đăng ký thành công!",
     "updated": "Thông tin video đã được cập nhật!",
+    "updatedAndApplied": "Đã cập nhật và áp dụng thời gian video!",
     "submitError": "Đăng ký video thất bại",
     "invalidUrl": "URL YouTube không hợp lệ",
     "videoNotFound": "Video YouTube không tồn tại",
@@ -2605,7 +2606,6 @@ window.LANG_VI = {
     "updateAvailable": "Có bản cập nhật",
     "by": "bởi {author}",
     "updated": "Cập nhật {date}",
-    "updatedAndApplied": "Đã cập nhật và áp dụng thời gian video!",
     "version": "v{version}",
     "noAddons": "Không có addon nào",
     "loadError": "Không thể tải danh sách addon",

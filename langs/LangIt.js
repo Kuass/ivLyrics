@@ -778,12 +778,12 @@ window.LANG_IT = {
     "exportSuccessDesc": "File impostazioni salvato.",
     "exportFailed": "Esportazione impostazioni fallita",
     "importSuccessDesc": "La pagina verrà ricaricata a breve...",
-    "dbExportSuccess": "Database export successful",
+    "dbExportSuccess": "Database esportato correttamente",
     "dbExportSuccessDesc": "File database salvato.",
-    "dbExportFailed": "Database export failed",
-    "dbImportSuccess": "Database import successful",
-    "dbImportSuccessDesc": "Page will refresh shortly...",
-    "dbImportFailed": "Database import failed",
+    "dbExportFailed": "Esportazione del database non riuscita",
+    "dbImportSuccess": "Database importato correttamente",
+    "dbImportSuccessDesc": "La pagina verrà aggiornata a breve...",
+    "dbImportFailed": "Importazione del database non riuscita",
     "resetSuccess": "Ripristino completato",
     "resetSuccessDesc": "La pagina verrà ricaricata a breve...",
     "resetFailed": "Ripristino fallito",
@@ -874,11 +874,11 @@ window.LANG_IT = {
     "noContributions": "Nessuna sync aggiunta al momento.",
     "unknownTrack": "Brano sconosciuto",
     "updated": "Aggiornato",
-    "topArtists": "Top Artists",
-    "artistGroups": "Artist Groups",
-    "noArtistStats": "No artist stats yet.",
-    "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist",
+    "topArtists": "Artisti aggiunti più spesso",
+    "artistGroups": "Numero di artisti",
+    "noArtistStats": "Nessuna statistica sugli artisti.",
+    "clearArtistFilter": "Rimuovi filtro artista",
+    "filteredArtist": "Artista filtrato",
     "supporter": "Sostenitore",
     "monthlySupporter": "Sostenitore mensile",
     "nicknameStyle": "Stile del nickname",
@@ -1456,18 +1456,18 @@ window.LANG_IT = {
       "excludedSecrets": "Vengono salvate le impostazioni attuali di aspetto e comportamento. Le chiavi API sono escluse."
     },
     "dbExportImport": {
-      "title": "Export/Import Database",
-      "subtitle": "Transfer translations, lyrics cache and all data",
+      "title": "Esporta/importa database",
+      "subtitle": "Trasferisci traduzioni, cache dei testi e tutti i dati",
       "export": {
-        "label": "Export Database",
+        "label": "Esporta database",
         "button": "Export",
-        "processing": "Exporting..."
+        "processing": "Esportazione..."
       },
       "import": {
-        "label": "Import Database",
+        "label": "Importa database",
         "button": "Import",
-        "processing": "Importing...",
-        "confirm": "All existing DB data will be overwritten. Continue?"
+        "processing": "Importazione...",
+        "confirm": "Tutti i dati esistenti nel database verranno sovrascritti. Continuare?"
       }
     },
     "resetSettings": {
@@ -1882,7 +1882,7 @@ window.LANG_IT = {
     "communityUnavailableLocal": "Non è possibile inviare offset della community per brani locali senza Spotify trackId."
   },
   "playbarButton": {
-    "label": "Lyrics Plus"
+    "label": "Testi Plus"
   },
   "generationStatus": {
     "complete": "Fatto!",
@@ -1968,6 +1968,7 @@ window.LANG_IT = {
     "submitting": "Registrazione...",
     "submitted": "Video registrato con successo!",
     "updated": "Info video aggiornate!",
+    "updatedAndApplied": "Sincronizzazione del video aggiornata e applicata!",
     "submitError": "Registrazione video fallita",
     "invalidUrl": "URL YouTube non valido",
     "videoNotFound": "Video YouTube inesistente",
@@ -2605,7 +2606,6 @@ window.LANG_IT = {
     "updateAvailable": "Aggiornamento disponibile",
     "by": "di {author}",
     "updated": "Aggiornato {date}",
-    "updatedAndApplied": "Sincronizzazione del video aggiornata e applicata!",
     "version": "v{version}",
     "noAddons": "Nessun addon disponibile",
     "loadError": "Impossibile caricare la lista degli addon",

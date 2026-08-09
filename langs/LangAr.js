@@ -778,12 +778,12 @@ window.LANG_AR = {
     "exportSuccessDesc": "تم حفظ ملف الإعدادات.",
     "exportFailed": "فشل تصدير الإعدادات",
     "importSuccessDesc": "سيتم تحديث الصفحة قريبًا...",
-    "dbExportSuccess": "Database export successful",
+    "dbExportSuccess": "تم تصدير قاعدة البيانات بنجاح",
     "dbExportSuccessDesc": "تم حفظ ملف قاعدة البيانات.",
-    "dbExportFailed": "Database export failed",
-    "dbImportSuccess": "Database import successful",
-    "dbImportSuccessDesc": "Page will refresh shortly...",
-    "dbImportFailed": "Database import failed",
+    "dbExportFailed": "فشل تصدير قاعدة البيانات",
+    "dbImportSuccess": "تم استيراد قاعدة البيانات بنجاح",
+    "dbImportSuccessDesc": "سيتم تحديث الصفحة بعد قليل...",
+    "dbImportFailed": "فشل استيراد قاعدة البيانات",
     "resetSuccess": "اكتملت إعادة التعيين",
     "resetSuccessDesc": "سيتم تحديث الصفحة قريبًا...",
     "resetFailed": "فشل إعادة التعيين",
@@ -874,11 +874,11 @@ window.LANG_AR = {
     "noContributions": "لا توجد مزامنات مضافة بعد.",
     "unknownTrack": "مقطع غير معروف",
     "updated": "تم التحديث",
-    "topArtists": "Top Artists",
-    "artistGroups": "Artist Groups",
-    "noArtistStats": "No artist stats yet.",
-    "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist",
+    "topArtists": "الفنانون الأكثر تسجيلًا",
+    "artistGroups": "عدد الفنانين",
+    "noArtistStats": "لا توجد إحصاءات للفنانين بعد.",
+    "clearArtistFilter": "مسح عامل تصفية الفنان",
+    "filteredArtist": "الفنان الذي تتم تصفيته",
     "supporter": "داعم",
     "monthlySupporter": "داعم شهري",
     "nicknameStyle": "نمط الاسم المستعار",
@@ -1456,18 +1456,18 @@ window.LANG_AR = {
       "excludedSecrets": "يتم حفظ إعدادات المظهر والسلوك الحالية. يتم استثناء مفاتيح API."
     },
     "dbExportImport": {
-      "title": "Export/Import Database",
-      "subtitle": "Transfer translations, lyrics cache and all data",
+      "title": "تصدير/استيراد قاعدة البيانات",
+      "subtitle": "انقل الترجمات وذاكرة كلمات الأغاني المؤقتة وجميع البيانات",
       "export": {
-        "label": "Export Database",
+        "label": "تصدير قاعدة البيانات",
         "button": "Export",
-        "processing": "Exporting..."
+        "processing": "جارٍ التصدير..."
       },
       "import": {
-        "label": "Import Database",
+        "label": "استيراد قاعدة البيانات",
         "button": "Import",
-        "processing": "Importing...",
-        "confirm": "All existing DB data will be overwritten. Continue?"
+        "processing": "جارٍ الاستيراد...",
+        "confirm": "ستُستبدل جميع بيانات قاعدة البيانات الحالية. هل تريد المتابعة؟"
       }
     },
     "resetSettings": {
@@ -1740,24 +1740,24 @@ window.LANG_AR = {
           "loginRequired": "يلزم تسجيل الدخول إلى Discord لإدارة خصوصية ملف المنشئ الشخصي."
         },
         "backup": {
-          "title": "Backup & Restore",
-          "enterName": "Please enter a backup name.",
-          "success": "Settings backed up.",
-          "fail": "Backup failed",
-          "error": "Error during backup",
-          "restoreSuccess": "Settings restored. Please restart the app to apply.",
-          "invalidFormat": "Invalid settings format.",
-          "downloadFail": "Failed to download settings",
-          "downloadError": "Error during download",
-          "deleteConfirm": "Are you sure you want to delete this backup?",
-          "deleted": "Backup deleted.",
-          "deleteFail": "Delete failed",
-          "deleteError": "Error during deletion",
-          "placeholder": "Backup name (e.g. PC Settings)",
-          "backupBtn": "Backup",
-          "restoreBtn": "Restore",
-          "deleteBtn": "Delete",
-          "noBackups": "No backups saved."
+          "title": "إعدادات النسخ الاحتياطي والاستعادة",
+          "enterName": "الرجاء إدخال اسم الإعداد.",
+          "success": "تم عمل نسخة احتياطية من إعداداتك.",
+          "fail": "فشل النسخ الاحتياطي",
+          "error": "حدث خطأ أثناء النسخ الاحتياطي",
+          "restoreSuccess": "تمت استعادة الإعدادات. يرجى إعادة تشغيل التطبيق لتطبيقها.",
+          "invalidFormat": "تنسيق ملف الإعدادات غير صحيح.",
+          "downloadFail": "فشل تنزيل الإعدادات",
+          "downloadError": "حدث خطأ أثناء التنزيل",
+          "deleteConfirm": "هل أنت متأكد أنك تريد حذف هذه النسخة الاحتياطية؟",
+          "deleted": "تم حذف النسخة الاحتياطية.",
+          "deleteFail": "فشل الحذف",
+          "deleteError": "حدث خطأ أثناء الحذف",
+          "placeholder": "اسم النسخة الاحتياطية (مثل إعدادات الكمبيوتر)",
+          "backupBtn": "نسخة احتياطية",
+          "restoreBtn": "استعادة",
+          "deleteBtn": "حذف",
+          "noBackups": "لا توجد نسخ احتياطية محفوظة."
         }
       },
       "appInfo": {

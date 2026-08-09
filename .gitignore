@@ -12,3 +12,4 @@ __pycache__/
 !tests/marketplace-direct-url.test.cjs
 !tests/karaoke-word-timing.test.cjs
 !tests/bing-translate-provider.test.cjs
+!tests/i18n-integrity.test.cjs

@@ -1882,7 +1882,7 @@ window.LANG_MS = {
     "communityUnavailableLocal": "Ofset komuniti tidak boleh dihantar untuk lagu setempat tanpa Spotify trackId."
   },
   "playbarButton": {
-    "label": "Lyrics Plus"
+    "label": "Lirik Plus"
   },
   "generationStatus": {
     "complete": "Selesai!",
@@ -1978,6 +1978,7 @@ window.LANG_MS = {
     "submitting": "Mendaftarkan...",
     "submitted": "Video berjaya didaftarkan!",
     "updated": "Maklumat video telah dikemas kini!",
+    "updatedAndApplied": "Pemasa video telah dikemas kini dan digunakan!",
     "submitError": "Gagal mendaftarkan video",
     "invalidUrl": "URL YouTube tidak sah",
     "videoNotFound": "Video YouTube tidak wujud",
@@ -2599,7 +2600,7 @@ window.LANG_MS = {
     "multiVocalDecisionMulti": "Teruskan dalam mod berbilang vokal"
   },
   "marketplace": {
-    "title": "Addon Marketplace",
+    "title": "Pasaran alat tambah",
     "search": "Cari Addon...",
     "filterAll": "Semua",
     "filterLyrics": "Lirik",
@@ -2614,7 +2615,6 @@ window.LANG_MS = {
     "updateAvailable": "Kemas kini tersedia",
     "by": "oleh {author}",
     "updated": "Dikemas kini pada {date}",
-    "updatedAndApplied": "Pemasa video telah dikemas kini dan digunakan!",
     "version": "v{version}",
     "noAddons": "Tiada Addon yang tersedia",
     "loadError": "Gagal memuatkan senarai Addon",

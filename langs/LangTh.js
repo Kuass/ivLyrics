@@ -161,7 +161,7 @@ window.LANG_TH = {
       }
     },
     "noise": {
-      "label": "Noise Overlay",
+      "label": "โอเวอร์เลย์นอยส์",
       "desc": "เพิ่มเอฟเฟกต์ Film Grain ให้กับพื้นหลัง"
     },
     "albumBgBlur": {
@@ -778,12 +778,12 @@ window.LANG_TH = {
     "exportSuccessDesc": "บันทึกไฟล์การตั้งค่าแล้ว",
     "exportFailed": "ส่งออกการตั้งค่าล้มเหลว",
     "importSuccessDesc": "หน้าเว็บจะรีเฟรชในอีกสักครู่...",
-    "dbExportSuccess": "Database export successful",
+    "dbExportSuccess": "ส่งออกฐานข้อมูลสำเร็จ",
     "dbExportSuccessDesc": "บันทึกไฟล์ฐานข้อมูลแล้ว",
-    "dbExportFailed": "Database export failed",
-    "dbImportSuccess": "Database import successful",
-    "dbImportSuccessDesc": "Page will refresh shortly...",
-    "dbImportFailed": "Database import failed",
+    "dbExportFailed": "ส่งออกฐานข้อมูลไม่สำเร็จ",
+    "dbImportSuccess": "นำเข้าฐานข้อมูลสำเร็จ",
+    "dbImportSuccessDesc": "หน้าจะรีเฟรชในอีกสักครู่...",
+    "dbImportFailed": "นำเข้าฐานข้อมูลไม่สำเร็จ",
     "resetSuccess": "รีเซ็ตเสร็จสมบูรณ์",
     "resetSuccessDesc": "หน้าเว็บจะรีเฟรชในอีกสักครู่...",
     "resetFailed": "รีเซ็ตล้มเหลว",
@@ -874,11 +874,11 @@ window.LANG_TH = {
     "noContributions": "ยังไม่มีการเพิ่มซิงก์ใดๆ",
     "unknownTrack": "เพลงที่ไม่รู้จัก",
     "updated": "อัปเดต",
-    "topArtists": "Top Artists",
-    "artistGroups": "Artist Groups",
-    "noArtistStats": "No artist stats yet.",
-    "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist",
+    "topArtists": "ศิลปินที่เพิ่มบ่อย",
+    "artistGroups": "จำนวนศิลปิน",
+    "noArtistStats": "ยังไม่มีสถิติศิลปิน",
+    "clearArtistFilter": "ล้างตัวกรองศิลปิน",
+    "filteredArtist": "ศิลปินที่กรองอยู่",
     "supporter": "ผู้สนับสนุน",
     "monthlySupporter": "ผู้สนับสนุนรายเดือน",
     "nicknameStyle": "รูปแบบชื่อเล่น",
@@ -1456,18 +1456,18 @@ window.LANG_TH = {
       "excludedSecrets": "บันทึกการตั้งค่ารูปลักษณ์และการทำงานปัจจุบัน โดยไม่รวมคีย์ API"
     },
     "dbExportImport": {
-      "title": "Export/Import Database",
-      "subtitle": "Transfer translations, lyrics cache and all data",
+      "title": "ส่งออก/นำเข้าฐานข้อมูล",
+      "subtitle": "ย้ายคำแปล แคชเนื้อเพลง และข้อมูลทั้งหมด",
       "export": {
-        "label": "Export Database",
+        "label": "ส่งออกฐานข้อมูล",
         "button": "Export",
-        "processing": "Exporting..."
+        "processing": "กำลังส่งออก..."
       },
       "import": {
-        "label": "Import Database",
+        "label": "นำเข้าฐานข้อมูล",
         "button": "Import",
-        "processing": "Importing...",
-        "confirm": "All existing DB data will be overwritten. Continue?"
+        "processing": "กำลังนำเข้า...",
+        "confirm": "ข้อมูลทั้งหมดในฐานข้อมูลปัจจุบันจะถูกเขียนทับ ดำเนินการต่อหรือไม่?"
       }
     },
     "resetSettings": {
@@ -1740,24 +1740,24 @@ window.LANG_TH = {
           "loginRequired": "ต้องเข้าสู่ระบบ Discord เพื่อจัดการความเป็นส่วนตัวของโปรไฟล์ผู้สร้าง"
         },
         "backup": {
-          "title": "Backup & Restore",
-          "enterName": "Please enter a backup name.",
-          "success": "Settings backed up.",
-          "fail": "Backup failed",
-          "error": "Error during backup",
-          "restoreSuccess": "Settings restored. Please restart the app to apply.",
-          "invalidFormat": "Invalid settings format.",
-          "downloadFail": "Failed to download settings",
-          "downloadError": "Error during download",
-          "deleteConfirm": "Are you sure you want to delete this backup?",
-          "deleted": "Backup deleted.",
-          "deleteFail": "Delete failed",
-          "deleteError": "Error during deletion",
-          "placeholder": "Backup name (e.g. PC Settings)",
-          "backupBtn": "Backup",
-          "restoreBtn": "Restore",
-          "deleteBtn": "Delete",
-          "noBackups": "No backups saved."
+          "title": "สำรองและกู้คืนการตั้งค่า",
+          "enterName": "โปรดป้อนชื่อการตั้งค่า",
+          "success": "สำรองการตั้งค่าแล้ว",
+          "fail": "สำรองข้อมูลไม่สำเร็จ",
+          "error": "เกิดข้อผิดพลาดขณะสำรองข้อมูล",
+          "restoreSuccess": "กู้คืนการตั้งค่าแล้ว โปรดรีสตาร์ทแอปเพื่อใช้งาน",
+          "invalidFormat": "รูปแบบไฟล์การตั้งค่าไม่ถูกต้อง",
+          "downloadFail": "ดาวน์โหลดการตั้งค่าไม่สำเร็จ",
+          "downloadError": "เกิดข้อผิดพลาดขณะดาวน์โหลด",
+          "deleteConfirm": "ต้องการลบข้อมูลสำรองนี้หรือไม่?",
+          "deleted": "ลบข้อมูลสำรองแล้ว",
+          "deleteFail": "ลบไม่สำเร็จ",
+          "deleteError": "เกิดข้อผิดพลาดขณะลบ",
+          "placeholder": "ชื่อข้อมูลสำรอง (เช่น การตั้งค่า PC)",
+          "backupBtn": "สำรองข้อมูล",
+          "restoreBtn": "กู้คืน",
+          "deleteBtn": "ลบ",
+          "noBackups": "ไม่มีข้อมูลสำรองที่บันทึกไว้"
         }
       },
       "appInfo": {
@@ -1968,6 +1968,7 @@ window.LANG_TH = {
     "submitting": "กำลังลงทะเบียน...",
     "submitted": "ลงทะเบียนวิดีโอสำเร็จ!",
     "updated": "อัปเดตข้อมูลวิดีโอแล้ว!",
+    "updatedAndApplied": "อัปเดตและนำเวลาของวิดีโอไปใช้แล้ว!",
     "submitError": "ลงทะเบียนวิดีโอล้มเหลว",
     "invalidUrl": "URL YouTube ไม่ถูกต้อง",
     "videoNotFound": "ไม่พบวิดีโอ YouTube",
@@ -2605,7 +2606,6 @@ window.LANG_TH = {
     "updateAvailable": "มีอัปเดต",
     "by": "โดย {author}",
     "updated": "อัปเดต {date}",
-    "updatedAndApplied": "อัปเดตและนำเวลาของวิดีโอไปใช้แล้ว!",
     "version": "v{version}",
     "noAddons": "ไม่มีส่วนเสริม",
     "loadError": "โหลดรายการส่วนเสริมไม่สำเร็จ",

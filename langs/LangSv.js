@@ -92,7 +92,7 @@ window.LANG_SV = {
     "autoTranslation": "Automatisk översättning",
     "lyrics": "Texter",
     "playBar": "Playbar-knapp",
-    "autoScroll": "Auto Scroll",
+    "autoScroll": "Automatisk rullning",
     "animation": "Animation",
     "karaoke": "Karaoke",
     "syncedLyricsContent": "Synkroniserat textinnehåll",
@@ -304,7 +304,7 @@ window.LANG_SV = {
       }
     },
     "autoScroll": {
-      "label": "Auto Scroll",
+      "label": "Automatisk rullning",
       "desc": "Aktivera automatisk rullning. Återupptar automatisk rullning 5 sekunder efter manuell rullning."
     },
     "animation": {
@@ -609,7 +609,7 @@ window.LANG_SV = {
     "checkFailed": "Det gick inte att söka efter uppdateringar",
     "versionChange": "Version",
     "copyCommand": "Kopiera kommando",
-    "releaseNotes": "Release Notes",
+    "releaseNotes": "Versionsinformation",
     "expand": "Expandera",
     "collapse": "Kollapsa",
     "copied": "Kopierade"
@@ -846,7 +846,7 @@ window.LANG_SV = {
     "syncContributor": "Synkronisera bidragsgivare"
   },
   "creatorProfile": {
-    "title": "Sync Creator",
+    "title": "Synkskapare",
     "anonymous": "Anonym",
     "openProfile": "Profilsida",
     "loading": "Laddar skaparprofil...",
@@ -1039,7 +1039,7 @@ window.LANG_SV = {
       }
     },
     "livePreview": {
-      "title": "Live Preview",
+      "title": "Liveförhandsvisning",
       "subtitle": "Se omedelbart dina stilförändringar",
       "sampleText": "Här är texten",
       "sampleTextMixed": "Här Lyric あります",
@@ -1320,7 +1320,7 @@ window.LANG_SV = {
       }
     },
     "communitySync": {
-      "title": "Community Sync",
+      "title": "Community-synkronisering",
       "subtitle": "Dela synkroniseringsoffset för texter med andra användare",
       "enabled": {
         "label": "Använd Community Sync",
@@ -1680,7 +1680,7 @@ window.LANG_SV = {
         "desc": "Dölj gränssnitt automatiskt"
       },
       "delay": {
-        "desc": "Auto Hide Delay",
+        "desc": "Fördröjning före automatisk döljning",
         "info": "Dags att vänta innan du döljer användargränssnittet efter musinaktivitet (1-10s)"
       }
     },
@@ -1796,7 +1796,7 @@ window.LANG_SV = {
         "copyFailed": "Kopieringen misslyckades"
       },
       "patchNotes": {
-        "title": "Patch Notes",
+        "title": "Versionsinformation",
         "subtitle": "Senaste uppdateringshistorik",
         "loading": "Laddar patch-anteckningar..."
       },
@@ -1855,7 +1855,7 @@ window.LANG_SV = {
   "syncAdjust": {
     "info": "Flytta skjutreglaget åt höger gör att texter visas snabbare.",
     "reset": "Återställ",
-    "communityTitle": "Community Sync",
+    "communityTitle": "Community-synkronisering",
     "communityOffset": "Offset",
     "submissions": "Inlämningar",
     "confidenceHigh": "Högt självförtroende",
@@ -1882,7 +1882,7 @@ window.LANG_SV = {
     "communityUnavailableLocal": "Community-offsets kan inte skickas för lokala spår utan Spotify trackId."
   },
   "playbarButton": {
-    "label": "Lyrics Plus"
+    "label": "Låttext Plus"
   },
   "generationStatus": {
     "complete": "Klart!",
@@ -1968,6 +1968,7 @@ window.LANG_SV = {
     "submitting": "Skickar...",
     "submitted": "Videon har skickats!",
     "updated": "Videoinformation uppdaterad!",
+    "updatedAndApplied": "Videotimingen har uppdaterats och tillämpats!",
     "submitError": "Det gick inte att skicka videon",
     "invalidUrl": "Ogiltig YouTube-URL",
     "videoNotFound": "YouTube-video finns inte",
@@ -2046,7 +2047,7 @@ window.LANG_SV = {
       "coverRadius": "Täckradie",
       "showPronunciation": "Uttal",
       "showTranslation": "Översättning",
-      "lyricsAlign": "Lyrics Alignment",
+      "lyricsAlign": "Låttextjustering",
       "alignLeft": "Vänster",
       "alignCenter": "Center",
       "fontSize": "Teckenstorlek",
@@ -2084,7 +2085,7 @@ window.LANG_SV = {
       "subtitle": "Välj önskat språk"
     },
     "apiKey": {
-      "title": "Gemini API Key Setup",
+      "title": "Konfigurera Gemini API-nyckel",
       "subtitle": "API-nyckel krävs för att använda AI-översättning",
       "guide": {
         "title": "Hur man får API-nyckel",
@@ -2420,7 +2421,7 @@ window.LANG_SV = {
     "submitSuccess": "Synkroniseringsdata har skickats! Det kommer att tillämpas efter administratörens godkännande.",
     "submitError": "Det gick inte att skicka synkroniseringsdata",
     "dragHint": "Dra för att spela in teckentiming. Dra åt vänster för att avbryta.",
-    "globalOffset": "Global Offset",
+    "globalOffset": "Global förskjutning",
     "lineOffset": "Radförskjutning",
     "lineOffsetUnavailable": "Tillgängligt efter synkning",
     "synced": "Registrerad",
@@ -2589,7 +2590,7 @@ window.LANG_SV = {
     "multiVocalDecisionMulti": "Fortsätt i flersångsläge"
   },
   "marketplace": {
-    "title": "Addon Marketplace",
+    "title": "Marknadsplats för tillägg",
     "search": "Sök tillägg...",
     "filterAll": "Alla",
     "filterLyrics": "Texter",
@@ -2604,7 +2605,6 @@ window.LANG_SV = {
     "updateAvailable": "Uppdatering tillgänglig",
     "by": "av {author}",
     "updated": "Uppdaterad {date}",
-    "updatedAndApplied": "Videotimingen har uppdaterats och tillämpats!",
     "version": "v{version}",
     "noAddons": "Inga tillägg tillgängliga",
     "loadError": "Det gick inte att läsa in tilläggslistan",

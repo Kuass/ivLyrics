@@ -846,7 +846,7 @@ window.LANG_CS = {
     "syncContributor": "Přispěvatel synchronizace"
   },
   "creatorProfile": {
-    "title": "Sync Creator",
+    "title": "Tvůrce synchronizace",
     "anonymous": "Anonymní",
     "openProfile": "Stránka profilu",
     "loading": "Načítání profilu autora...",
@@ -982,7 +982,7 @@ window.LANG_CS = {
         "desc": "Vyberte animaci zobrazenou pro mezery v textech delší než 0,5 sekundy",
         "options": {
           "equalizer": "01 Ekvalizér",
-          "dotWave": "02 Dot Wave",
+          "dotWave": "02 Bodová vlna",
           "ripples": "03 Vlnky",
           "orbit": "04 Orbit",
           "diamonds": "05 Diamanty",
@@ -1096,7 +1096,7 @@ window.LANG_CS = {
         "label": "Spojovník (-) Manipulace",
         "desc": "Vyberte způsob zobrazení pomlček ve výslovnosti (např. Tah-shee-kah → Tah shee kah nebo Tahsheekah)",
         "options": {
-          "keep": "Keep (Tah-shee-kah)",
+          "keep": "Ponechat (Tah-shee-kah)",
           "space": "Nahradit mezerou (Tah shee kah)",
           "remove": "Odebrat (Tahsheekah)"
         }
@@ -1536,7 +1536,7 @@ window.LANG_CS = {
         }
       },
       "infoGap": {
-        "desc": "Album Art Gap",
+        "desc": "Mezera u obalu alba",
         "info": "Upravit mezeru mezi obalem alba a ovládacími prvky/informacemi (px)"
       },
       "centerWhenNoLyrics": {
@@ -1796,7 +1796,7 @@ window.LANG_CS = {
         "copyFailed": "Kopírování se nezdařilo"
       },
       "patchNotes": {
-        "title": "Patch Notes",
+        "title": "Poznámky k vydání",
         "subtitle": "Nedávná historie aktualizací",
         "loading": "Načítání poznámek k opravě..."
       },
@@ -1882,7 +1882,7 @@ window.LANG_CS = {
     "communityUnavailableLocal": "Komunitní offsety nelze odeslat pro místní stopy bez Spotify trackId."
   },
   "playbarButton": {
-    "label": "Lyrics Plus"
+    "label": "Texty Plus"
   },
   "generationStatus": {
     "complete": "Hotovo!",
@@ -1968,6 +1968,7 @@ window.LANG_CS = {
     "submitting": "Odesílání...",
     "submitted": "Video bylo úspěšně odesláno!",
     "updated": "Informace o videu aktualizovány!",
+    "updatedAndApplied": "Časování videa bylo aktualizováno a použito!",
     "submitError": "Video se nepodařilo odeslat",
     "invalidUrl": "Neplatná adresa URL YouTube",
     "videoNotFound": "Video na YouTube neexistuje",
@@ -2589,7 +2590,7 @@ window.LANG_CS = {
     "multiVocalDecisionMulti": "Pokračujte v režimu více vokálů"
   },
   "marketplace": {
-    "title": "Addon Marketplace",
+    "title": "Tržiště doplňků",
     "search": "Hledat doplňky...",
     "filterAll": "Vše",
     "filterLyrics": "Text písně",
@@ -2604,7 +2605,6 @@ window.LANG_CS = {
     "updateAvailable": "Aktualizace k dispozici",
     "by": "od {author}",
     "updated": "Aktualizováno {date}",
-    "updatedAndApplied": "Časování videa bylo aktualizováno a použito!",
     "version": "v{version}",
     "noAddons": "Nejsou k dispozici žádné doplňky",
     "loadError": "Nepodařilo se načíst seznam doplňků",

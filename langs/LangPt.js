@@ -778,12 +778,12 @@ window.LANG_PT = {
     "exportSuccessDesc": "Arquivo de configuração salvo.",
     "exportFailed": "Falha ao exportar configurações",
     "importSuccessDesc": "A página será atualizada em breve...",
-    "dbExportSuccess": "Database export successful",
+    "dbExportSuccess": "Banco de dados exportado com sucesso",
     "dbExportSuccessDesc": "Arquivo de banco de dados salvo.",
-    "dbExportFailed": "Database export failed",
-    "dbImportSuccess": "Database import successful",
-    "dbImportSuccessDesc": "Page will refresh shortly...",
-    "dbImportFailed": "Database import failed",
+    "dbExportFailed": "Falha ao exportar o banco de dados",
+    "dbImportSuccess": "Banco de dados importado com sucesso",
+    "dbImportSuccessDesc": "A página será atualizada em breve...",
+    "dbImportFailed": "Falha ao importar o banco de dados",
     "resetSuccess": "Redefinição concluída",
     "resetSuccessDesc": "A página será atualizada em breve...",
     "resetFailed": "Falha na redefinição",
@@ -874,11 +874,11 @@ window.LANG_PT = {
     "noContributions": "Ainda não há sincronizações adicionadas.",
     "unknownTrack": "Faixa desconhecida",
     "updated": "Atualizado",
-    "topArtists": "Top Artists",
-    "artistGroups": "Artist Groups",
-    "noArtistStats": "No artist stats yet.",
-    "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist",
+    "topArtists": "Artistas mais adicionados",
+    "artistGroups": "Número de artistas",
+    "noArtistStats": "Ainda não há estatísticas de artistas.",
+    "clearArtistFilter": "Limpar filtro de artista",
+    "filteredArtist": "Artista filtrado",
     "supporter": "Apoiador",
     "monthlySupporter": "Apoiador mensal",
     "nicknameStyle": "Estilo do apelido",
@@ -1456,18 +1456,18 @@ window.LANG_PT = {
       "excludedSecrets": "As configurações atuais de aparência e comportamento são salvas. Chaves de API são excluídas."
     },
     "dbExportImport": {
-      "title": "Export/Import Database",
-      "subtitle": "Transfer translations, lyrics cache and all data",
+      "title": "Exportar/importar banco de dados",
+      "subtitle": "Transfira traduções, cache de letras e todos os dados",
       "export": {
-        "label": "Export Database",
+        "label": "Exportar banco de dados",
         "button": "Export",
-        "processing": "Exporting..."
+        "processing": "Exportando..."
       },
       "import": {
-        "label": "Import Database",
+        "label": "Importar banco de dados",
         "button": "Import",
-        "processing": "Importing...",
-        "confirm": "All existing DB data will be overwritten. Continue?"
+        "processing": "Importando...",
+        "confirm": "Todos os dados atuais do banco de dados serão substituídos. Continuar?"
       }
     },
     "resetSettings": {
@@ -1968,6 +1968,7 @@ window.LANG_PT = {
     "submitting": "Registrando...",
     "submitted": "Vídeo registrado com sucesso!",
     "updated": "Informações do vídeo atualizadas!",
+    "updatedAndApplied": "Sincronização do vídeo atualizada e aplicada!",
     "submitError": "Falha ao registrar vídeo",
     "invalidUrl": "URL do YouTube inválida",
     "videoNotFound": "Vídeo do YouTube não encontrado",
@@ -2605,7 +2606,6 @@ window.LANG_PT = {
     "updateAvailable": "Atualização disponível",
     "by": "por {author}",
     "updated": "Atualizado {date}",
-    "updatedAndApplied": "Sincronização do vídeo atualizada e aplicada!",
     "version": "v{version}",
     "noAddons": "Nenhuma extensão disponível",
     "loadError": "Falha ao carregar a lista de extensões",

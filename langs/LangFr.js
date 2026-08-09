@@ -778,12 +778,12 @@ window.LANG_FR = {
     "exportSuccessDesc": "Le fichier de configuration a été enregistré.",
     "exportFailed": "Échec de l'exportation",
     "importSuccessDesc": "La page va s'actualiser dans un instant...",
-    "dbExportSuccess": "Database export successful",
+    "dbExportSuccess": "Base de données exportée avec succès",
     "dbExportSuccessDesc": "Le fichier de base de données a été enregistré.",
-    "dbExportFailed": "Database export failed",
-    "dbImportSuccess": "Database import successful",
-    "dbImportSuccessDesc": "Page will refresh shortly...",
-    "dbImportFailed": "Database import failed",
+    "dbExportFailed": "Échec de l’exportation de la base de données",
+    "dbImportSuccess": "Base de données importée avec succès",
+    "dbImportSuccessDesc": "La page va bientôt s’actualiser…",
+    "dbImportFailed": "Échec de l’importation de la base de données",
     "resetSuccess": "Réinitialisation terminée",
     "resetSuccessDesc": "La page va s'actualiser dans un instant...",
     "resetFailed": "Échec de la réinitialisation",
@@ -874,11 +874,11 @@ window.LANG_FR = {
     "noContributions": "Aucune synchronisation ajoutée pour le moment.",
     "unknownTrack": "Titre inconnu",
     "updated": "Mis à jour",
-    "topArtists": "Top Artists",
-    "artistGroups": "Artist Groups",
-    "noArtistStats": "No artist stats yet.",
-    "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist",
+    "topArtists": "Artistes les plus ajoutés",
+    "artistGroups": "Nombre d’artistes",
+    "noArtistStats": "Aucune statistique d’artiste pour le moment.",
+    "clearArtistFilter": "Effacer le filtre d’artiste",
+    "filteredArtist": "Artiste filtré",
     "supporter": "Soutien",
     "monthlySupporter": "Soutien mensuel",
     "nicknameStyle": "Style du pseudo",
@@ -1456,18 +1456,18 @@ window.LANG_FR = {
       "excludedSecrets": "Les paramètres actuels d’apparence et de comportement sont enregistrés. Les clés API sont exclues."
     },
     "dbExportImport": {
-      "title": "Export/Import Database",
-      "subtitle": "Transfer translations, lyrics cache and all data",
+      "title": "Exporter/importer la base de données",
+      "subtitle": "Transférez les traductions, le cache des paroles et toutes les données",
       "export": {
-        "label": "Export Database",
+        "label": "Exporter la base de données",
         "button": "Export",
-        "processing": "Exporting..."
+        "processing": "Exportation…"
       },
       "import": {
-        "label": "Import Database",
+        "label": "Importer la base de données",
         "button": "Import",
-        "processing": "Importing...",
-        "confirm": "All existing DB data will be overwritten. Continue?"
+        "processing": "Importation…",
+        "confirm": "Toutes les données existantes seront remplacées. Continuer ?"
       }
     },
     "resetSettings": {
@@ -1882,7 +1882,7 @@ window.LANG_FR = {
     "communityUnavailableLocal": "Les offsets communautaires ne peuvent pas être envoyés pour les titres locaux sans Spotify trackId."
   },
   "playbarButton": {
-    "label": "Lyrics Plus"
+    "label": "Paroles Plus"
   },
   "generationStatus": {
     "complete": "Terminé !",
@@ -1968,6 +1968,7 @@ window.LANG_FR = {
     "submitting": "Envoi...",
     "submitted": "Vidéo enregistrée avec succès !",
     "updated": "Infos vidéo mises à jour !",
+    "updatedAndApplied": "Le minutage de la vidéo a été mis à jour et appliqué !",
     "submitError": "Échec de l'enregistrement",
     "invalidUrl": "URL YouTube invalide",
     "videoNotFound": "Vidéo YouTube inexistante",
@@ -2300,7 +2301,7 @@ window.LANG_FR = {
     "quizTypeUsage": "Usage en contexte",
     "quizTypeRewrite": "Reformuler",
     "quizTypeGrammar": "Grammaire",
-    "quizStep": "Question {current}/{total}",
+    "quizStep": "Question {current} sur {total}",
     "quizCorrect": "Correct",
     "quizWrong": "Explication",
     "skipQuiz": "Passer",
@@ -2376,7 +2377,7 @@ window.LANG_FR = {
     "removeWord": "Supprimer",
     "noWords": "Aucun mot enregistré.",
     "noQuiz": "Aucun quiz généré.",
-    "score": "{score}/{total} correct",
+    "score": "{score}/{total} bonnes réponses",
     "omitted": "{count} segments de paroles sont hors de la plage d’analyse.",
     "linePending": "Cette carte de parole est encore en cours de création.",
     "lineOutOfRange": "La parole actuelle est hors de la plage d’analyse."
@@ -2605,7 +2606,6 @@ window.LANG_FR = {
     "updateAvailable": "Mise à jour disponible",
     "by": "par {author}",
     "updated": "Mis à jour {date}",
-    "updatedAndApplied": "Le minutage de la vidéo a été mis à jour et appliqué !",
     "version": "v{version}",
     "noAddons": "Aucune extension disponible",
     "loadError": "Échec du chargement de la liste des extensions",

@@ -778,12 +778,12 @@ window.LANG_DE = {
     "exportSuccessDesc": "Die Einstellungsdatei wurde gespeichert.",
     "exportFailed": "Export der Einstellungen fehlgeschlagen",
     "importSuccessDesc": "Die Seite wird in Kürze aktualisiert...",
-    "dbExportSuccess": "Database export successful",
+    "dbExportSuccess": "Datenbank erfolgreich exportiert",
     "dbExportSuccessDesc": "Die Datenbankdatei wurde gespeichert.",
-    "dbExportFailed": "Database export failed",
-    "dbImportSuccess": "Database import successful",
-    "dbImportSuccessDesc": "Page will refresh shortly...",
-    "dbImportFailed": "Database import failed",
+    "dbExportFailed": "Datenbankexport fehlgeschlagen",
+    "dbImportSuccess": "Datenbank erfolgreich importiert",
+    "dbImportSuccessDesc": "Die Seite wird in Kürze neu geladen...",
+    "dbImportFailed": "Datenbankimport fehlgeschlagen",
     "resetSuccess": "Zurücksetzen abgeschlossen",
     "resetSuccessDesc": "Die Seite wird in Kürze aktualisiert...",
     "resetFailed": "Zurücksetzen fehlgeschlagen",
@@ -874,11 +874,11 @@ window.LANG_DE = {
     "noContributions": "Noch keine Sync-Beiträge vorhanden.",
     "unknownTrack": "Unbekannter Titel",
     "updated": "Aktualisiert",
-    "topArtists": "Top Artists",
-    "artistGroups": "Artist Groups",
-    "noArtistStats": "No artist stats yet.",
-    "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist",
+    "topArtists": "Häufig hinzugefügte Künstler",
+    "artistGroups": "Anzahl der Künstler",
+    "noArtistStats": "Noch keine Künstlerstatistik.",
+    "clearArtistFilter": "Künstlerfilter entfernen",
+    "filteredArtist": "Gefilterter Künstler",
     "supporter": "Unterstützer",
     "monthlySupporter": "Monatlicher Unterstützer",
     "nicknameStyle": "Spitznamen-Stil",
@@ -1456,18 +1456,18 @@ window.LANG_DE = {
       "excludedSecrets": "Aktuelle Darstellungs- und Verhaltenseinstellungen werden gespeichert. API-Schlüssel werden ausgeschlossen."
     },
     "dbExportImport": {
-      "title": "Export/Import Database",
-      "subtitle": "Transfer translations, lyrics cache and all data",
+      "title": "Datenbank exportieren/importieren",
+      "subtitle": "Übersetzungen, Liedtext-Cache und alle Daten übertragen",
       "export": {
-        "label": "Export Database",
+        "label": "Datenbank exportieren",
         "button": "Export",
-        "processing": "Exporting..."
+        "processing": "Wird exportiert..."
       },
       "import": {
-        "label": "Import Database",
+        "label": "Datenbank importieren",
         "button": "Import",
-        "processing": "Importing...",
-        "confirm": "All existing DB data will be overwritten. Continue?"
+        "processing": "Wird importiert...",
+        "confirm": "Alle vorhandenen Datenbankdaten werden überschrieben. Fortfahren?"
       }
     },
     "resetSettings": {
@@ -1882,7 +1882,7 @@ window.LANG_DE = {
     "communityUnavailableLocal": "Community-Offsets können für lokale Titel ohne Spotify trackId nicht übermittelt werden."
   },
   "playbarButton": {
-    "label": "Lyrics Plus"
+    "label": "Songtexte Plus"
   },
   "generationStatus": {
     "complete": "Fertig!",
@@ -1968,6 +1968,7 @@ window.LANG_DE = {
     "submitting": "Registriere...",
     "submitted": "Video erfolgreich registriert!",
     "updated": "Videoinformationen aktualisiert!",
+    "updatedAndApplied": "Video-Timing aktualisiert und angewendet!",
     "submitError": "Registrierung fehlgeschlagen",
     "invalidUrl": "Ungültige YouTube URL",
     "videoNotFound": "YouTube Video existiert nicht",
@@ -2327,7 +2328,7 @@ window.LANG_DE = {
     "wordStatAll": "Alle {count}",
     "wordStatCurrent": "Dieser Song {count}",
     "wordStatReading": "Lesung {count}",
-    "wordStatSource": "Lyrics {count}",
+    "wordStatSource": "Liedtexte: {count}",
     "wordStatSynced": "Synchron {count}",
     "wordScopeAll": "Alle",
     "wordScopeCurrent": "Dieser Song",
@@ -2604,7 +2605,6 @@ window.LANG_DE = {
     "updateAvailable": "Update verfügbar",
     "by": "von {author}",
     "updated": "Aktualisiert {date}",
-    "updatedAndApplied": "Video-Timing aktualisiert und angewendet!",
     "version": "v{version}",
     "noAddons": "Keine Addons verfügbar",
     "loadError": "Addon-Liste konnte nicht geladen werden",

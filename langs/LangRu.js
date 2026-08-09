@@ -778,12 +778,12 @@ window.LANG_RU = {
     "exportSuccessDesc": "Файл настроек сохранен.",
     "exportFailed": "Ошибка экспорта настроек",
     "importSuccessDesc": "Страница скоро обновится...",
-    "dbExportSuccess": "Database export successful",
+    "dbExportSuccess": "База данных успешно экспортирована",
     "dbExportSuccessDesc": "Файл базы данных сохранен.",
-    "dbExportFailed": "Database export failed",
-    "dbImportSuccess": "Database import successful",
-    "dbImportSuccessDesc": "Page will refresh shortly...",
-    "dbImportFailed": "Database import failed",
+    "dbExportFailed": "Не удалось экспортировать базу данных",
+    "dbImportSuccess": "База данных успешно импортирована",
+    "dbImportSuccessDesc": "Страница скоро обновится...",
+    "dbImportFailed": "Не удалось импортировать базу данных",
     "resetSuccess": "Сброс выполнен успешно",
     "resetSuccessDesc": "Страница скоро обновится...",
     "resetFailed": "Ошибка сброса",
@@ -874,11 +874,11 @@ window.LANG_RU = {
     "noContributions": "Пока нет добавленных синхронизаций.",
     "unknownTrack": "Неизвестный трек",
     "updated": "Обновлено",
-    "topArtists": "Top Artists",
-    "artistGroups": "Artist Groups",
-    "noArtistStats": "No artist stats yet.",
-    "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist",
+    "topArtists": "Часто добавляемые исполнители",
+    "artistGroups": "Количество исполнителей",
+    "noArtistStats": "Статистики по исполнителям пока нет.",
+    "clearArtistFilter": "Сбросить фильтр исполнителя",
+    "filteredArtist": "Выбранный исполнитель",
     "supporter": "Спонсор",
     "monthlySupporter": "Ежемесячный спонсор",
     "nicknameStyle": "Стиль имени",
@@ -1456,18 +1456,18 @@ window.LANG_RU = {
       "excludedSecrets": "Сохраняются текущие настройки внешнего вида и поведения. API-ключи исключаются."
     },
     "dbExportImport": {
-      "title": "Export/Import Database",
-      "subtitle": "Transfer translations, lyrics cache and all data",
+      "title": "Экспорт/импорт базы данных",
+      "subtitle": "Перенос переводов, кеша текстов песен и всех данных",
       "export": {
-        "label": "Export Database",
+        "label": "Экспортировать базу данных",
         "button": "Export",
-        "processing": "Exporting..."
+        "processing": "Экспорт..."
       },
       "import": {
-        "label": "Import Database",
+        "label": "Импортировать базу данных",
         "button": "Import",
-        "processing": "Importing...",
-        "confirm": "All existing DB data will be overwritten. Continue?"
+        "processing": "Импорт...",
+        "confirm": "Все существующие данные базы будут перезаписаны. Продолжить?"
       }
     },
     "resetSettings": {

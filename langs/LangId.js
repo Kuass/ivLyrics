@@ -778,12 +778,12 @@ window.LANG_ID = {
     "exportSuccessDesc": "File pengaturan telah disimpan.",
     "exportFailed": "Gagal mengekspor pengaturan",
     "importSuccessDesc": "Halaman akan disegarkan sebentar lagi...",
-    "dbExportSuccess": "Database export successful",
+    "dbExportSuccess": "Database berhasil diekspor",
     "dbExportSuccessDesc": "File database telah disimpan.",
-    "dbExportFailed": "Database export failed",
-    "dbImportSuccess": "Database import successful",
-    "dbImportSuccessDesc": "Page will refresh shortly...",
-    "dbImportFailed": "Database import failed",
+    "dbExportFailed": "Ekspor database gagal",
+    "dbImportSuccess": "Database berhasil diimpor",
+    "dbImportSuccessDesc": "Halaman akan segera dimuat ulang...",
+    "dbImportFailed": "Impor database gagal",
     "resetSuccess": "Reset selesai",
     "resetSuccessDesc": "Halaman akan disegarkan sebentar lagi...",
     "resetFailed": "Reset gagal",
@@ -874,11 +874,11 @@ window.LANG_ID = {
     "noContributions": "Belum ada sinkronisasi yang ditambahkan.",
     "unknownTrack": "Track tidak dikenal",
     "updated": "Diperbarui",
-    "topArtists": "Top Artists",
-    "artistGroups": "Artist Groups",
-    "noArtistStats": "No artist stats yet.",
-    "clearArtistFilter": "Clear artist filter",
-    "filteredArtist": "Filtered artist",
+    "topArtists": "Artis yang paling sering ditambahkan",
+    "artistGroups": "Jumlah artis",
+    "noArtistStats": "Belum ada statistik artis.",
+    "clearArtistFilter": "Hapus filter artis",
+    "filteredArtist": "Artis yang difilter",
     "supporter": "Pendukung",
     "monthlySupporter": "Pendukung bulanan",
     "nicknameStyle": "Gaya nama panggilan",
@@ -1002,7 +1002,7 @@ window.LANG_ID = {
           "strings": "19 Senar",
           "piano": "20 Piano",
           "bloom": "21 Mekar",
-          "speaker": "22 Speaker",
+          "speaker": "22 Pengeras suara",
           "crossfade": "23 Crossfade"
         }
       },
@@ -1456,18 +1456,18 @@ window.LANG_ID = {
       "excludedSecrets": "Pengaturan tampilan dan perilaku saat ini disimpan. Kunci API dikecualikan."
     },
     "dbExportImport": {
-      "title": "Export/Import Database",
-      "subtitle": "Transfer translations, lyrics cache and all data",
+      "title": "Ekspor/Impor Database",
+      "subtitle": "Pindahkan terjemahan, cache lirik, dan semua data",
       "export": {
-        "label": "Export Database",
+        "label": "Ekspor Database",
         "button": "Export",
-        "processing": "Exporting..."
+        "processing": "Mengekspor..."
       },
       "import": {
-        "label": "Import Database",
+        "label": "Impor Database",
         "button": "Import",
-        "processing": "Importing...",
-        "confirm": "All existing DB data will be overwritten. Continue?"
+        "processing": "Mengimpor...",
+        "confirm": "Semua data database yang ada akan ditimpa. Lanjutkan?"
       }
     },
     "resetSettings": {
@@ -1740,24 +1740,24 @@ window.LANG_ID = {
           "loginRequired": "Login Discord diperlukan untuk mengelola privasi profil kreator."
         },
         "backup": {
-          "title": "Backup & Restore",
-          "enterName": "Please enter a backup name.",
-          "success": "Settings backed up.",
-          "fail": "Backup failed",
-          "error": "Error during backup",
-          "restoreSuccess": "Settings restored. Please restart the app to apply.",
-          "invalidFormat": "Invalid settings format.",
-          "downloadFail": "Failed to download settings",
-          "downloadError": "Error during download",
-          "deleteConfirm": "Are you sure you want to delete this backup?",
-          "deleted": "Backup deleted.",
-          "deleteFail": "Delete failed",
-          "deleteError": "Error during deletion",
-          "placeholder": "Backup name (e.g. PC Settings)",
-          "backupBtn": "Backup",
-          "restoreBtn": "Restore",
-          "deleteBtn": "Delete",
-          "noBackups": "No backups saved."
+          "title": "Cadangkan dan pulihkan pengaturan",
+          "enterName": "Masukkan nama pengaturan.",
+          "success": "Pengaturan telah dicadangkan.",
+          "fail": "Pencadangan gagal",
+          "error": "Terjadi kesalahan saat mencadangkan",
+          "restoreSuccess": "Pengaturan telah dipulihkan. Mulai ulang aplikasi untuk menerapkannya.",
+          "invalidFormat": "Format file pengaturan tidak valid.",
+          "downloadFail": "Pengaturan gagal diunduh",
+          "downloadError": "Terjadi kesalahan saat mengunduh",
+          "deleteConfirm": "Yakin ingin menghapus cadangan ini?",
+          "deleted": "Cadangan telah dihapus.",
+          "deleteFail": "Penghapusan gagal",
+          "deleteError": "Terjadi kesalahan saat menghapus",
+          "placeholder": "Nama cadangan (misalnya: Pengaturan PC)",
+          "backupBtn": "Cadangkan",
+          "restoreBtn": "Pulihkan",
+          "deleteBtn": "Hapus",
+          "noBackups": "Tidak ada cadangan yang tersimpan."
         }
       },
       "appInfo": {
@@ -1968,6 +1968,7 @@ window.LANG_ID = {
     "submitting": "Mendaftarkan...",
     "submitted": "Video berhasil didaftarkan!",
     "updated": "Info video diperbarui!",
+    "updatedAndApplied": "Waktu video diperbarui dan diterapkan!",
     "submitError": "Gagal mendaftarkan video",
     "invalidUrl": "URL YouTube tidak valid",
     "videoNotFound": "Video YouTube tidak ada",
@@ -2010,7 +2011,7 @@ window.LANG_ID = {
     "selectLyricsHint": "Klik baris lirik yang ingin dimasukkan (Maks 10 baris)",
     "template": "Preset",
     "templates": {
-      "cover": "Cover Blur",
+      "cover": "ภาพปกเบลอ",
       "gradient": "Gradien",
       "minimal": "Minimal",
       "glass": "Glass",
@@ -2604,7 +2605,6 @@ window.LANG_ID = {
     "updateAvailable": "Pembaruan tersedia",
     "by": "oleh {author}",
     "updated": "Diperbarui {date}",
-    "updatedAndApplied": "Waktu video diperbarui dan diterapkan!",
     "version": "v{version}",
     "noAddons": "Tidak ada addon tersedia",
     "loadError": "Gagal memuat daftar addon",
