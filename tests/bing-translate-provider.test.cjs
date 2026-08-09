@@ -12,6 +12,7 @@ const managerSource = fs.readFileSync(path.join(root, 'AIAddonManager.js'), 'utf
 const settingsSource = fs.readFileSync(path.join(root, 'Settings.js'), 'utf8');
 const optionsSource = fs.readFileSync(path.join(root, 'OptionsMenu.js'), 'utf8');
 const globalShortcutsSource = fs.readFileSync(path.join(root, 'GlobalShortcuts.js'), 'utf8');
+const pageSource = fs.readFileSync(path.join(root, 'index.js'), 'utf8');
 const testBingOrigin = ['https://www', 'bing', 'com'].join('.');
 const testProxyOrigin = ['https://cors-proxy', 'spicetify', 'app'].join('.');
 
@@ -326,6 +327,23 @@ test('reserves plain S for settings on lyric and fullscreen views', () => {
         false,
         'Spotify dialogs and fullscreen presentations must not block the ivLyrics shortcut'
     );
+});
+
+test('maps fullscreen number shortcuts to every presentation mode', () => {
+    for (const [key, mode] of [
+        ['1', 'standard'],
+        ['2', 'compact-vinyl'],
+        ['3', 'vinyl'],
+        ['4', 'video'],
+    ]) {
+        assert.match(globalShortcutsSource, new RegExp(`Digit${key}: ["']${mode}["']`));
+        assert.match(globalShortcutsSource, new RegExp(`Numpad${key}: ["']${mode}["']`));
+    }
+    assert.match(globalShortcutsSource, /!isInFullscreenMode\(\)/);
+    assert.match(globalShortcutsSource, /type: "fullscreen-presentation"/);
+    assert.match(globalShortcutsSource, /fullscreen-tv-mode[\s\S]*toggleTvMode\(\)/);
+    assert.match(pageSource, /event\.detail\?\.type === "fullscreen-presentation"[\s\S]*this\.state\.isFullscreen/);
+    assert.match(pageSource, /fullscreenPresentation: normalizeIvLyricsFullscreenPresentation\([\s\S]*event\.detail\.value/);
 });
 
 test('shows the AI provider hint only when translation is limited to keyless providers', () => {

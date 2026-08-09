@@ -9163,6 +9163,15 @@ class LyricsContainer extends react.Component {
         this.reloadLyrics?.(false);
       } else if (event.detail?.name === "pseudo-karaoke-render-advance") {
         this.forceUpdate?.();
+      } else if (
+        event.detail?.type === "fullscreen-presentation"
+        && this.state.isFullscreen
+      ) {
+        this.setState({
+          fullscreenPresentation: normalizeIvLyricsFullscreenPresentation(
+            event.detail.value
+          )
+        });
       }
     };
     window.addEventListener("ivLyrics", this.handleConfigChange);
