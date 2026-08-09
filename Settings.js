@@ -109,6 +109,52 @@ const ProviderDragHandle = ({ provider, label, onDragStart, onDragEnd, onMove })
     )
   );
 
+const SETTINGS_OUTLINE_ICONS = Object.freeze({
+  general: "M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6",
+  "lyrics-providers": "M9 18V5l10-2v13M9 8l10-2M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm10-2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z",
+  "ai-providers": "M12 3l1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2L12 3ZM5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8L5 14Zm13-1 1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3Z",
+  appearance: "M12 3a9 9 0 0 0 0 18h1.4a2.1 2.1 0 0 0 0-4.2h-1a1.7 1.7 0 0 1 0-3.4H15a6 6 0 0 0 0-12h-3ZM7.5 9h.01M9.5 6h.01M15 6.5h.01M17 10h.01",
+  performance: "M4.3 18a9 9 0 1 1 15.4 0M12 12l4-4M7 18h10",
+  lyrics: "M5 7h8M5 12h6M5 17h8M16 8l4 4-4 4V8Z",
+  fullscreen: "M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5",
+  nowplaying: "M3 5h18v14H3V5Zm11 0v14M17 9h1M17 13h1",
+  advanced: "M4 7h6M14 7h6M4 17h10M18 17h2M10 4v6M14 14v6",
+  debug: "M9 9h6v8a3 3 0 0 1-6 0V9Zm3-5v5M8 4l2 2M16 4l-2 2M5 11h4M15 11h4M5 16h4M15 16h4",
+  about: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-11v6M12 7h.01",
+  karaoke: "M12 14a4 4 0 0 0 4-4V5a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4Zm-7-4a7 7 0 0 0 14 0M12 17v4M9 21h6",
+  synced: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-15v5l3 2",
+  unsynced: "M5 6h14M5 12h14M5 18h9",
+  ivsync: "M20 7h-5V2M4 17h5v5M5.5 8a8 8 0 0 1 13-2L20 7M4 17l1.5 1A8 8 0 0 0 18.5 16",
+  translate: "M4 5h8M8 3v2M6 5c0 4 2 7 6 9M11 5c-.4 3.4-2.2 6.2-5.5 8M14 21l3.5-9L21 21M15.5 18h4",
+  metadata: "M4 4h7l9 9-7 7-9-9V4Zm4 4h.01",
+  tmi: "M21 12a9 9 0 0 1-9 9H5l1.8-3.2A9 9 0 1 1 21 12Zm-9-1v5M12 7h.01",
+  lyricsStudy: "M4 5.5A3.5 3.5 0 0 1 7.5 2H12v17H7.5A3.5 3.5 0 0 0 4 22V5.5ZM20 5.5A3.5 3.5 0 0 0 16.5 2H12v17h4.5A3.5 3.5 0 0 1 20 22V5.5Z",
+  characterPronunciation: "M5 9v6M9 6v12M13 9v6M17 4v16M21 8v8",
+  culturalAnnotations: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-20c3 3 4.5 6.3 4.5 10S15 19 12 22M12 2C9 5 7.5 8.3 7.5 12S9 19 12 22M2 12h20",
+});
+
+const SettingsOutlineIcon = ({ name, className = "", size = 16 }) =>
+  react.createElement("svg", {
+    className,
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.7,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": "true",
+  }, react.createElement("path", { d: SETTINGS_OUTLINE_ICONS[name] || SETTINGS_OUTLINE_ICONS.general }));
+
+const ProviderSupportIconChip = ({ type, label }) =>
+  react.createElement("span", {
+    className: `support-icon-chip support-icon-${type}`,
+    role: "img",
+    "aria-label": label,
+    title: label,
+  }, react.createElement(SettingsOutlineIcon, { name: type, size: 14 }));
+
 // 데스크탑 오버레이 설정 컴포넌트
 const OverlaySettings = () => {
   const [enabled, setEnabled] = useState(window.OverlaySender?.enabled ?? false);
@@ -1243,22 +1289,22 @@ const AddonSettingsCard = ({ addon, isEnabled, onToggle, isExpanded, onExpandTog
   const renderSupportBadges = () => {
     const badges = [];
     if (addon.supports?.translate) {
-      badges.push(react.createElement("span", { key: "translate", className: "support-badge synced" }, I18n.t("settings.aiProviders.supports.translate") || "번역"));
+      badges.push(react.createElement(ProviderSupportIconChip, { key: "translate", type: "translate", label: I18n.t("settings.aiProviders.supports.translate") || "Translation" }));
     }
     if (addon.supports?.metadata) {
-      badges.push(react.createElement("span", { key: "metadata", className: "support-badge karaoke" }, I18n.t("settings.aiProviders.supports.metadata") || "메타데이터"));
+      badges.push(react.createElement(ProviderSupportIconChip, { key: "metadata", type: "metadata", label: I18n.t("settings.aiProviders.supports.metadata") || "Metadata" }));
     }
     if (addon.supports?.tmi) {
-      badges.push(react.createElement("span", { key: "tmi", className: "support-badge unsynced" }, I18n.t("settings.aiProviders.supports.tmi") || "TMI"));
+      badges.push(react.createElement(ProviderSupportIconChip, { key: "tmi", type: "tmi", label: I18n.t("settings.aiProviders.supports.tmi") || "TMI" }));
     }
     if (addon.supports?.lyricsStudy) {
-      badges.push(react.createElement("span", { key: "lyricsStudy", className: "support-badge synced" }, I18n.t("settings.aiProviders.supports.lyricsStudy") || "학습"));
+      badges.push(react.createElement(ProviderSupportIconChip, { key: "lyricsStudy", type: "lyricsStudy", label: I18n.t("settings.aiProviders.supports.lyricsStudy") || "Lyrics study" }));
     }
     if (addon.supports?.characterPronunciation) {
-      badges.push(react.createElement("span", { key: "characterPronunciation", className: "support-badge karaoke" }, I18n.t("settings.aiProviders.supports.characterPronunciation") || "글자 발음"));
+      badges.push(react.createElement(ProviderSupportIconChip, { key: "characterPronunciation", type: "characterPronunciation", label: I18n.t("settings.aiProviders.supports.characterPronunciation") || "Pronunciation" }));
     }
     if (addon.supports?.culturalAnnotations) {
-      badges.push(react.createElement("span", { key: "culturalAnnotations", className: "support-badge unsynced" }, I18n.t("settings.aiProviders.supports.culturalAnnotations") || "문화 설명"));
+      badges.push(react.createElement(ProviderSupportIconChip, { key: "culturalAnnotations", type: "culturalAnnotations", label: I18n.t("settings.aiProviders.supports.culturalAnnotations") || "Cultural context" }));
     }
     return badges;
   };
@@ -1373,16 +1419,16 @@ const LyricsProviderCard = ({ provider, isEnabled, onToggle, isExpanded, onExpan
   const renderSupportBadges = () => {
     const badges = [];
     if (provider.supports?.karaoke) {
-      badges.push(react.createElement("span", { key: "karaoke", className: "support-badge karaoke" }, I18n.t("settings.lyricsProviders.supports.karaoke") || "Karaoke"));
+      badges.push(react.createElement(ProviderSupportIconChip, { key: "karaoke", type: "karaoke", label: I18n.t("settings.lyricsProviders.supports.karaoke") || "Karaoke" }));
     }
     if (provider.supports?.synced) {
-      badges.push(react.createElement("span", { key: "synced", className: "support-badge synced" }, I18n.t("settings.lyricsProviders.supports.synced") || "Synced"));
+      badges.push(react.createElement(ProviderSupportIconChip, { key: "synced", type: "synced", label: I18n.t("settings.lyricsProviders.supports.synced") || "Synced" }));
     }
     if (provider.supports?.unsynced) {
-      badges.push(react.createElement("span", { key: "unsynced", className: "support-badge unsynced" }, I18n.t("settings.lyricsProviders.supports.unsynced") || "Plain"));
+      badges.push(react.createElement(ProviderSupportIconChip, { key: "unsynced", type: "unsynced", label: I18n.t("settings.lyricsProviders.supports.unsynced") || "Plain" }));
     }
     if (provider.useIvLyricsSync) {
-      badges.push(react.createElement("span", { key: "ivsync", className: "support-badge ivsync" }, I18n.t("settings.lyricsProviders.supports.ivLyricsSync") || "ivLyrics Sync"));
+      badges.push(react.createElement(ProviderSupportIconChip, { key: "ivsync", type: "ivsync", label: I18n.t("settings.lyricsProviders.supports.ivLyricsSync") || "ivLyrics Sync" }));
     }
     return badges;
   };
@@ -1660,10 +1706,11 @@ const LyricsProvidersTab = () => {
       }),
 
       // Provider 목록
-      providers.length > 0 && react.createElement("div", { className: "lyrics-providers-list" },
-        sortedProviders.map((provider) =>
+      providers.length > 0 && react.createElement("div", { className: "lyrics-providers-list", role: "list" },
+        sortedProviders.map((provider, providerIndex) =>
           react.createElement("div", {
             key: provider.id,
+            role: "listitem",
             className: [
               "lyrics-provider-item",
               dragState.sourceId === provider.id ? "dragging" : "",
@@ -1672,6 +1719,10 @@ const LyricsProvidersTab = () => {
             onDragOver: (event) => handleDragOver(event, provider.id),
             onDrop: (event) => handleDrop(event, provider.id),
           },
+            react.createElement("span", {
+              className: "provider-order-index",
+              "aria-hidden": "true",
+            }, providerIndex + 1),
             react.createElement(ProviderDragHandle, {
               provider,
               label: `${provider.name || provider.id}: ${I18n.t("settings.lyricsProviders.moveUp") || "Move Up"} / ${I18n.t("settings.lyricsProviders.moveDown") || "Move Down"}`,
@@ -1970,42 +2021,46 @@ const AIProvidersTab = () => {
           setProviderRetryCount(nextValue);
         },
       }),
-      react.createElement(OptionList, {
-        items: [
-          {
-            desc: I18n.t("settings.culturalAnnotations.label"),
-            key: "cultural-annotations-enabled",
-            info: I18n.t("settings.culturalAnnotations.desc"),
-            type: ConfigSlider,
-            defaultValue: CONFIG.visual["cultural-annotations-enabled"] ?? false,
-          },
-        ],
-        onChange: handleCulturalSettingChange,
-      }),
-      culturalAnnotationsEnabled && react.createElement("button", {
-        type: "button",
-        className: `cultural-details-toggle${culturalDetailsExpanded ? " expanded" : ""}`,
-        "aria-expanded": culturalDetailsExpanded,
-        "aria-controls": "cultural-annotation-details",
-        onClick: () => setCulturalDetailsExpanded((expanded) => !expanded),
+      react.createElement("div", {
+        className: `cultural-annotation-group${culturalAnnotationsEnabled ? " is-enabled" : ""}${culturalDetailsExpanded ? " is-expanded" : ""}`,
+        "data-setting-key": "cultural-annotations-group",
       },
-        react.createElement("span", null, I18n.t("shareImage.advancedSettings") || "Detailed settings"),
-        react.createElement("svg", {
-          width: 16,
-          height: 16,
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: 2,
-          strokeLinecap: "round",
-          strokeLinejoin: "round",
-          "aria-hidden": "true",
-        }, react.createElement("polyline", { points: "6 9 12 15 18 9" }))
-      ),
-      culturalAnnotationsEnabled && culturalDetailsExpanded && react.createElement("div", {
-        id: "cultural-annotation-details",
-        className: "cultural-annotation-details",
-      }, react.createElement(OptionList, {
+        react.createElement(OptionList, {
+          items: [
+            {
+              desc: I18n.t("settings.culturalAnnotations.label"),
+              key: "cultural-annotations-enabled",
+              info: I18n.t("settings.culturalAnnotations.desc"),
+              type: ConfigSlider,
+              defaultValue: CONFIG.visual["cultural-annotations-enabled"] ?? false,
+            },
+          ],
+          onChange: handleCulturalSettingChange,
+        }),
+        culturalAnnotationsEnabled && react.createElement("button", {
+          type: "button",
+          className: `cultural-details-toggle${culturalDetailsExpanded ? " expanded" : ""}`,
+          "aria-expanded": culturalDetailsExpanded,
+          "aria-controls": "cultural-annotation-details",
+          onClick: () => setCulturalDetailsExpanded((expanded) => !expanded),
+        },
+          react.createElement("span", null, I18n.t("shareImage.advancedSettings") || "Detailed settings"),
+          react.createElement("svg", {
+            width: 16,
+            height: 16,
+            viewBox: "0 0 24 24",
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: 2,
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            "aria-hidden": "true",
+          }, react.createElement("polyline", { points: "6 9 12 15 18 9" }))
+        ),
+        culturalAnnotationsEnabled && culturalDetailsExpanded && react.createElement("div", {
+          id: "cultural-annotation-details",
+          className: "cultural-annotation-details",
+        }, react.createElement(OptionList, {
         items: [
           {
             desc: I18n.t("settings.culturalAnnotations.fontFamily.label"),
@@ -2079,13 +2134,15 @@ const AIProvidersTab = () => {
             infoPrefix: `${vinylModeLabel}: `,
           }),
         ],
-        onChange: handleCulturalSettingChange,
-      })),
+          onChange: handleCulturalSettingChange,
+        }))
+      ),
       // Provider 목록
-      providers.length > 0 && react.createElement("div", { className: "lyrics-providers-list" },
-        sortedProviders.map((provider) =>
+      providers.length > 0 && react.createElement("div", { className: "lyrics-providers-list", role: "list" },
+        sortedProviders.map((provider, providerIndex) =>
           react.createElement("div", {
             key: provider.id,
+            role: "listitem",
             className: [
               "lyrics-provider-item",
               dragState.sourceId === provider.id ? "dragging" : "",
@@ -2094,6 +2151,10 @@ const AIProvidersTab = () => {
             onDragOver: (event) => handleDragOver(event, provider.id),
             onDrop: (event) => handleDrop(event, provider.id),
           },
+            react.createElement("span", {
+              className: "provider-order-index",
+              "aria-hidden": "true",
+            }, providerIndex + 1),
             react.createElement(ProviderDragHandle, {
               provider,
               label: `${provider.name || provider.id}: ${I18n.t("settings.aiProviders.moveUp") || "Move Up"} / ${I18n.t("settings.aiProviders.moveDown") || "Move Down"}`,
@@ -8469,12 +8530,16 @@ const ConfigModal = ({
   const sidebarTabs = [
     {
       id: "general",
+      icon: "general",
+      group: "general",
       label: I18n.t("tabs.general"),
       badge: tabMeta.general.badge,
       description: tabMeta.general.description,
     },
     {
       id: "lyrics-providers",
+      icon: "lyrics-providers",
+      group: "sources",
       label: I18n.t("tabs.lyricsProviders"),
       badge: tabMeta["lyrics-providers"].badge,
       description: tabMeta["lyrics-providers"].description,
@@ -8482,6 +8547,8 @@ const ConfigModal = ({
     },
     {
       id: "ai-providers",
+      icon: "ai-providers",
+      group: "sources",
       label: I18n.t("tabs.aiProviders"),
       badge: tabMeta["ai-providers"].badge,
       description: tabMeta["ai-providers"].description,
@@ -8489,51 +8556,85 @@ const ConfigModal = ({
     },
     {
       id: "appearance",
+      icon: "appearance",
+      group: "general",
       label: I18n.t("tabs.appearance"),
       badge: tabMeta.appearance.badge,
       description: tabMeta.appearance.description,
     },
     {
       id: "performance",
+      icon: "performance",
+      group: "general",
       label: I18n.t("tabs.performance"),
       badge: tabMeta.performance.badge,
       description: tabMeta.performance.description,
     },
     {
       id: "lyrics",
+      icon: "lyrics",
+      group: "screen",
       label: I18n.t("tabs.behavior"),
       badge: tabMeta.lyrics.badge,
       description: tabMeta.lyrics.description,
     },
     {
       id: "fullscreen",
+      icon: "fullscreen",
+      group: "screen",
       label: I18n.t("tabs.fullscreen"),
       badge: tabMeta.fullscreen.badge,
       description: tabMeta.fullscreen.description,
     },
     {
       id: "nowplaying",
+      icon: "nowplaying",
+      group: "screen",
       label: I18n.t("tabs.nowplaying"),
       badge: tabMeta.nowplaying.badge,
       description: tabMeta.nowplaying.description,
     },
     {
       id: "advanced",
+      icon: "advanced",
+      group: "system",
       label: I18n.t("tabs.advanced"),
       badge: tabMeta.advanced.badge,
       description: tabMeta.advanced.description,
     },
     {
       id: "debug",
+      icon: "debug",
+      group: "system",
       label: I18n.t("tabs.debug"),
       badge: tabMeta.debug.badge,
       description: tabMeta.debug.description,
     },
     {
       id: "about",
+      icon: "about",
+      group: "system",
       label: I18n.t("tabs.about"),
       badge: tabMeta.about.badge,
       description: tabMeta.about.description,
+    },
+  ];
+  const sidebarGroups = [
+    {
+      id: "general",
+      label: I18n.t("tabs.general") || "General",
+    },
+    {
+      id: "sources",
+      label: getSettingsText("settingsUi.nav.badges.providers", "Sources"),
+    },
+    {
+      id: "screen",
+      label: getSettingsText("settingsUi.nav.badges.surface", "Screen"),
+    },
+    {
+      id: "system",
+      label: getSettingsText("settingsUi.nav.badges.system", "System"),
     },
   ];
   const [sidebarSectionsByTab, setSidebarSectionsByTab] = react.useState({});
@@ -9189,106 +9290,136 @@ const ConfigModal = ({
         );
       });
 
+    const renderSidebarTab = (tab) => {
+      const sectionItems = sidebarSectionsByTab[tab.id] || [];
+      const hasSubmenu = !tab.standalone && sectionItems.length > 0;
+      const isExpanded = expandedGroupIds.includes(tab.id);
+      const isTabActive = activeTab === tab.id;
+      const submenuId = `${APP_NAME}-settings-nav-${tab.id}`;
+      const navIcon = react.createElement(SettingsOutlineIcon, {
+        name: tab.icon || tab.id,
+        className: "settings-nav-icon",
+        size: 16,
+      });
+
+      if (!hasSubmenu) {
+        return react.createElement(
+          "button",
+          {
+            key: tab.id,
+            className: `settings-nav-card ${isTabActive ? "active" : ""}`,
+            type: "button",
+            "aria-current": isTabActive ? "page" : undefined,
+            onClick: () =>
+              navigateToDestination(tab.id, null, resolveNavItemId(tab.id)),
+          },
+          navIcon,
+          react.createElement(
+            "strong",
+            { className: "settings-nav-card-title" },
+            tab.label
+          ),
+          react.createElement(
+            "span",
+            { className: "settings-nav-card-badge", "aria-hidden": "true" },
+            tab.badge || ""
+          )
+        );
+      }
+
+      return react.createElement(
+        "div",
+        {
+          key: tab.id,
+          className: "settings-nav-group",
+        },
+        react.createElement(
+          "button",
+          {
+            className: `settings-nav-group-toggle ${
+              isExpanded ? "expanded" : ""
+            } ${isTabActive ? "active" : ""}`,
+            type: "button",
+            onClick: () => {
+              if (activeTab !== tab.id) {
+                navigateToDestination(tab.id, null, resolveNavItemId(tab.id));
+                setExpandedGroupIds([tab.id]);
+                return;
+              }
+
+              toggleNavigationGroup(tab.id);
+            },
+            "aria-expanded": isExpanded,
+            "aria-controls": isExpanded ? submenuId : undefined,
+          },
+          navIcon,
+          react.createElement(
+            "span",
+            { className: "settings-nav-group-title" },
+            tab.label
+          ),
+          react.createElement(
+            "span",
+            { className: "settings-nav-group-indicator", "aria-hidden": "true" },
+            react.createElement(
+              "svg",
+              {
+                viewBox: "0 0 16 16",
+                fill: "none",
+                stroke: "currentColor",
+                strokeWidth: 1.5,
+                strokeLinecap: "round",
+                strokeLinejoin: "round",
+              },
+              react.createElement("path", {
+                d: isExpanded ? "M4 6l4 4 4-4" : "M6 4l4 4-4 4",
+              })
+            )
+          )
+        ),
+        isExpanded &&
+          react.createElement(
+            "div",
+            {
+              id: submenuId,
+              className: "settings-nav-group-items",
+              role: "tree",
+              "aria-label": tab.label,
+            },
+            renderSectionNodes(buildSettingsNavigationTree(sectionItems))
+          )
+      );
+    };
+
     return react.createElement(
       "div",
       { className: "settings-sidebar-nav", role: "navigation" },
-      sidebarTabs.map((tab) =>
-        (() => {
-          const sectionItems = sidebarSectionsByTab[tab.id] || [];
-          const hasSubmenu = !tab.standalone && sectionItems.length > 0;
-          const isExpanded = expandedGroupIds.includes(tab.id);
-          const isTabActive = activeTab === tab.id;
-          const submenuId = `${APP_NAME}-settings-nav-${tab.id}`;
-
-          if (!hasSubmenu) {
-            return react.createElement(
-              "button",
-              {
-                key: tab.id,
-                className: `settings-nav-card ${isTabActive ? "active" : ""}`,
-                type: "button",
-                "aria-current": isTabActive ? "page" : undefined,
-                onClick: () =>
-                  navigateToDestination(tab.id, null, resolveNavItemId(tab.id)),
-              },
-              react.createElement(
-                "strong",
-                { className: "settings-nav-card-title" },
-                tab.label
-              ),
-              react.createElement(
-                "span",
-                { className: "settings-nav-card-badge" },
-                tab.badge || ""
-              )
-            );
-          }
-
-          return react.createElement(
+      sidebarGroups.map((group) => {
+        const groupTabs = sidebarTabs.filter((tab) => tab.group === group.id);
+        if (groupTabs.length === 0) return null;
+        const labelId = `${APP_NAME}-settings-nav-category-${group.id}`;
+        return react.createElement(
+          "section",
+          {
+            key: group.id,
+            className: "settings-nav-category",
+            "aria-labelledby": labelId,
+          },
+          react.createElement(
             "div",
             {
-              key: tab.id,
-              className: "settings-nav-group",
+              id: labelId,
+              className: "settings-nav-category-label",
             },
-            react.createElement(
-              "button",
-                {
-                  className: `settings-nav-group-toggle ${
-                    isExpanded ? "expanded" : ""
-                  } ${isTabActive ? "active" : ""}`,
-                  type: "button",
-                onClick: () => {
-                  if (activeTab !== tab.id) {
-                    navigateToDestination(tab.id, null, resolveNavItemId(tab.id));
-                    setExpandedGroupIds([tab.id]);
-                    return;
-                  }
-
-                  toggleNavigationGroup(tab.id);
-                  },
-                  "aria-expanded": isExpanded,
-                  "aria-controls": isExpanded ? submenuId : undefined,
-                },
-              react.createElement(
-                "span",
-                { className: "settings-nav-group-title" },
-                tab.label
-              ),
-                react.createElement(
-                  "span",
-                  { className: "settings-nav-group-indicator", "aria-hidden": "true" },
-                  react.createElement(
-                    "svg",
-                    {
-                      viewBox: "0 0 16 16",
-                      fill: "none",
-                      stroke: "currentColor",
-                      strokeWidth: 1.5,
-                      strokeLinecap: "round",
-                      strokeLinejoin: "round",
-                    },
-                    react.createElement("path", {
-                      d: isExpanded ? "M4 6l4 4 4-4" : "M6 4l4 4-4 4",
-                    })
-                  )
-                )
-              ),
-              isExpanded &&
-                react.createElement(
-                  "div",
-                  {
-                    id: submenuId,
-                    className: "settings-nav-group-items",
-                    role: "tree",
-                    "aria-label": tab.label,
-                  },
-                  renderSectionNodes(
-                    buildSettingsNavigationTree(sectionItems)
-                  )
-              )
-          );
-        })()
-      )
+            group.label
+          ),
+          react.createElement(
+            "div",
+            { className: "settings-nav-category-items" },
+            groupTabs.map(renderSidebarTab)
+          )
+        );
+      })
     );
   };
 
@@ -15455,6 +15586,898 @@ const ConfigModal = ({
     #${APP_NAME}-config-container .slider-container {
         width: 100%;
         max-width: none;
+    }
+}
+
+/* ========================================
+   Restrained flat settings workspace
+   ======================================== */
+.ivlyrics-settings-modal-shell:has(#${APP_NAME}-config-container) {
+    width: min(calc(100vw - 32px), 1480px) !important;
+    max-width: calc(100vw - 32px) !important;
+    max-height: calc(100vh - 32px) !important;
+    border: 0.5px solid #2a2b2d !important;
+    border-radius: 22px !important;
+    background: #090a0b !important;
+    box-shadow: none !important;
+}
+
+#${APP_NAME}-config-container {
+    --settings-page: #0a0b0c;
+    --settings-sidebar-surface: #0d0e0f;
+    --settings-surface-1: #111315;
+    --settings-surface-2: #16181a;
+    --settings-muted-surface: #0e1011;
+    --settings-border: #27292c;
+    --settings-border-strong: #34373a;
+    --settings-divider: #232528;
+    --settings-section-outline: #24272a;
+    --settings-row-divider: #222427;
+    --settings-section-surface: var(--settings-surface-1);
+    --settings-section-surface-hover: var(--settings-surface-2);
+    --settings-accent-rgb: 95, 216, 143;
+    --accent-primary: #5fd88f;
+    --accent-primary-light: rgba(95, 216, 143, 0.12);
+    --settings-glass-active: rgba(95, 216, 143, 0.12);
+    --settings-glass-hover: var(--settings-surface-2);
+    --settings-glass-soft: var(--settings-surface-1);
+    --settings-glass: var(--settings-surface-1);
+    --settings-glass-strong: var(--settings-surface-2);
+    --text-primary: #eeeeee;
+    --text-secondary: #92969b;
+    --text-tertiary: #5f6469;
+    --settings-section-radius: 9px;
+    --settings-field-radius: 7px;
+    --settings-row-min-height: 58px;
+    --settings-row-padding-x: 14px;
+    --settings-control-height: 34px;
+    width: 100%;
+    height: min(92vh, 1080px);
+    min-height: min(620px, calc(100vh - 32px));
+    grid-template-columns: 292px minmax(0, 1fr) !important;
+    grid-template-rows: 80px minmax(0, 1fr) !important;
+    border: 0 !important;
+    border-radius: 22px !important;
+    background: var(--settings-page) !important;
+    color: var(--text-primary);
+    box-shadow: none !important;
+    font-family: "Pretendard Variable", Pretendard, "Segoe UI Variable Text", "Segoe UI", sans-serif;
+}
+
+#${APP_NAME}-config-container[data-ui-theme="light"] {
+    --settings-page: #f5f6f7;
+    --settings-sidebar-surface: #eff1f3;
+    --settings-surface-1: #ffffff;
+    --settings-surface-2: #f5f7f8;
+    --settings-muted-surface: #eef0f2;
+    --settings-border: #dfe2e5;
+    --settings-border-strong: #cfd3d7;
+    --settings-divider: #e0e3e6;
+    --settings-section-outline: #dfe2e5;
+    --settings-row-divider: #e5e7e9;
+    --settings-accent-rgb: 47, 143, 91;
+    --accent-primary: #2f8f5b;
+    --accent-primary-light: rgba(47, 143, 91, 0.11);
+    --text-primary: #17191b;
+    --text-secondary: #63686d;
+    --text-tertiary: #94999e;
+    background: var(--settings-page) !important;
+}
+
+.ivlyrics-settings-modal-shell:has(#${APP_NAME}-config-container[data-ui-theme="light"]) {
+    border-color: #d8dadd !important;
+    background: #f5f6f7 !important;
+    box-shadow: none !important;
+}
+
+#${APP_NAME}-config-container .settings-header {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+    min-width: 0;
+    padding: 0 26px 0 30px !important;
+    border-bottom: 0.5px solid var(--settings-border) !important;
+    background: var(--settings-page) !important;
+    box-shadow: none !important;
+}
+
+#${APP_NAME}-config-container .settings-header-content {
+    height: 100%;
+    gap: 20px;
+}
+
+#${APP_NAME}-config-container .settings-title-section {
+    gap: 14px;
+}
+
+#${APP_NAME}-config-container .settings-title-section h1 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 25px !important;
+    font-weight: 500 !important;
+    letter-spacing: -0.035em;
+}
+
+#${APP_NAME}-config-container .settings-version {
+    height: 26px;
+    min-width: 0;
+    padding: 0 10px;
+    border: 0.5px solid var(--settings-border-strong) !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    color: var(--text-secondary);
+    font-size: 10.5px;
+    font-weight: 400;
+}
+
+#${APP_NAME}-config-container .settings-buttons {
+    gap: 6px !important;
+    padding: 0 !important;
+    overflow: visible;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+#${APP_NAME}-config-container .settings-theme-btn,
+#${APP_NAME}-config-container .settings-github-btn,
+#${APP_NAME}-config-container .settings-discord-btn,
+#${APP_NAME}-config-container .settings-close-btn {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 !important;
+    border: 0.5px solid transparent !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    color: var(--text-secondary);
+}
+
+#${APP_NAME}-config-container .settings-theme-btn span,
+#${APP_NAME}-config-container .settings-github-btn span,
+#${APP_NAME}-config-container .settings-discord-btn span {
+    display: none !important;
+}
+
+#${APP_NAME}-config-container .settings-coffee-btn {
+    min-width: 88px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 15px !important;
+    border: 0.5px solid rgba(95, 216, 143, 0.28) !important;
+    border-radius: 8px !important;
+    background: #143b29 !important;
+    color: #6ce39d !important;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+#${APP_NAME}-config-container .settings-buttons > button + button {
+    border-left: 0.5px solid transparent !important;
+}
+
+#${APP_NAME}-config-container .settings-theme-btn:hover,
+#${APP_NAME}-config-container .settings-github-btn:hover,
+#${APP_NAME}-config-container .settings-discord-btn:hover,
+#${APP_NAME}-config-container .settings-close-btn:hover {
+    border-color: var(--settings-border) !important;
+    background: var(--settings-surface-1) !important;
+    color: var(--text-primary);
+}
+
+#${APP_NAME}-config-container .settings-coffee-btn:hover {
+    border-color: rgba(95, 216, 143, 0.42) !important;
+    background: #18452f !important;
+}
+
+#${APP_NAME}-config-container .settings-sidebar {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    padding: 24px 18px 28px 20px !important;
+    border-right: 0.5px solid var(--settings-border) !important;
+    border-bottom: 0 !important;
+    background: var(--settings-sidebar-surface) !important;
+    box-shadow: none !important;
+}
+
+#${APP_NAME}-config-container .settings-search-container {
+    width: 100%;
+    padding: 0 0 20px !important;
+}
+
+#${APP_NAME}-config-container .settings-search-wrapper {
+    border-radius: 8px !important;
+}
+
+#${APP_NAME}-config-container .settings-search-wrapper .settings-search-input {
+    height: 42px !important;
+    padding-left: 38px !important;
+    border: 0.5px solid var(--settings-border) !important;
+    border-radius: 8px !important;
+    background: var(--settings-surface-1) !important;
+    color: var(--text-primary) !important;
+    box-shadow: none !important;
+    font-size: 12.5px;
+    font-weight: 400;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+#${APP_NAME}-config-container .settings-search-input::placeholder {
+    color: var(--text-tertiary);
+}
+
+#${APP_NAME}-config-container .settings-sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 20px !important;
+    padding: 0 4px 0 0 !important;
+}
+
+#${APP_NAME}-config-container .settings-nav-category {
+    min-width: 0;
+}
+
+#${APP_NAME}-config-container .settings-nav-category-label {
+    margin: 0 10px 7px;
+    color: var(--text-tertiary);
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: 0.035em;
+}
+
+#${APP_NAME}-config-container .settings-nav-category-items {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+#${APP_NAME}-config-container .settings-nav-group {
+    margin: 0 !important;
+}
+
+#${APP_NAME}-config-container .settings-nav-card,
+#${APP_NAME}-config-container .settings-nav-group-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    min-height: 40px !important;
+    padding: 0 10px !important;
+    gap: 10px;
+    border: 0 !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    color: var(--text-secondary);
+    box-shadow: none !important;
+    text-align: left;
+    text-transform: none;
+}
+
+#${APP_NAME}-config-container .settings-nav-card:hover,
+#${APP_NAME}-config-container .settings-nav-group-toggle:hover {
+    background: var(--settings-surface-1) !important;
+    color: var(--text-primary);
+}
+
+#${APP_NAME}-config-container .settings-nav-card.active,
+#${APP_NAME}-config-container .settings-nav-group-toggle.active {
+    background: #143b29 !important;
+    color: #6ce39d !important;
+    box-shadow: none !important;
+}
+
+#${APP_NAME}-config-container[data-ui-theme="light"] .settings-nav-card.active,
+#${APP_NAME}-config-container[data-ui-theme="light"] .settings-nav-group-toggle.active {
+    background: #dff3e7 !important;
+    color: #16653a !important;
+}
+
+#${APP_NAME}-config-container .settings-nav-icon {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    color: currentColor;
+}
+
+#${APP_NAME}-config-container .settings-nav-card-title,
+#${APP_NAME}-config-container .settings-nav-group-title {
+    min-width: 0;
+    flex: 1 1 auto;
+    color: inherit;
+    font-size: 13px;
+    font-weight: 500 !important;
+    line-height: 1.2;
+}
+
+#${APP_NAME}-config-container .settings-nav-card-badge {
+    display: none !important;
+}
+
+#${APP_NAME}-config-container .settings-nav-group-indicator {
+    width: 16px;
+    height: 16px;
+    margin-left: auto;
+    color: var(--text-tertiary);
+}
+
+#${APP_NAME}-config-container .settings-nav-group-items {
+    margin: 3px 0 4px 17px !important;
+    padding: 2px 0 2px 10px !important;
+    border-left: 0.5px solid var(--settings-border) !important;
+}
+
+#${APP_NAME}-config-container .settings-nav-subitem {
+    min-height: 32px !important;
+    padding: 0 9px !important;
+    border: 0 !important;
+    border-radius: 6px !important;
+    color: var(--text-secondary);
+    font-size: 11.5px !important;
+    font-weight: 400 !important;
+}
+
+#${APP_NAME}-config-container .settings-nav-subitem:hover {
+    background: var(--settings-surface-1) !important;
+    color: var(--text-primary);
+}
+
+#${APP_NAME}-config-container .settings-nav-subitem.active {
+    background: transparent !important;
+    color: var(--accent-primary) !important;
+    font-weight: 500 !important;
+}
+
+#${APP_NAME}-config-container .settings-main-panel {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    min-width: 0;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: var(--settings-page) !important;
+    box-shadow: none !important;
+}
+
+#${APP_NAME}-config-container .settings-content {
+    width: 100%;
+    max-width: 1120px;
+    margin: 0;
+    padding: 46px 54px 64px !important;
+}
+
+#${APP_NAME}-config-container .settings-panel-hero {
+    gap: 9px;
+    margin: 0 0 28px !important;
+    padding: 0 !important;
+    border: 0 !important;
+}
+
+#${APP_NAME}-config-container .settings-panel-badge {
+    align-self: flex-start;
+    height: 26px;
+    padding: 0 10px;
+    border: 0 !important;
+    border-radius: 7px !important;
+    background: #143b29 !important;
+    color: #6ce39d !important;
+    font-size: 10.5px;
+    font-weight: 500;
+}
+
+#${APP_NAME}-config-container[data-ui-theme="light"] .settings-panel-badge {
+    background: #dff3e7 !important;
+    color: #16653a !important;
+}
+
+#${APP_NAME}-config-container .settings-panel-copy h2 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 28px !important;
+    font-weight: 500 !important;
+    line-height: 1.15 !important;
+    letter-spacing: -0.035em !important;
+}
+
+#${APP_NAME}-config-container .settings-panel-copy p {
+    max-width: 720px;
+    margin: 8px 0 0;
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    font-weight: 400;
+    line-height: 1.55;
+}
+
+#${APP_NAME}-config-container .section-title {
+    margin: 26px 2px 8px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+}
+
+#${APP_NAME}-config-container .section-text h3 {
+    color: var(--text-primary);
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    line-height: 1.35;
+}
+
+#${APP_NAME}-config-container .section-text p,
+#${APP_NAME}-config-container .setting-description {
+    color: var(--text-secondary);
+    font-size: 11.5px !important;
+    font-weight: 400;
+    line-height: 1.5;
+}
+
+#${APP_NAME}-config-container .option-list-wrapper,
+#${APP_NAME}-config-container .service-list-wrapper,
+#${APP_NAME}-config-container .ai-translation-style-panel {
+    margin-bottom: 22px;
+    border: 0.5px solid var(--settings-section-outline) !important;
+    border-radius: 9px !important;
+    background: var(--settings-surface-1) !important;
+    box-shadow: none !important;
+}
+
+#${APP_NAME}-config-container .setting-row,
+#${APP_NAME}-config-container .search-result-item {
+    background: transparent !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+#${APP_NAME}-config-container .setting-row::after {
+    display: none !important;
+}
+
+#${APP_NAME}-config-container .setting-row-content {
+    min-height: 58px !important;
+    padding: 11px 14px !important;
+    gap: 18px !important;
+    grid-template-columns: minmax(220px, 1fr) minmax(220px, 340px) !important;
+}
+
+#${APP_NAME}-config-container .setting-name {
+    color: var(--text-primary);
+    font-size: 13px !important;
+    font-weight: 500 !important;
+}
+
+#${APP_NAME}-config-container .btn,
+#${APP_NAME}-config-container .btn-primary,
+#${APP_NAME}-config-container .order-btn,
+#${APP_NAME}-config-container .swap-button,
+#${APP_NAME}-config-container .ai-addon-btn,
+#${APP_NAME}-config-container .about-client-copy-btn,
+#${APP_NAME}-config-container .karaoke-fill-curve-reset {
+    border: 0.5px solid var(--settings-border) !important;
+    border-radius: 7px !important;
+    background: transparent !important;
+    font-size: 11.5px;
+    font-weight: 500;
+    box-shadow: none !important;
+}
+
+#${APP_NAME}-config-container .switch-checkbox {
+    width: 38px !important;
+    min-width: 38px;
+    height: 22px !important;
+    border: 0.5px solid var(--settings-border-strong) !important;
+    background: #1a1c1e !important;
+}
+
+#${APP_NAME}-config-container .switch-checkbox::after {
+    top: 3px !important;
+    left: 3px !important;
+    width: 14px !important;
+    height: 14px !important;
+    background: #666b70 !important;
+}
+
+#${APP_NAME}-config-container .switch-checkbox.active {
+    border-color: #2f8f5b !important;
+    background: #2f8f5b !important;
+}
+
+#${APP_NAME}-config-container .switch-checkbox.active::after {
+    background: #0a0b0c !important;
+    transform: translateX(16px) !important;
+}
+
+#${APP_NAME}-config-container[data-ui-theme="light"] .switch-checkbox {
+    background: #e1e4e6 !important;
+}
+
+#${APP_NAME}-config-container .lyrics-providers-section {
+    margin-top: 0 !important;
+}
+
+#${APP_NAME}-config-container .lyrics-providers-container,
+#${APP_NAME}-config-container .lyrics-providers-container:hover {
+    border: 0 !important;
+    background: transparent !important;
+}
+
+#${APP_NAME}-config-container .lyrics-providers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px !important;
+    overflow: visible;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-item {
+    position: relative;
+    display: flex;
+    align-items: stretch !important;
+    gap: 0 !important;
+    min-width: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0.5px solid var(--settings-section-outline) !important;
+    border-radius: 9px !important;
+    background: var(--settings-surface-1) !important;
+    box-shadow: none !important;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-item + .lyrics-provider-item::before {
+    display: none !important;
+}
+
+#${APP_NAME}-config-container .provider-order-index {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    width: 28px;
+    min-width: 28px;
+    padding-left: 8px;
+    color: var(--text-tertiary);
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+}
+
+#${APP_NAME}-config-container .provider-drag-handle {
+    align-self: stretch;
+    width: 30px !important;
+    min-width: 30px !important;
+    flex: 0 0 30px !important;
+    margin: 8px 2px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 6px !important;
+    background: transparent !important;
+    color: var(--text-tertiary);
+}
+
+#${APP_NAME}-config-container .provider-drag-handle:hover {
+    background: var(--settings-surface-2) !important;
+    color: var(--text-secondary);
+}
+
+#${APP_NAME}-config-container .lyrics-provider-card,
+#${APP_NAME}-config-container .lyrics-provider-card:hover,
+#${APP_NAME}-config-container .lyrics-provider-card.expanded {
+    min-width: 0;
+    border: 0 !important;
+    border-radius: 9px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-card.disabled {
+    opacity: 0.54 !important;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-card-header {
+    align-items: center !important;
+    min-height: 76px !important;
+    padding: 11px 13px 11px 4px !important;
+    border: 0 !important;
+    background: transparent !important;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-card-header:hover {
+    background: var(--settings-surface-2) !important;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-card-header-left {
+    gap: 12px !important;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-toggle {
+    width: 38px !important;
+    min-width: 38px !important;
+    height: 22px !important;
+    flex: 0 0 38px !important;
+    align-self: center !important;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-toggle .toggle-slider {
+    border: 0.5px solid var(--settings-border-strong) !important;
+    border-radius: 999px !important;
+    background: #1a1c1e !important;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-toggle .toggle-slider::before {
+    width: 16px !important;
+    height: 16px !important;
+    left: 2.5px !important;
+    bottom: 2.5px !important;
+    border-radius: 50% !important;
+    background: #666b70 !important;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-toggle input:checked + .toggle-slider {
+    border-color: #2f8f5b !important;
+    background: #2f8f5b !important;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-toggle input:checked + .toggle-slider::before {
+    background: #0a0b0c !important;
+    transform: translateX(16px) !important;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-title-group {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    column-gap: 7px;
+    row-gap: 2px;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-name {
+    color: var(--text-primary);
+    font-size: 13.5px !important;
+    font-weight: 500 !important;
+    line-height: 1.3;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-title-meta {
+    min-width: 0;
+    color: var(--text-tertiary);
+    font-size: 10px !important;
+    font-weight: 400;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-summary {
+    grid-column: 1 / -1;
+    margin-top: 1px !important;
+    color: var(--text-secondary);
+    font-size: 11.5px !important;
+    font-weight: 400;
+    line-height: 1.45;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-card-header-right {
+    gap: 10px !important;
+    padding-left: 12px;
+}
+
+#${APP_NAME}-config-container .support-badges {
+    display: flex;
+    flex-wrap: nowrap !important;
+    justify-content: flex-end;
+    gap: 5px !important;
+}
+
+#${APP_NAME}-config-container .support-icon-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    border: 0.5px solid #1c4a32;
+    border-radius: 6px;
+    background: #132a20;
+    color: #5fd88f;
+}
+
+#${APP_NAME}-config-container .support-icon-chip.support-icon-karaoke {
+    border-color: #4b3a16;
+    background: #2c2412;
+    color: #d8a92f;
+}
+
+#${APP_NAME}-config-container .support-icon-chip.support-icon-unsynced {
+    border-color: var(--settings-border);
+    background: var(--settings-muted-surface);
+    color: var(--text-secondary);
+}
+
+#${APP_NAME}-config-container[data-ui-theme="light"] .support-icon-chip {
+    border-color: #cce8d7;
+    background: #e6f5ec;
+    color: #237447;
+}
+
+#${APP_NAME}-config-container[data-ui-theme="light"] .support-icon-chip.support-icon-karaoke {
+    border-color: #eadcba;
+    background: #fbf4df;
+    color: #956f10;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-expand-icon {
+    width: 14px;
+    height: 14px;
+    color: var(--text-tertiary);
+}
+
+#${APP_NAME}-config-container .lyrics-provider-card-body {
+    margin: 0 13px 13px 4px !important;
+    padding: 13px 0 0 !important;
+    border-top: 0.5px solid var(--settings-divider) !important;
+    background: transparent !important;
+}
+
+#${APP_NAME}-config-container .ai-translation-style-title,
+#${APP_NAME}-config-container .ai-translation-style-option-label,
+#${APP_NAME}-config-container .lyrics-type-toggles-title,
+#${APP_NAME}-config-container .ai-addon-capabilities-title {
+    font-weight: 500 !important;
+}
+
+#${APP_NAME}-config-container .cultural-annotation-group {
+    overflow: hidden;
+    margin: 0 0 22px;
+    border: 0.5px solid var(--settings-section-outline);
+    border-radius: 9px;
+    background: var(--settings-surface-1);
+}
+
+#${APP_NAME}-config-container .cultural-annotation-group > .option-list-wrapper {
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+}
+
+#${APP_NAME}-config-container .cultural-annotation-group > .cultural-details-toggle {
+    min-height: 40px;
+    margin: 0 !important;
+    padding: 9px 14px !important;
+    border: 0 !important;
+    border-top: 0.5px solid var(--settings-row-divider) !important;
+    border-radius: 0 !important;
+    background: var(--settings-muted-surface) !important;
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    font-weight: 500;
+}
+
+#${APP_NAME}-config-container .cultural-annotation-group > .cultural-details-toggle:hover {
+    border-color: var(--settings-row-divider) !important;
+    background: var(--settings-surface-2) !important;
+    color: var(--text-primary);
+}
+
+#${APP_NAME}-config-container .cultural-annotation-group > .cultural-annotation-details {
+    padding: 0 12px 12px;
+    border-top: 0.5px solid var(--settings-row-divider);
+    background: var(--settings-muted-surface);
+}
+
+#${APP_NAME}-config-container .cultural-annotation-group > .cultural-annotation-details > .option-list-wrapper {
+    margin: 12px 0 0 !important;
+    border: 0.5px solid var(--settings-section-outline) !important;
+    border-radius: 8px !important;
+    background: var(--settings-surface-1) !important;
+}
+
+#${APP_NAME}-config-container button:not([disabled]):focus-visible,
+#${APP_NAME}-config-container input[type]:not([disabled]):focus-visible,
+#${APP_NAME}-config-container select:not([disabled]):focus-visible,
+#${APP_NAME}-config-container textarea:not([disabled]):focus-visible,
+#${APP_NAME}-config-container [tabindex]:not([tabindex="-1"]):focus-visible {
+    outline: 2px solid rgba(95, 216, 143, 0.86) !important;
+    outline-offset: 2px !important;
+    border-color: rgba(95, 216, 143, 0.58) !important;
+    box-shadow: none !important;
+}
+
+@media (max-width: 900px) {
+    .ivlyrics-settings-modal-shell:has(#${APP_NAME}-config-container) {
+        width: min(calc(100vw - 20px), 820px) !important;
+        max-width: calc(100vw - 20px) !important;
+        max-height: calc(100vh - 20px) !important;
+    }
+
+    #${APP_NAME}-config-container {
+        height: calc(100vh - 20px);
+        min-height: 0;
+        grid-template-columns: 1fr !important;
+        grid-template-rows: 72px auto minmax(0, 1fr) !important;
+    }
+
+    #${APP_NAME}-config-container .settings-header {
+        grid-column: 1 !important;
+        grid-row: 1 !important;
+        padding: 0 18px !important;
+    }
+
+    #${APP_NAME}-config-container .settings-sidebar {
+        grid-column: 1 !important;
+        grid-row: 2 !important;
+        max-height: min(30vh, 230px);
+        padding: 14px 16px 16px !important;
+        border-right: 0 !important;
+        border-bottom: 0.5px solid var(--settings-border) !important;
+    }
+
+    #${APP_NAME}-config-container .settings-sidebar-nav {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 18px !important;
+    }
+
+    #${APP_NAME}-config-container .settings-main-panel {
+        grid-column: 1 !important;
+        grid-row: 3 !important;
+    }
+
+    #${APP_NAME}-config-container .settings-content {
+        max-width: none;
+        padding: 30px 28px 48px !important;
+    }
+
+    #${APP_NAME}-config-container .setting-row-content {
+        grid-template-columns: 1fr !important;
+        align-items: start;
+        gap: 10px !important;
+    }
+
+    #${APP_NAME}-config-container .setting-row-right {
+        width: 100%;
+        max-width: none;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 650px) {
+    .ivlyrics-settings-modal-shell:has(#${APP_NAME}-config-container) {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        max-height: 100vh !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+    }
+
+    #${APP_NAME}-config-container {
+        height: 100vh;
+        border-radius: 0 !important;
+    }
+
+    #${APP_NAME}-config-container .settings-coffee-btn span {
+        display: inline !important;
+    }
+
+    #${APP_NAME}-config-container .settings-sidebar-nav {
+        grid-template-columns: 1fr;
+    }
+
+    #${APP_NAME}-config-container .settings-content {
+        padding: 26px 18px 40px !important;
+    }
+
+    #${APP_NAME}-config-container .lyrics-provider-card-header {
+        align-items: flex-start;
+    }
+
+    #${APP_NAME}-config-container .lyrics-provider-card-header-right {
+        padding-left: 8px;
+    }
+
+    #${APP_NAME}-config-container .support-badges {
+        max-width: 58px;
+        flex-wrap: wrap !important;
     }
 }
 `,
