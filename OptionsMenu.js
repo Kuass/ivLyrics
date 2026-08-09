@@ -2751,11 +2751,17 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
                 "ivLyrics-settings-overlay"
               );
               if (overlay) {
-                overlay.remove();
+                if (typeof window.ivLyricsCloseConfig === "function") {
+                  window.ivLyricsCloseConfig();
+                } else {
+                  overlay.remove();
+                  document.documentElement.classList.remove("ivlyrics-settings-open");
+                  document.body?.classList.remove("ivlyrics-settings-open");
+                }
               }
               setTimeout(() => {
                 openConfig({ initialTab: "ai-providers" });
-              }, 100);
+              }, overlay ? getSettingsMotionDurationMs() + 24 : 0);
             },
             info: I18n.t("menu.apiKeySettingsInfo"),
           },

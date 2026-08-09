@@ -5321,16 +5321,23 @@ const AnimationManager = {
 	animate() {
 		if (!this.active) return;
 
-		for (const callback of this.callbacks) {
-			try {
-				callback();
-			} catch (error) {
-				// Error ignored
+		const settingsOpen = document.documentElement.classList.contains("ivlyrics-settings-open")
+			|| document.body?.classList.contains("ivlyrics-settings-open");
+		if (!settingsOpen) {
+			for (const callback of this.callbacks) {
+				try {
+					callback();
+				} catch (error) {
+					// Error ignored
+				}
 			}
 		}
 		this.lastTime = performance.now();
 		this.updateFrameInterval();
-		this.timerId = setTimeout(this.boundAnimate, document.hidden ? 250 : this.frameInterval);
+		this.timerId = setTimeout(
+			this.boundAnimate,
+			document.hidden || settingsOpen ? 250 : this.frameInterval
+		);
 	}
 };
 

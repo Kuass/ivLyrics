@@ -183,28 +183,29 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(0px);
-  -webkit-backdrop-filter: blur(0px);
-  opacity: 0;
-  transition:
-    opacity var(--iv-motion-duration-medium) var(--iv-motion-ease-standard),
-    backdrop-filter var(--iv-motion-duration-medium) var(--iv-motion-ease-standard),
-    -webkit-backdrop-filter var(--iv-motion-duration-medium) var(--iv-motion-ease-standard),
-    background var(--iv-motion-duration-medium) var(--iv-motion-ease-standard);
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  opacity: 1;
+  isolation: isolate;
+  contain: paint;
+  transition: none;
 }
 
 .ivlyrics-settings-overlay.is-open {
   opacity: 1;
-  background: rgba(0, 0, 0, 0.46);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, 0.58);
+}
+
+.ivlyrics-settings-overlay.is-closing {
+  opacity: 0;
+  transition: opacity 140ms linear;
 }
 
 .ivlyrics-settings-modal-shell {
-  background: var(--iv-surface-shell-strong);
-  backdrop-filter: var(--iv-surface-blur);
-  -webkit-backdrop-filter: var(--iv-surface-blur);
+  background: rgba(var(--spice-rgb-card, 32, 32, 32), 0.98);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border-radius: var(--iv-radius-shell);
   max-width: 96vw;
   max-height: 88vh;
@@ -215,13 +216,35 @@
   opacity: 0;
   transform: translateY(var(--iv-motion-distance-md)) scale(0.985);
   transition:
-    opacity var(--iv-motion-duration-medium) var(--iv-motion-ease-standard),
-    transform var(--iv-motion-duration-medium) var(--iv-motion-ease-standard);
+    opacity 180ms var(--iv-motion-ease-standard),
+    transform 220ms var(--iv-motion-ease-standard);
 }
 
 .ivlyrics-settings-overlay.is-open .ivlyrics-settings-modal-shell {
   opacity: 1;
   transform: translateY(0) scale(1);
+}
+
+/* The lyrics page remains mounted below the modal. Freeze its decorative GPU
+   layers while settings are open so they cannot be recomposited over the
+   dialog and do not consume cycles behind an opaque surface. */
+html.ivlyrics-settings-open #ivLyrics-gradient-background,
+html.ivlyrics-settings-open #ivLyrics-gradient-background *,
+html.ivlyrics-settings-open .lyrics-lyricsContainer-LyricsContainer *,
+body.ivlyrics-settings-open #ivLyrics-gradient-background,
+body.ivlyrics-settings-open #ivLyrics-gradient-background *,
+body.ivlyrics-settings-open .lyrics-lyricsContainer-LyricsContainer * {
+  animation-play-state: paused !important;
+}
+
+/* The dialog is an opaque, top-level workspace. Removing Spotify's painted
+   application tree while it is open prevents hidden lyric/native animations
+   from consuming renderer/GPU time or flashing above the modal. Playback and
+   application state continue normally and the tree is restored on close. */
+body.ivlyrics-settings-open > #main,
+body.ivlyrics-settings-open > .body-drag-top,
+body.ivlyrics-settings-open > .sync-creator-hint--portal {
+  display: none !important;
 }
 
 /* 좁은 화면: 오버레이/모달 반응형 */

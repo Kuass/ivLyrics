@@ -8947,17 +8947,17 @@
         },
 
         setSettingsOpen(isOpen) {
-            this._isSettingsOpen = isOpen;
             clearSettingsPolling(this);
+            this._isSettingsOpen = Boolean(isOpen);
 
-            if (isOpen) {
+            if (this._isSettingsOpen) {
                 helperDebug('[OverlaySender] 설정창 열림 - 연결 확인 폴링 시작');
                 this.checkConnection();
                 this._settingsTimer = setInterval(() => {
                     if (!this.isConnected) {
                         this.checkConnection();
                     }
-                }, 2000);
+                }, 5000);
             } else {
                 helperDebug('[OverlaySender] 설정창 닫힘 - 연결 확인 폴링 종료');
             }
@@ -9461,7 +9461,7 @@
             this._worker.onmessage = async () => {
                 if (!this.enabled) return;
                 if (this._isSendingProgress) return;
-                if (!this.isConnected && !this._isSettingsOpen) return;
+                if (!this.isConnected) return;
 
                 // 전역 딜레이 변경 체크
                 if (typeof window.CONFIG !== 'undefined' && window.CONFIG.visual) {
@@ -9847,17 +9847,17 @@
         },
         setSettingsOpen: {
             value: function (isOpen) {
-                this._isSettingsOpen = isOpen;
                 clearSettingsPolling(this);
+                this._isSettingsOpen = Boolean(isOpen);
 
-                if (isOpen) {
+                if (this._isSettingsOpen) {
                     helperDebug('[lyricsHelperSender] 설정창 열림 - 연결 확인 폴링 시작');
                     this.checkConnection();
                     this._settingsTimer = setInterval(() => {
                         if (!this.isConnected) {
                             this.checkConnection();
                         }
-                    }, 2000);
+                    }, 5000);
                 } else {
                     helperDebug('[lyricsHelperSender] 설정창 닫힘 - 연결 확인 폴링 종료');
                 }
@@ -10210,7 +10210,7 @@
                 this._worker.onmessage = async () => {
                     if (!this.enabled) return;
                     if (this._isSendingProgress) return;
-                    if (!this.isConnected && !this._isSettingsOpen) return;
+                    if (!this.isConnected) return;
 
                     // 전역 딜레이 변경 체크
                     if (typeof window.CONFIG !== 'undefined' && window.CONFIG.visual) {

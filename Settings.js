@@ -87,8 +87,9 @@ const OverlaySettings = () => {
       setIsConnected(window.OverlaySender.isConnected);
       setPort(window.OverlaySender.port);
       setPortInput(String(window.OverlaySender.port));
-      // 설정창 열림 알림 (폴링 모드 활성화)
-      window.OverlaySender.setSettingsOpen?.(true);
+      // 연결 확인 폴링은 기능이 켜져 있을 때만 필요하다. 설정 모달이
+      // 열렸다는 이유만으로 비활성 오버레이를 계속 탐색하지 않는다.
+      window.OverlaySender.setSettingsOpen?.(enabled);
     }
 
     return () => {
@@ -96,7 +97,7 @@ const OverlaySettings = () => {
       // 설정창 닫힘 알림
       window.OverlaySender?.setSettingsOpen?.(false);
     };
-  }, []);
+  }, [enabled]);
 
   // 토글 핸들러
   const handleToggle = () => {
@@ -104,6 +105,7 @@ const OverlaySettings = () => {
     setEnabled(newValue);
     if (window.OverlaySender) {
       window.OverlaySender.enabled = newValue;
+      window.OverlaySender.setSettingsOpen?.(newValue);
     }
   };
 
@@ -7403,6 +7405,29 @@ const ConfigModal = ({
         ])];
       };
 
+      // Keep the complete manually maintained index available while only the
+      // active tab is mounted. Visible controls from the active tab enrich the
+      // matching entries below without forcing every settings panel to exist.
+      searchableSettings.forEach((setting) => {
+        mergeSearchSetting({
+          resultKey: `${setting.sectionKey}:${setting.settingKey || "__tab__"}`,
+          section: setting.section,
+          sectionKey: setting.sectionKey,
+          settingKey: setting.settingKey || null,
+          navItemId: setting.settingKey || setting.sectionKey,
+          name: setting.name,
+          desc: setting.desc || "",
+          i18nKeys: setting.i18nKeys || [],
+          directKeywords: [
+            ...(setting.keywords || []),
+            setting.name || "",
+            setting.desc || "",
+          ].filter(Boolean),
+          contextKeywords: [setting.section || ""].filter(Boolean),
+          preferVisibleText: false,
+        });
+      });
+
       container
         .querySelectorAll('.tab-content[data-tab-id]:not([data-tab-id="search"])')
         .forEach((tabNode) => {
@@ -7550,7 +7575,6 @@ const ConfigModal = ({
         observer.observe(tabNode, {
           childList: true,
           subtree: true,
-          characterData: true,
         });
       });
     scheduleScan();
@@ -7560,7 +7584,7 @@ const ConfigModal = ({
       observer.disconnect();
       if (frameId != null) cancelAnimationFrame(frameId);
     };
-  }, [searchableSettings]);
+  }, [activeTab, searchableSettings]);
 
   const normalizeSettingsSearchText = (value) =>
     String(value || "")
@@ -8456,11 +8480,11 @@ const ConfigModal = ({
           .filter(Boolean);
       });
 
-      setSidebarSectionsByTab(next);
+      setSidebarSectionsByTab((previous) => ({ ...previous, ...next }));
     });
 
     return () => cancelAnimationFrame(frameId);
-  }, [activeTab, searchQuery]);
+  }, [activeTab]);
 
   // Derived helpers (remain the same)
   const activeSidebarTab =
@@ -13141,15 +13165,15 @@ const ConfigModal = ({
 
 .ivlyrics-settings-modal-shell {
     border-radius: 24px !important;
-    background: rgba(var(--spice-rgb-card, 24, 24, 24), 0.7) !important;
+    background: rgba(var(--spice-rgb-card, 24, 24, 24), 0.98) !important;
     border: 1px solid rgba(var(--spice-rgb-text, 255, 255, 255), 0.12) !important;
     box-shadow: 0 28px 72px rgba(0, 0, 0, 0.42) !important;
-    backdrop-filter: blur(24px) saturate(140%) !important;
-    -webkit-backdrop-filter: blur(24px) saturate(140%) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
 }
 
 .ivlyrics-settings-modal-shell:has(#${APP_NAME}-config-container[data-ui-theme="light"]) {
-    background: rgba(248, 250, 252, 0.78) !important;
+    background: rgba(248, 250, 252, 0.98) !important;
     border-color: rgba(15, 23, 42, 0.12) !important;
     box-shadow: 0 28px 72px rgba(15, 23, 42, 0.2) !important;
 }
@@ -13823,6 +13847,39 @@ const ConfigModal = ({
 #${APP_NAME}-config-container .instrumental-break-preview-option.active {
     border-color: rgba(var(--settings-accent-rgb), 0.4) !important;
     background: var(--settings-glass-active);
+}
+
+/* Rendering every instrumental-break sample at once is extremely expensive
+   in Chromium. Keep the grid still and animate only the sample the user is
+   actively inspecting; the dedicated selected preview remains animated. */
+#${APP_NAME}-config-container .instrumental-break-picker-row .lyrics-break-icon,
+#${APP_NAME}-config-container .instrumental-break-picker-row .lyrics-break-icon *,
+#${APP_NAME}-config-container .instrumental-break-picker-row .lyrics-break-icon::before,
+#${APP_NAME}-config-container .instrumental-break-picker-row .lyrics-break-icon::after,
+#${APP_NAME}-config-container .instrumental-break-picker-row .lyrics-break-icon *::before,
+#${APP_NAME}-config-container .instrumental-break-picker-row .lyrics-break-icon *::after {
+    animation-play-state: paused !important;
+}
+
+#${APP_NAME}-config-container .instrumental-break-selected-preview:hover .lyrics-break-icon,
+#${APP_NAME}-config-container .instrumental-break-selected-preview:hover .lyrics-break-icon *,
+#${APP_NAME}-config-container .instrumental-break-selected-preview:hover .lyrics-break-icon::before,
+#${APP_NAME}-config-container .instrumental-break-selected-preview:hover .lyrics-break-icon::after,
+#${APP_NAME}-config-container .instrumental-break-selected-preview:hover .lyrics-break-icon *::before,
+#${APP_NAME}-config-container .instrumental-break-selected-preview:hover .lyrics-break-icon *::after,
+#${APP_NAME}-config-container .instrumental-break-preview-option:hover .lyrics-break-icon,
+#${APP_NAME}-config-container .instrumental-break-preview-option:hover .lyrics-break-icon *,
+#${APP_NAME}-config-container .instrumental-break-preview-option:hover .lyrics-break-icon::before,
+#${APP_NAME}-config-container .instrumental-break-preview-option:hover .lyrics-break-icon::after,
+#${APP_NAME}-config-container .instrumental-break-preview-option:hover .lyrics-break-icon *::before,
+#${APP_NAME}-config-container .instrumental-break-preview-option:hover .lyrics-break-icon *::after,
+#${APP_NAME}-config-container .instrumental-break-preview-option:focus-visible .lyrics-break-icon,
+#${APP_NAME}-config-container .instrumental-break-preview-option:focus-visible .lyrics-break-icon *,
+#${APP_NAME}-config-container .instrumental-break-preview-option:focus-visible .lyrics-break-icon::before,
+#${APP_NAME}-config-container .instrumental-break-preview-option:focus-visible .lyrics-break-icon::after,
+#${APP_NAME}-config-container .instrumental-break-preview-option:focus-visible .lyrics-break-icon *::before,
+#${APP_NAME}-config-container .instrumental-break-preview-option:focus-visible .lyrics-break-icon *::after {
+    animation-play-state: running !important;
 }
 
 #${APP_NAME}-config-container .btn-primary {
@@ -15251,6 +15308,7 @@ const ConfigModal = ({
           activeNavigationGroup?.description || activeTabMeta?.description,
       },
       // 검색 결과 탭
+      activeTab === "search" &&
         react.createElement(
           "div",
           {
@@ -15260,6 +15318,7 @@ const ConfigModal = ({
         react.createElement(SearchResults)
       ),
       // 일반 탭 (동작 관련 설정)
+      activeTab === "general" &&
         react.createElement(
           "div",
           {
@@ -15330,6 +15389,7 @@ const ConfigModal = ({
         react.createElement(OverlaySettings)
       ),
       // 외관 탭 (시각 효과 + 타이포그래피)
+      activeTab === "appearance" &&
       react.createElement(
         "div",
         {
@@ -16238,6 +16298,7 @@ const ConfigModal = ({
         })
       ),
       // 성능 탭
+      activeTab === "performance" &&
       react.createElement(
         "div",
         {
@@ -16355,6 +16416,7 @@ const ConfigModal = ({
         })
       ),
       // 가사 탭 (가사 동기화 및 동작)
+      activeTab === "lyrics" &&
       react.createElement(
         "div",
         {
@@ -16629,6 +16691,7 @@ const ConfigModal = ({
         })
       ),
       // 고급 탭
+      activeTab === "advanced" &&
       react.createElement(
         "div",
         {
@@ -17414,6 +17477,7 @@ const ConfigModal = ({
         })
       ),
       // 가사 제공자 탭
+      activeTab === "lyrics-providers" &&
       react.createElement(
         "div",
         {
@@ -17427,6 +17491,7 @@ const ConfigModal = ({
         )
       ),
       // AI 제공자 탭
+      activeTab === "ai-providers" &&
       react.createElement(
         "div",
         {
@@ -17440,6 +17505,7 @@ const ConfigModal = ({
         )
       ),
       // 전체화면 탭
+      activeTab === "fullscreen" &&
       react.createElement(
         "div",
         {
@@ -18365,6 +18431,7 @@ const ConfigModal = ({
         })
       ),
       // NowPlaying 패널 가사 탭
+      activeTab === "nowplaying" &&
       react.createElement(
         "div",
         {
@@ -18595,6 +18662,7 @@ const ConfigModal = ({
         })
       ),
       // 디버그 탭
+      activeTab === "debug" &&
       react.createElement(
         "div",
         {
@@ -18609,6 +18677,7 @@ const ConfigModal = ({
         react.createElement(DebugInfoPanel)
       ),
       // 정보 탭
+      activeTab === "about" &&
       react.createElement(
         "div",
         {
@@ -19181,6 +19250,14 @@ function openConfig(options = {}) {
     return;
   }
 
+  const setSettingsVisibility = (isOpen) => {
+    document.documentElement.classList.toggle("ivlyrics-settings-open", isOpen);
+    document.body?.classList.toggle("ivlyrics-settings-open", isOpen);
+    window.dispatchEvent(new CustomEvent("ivLyrics:settings-visibility", {
+      detail: { open: isOpen },
+    }));
+  };
+
   let isClosing = false;
   const closeOverlay = () => {
     if (isClosing) {
@@ -19197,12 +19274,17 @@ function openConfig(options = {}) {
       if (overlay.parentNode) {
         overlay.remove();
       }
+      setSettingsVisibility(false);
       document.removeEventListener("keydown", handleModalKeydown);
+      if (window.ivLyricsCloseConfig === closeOverlay) {
+        window.ivLyricsCloseConfig = null;
+      }
       if (previouslyFocused && document.contains(previouslyFocused)) {
         previouslyFocused.focus();
       }
     }, getSettingsMotionDurationMs());
   };
+  window.ivLyricsCloseConfig = closeOverlay;
 
   // Close on outside click
   overlay.addEventListener("click", (e) => {
@@ -19246,6 +19328,7 @@ function openConfig(options = {}) {
 
   overlay.appendChild(modalContainer);
   document.body.appendChild(overlay);
+  setSettingsVisibility(true);
   window.requestAnimationFrame(() => {
     overlay.classList.remove("is-entering");
     overlay.classList.add("is-open");
