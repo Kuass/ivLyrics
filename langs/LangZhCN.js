@@ -727,7 +727,9 @@ window.LANG_ZH_CN = {
     "both": "发音 + 翻译",
     "bothDescription": "同时显示发音标注和翻译。",
     "notNow": "不进行设置",
-    "apply": "应用这些设置"
+    "apply": "应用这些设置",
+    "aiProviderHint": "目前仅启用了 Bing 和 Google 翻译。如需更自然、更丰富的翻译，请在 AI 提供商设置中添加一个 AI 提供商。",
+    "pronunciationAiProviderHint": "只有在 AI 提供商设置中添加 AI 提供商后，才能实际生成发音。"
   },
   "lyricsCacheEditor": {
     "title": "编辑已保存的发音 / 翻译歌词",

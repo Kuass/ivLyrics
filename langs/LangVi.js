@@ -727,7 +727,9 @@ window.LANG_VI = {
     "both": "Cách phát âm + bản dịch",
     "bothDescription": "Hiển thị cả hướng dẫn phát âm và bản dịch.",
     "notNow": "Không thiết lập",
-    "apply": "Áp dụng các cài đặt này"
+    "apply": "Áp dụng các cài đặt này",
+    "aiProviderHint": "Hiện chỉ có Bing và Google Dịch được bật. Hãy thêm một nhà cung cấp AI trong phần cài đặt để có bản dịch tự nhiên và phong phú hơn.",
+    "pronunciationAiProviderHint": "Phần phát âm chỉ được tạo sau khi bạn thêm nhà cung cấp AI trong phần cài đặt nhà cung cấp AI."
   },
   "lyricsCacheEditor": {
     "title": "Chỉnh sửa phiên âm / bản dịch đã lưu",

@@ -727,7 +727,9 @@ window.LANG_TR = {
     "both": "Telaffuz + çeviri",
     "bothDescription": "Hem telaffuz kılavuzunu hem de çeviriyi gösterir.",
     "notNow": "Ayarlama",
-    "apply": "Bu ayarları uygula"
+    "apply": "Bu ayarları uygula",
+    "aiProviderHint": "Şu anda yalnızca Bing ve Google Çeviri etkin. Daha doğal ve zengin çeviriler için AI sağlayıcı ayarlarından bir AI sağlayıcısı ekleyin.",
+    "pronunciationAiProviderHint": "Telaffuz ancak AI sağlayıcı ayarlarından bir AI sağlayıcısı ekledikten sonra oluşturulur."
   },
   "lyricsCacheEditor": {
     "title": "Önbelleğe Alınmış Okunuşu / Çeviriyi Düzenle",

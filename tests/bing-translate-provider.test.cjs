@@ -10,6 +10,7 @@ const providerSource = fs.readFileSync(path.join(root, 'Addon_AI_BingTranslate.j
 const googleProviderSource = fs.readFileSync(path.join(root, 'Addon_AI_GoogleTranslate.js'), 'utf8');
 const managerSource = fs.readFileSync(path.join(root, 'AIAddonManager.js'), 'utf8');
 const settingsSource = fs.readFileSync(path.join(root, 'Settings.js'), 'utf8');
+const optionsSource = fs.readFileSync(path.join(root, 'OptionsMenu.js'), 'utf8');
 const testBingOrigin = ['https://www', 'bing', 'com'].join('.');
 const testProxyOrigin = ['https://cors-proxy', 'spicetify', 'app'].join('.');
 
@@ -151,7 +152,8 @@ test('localizes provider descriptions and first-language prompts for every suppo
     const requiredPromptKeys = [
         'title', 'description', 'original', 'originalDescription', 'pronunciation',
         'pronunciationDescription', 'translation', 'translationDescription', 'both',
-        'bothDescription', 'notNow', 'apply'
+        'bothDescription', 'notNow', 'apply', 'aiProviderHint',
+        'pronunciationAiProviderHint'
     ];
     const languageFiles = fs.readdirSync(path.join(root, 'langs'))
         .filter(file => /^Lang.*\.js$/.test(file));
@@ -261,4 +263,13 @@ test('uses drag handles for both provider lists and keeps cultural details colla
     assert.match(settingsSource, /useState\(false\);\s*\n\s*const vinylModeLabel/);
     assert.match(settingsSource, /"aria-expanded": culturalDetailsExpanded/);
     assert.match(settingsSource, /onKeyDown:[\s\S]*event\.key !== "ArrowUp"[\s\S]*event\.key !== "ArrowDown"/);
+});
+
+test('shows the AI provider hint only when translation is limited to keyless providers', () => {
+    assert.match(optionsSource, /FIRST_LANGUAGE_KEYLESS_PROVIDER_IDS[\s\S]*bing-translate[\s\S]*google-translate/);
+    assert.match(optionsSource, /enabledTranslationProviders\.every[\s\S]*FIRST_LANGUAGE_KEYLESS_PROVIDER_IDS\.has/);
+    assert.match(optionsSource, /firstLanguagePrompt\.aiProviderHint/);
+    assert.match(optionsSource, /firstLanguagePrompt\.pronunciationAiProviderHint/);
+    assert.match(optionsSource, /draft\.pronunciation[\s\S]*firstLanguagePrompt\.pronunciationAiProviderHint/);
+    assert.match(optionsSource, /role", "note"/);
 });

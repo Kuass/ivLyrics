@@ -727,7 +727,9 @@ window.LANG_CS = {
     "both": "Výslovnost + překlad",
     "bothDescription": "Zobrazí průvodce výslovností i překlad.",
     "notNow": "Nenastavovat",
-    "apply": "Použít tato nastavení"
+    "apply": "Použít tato nastavení",
+    "aiProviderHint": "Aktivní jsou pouze překladače Bing a Google. Pro přirozenější a bohatší překlady přidejte v nastavení poskytovatele AI.",
+    "pronunciationAiProviderHint": "Výslovnost se skutečně vygeneruje až po přidání poskytovatele AI v jeho nastavení."
   },
   "lyricsCacheEditor": {
     "title": "Upravit výslovnost / překlad uloženou v mezipaměti",

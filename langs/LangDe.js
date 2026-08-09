@@ -727,7 +727,9 @@ window.LANG_DE = {
     "both": "Aussprache + Übersetzung",
     "bothDescription": "Zeigt sowohl die Aussprachehilfe als auch die Übersetzung.",
     "notNow": "Nicht einrichten",
-    "apply": "Diese Einstellungen anwenden"
+    "apply": "Diese Einstellungen anwenden",
+    "aiProviderHint": "Derzeit sind nur Bing und Google Übersetzer aktiv. Füge in den KI-Anbietereinstellungen einen KI-Anbieter hinzu, um natürlichere und umfassendere Übersetzungen zu erhalten.",
+    "pronunciationAiProviderHint": "Die Aussprache wird erst erzeugt, wenn du in den KI-Anbietereinstellungen einen KI-Anbieter hinzufügst."
   },
   "lyricsCacheEditor": {
     "title": "Gespeicherte Aussprache / Übersetzung bearbeiten",

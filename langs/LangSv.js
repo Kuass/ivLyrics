@@ -727,7 +727,9 @@ window.LANG_SV = {
     "both": "Uttal + översättning",
     "bothDescription": "Visa både uttalsguiden och översättningen.",
     "notNow": "Konfigurera inte",
-    "apply": "Tillämpa dessa inställningar"
+    "apply": "Tillämpa dessa inställningar",
+    "aiProviderHint": "Just nu är endast Bing och Google Översätt aktiva. Lägg till en AI-leverantör i inställningarna för mer naturliga och innehållsrika översättningar.",
+    "pronunciationAiProviderHint": "Uttal genereras först när du har lagt till en AI-leverantör i inställningarna."
   },
   "lyricsCacheEditor": {
     "title": "Redigera cachelagrat uttal/översättning",

@@ -727,7 +727,9 @@ window.LANG_KO = {
     "both": "발음 + 번역",
     "bothDescription": "발음 표기와 번역을 모두 표시합니다.",
     "notNow": "설정하지 않기",
-    "apply": "이 설정으로 적용"
+    "apply": "이 설정으로 적용",
+    "aiProviderHint": "현재 Bing과 Google 번역만 활성화되어 있어요. 더 자연스럽고 풍부한 번역을 원한다면 AI 제공자 설정에서 AI 제공자를 추가해 주세요.",
+    "pronunciationAiProviderHint": "발음은 AI 제공자 설정에서 AI 제공자를 추가해야 실제로 생성됩니다."
   },
   "lyricsCacheEditor": {
     "title": "저장된 발음 / 번역 가사 수정",

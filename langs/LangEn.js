@@ -727,7 +727,9 @@ window.LANG_EN = {
     "both": "Pronunciation + translation",
     "bothDescription": "Show both a pronunciation guide and a translation.",
     "notNow": "Don't set up",
-    "apply": "Apply these settings"
+    "apply": "Apply these settings",
+    "aiProviderHint": "Only Bing and Google Translate are active. Add an AI provider in AI provider settings for more natural, richer translations.",
+    "pronunciationAiProviderHint": "Pronunciation is generated only after you add an AI provider in AI provider settings."
   },
   "lyricsCacheEditor": {
     "title": "Edit Cached Pronunciation / Translation",

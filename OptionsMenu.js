@@ -466,6 +466,36 @@ function ensureFluentModalStyles() {
   padding: 0 28px;
 }
 
+.ivlyrics-first-language-provider-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 11px 12px;
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  border-radius: 11px;
+  background: rgba(59, 130, 246, 0.10);
+  color: rgba(219, 234, 254, 0.88);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.ivlyrics-first-language-provider-hint-icon {
+  flex: 0 0 auto;
+  color: #93c5fd;
+  font-weight: 800;
+}
+
+.ivlyrics-first-language-shell[data-ui-theme="light"] .ivlyrics-first-language-provider-hint {
+  border-color: rgba(37, 99, 235, 0.18);
+  background: rgba(59, 130, 246, 0.08);
+  color: #1e4f8f;
+}
+
+.ivlyrics-first-language-shell[data-ui-theme="light"] .ivlyrics-first-language-provider-hint-icon {
+  color: #2563a9;
+}
+
 .ivlyrics-first-language-toggle-row {
   width: 100%;
   min-height: 58px;
@@ -2481,6 +2511,19 @@ function hasExplicitFirstLanguageModes(modeKey) {
     || readFirstLanguagePromptStorage(secondKey) !== null;
 }
 
+const FIRST_LANGUAGE_KEYLESS_PROVIDER_IDS = new Set(["bing-translate", "google-translate"]);
+
+function shouldShowFirstLanguageAIProviderHint() {
+  try {
+    const enabledTranslationProviders = (window.AIAddonManager?.getEnabledProviders?.() || [])
+      .filter((provider) => provider?.supports?.translate === true);
+    return enabledTranslationProviders.length > 0
+      && enabledTranslationProviders.every((provider) => FIRST_LANGUAGE_KEYLESS_PROVIDER_IDS.has(provider.id));
+  } catch {
+    return false;
+  }
+}
+
 function openFirstLanguagePrompt({ sourceLang, modeKey }) {
   const normalizedSource = normalizeFirstLanguagePromptCode(sourceLang);
   if (!normalizedSource) return null;
@@ -2545,6 +2588,7 @@ function openFirstLanguagePrompt({ sourceLang, modeKey }) {
       pronunciation: false,
       translation: false,
     };
+    let providerHintText = null;
     const action = document.createElement("button");
     action.type = "button";
     action.className = "ivlyrics-first-language-action";
@@ -2555,6 +2599,13 @@ function openFirstLanguagePrompt({ sourceLang, modeKey }) {
       action.textContent = I18n.t(
         hasSelection ? "firstLanguagePrompt.apply" : "firstLanguagePrompt.notNow"
       );
+      if (providerHintText) {
+        providerHintText.textContent = I18n.t(
+          draft.pronunciation
+            ? "firstLanguagePrompt.pronunciationAiProviderHint"
+            : "firstLanguagePrompt.aiProviderHint"
+        );
+      }
     };
 
     const createToggleRow = ({ key, iconText, label }) => {
@@ -2600,6 +2651,23 @@ function openFirstLanguagePrompt({ sourceLang, modeKey }) {
         label: I18n.t("firstLanguagePrompt.translation"),
       })
     );
+
+    if (shouldShowFirstLanguageAIProviderHint()) {
+      const providerHintId = "ivLyrics-first-language-provider-hint";
+      const providerHint = document.createElement("div");
+      providerHint.id = providerHintId;
+      providerHint.className = "ivlyrics-first-language-provider-hint";
+      providerHint.setAttribute("role", "note");
+      const providerHintIcon = document.createElement("span");
+      providerHintIcon.className = "ivlyrics-first-language-provider-hint-icon";
+      providerHintIcon.setAttribute("aria-hidden", "true");
+      providerHintIcon.textContent = "✦";
+      providerHintText = document.createElement("span");
+      providerHintText.textContent = I18n.t("firstLanguagePrompt.aiProviderHint");
+      providerHint.append(providerHintIcon, providerHintText);
+      body.appendChild(providerHint);
+      host.shell.setAttribute("aria-describedby", `${descriptionId} ${providerHintId}`);
+    }
 
     action.addEventListener("click", () => {
       if (draft.pronunciation || draft.translation) {

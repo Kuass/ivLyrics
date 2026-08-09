@@ -727,7 +727,9 @@ window.LANG_MS = {
     "both": "Sebutan + terjemahan",
     "bothDescription": "Paparkan panduan sebutan dan terjemahan.",
     "notNow": "Jangan sediakan",
-    "apply": "Gunakan tetapan ini"
+    "apply": "Gunakan tetapan ini",
+    "aiProviderHint": "Buat masa ini hanya Bing dan Google Terjemah diaktifkan. Tambahkan penyedia AI dalam tetapan untuk terjemahan yang lebih semula jadi dan lengkap.",
+    "pronunciationAiProviderHint": "Sebutan hanya akan dijana selepas anda menambah penyedia AI dalam tetapan penyedia AI."
   },
   "lyricsCacheEditor": {
     "title": "Sunting Sebutan / Terjemahan Lirik Disimpan",

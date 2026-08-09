@@ -727,7 +727,9 @@ window.LANG_FR = {
     "both": "Prononciation + traduction",
     "bothDescription": "Afficher à la fois le guide de prononciation et la traduction.",
     "notNow": "Ne pas configurer",
-    "apply": "Appliquer ces réglages"
+    "apply": "Appliquer ces réglages",
+    "aiProviderHint": "Seuls Bing et Google Traduction sont actifs. Ajoutez un fournisseur d’IA dans ses réglages pour obtenir des traductions plus naturelles et plus riches.",
+    "pronunciationAiProviderHint": "La prononciation ne sera générée qu’après l’ajout d’un fournisseur d’IA dans les réglages correspondants."
   },
   "lyricsCacheEditor": {
     "title": "Modifier la prononciation / traduction en cache",

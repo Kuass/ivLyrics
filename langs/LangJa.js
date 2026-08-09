@@ -727,7 +727,9 @@ window.LANG_JA = {
     "both": "発音 + 翻訳",
     "bothDescription": "発音ガイドと翻訳の両方を表示します。",
     "notNow": "設定しない",
-    "apply": "この設定を適用"
+    "apply": "この設定を適用",
+    "aiProviderHint": "現在は Bing と Google 翻訳のみが有効です。より自然で豊かな翻訳を楽しむには、AIプロバイダー設定でAIプロバイダーを追加してください。",
+    "pronunciationAiProviderHint": "発音を実際に生成するには、AIプロバイダー設定でAIプロバイダーを追加する必要があります。"
   },
   "lyricsCacheEditor": {
     "title": "保存された発音 / 翻訳歌詞を編集",

@@ -727,7 +727,9 @@ window.LANG_ID = {
     "both": "Pelafalan + terjemahan",
     "bothDescription": "Tampilkan panduan pelafalan dan terjemahan.",
     "notNow": "Jangan siapkan",
-    "apply": "Terapkan pengaturan ini"
+    "apply": "Terapkan pengaturan ini",
+    "aiProviderHint": "Saat ini hanya Bing dan Google Terjemahan yang aktif. Tambahkan penyedia AI di pengaturannya untuk terjemahan yang lebih alami dan kaya.",
+    "pronunciationAiProviderHint": "Pelafalan baru akan dibuat setelah Anda menambahkan penyedia AI di pengaturan penyedia AI."
   },
   "lyricsCacheEditor": {
     "title": "Edit pelafalan / terjemahan yang disimpan",
