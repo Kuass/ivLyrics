@@ -45,7 +45,7 @@
         if (!apiKey) return [];
 
         try {
-            const response = await fetch(`${BASE_URL}/models`, {
+            const response = await window.ivLyricsFetch(`${BASE_URL}/models`, {
                 method: 'GET',
                 headers: {
                     'x-api-key': apiKey,
@@ -222,7 +222,7 @@
 
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 try {
-                    const response = await fetch(`${BASE_URL}/messages`, {
+                    const response = await window.ivLyricsFetch(`${BASE_URL}/messages`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -362,7 +362,7 @@
                 };
 
                 try {
-                    const response = await fetch(`${BASE_URL}/messages`, {
+                    const response = await window.ivLyricsFetch(`${BASE_URL}/messages`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

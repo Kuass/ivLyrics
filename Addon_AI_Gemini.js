@@ -53,7 +53,7 @@
 
         try {
             const endpoint = `${(baseUrl || 'https://generativelanguage.googleapis.com/v1beta').replace(/\/$/, '')}/models?key=${encodeURIComponent(apiKey)}`;
-            const response = await fetch(endpoint);
+            const response = await window.ivLyricsFetch(endpoint);
 
             if (!response.ok) {
                 window.__ivLyricsDebugLog?.('[Gemini Addon] Failed to fetch models:', response.status);
@@ -295,7 +295,7 @@
                     const baseUrl = getBaseUrl();
                     const endpoint = `${baseUrl.replace(/\/$/, '')}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-                    const response = await fetch(endpoint, {
+                    const response = await window.ivLyricsFetch(endpoint, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -422,7 +422,7 @@
                     const baseUrl = getBaseUrl();
                     const endpoint = `${baseUrl.replace(/\/$/, '')}/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
 
-                    const response = await fetch(endpoint, {
+                    const response = await window.ivLyricsFetch(endpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({

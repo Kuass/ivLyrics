@@ -55,7 +55,7 @@
      */
     async function fetchAvailableModels(apiKey = getPrimaryApiKey()) {
         try {
-            const response = await fetch(`${BASE_URL}/v1/models`, {
+            const response = await window.ivLyricsFetch(`${BASE_URL}/v1/models`, {
                 headers: buildAuthHeaders(apiKey)
             });
 
@@ -196,7 +196,7 @@
             client_id: validateClientId()
         };
 
-        const response = await fetch(`${AUTH_BASE_URL}/api/device/code`, {
+        const response = await window.ivLyricsFetch(`${AUTH_BASE_URL}/api/device/code`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
@@ -231,7 +231,7 @@
     }
 
     async function pollDeviceToken(deviceCode) {
-        const response = await fetch(`${AUTH_BASE_URL}/api/device/token`, {
+        const response = await window.ivLyricsFetch(`${AUTH_BASE_URL}/api/device/token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ device_code: deviceCode })
@@ -269,7 +269,7 @@
     async function fetchApiKeyInfo(apiKey = getPrimaryApiKey()) {
         if (!apiKey) return null;
 
-        const response = await fetch(`${BASE_URL}/account/key`, {
+        const response = await window.ivLyricsFetch(`${BASE_URL}/account/key`, {
             headers: buildAuthHeaders(apiKey)
         });
 
@@ -392,7 +392,7 @@
                         headers['Authorization'] = `Bearer ${apiKey}`;
                     }
 
-                    const response = await fetch(endpoint, {
+                    const response = await window.ivLyricsFetch(endpoint, {
                         method: 'POST',
                         headers: headers,
                         body: JSON.stringify({
@@ -515,7 +515,7 @@
                     const headers = { 'Content-Type': 'application/json' };
                     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
-                    const response = await fetch(endpoint, {
+                    const response = await window.ivLyricsFetch(endpoint, {
                         method: 'POST',
                         headers,
                         body: JSON.stringify({ model, messages: buildPromptMessages(prompt), ...getAdvancedRequestParams(), stream: true })

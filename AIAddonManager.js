@@ -79,6 +79,7 @@
     const DEFAULT_PROVIDER_RETRY_COUNT = 2;
     const MAX_PROVIDER_RETRY_COUNT = 5;
     const PROVIDER_RETRY_COUNT_STORAGE_KEY = `${STORAGE_PREFIX}provider-retry-count`;
+    const PROVIDER_OPERATION_TIMEOUT_MS = 95_000;
     const PROMPT_LANGUAGE_DATA = {
         ko: { name: 'Korean', native: '한국어', phoneticDesc: 'Korean Hangul pronunciation (e.g., こんにちは → 콘니치와)' },
         en: { name: 'English', native: 'English', phoneticDesc: 'English romanization (e.g., こんにちは → konnichiwa)' },
@@ -829,6 +830,24 @@ ${JSON.stringify(payload)}`;
             return this.getProviderRetryCount() + 1;
         }
 
+        async _callProvider(addon, method, params) {
+            let timeoutId = null;
+            const providerName = addon?.name || addon?.id || 'unknown';
+            const operation = Promise.resolve().then(() => addon[method](params));
+            const timeout = new Promise((_, reject) => {
+                timeoutId = setTimeout(() => {
+                    const error = new Error(`${providerName} ${method} timed out`);
+                    error.name = 'TimeoutError';
+                    reject(error);
+                }, PROVIDER_OPERATION_TIMEOUT_MS);
+            });
+            try {
+                return await Promise.race([operation, timeout]);
+            } finally {
+                if (timeoutId !== null) clearTimeout(timeoutId);
+            }
+        }
+
         /**
          * 모든 AI 제공자가 공유하는 가사 번역 시스템 프롬프트 생성
          * @param {Object} params - { text, lang, translationStyle }
@@ -1393,7 +1412,7 @@ ${normalizedText}
 
                 try {
                     window.__ivLyricsDebugLog?.(`[AIAddonManager] Trying metadata provider: ${addon.id}`);
-                    const result = await addon.translateMetadata({
+                    const result = await this._callProvider(addon, 'translateMetadata', {
                         ...params,
                         metadataPrompt: this.buildMetadataTranslationPrompt({
                             ...params,
@@ -1497,6 +1516,7 @@ ${normalizedText}
                     hasProvisionalOutput = false;
                     maxProvisionalLineIndex = -1;
                 };
+                let providerActive = true;
                 const providerParams = {
                     ...params,
                     translationStyle,
@@ -1510,6 +1530,7 @@ ${normalizedText}
                         : null,
                     onLine: typeof params.onLine === 'function'
                         ? (lineIndex, lineText, detail) => {
+                            if (!providerActive) return;
                             hasProvisionalOutput = true;
                             if (Number.isInteger(lineIndex) && lineIndex >= 0) {
                                 maxProvisionalLineIndex = Math.max(maxProvisionalLineIndex, lineIndex);
@@ -1523,7 +1544,7 @@ ${normalizedText}
                 try {
                     window.__ivLyricsDebugLog?.(`[AIAddonManager] Trying translate provider: ${addon.id}`);
                     const result = validateLyricsTranslationResult(
-                        await addon.translateLyrics(providerParams),
+                        await this._callProvider(addon, 'translateLyrics', providerParams),
                         params,
                         addon.id
                     );
@@ -1536,8 +1557,10 @@ ${normalizedText}
                     // 이벤트 발생
                     this.emit('ai:request:success', { type: 'translate', provider: addon.id });
 
+                    providerActive = false;
                     return result;
                 } catch (e) {
+                    providerActive = false;
                     console.warn(`[AIAddonManager] Provider ${addon.id} failed for translateLyrics:`, e.message);
                     lastError = e;
                     resetProvisionalOutput({ reason: 'provider-fallback', error: e?.message || null });
@@ -1821,7 +1844,7 @@ ${normalizedText}
                     unitMode,
                     ...providerParams
                 } = params || {};
-                const result = await addon.generateCharacterPronunciation({
+                const result = await this._callProvider(addon, 'generateCharacterPronunciation', {
                     ...providerParams,
                     unitMode: unitMode || characterPronunciationUnitMode || 'char',
                     lines: chunkLines,
@@ -2168,7 +2191,7 @@ ${normalizedText}
 
                 try {
                     window.__ivLyricsDebugLog?.(`[AIAddonManager] Trying lyrics study provider: ${addon.id}`);
-                    const result = await addon.generateLyricsStudy({
+                    const result = await this._callProvider(addon, 'generateLyricsStudy', {
                         ...params,
                         lyricsStudyPrompt: this.buildLyricsStudyPrompt(params)
                     });
@@ -2231,7 +2254,7 @@ ${normalizedText}
                     }
                     window.__ivLyricsDebugLog?.(`[AIAddonManager] Trying cultural annotations provider: ${addon.id}`);
                     const result = normalizeCulturalAnnotationsResult(
-                        await addon.generateCulturalAnnotations({
+                        await this._callProvider(addon, 'generateCulturalAnnotations', {
                             ...params,
                             culturalAnnotationsPrompt: this.buildCulturalAnnotationsPrompt({
                                 ...params,
@@ -2287,7 +2310,7 @@ ${normalizedText}
 
                 try {
                     window.__ivLyricsDebugLog?.(`[AIAddonManager] Trying TMI provider: ${addon.id}`);
-                    const result = await addon.generateTMI({
+                    const result = await this._callProvider(addon, 'generateTMI', {
                         ...params,
                         tmiPrompt: this.buildTMIPrompt(params)
                     });

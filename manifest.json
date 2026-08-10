@@ -64,6 +64,7 @@
 	"subfiles_extension": [
 		"StoragePersistence.js",
 		"MarketplaceManager.js",
+		"AIRequest.js",
 		"Addon_AI_Pollinations.js",
 		"Addon_AI_ChatGPT.js",
 		"Addon_AI_Claude.js",

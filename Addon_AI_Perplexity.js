@@ -45,7 +45,7 @@
         if (!apiKey) return [];
 
         try {
-            const response = await fetch(`${BASE_URL}/models`, {
+            const response = await window.ivLyricsFetch(`${BASE_URL}/models`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${apiKey}`,
@@ -231,7 +231,7 @@
 
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 try {
-                    const response = await fetch(`${BASE_URL}/chat/completions`, {
+                    const response = await window.ivLyricsFetch(`${BASE_URL}/chat/completions`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -361,7 +361,7 @@
                 };
 
                 try {
-                    const response = await fetch(`${BASE_URL}/chat/completions`, {
+                    const response = await window.ivLyricsFetch(`${BASE_URL}/chat/completions`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
                         body: JSON.stringify({ model, messages: buildPromptMessages(prompt), ...getAdvancedRequestParams(), stream: true })

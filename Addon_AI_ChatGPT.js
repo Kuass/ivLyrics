@@ -75,7 +75,7 @@
 
         try {
             const endpoint = `${normalizedBaseUrl}/models`;
-            const response = await fetch(endpoint, {
+            const response = await window.ivLyricsFetch(endpoint, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${apiKey}`
@@ -442,7 +442,7 @@
                 try {
                     const endpoint = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
 
-                    const response = await fetch(endpoint, {
+                    const response = await window.ivLyricsFetch(endpoint, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -578,7 +578,7 @@
                 try {
                     const endpoint = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
 
-                    const response = await fetch(endpoint, {
+                    const response = await window.ivLyricsFetch(endpoint, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
