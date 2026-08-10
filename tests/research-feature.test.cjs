@@ -6,6 +6,7 @@ const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '..');
 const managerSource = fs.readFileSync(path.join(root, 'AIAddonManager.js'), 'utf8');
+const chatGPTSource = fs.readFileSync(path.join(root, 'Addon_AI_ChatGPT.js'), 'utf8');
 const paxsenixSource = fs.readFileSync(path.join(root, 'Addon_AI_Paxsenix.js'), 'utf8');
 const serviceSource = fs.readFileSync(path.join(root, 'LyricsService.js'), 'utf8');
 const readerSource = fs.readFileSync(path.join(root, 'SongInfoTicker.js'), 'utf8');
@@ -155,6 +156,8 @@ test('Research is wired through provider fallback, versioned cache, lyrics snaps
   assert.match(managerSource, /requestTimeoutMs: PROVIDER_RESEARCH_REQUEST_TIMEOUT_MS/);
   assert.match(paxsenixSource, /}, requestTimeoutMs\);/);
   assert.match(paxsenixSource, /callPaxsenixAPI\(prompt, 1, requestTimeoutMs\)/);
+  assert.match(chatGPTSource, /}, requestTimeoutMs\);/);
+  assert.match(chatGPTSource, /callChatGPTAPI\(prompt, 1, requestTimeoutMs\)/);
   assert.match(managerSource, /throw new Error\(errorMsg\);/);
   assert.match(serviceSource, /getResearch failed:[\s\S]*throw e;/);
   assert.match(readerSource, /research-error-detail/);

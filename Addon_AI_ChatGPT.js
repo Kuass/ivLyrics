@@ -422,7 +422,12 @@
         return { text, finishReason };
     }
 
-    async function callChatGPTAPIRaw(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
+    async function callChatGPTAPIRaw(
+        prompt,
+        maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3,
+        transformResult = null,
+        requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000
+    ) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[ChatGPT] API key is required. Please configure your API key in settings.');
@@ -449,7 +454,7 @@
                             'Authorization': `Bearer ${apiKey}`
                         },
                         body: JSON.stringify(buildChatGPTRequestBody(model, prompt))
-                    });
+                    }, requestTimeoutMs);
 
                     if (response.status === 429 || response.status === 403) {
                         window.__ivLyricsDebugLog?.(`[ChatGPT Addon] API key ${keyIndex + 1} failed (${response.status}), trying next...`);
@@ -698,8 +703,12 @@
     /**
      * Call ChatGPT API and parse JSON response (for metadata, TMI, etc.)
      */
-    async function callChatGPTAPI(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3) {
-        return await callChatGPTAPIRaw(prompt, maxRetries, extractJSON);
+    async function callChatGPTAPI(
+        prompt,
+        maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3,
+        requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000
+    ) {
+        return await callChatGPTAPIRaw(prompt, maxRetries, extractJSON, requestTimeoutMs);
     }
 
     /**
@@ -1070,7 +1079,7 @@
             };
         },
 
-        async generateTMI({ title, artist, tmiPrompt }) {
+        async generateTMI({ title, artist, tmiPrompt, requestTimeoutMs }) {
             if (!title || !artist) {
                 throw new Error('Title and artist are required');
             }
@@ -1079,7 +1088,10 @@
             if (!prompt) {
                 throw new Error('[OpenAI ChatGPT] Central TMI prompt is unavailable.');
             }
-            return await callChatGPTAPI(prompt);
+            // Research uses the manager-provided extended timeout. A single
+            // long request avoids retrying the same expensive generation at
+            // the shared 90-second translation boundary.
+            return await callChatGPTAPI(prompt, 1, requestTimeoutMs);
         },
 
         async generateLyricsStudy(params) {
