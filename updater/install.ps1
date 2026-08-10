@@ -17,7 +17,7 @@ $LEGACY_TARGET_DIRS = @(
 )
 $TARGET_DIR = $LEGACY_TARGET_DIRS[0]
 $FINAL_APP_NAME = "ivLyrics"
-$PROXY_URL = "http://ivlis.kr/ivLyrics/proxy.php"
+$PROXY_URL = "https://ivlis.kr/ivLyrics/proxy.php"
 $MAX_RETRIES = 3
 $SCRIPT_VERSION = "2.1.3"
 
@@ -655,18 +655,27 @@ Write-Step 5 7 "Fetching latest version..." "running"
 
 $DOWNLOAD_URL = $null
 $VERSION_TAG = "unknown"
+$EXPECTED_SHA256 = $null
+$CHECKSUM_URL = $null
 
 try {
     $versionResult = Invoke-WithRetry -MaxRetries $MAX_RETRIES -ScriptBlock {
         $response = Invoke-RestMethod -Uri "https://api.github.com/repos/$REPO/releases/latest" -ErrorAction Stop
+        $archive = @($response.assets | Where-Object { $_.name -eq "ivLyrics.zip" }) | Select-Object -First 1
+        $checksum = @($response.assets | Where-Object { $_.name -eq "ivLyrics.zip.sha256" }) | Select-Object -First 1
+        if (-not $archive -or -not $checksum) {
+            throw "Verified release archive is unavailable"
+        }
         return @{
-            Url     = $response.zipball_url
-            Version = $response.tag_name
-            Source  = "github"
+            Url         = $archive.browser_download_url
+            ChecksumUrl = $checksum.browser_download_url
+            Version     = $response.tag_name
+            Source      = "github"
         }
     }
 
     $DOWNLOAD_URL = $versionResult.Url
+    $CHECKSUM_URL = $versionResult.ChecksumUrl
     $VERSION_TAG = $versionResult.Version
     Write-SubStep "Found version: $VERSION_TAG (via GitHub)" "success"
 }
@@ -677,17 +686,19 @@ catch {
         $versionResult = Invoke-WithRetry -MaxRetries $MAX_RETRIES -ScriptBlock {
             $response = Invoke-RestMethod -Uri "$PROXY_URL`?action=version" -TimeoutSec 10 -ErrorAction Stop
 
-            if ($response.zip_available) {
+            if ($response.zip_available -and "$($response.sha256)" -match '^[A-Fa-f0-9]{64}$') {
                 return @{
-                    Url     = "$PROXY_URL`?action=download"
-                    Version = $response.tag_name
-                    Source  = "proxy"
+                    Url      = "$PROXY_URL`?action=download"
+                    Checksum = "$($response.sha256)".ToLowerInvariant()
+                    Version  = $response.tag_name
+                    Source   = "proxy"
                 }
             }
             throw "Zip not available"
         }
 
         $DOWNLOAD_URL = $versionResult.Url
+        $EXPECTED_SHA256 = $versionResult.Checksum
         $VERSION_TAG = $versionResult.Version
         Write-SubStep "Found version: $VERSION_TAG (via proxy)" "success"
     }
@@ -742,6 +753,18 @@ try {
         if (-not (Test-Path -LiteralPath $TEMP_ZIP -PathType Leaf) -or
             (Get-Item -LiteralPath $TEMP_ZIP).Length -lt 1000) {
             throw "Download failed or file too small"
+        }
+
+        if ($CHECKSUM_URL) {
+            $checksumResponse = Invoke-WebRequest -Uri $CHECKSUM_URL -UseBasicParsing -ErrorAction Stop
+            $EXPECTED_SHA256 = (($checksumResponse.Content -split '\s+')[0]).ToLowerInvariant()
+        }
+        if ($EXPECTED_SHA256 -notmatch '^[a-f0-9]{64}$') {
+            throw "Release checksum is missing or invalid"
+        }
+        $actualSha256 = (Get-FileHash -LiteralPath $TEMP_ZIP -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actualSha256 -ne $EXPECTED_SHA256) {
+            throw "Release checksum verification failed"
         }
     }
 

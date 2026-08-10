@@ -7,7 +7,7 @@
 REPO="ivLis-Studio/ivLyrics"
 TARGET_DIR="$HOME/.config/spicetify/CustomApps"
 FINAL_APP_NAME="ivLyrics"
-PROXY_URL="http://ivlis.kr/ivLyrics/proxy.php"
+PROXY_URL="https://ivlis.kr/ivLyrics/proxy.php"
 MAX_RETRIES=3
 SCRIPT_VERSION="2.0.0"
 
@@ -181,9 +181,9 @@ get_current_version() {
 }
 
 check_network() {
-    if curl -s --connect-timeout 5 "https://api.github.com" > /dev/null 2>&1; then
+    if curl --fail --silent --show-error --proto '=https' --tlsv1.2 --connect-timeout 5 "https://api.github.com" > /dev/null 2>&1; then
         return 0
-    elif curl -s --connect-timeout 5 "$PROXY_URL" > /dev/null 2>&1; then
+    elif curl --fail --silent --show-error --proto '=https' --tlsv1.2 --connect-timeout 5 "$PROXY_URL" > /dev/null 2>&1; then
         return 0
     fi
     return 1
@@ -367,29 +367,35 @@ print_step 5 7 "Fetching latest version..." "running"
 
 DOWNLOAD_URL=""
 VERSION_TAG="unknown"
+EXPECTED_SHA256=""
+CHECKSUM_URL=""
 
 # Try GitHub with retry
 fetch_from_github() {
-    GITHUB_RESPONSE=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null)
-    DOWNLOAD_URL=$(echo "$GITHUB_RESPONSE" | grep "zipball_url" | head -n 1 | cut -d'"' -f4)
+    GITHUB_RESPONSE=$(curl --fail --silent --show-error --proto '=https' --tlsv1.2 "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null)
+    DOWNLOAD_URL=$(echo "$GITHUB_RESPONSE" | grep '"browser_download_url"' | grep '/ivLyrics\.zip"' | head -n 1 | cut -d'"' -f4)
+    CHECKSUM_URL=$(echo "$GITHUB_RESPONSE" | grep '"browser_download_url"' | grep '/ivLyrics\.zip\.sha256"' | head -n 1 | cut -d'"' -f4)
     VERSION_TAG=$(echo "$GITHUB_RESPONSE" | grep '"tag_name"' | head -n 1 | cut -d'"' -f4)
 
-    if [ -n "$DOWNLOAD_URL" ]; then
+    if [ -n "$DOWNLOAD_URL" ] && [ -n "$CHECKSUM_URL" ]; then
         return 0
     fi
     return 1
 }
 
 fetch_from_proxy() {
-    VERSION_RESPONSE=$(curl -s --connect-timeout 10 "${PROXY_URL}?action=version" 2>/dev/null)
+    VERSION_RESPONSE=$(curl --fail --silent --show-error --proto '=https' --tlsv1.2 --connect-timeout 10 "${PROXY_URL}?action=version" 2>/dev/null)
 
     if [ $? -eq 0 ] && [ -n "$VERSION_RESPONSE" ]; then
         local ZIP_AVAILABLE=$(echo "$VERSION_RESPONSE" | grep -o '"zip_available":\s*true' | head -n 1)
 
         if [ -n "$ZIP_AVAILABLE" ]; then
             VERSION_TAG=$(echo "$VERSION_RESPONSE" | grep -o '"tag_name":\s*"[^"]*"' | head -n 1 | cut -d'"' -f4)
+            EXPECTED_SHA256=$(echo "$VERSION_RESPONSE" | grep -o '"sha256":\s*"[A-Fa-f0-9]\{64\}"' | head -n 1 | cut -d'"' -f4 | tr '[:upper:]' '[:lower:]')
             DOWNLOAD_URL="${PROXY_URL}?action=download"
-            return 0
+            if [ -n "$VERSION_TAG" ] && [ -n "$EXPECTED_SHA256" ]; then
+                return 0
+            fi
         fi
     fi
     return 1
@@ -425,17 +431,46 @@ fi
 # Step 6: Download and extract
 print_step 6 7 "Downloading ivLyrics..." "running"
 
-TEMP_ZIP="/tmp/ivLyrics_latest.zip"
-TEMP_EXTRACT="/tmp/ivLyrics_extract"
+TEMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/ivLyrics_install.XXXXXX") || {
+    print_substep "Could not create a secure temporary directory" "error"
+    exit 1
+}
+TEMP_ZIP="$TEMP_ROOT/ivLyrics.zip"
+TEMP_EXTRACT="$TEMP_ROOT/extract"
+
+cleanup_installer_temp() {
+    rm -rf -- "$TEMP_ROOT"
+}
+trap cleanup_installer_temp EXIT HUP INT TERM
+
+calculate_sha256() {
+    if command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | awk '{print $1}'
+    elif command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        return 1
+    fi
+}
 
 # Download with retry
 download_file() {
-    curl -sL "$DOWNLOAD_URL" -o "$TEMP_ZIP"
-    if [ $? -eq 0 ] && [ -f "$TEMP_ZIP" ] && [ $(stat -f%z "$TEMP_ZIP" 2>/dev/null || stat -c%s "$TEMP_ZIP" 2>/dev/null) -gt 1000 ]; then
-        return 0
+    rm -f -- "$TEMP_ZIP"
+    curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 "$DOWNLOAD_URL" -o "$TEMP_ZIP" || return 1
+    if [ ! -f "$TEMP_ZIP" ] || [ "$(stat -f%z "$TEMP_ZIP" 2>/dev/null || stat -c%s "$TEMP_ZIP" 2>/dev/null)" -le 1000 ]; then
+        rm -f -- "$TEMP_ZIP"
+        return 1
     fi
-    rm -f "$TEMP_ZIP"
-    return 1
+
+    if [ -n "$CHECKSUM_URL" ]; then
+        EXPECTED_SHA256=$(curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 "$CHECKSUM_URL" 2>/dev/null | awk 'NR == 1 {print tolower($1)}') || return 1
+    fi
+    case "$EXPECTED_SHA256" in
+        [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+        *) return 1 ;;
+    esac
+    ACTUAL_SHA256=$(calculate_sha256 "$TEMP_ZIP") || return 1
+    [ "$ACTUAL_SHA256" = "$EXPECTED_SHA256" ]
 }
 
 # Progress simulation + download
@@ -457,14 +492,11 @@ print_substep "Download complete" "success"
 # Extract
 print_substep "Extracting files..." "info"
 
-rm -rf "$TEMP_EXTRACT"
 mkdir -p "$TEMP_EXTRACT"
 
 unzip -q -o "$TEMP_ZIP" -d "$TEMP_EXTRACT"
 if [ $? -ne 0 ]; then
     print_substep "Extraction failed" "error"
-    rm -f "$TEMP_ZIP"
-    rm -rf "$TEMP_EXTRACT"
     exit 1
 fi
 
@@ -476,8 +508,6 @@ fi
 
 if [ -z "$EXTRACTED_DIR" ]; then
     print_substep "Could not find extracted folder" "error"
-    rm -f "$TEMP_ZIP"
-    rm -rf "$TEMP_EXTRACT"
     exit 1
 fi
 

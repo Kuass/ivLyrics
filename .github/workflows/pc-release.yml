@@ -200,6 +200,23 @@ jobs:
               --notes-file "$RELEASE_NOTES"
           fi
 
+      - name: Build and upload verified installer archive
+        if: ${{ inputs.dry_run == false }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/ivLyrics.zip"
+          checksum="$RUNNER_TEMP/ivLyrics.zip.sha256"
+          git archive --format=zip --prefix=ivLyrics/ --output="$archive" HEAD
+          (
+            cd "$RUNNER_TEMP"
+            sha256sum ivLyrics.zip > ivLyrics.zip.sha256
+          )
+          gh release upload "$RELEASE_TAG" "$archive" "$checksum" --clobber
+
       - name: Send PC release notes to Discord
         if: ${{ inputs.dry_run == false }}
         env:
