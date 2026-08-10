@@ -91,13 +91,16 @@
         'line-timing-pseudo'
     ]);
     const CANONICAL_INSTRUMENTAL_BREAK_MARKER = '♪';
-    const NOTE_ONLY_INSTRUMENTAL_BREAK_PATTERN = /^[\s\u00A0\u200B-\u200D\uFEFF♩♪♫♬♭♮♯🎵🎶🎼]+$/u;
+    const NOTE_ONLY_INSTRUMENTAL_BREAK_PATTERN = /^[\s\u00A0\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFE0E\uFE0F\uFEFF\u2669-\u266F\u{1D100}-\u{1D1FF}\u{1F3B5}-\u{1F3BC}]+$/u;
 
     function hasLyricsContent(lines) {
         return Array.isArray(lines) && lines.length > 0;
     }
 
     function decodeInstrumentalBreakEntities(value) {
+        if (window.ivLyricsInstrumentalBreaks?.decodeEntities) {
+            return window.ivLyricsInstrumentalBreaks.decodeEntities(value);
+        }
         return String(value ?? '')
             .replace(/&lt;|&#0*60;|&#x0*3c;/giu, '<')
             .replace(/&gt;|&#0*62;|&#x0*3e;/giu, '>')
@@ -105,6 +108,9 @@
     }
 
     function getInstrumentalBreakMarker(value) {
+        if (window.ivLyricsInstrumentalBreaks?.getMarker) {
+            return window.ivLyricsInstrumentalBreaks.getMarker(value);
+        }
         const normalized = decodeInstrumentalBreakEntities(value).trim();
         if (!normalized) return null;
         if (NOTE_ONLY_INSTRUMENTAL_BREAK_PATTERN.test(normalized)) {
@@ -1268,6 +1274,14 @@
                     console.warn('[LyricsAddonManager] Failed to apply pseudo karaoke:', error);
                 }
             }
+
+            // Sync-data and pseudo-karaoke can rebuild line objects after the
+            // provider result was normalized. Normalize once more at the final
+            // boundary so every provider and lyric type keeps the same marker.
+            const finalInstrumentalBreaks = normalizeProviderInstrumentalBreaks(result, info);
+            result = finalInstrumentalBreaks.result;
+            instrumentalBreaksNormalized = instrumentalBreaksNormalized
+                || finalInstrumentalBreaks.changed;
 
             const finalResult = { ...result };
             if (finalResult.syncDataApplied) {

@@ -2545,7 +2545,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
 
     const INTERLUDE_MIN_DURATION_MS = 500;
     const KARAOKE_TRAILING_INTERLUDE_DELAY_MS = 2500;
-    const INTERLUDE_MARKER_REGEX = /^[\s\u00A0\u200B-\u200D\uFEFF\u2669-\u266C]+$/;
+    const INTERLUDE_MARKER_REGEX = /^[\s\u00A0\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFE0E\uFE0F\uFEFF\u2669-\u266F\u{1D100}-\u{1D1FF}\u{1F3B5}-\u{1F3BC}]+$/u;
     const INSTRUMENTAL_BREAK_ICON_DESIGNS = new Set([
         "equalizer",
         "dotWave",
@@ -2663,6 +2663,10 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
     };
 
     const isInterludeMarkerText = (text) => {
+        if (window.ivLyricsInstrumentalBreaks?.isMarkerText?.(text)) {
+            return true;
+        }
+
         const normalized = String(text ?? '')
             .replace(/&nbsp;/gi, ' ')
             .replace(/<[^>]+>/g, '')

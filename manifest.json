@@ -62,6 +62,7 @@
 		"LearningMode.js"
 	],
 	"subfiles_extension": [
+		"InstrumentalBreaks.js",
 		"StoragePersistence.js",
 		"MarketplaceManager.js",
 		"AIRequest.js",
