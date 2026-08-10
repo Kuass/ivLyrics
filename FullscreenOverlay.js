@@ -982,15 +982,19 @@ const FullscreenOverlay = (() => {
             checkLiked();
             updateVolume();
 
-            // 볼륨 변경 감지를 위한 저빈도 폴링
-            const volumeCheckInterval = 500;
-            const volumeIntervalId = setInterval(updateVolume, volumeCheckInterval);
+            // Spotify can change repeat outside this component (including the
+            // temporary Research playback guard), so keep both controls in sync.
+            const controlStateCheckInterval = 500;
+            const controlStateIntervalId = setInterval(() => {
+                updateVolume();
+                updateRepeat();
+            }, controlStateCheckInterval);
 
             Spicetify.Player.addEventListener("onplaypause", updatePlayState);
             Spicetify.Player.addEventListener("songchange", checkLiked);
 
             return () => {
-                clearInterval(volumeIntervalId);
+                clearInterval(controlStateIntervalId);
                 Spicetify.Player.removeEventListener("onplaypause", updatePlayState);
                 Spicetify.Player.removeEventListener("songchange", checkLiked);
             };
@@ -1891,6 +1895,7 @@ const FullscreenOverlay = (() => {
         const [tmiMode, setTmiMode] = useState(false);
         const [tmiData, setTmiData] = useState(null);
         const [tmiLoading, setTmiLoading] = useState(false);
+        const [tmiWebSearchFallback, setTmiWebSearchFallback] = useState(false);
         const [lpModeClosing, setLpModeClosing] = useState(false);
         const [isPlaying, setIsPlaying] = useState(false);
         const [position, setPosition] = useState(0);
@@ -1905,6 +1910,11 @@ const FullscreenOverlay = (() => {
         const uiVisibleRef = useRef(true);
         const tmiOpeningRef = useRef(false);
         const tmiRequestRef = useRef(0);
+        const tmiPlaybackGuardRef = useRef({
+            active: false,
+            previousRepeat: null,
+            trackUri: ""
+        });
         const albumPressTimerRef = useRef(null);
         const albumPressStartRef = useRef(null);
         const suppressAlbumClickRef = useRef(false);
@@ -2161,11 +2171,17 @@ const FullscreenOverlay = (() => {
             const requestId = ++tmiRequestRef.current;
             setTmiData(null);
             setTmiLoading(true);
+            setTmiWebSearchFallback(false);
 
             try {
                 const data = await window.SongInfoTMI?.fetchSongInfo(trackId, regenerate, {
                     onProgress: (partial, details = {}) => {
                         if (requestId !== tmiRequestRef.current) return;
+                        if (details.webSearchStatus === 'fallback') {
+                            setTmiWebSearchFallback(true);
+                        } else if (details.webSearchStatus === 'searching') {
+                            setTmiWebSearchFallback(false);
+                        }
                         if (!partial || details.reset) {
                             setTmiData(null);
                             return;
@@ -2184,6 +2200,53 @@ const FullscreenOverlay = (() => {
             }
         }, []);
 
+        const enableResearchPlaybackGuard = useCallback((researchTrackUri) => {
+            const guard = tmiPlaybackGuardRef.current;
+
+            if (!guard.active) {
+                guard.active = true;
+                guard.trackUri = researchTrackUri || "";
+
+                try {
+                    const currentRepeat = Number(Spicetify.Player?.getRepeat?.());
+                    guard.previousRepeat = [0, 1, 2].includes(currentRepeat)
+                        ? currentRepeat
+                        : null;
+                } catch (error) {
+                    guard.previousRepeat = null;
+                    console.warn("[Research] Failed to read repeat mode:", error);
+                }
+            }
+
+            try {
+                if (Spicetify.Player?.getRepeat?.() !== 2) {
+                    Spicetify.Player?.setRepeat?.(2);
+                }
+            } catch (error) {
+                console.warn("[Research] Failed to enable repeat-one mode:", error);
+            }
+        }, []);
+
+        const restoreResearchPlaybackGuard = useCallback(() => {
+            const guard = tmiPlaybackGuardRef.current;
+            if (!guard.active) return;
+
+            const previousRepeat = guard.previousRepeat;
+            guard.active = false;
+            guard.previousRepeat = null;
+            guard.trackUri = "";
+
+            if (previousRepeat === null) return;
+
+            try {
+                if (Spicetify.Player?.getRepeat?.() !== previousRepeat) {
+                    Spicetify.Player?.setRepeat?.(previousRepeat);
+                }
+            } catch (error) {
+                console.warn("[Research] Failed to restore repeat mode:", error);
+            }
+        }, []);
+
         // Research is intentionally opened only through context click or a long press.
         const openTmiMode = useCallback(async () => {
             if (tmiMode || tmiOpeningRef.current) return;
@@ -2199,6 +2262,7 @@ const FullscreenOverlay = (() => {
             if (!trackId) return;
 
             tmiOpeningRef.current = true;
+            enableResearchPlaybackGuard(trackUri);
             setTmiMode(true);
 
             try {
@@ -2206,7 +2270,7 @@ const FullscreenOverlay = (() => {
             } finally {
                 tmiOpeningRef.current = false;
             }
-        }, [loadResearch, tmiMode, trackUri]);
+        }, [enableResearchPlaybackGuard, loadResearch, tmiMode, trackUri]);
 
         const handleAlbumModeClick = useCallback((event) => {
             event?.preventDefault?.();
@@ -2339,6 +2403,7 @@ const FullscreenOverlay = (() => {
 
         useEffect(() => () => {
             tmiRequestRef.current += 1;
+            restoreResearchPlaybackGuard();
             clearAlbumPressTimer();
             if (suppressAlbumClickTimerRef.current) {
                 window.clearTimeout(suppressAlbumClickTimerRef.current);
@@ -2353,7 +2418,7 @@ const FullscreenOverlay = (() => {
                 "is-lp-view-enter",
                 "is-lp-view-exit"
             );
-        }, [clearAlbumPressTimer]);
+        }, [clearAlbumPressTimer, restoreResearchPlaybackGuard]);
 
         // Handle Regenerate
         const handleRegenerate = useCallback(async () => {
@@ -2368,22 +2433,23 @@ const FullscreenOverlay = (() => {
             tmiRequestRef.current += 1;
             tmiOpeningRef.current = false;
             setTmiMode(false);
+            setTmiData(null);
             setTmiLoading(false);
-        }, []);
+            setTmiWebSearchFallback(false);
+            restoreResearchPlaybackGuard();
+        }, [restoreResearchPlaybackGuard]);
 
-        // Reset TMI mode when track changes
+        // Research belongs to the track it was opened for. If playback is changed
+        // externally or with the next/previous controls, close instead of silently
+        // starting another long-running request for the new track.
         useEffect(() => {
-            if (tmiMode) {
-                const trackId = trackUri?.split(":")[2];
-                if (trackId) {
-                    loadResearch(trackId);
-                }
-            } else {
-                tmiRequestRef.current += 1;
-                setTmiData(null);
-                setTmiLoading(false);
+            if (!tmiMode || !trackUri) return;
+
+            const researchTrackUri = tmiPlaybackGuardRef.current.trackUri;
+            if (researchTrackUri && researchTrackUri !== trackUri) {
+                closeTmiMode();
             }
-        }, [loadResearch, trackUri]);
+        }, [closeTmiMode, tmiMode, trackUri]);
 
         const currentPlayerItem = Spicetify.Player.data?.item;
         const currentPlayerMetadata = currentPlayerItem?.metadata;
@@ -2625,11 +2691,13 @@ const FullscreenOverlay = (() => {
                 tmiLoading && !tmiData ?
                     react.createElement(window.SongInfoTMI?.TMILoadingView || 'div', {
                         onClose: closeTmiMode,
-                        tmiScale: tmiScale
+                        tmiScale: tmiScale,
+                        webSearchFallback: tmiWebSearchFallback
                     }) :
                     react.createElement(window.SongInfoTMI?.TMIFullView || 'div', {
                         info: tmiData,
                         isGenerating: tmiLoading,
+                        webSearchFallback: tmiWebSearchFallback,
                         onClose: closeTmiMode,
                         tmiScale: tmiScale,
                         trackName: (() => {
@@ -3027,11 +3095,13 @@ const FullscreenOverlay = (() => {
                     tmiLoading && !tmiData ?
                         react.createElement(window.SongInfoTMI?.TMILoadingView || 'div', {
                             onClose: closeTmiMode,
-                            tmiScale: tmiScale
+                            tmiScale: tmiScale,
+                            webSearchFallback: tmiWebSearchFallback
                         }) :
                         react.createElement(window.SongInfoTMI?.TMIFullView || 'div', {
                             info: tmiData,
                             isGenerating: tmiLoading,
+                            webSearchFallback: tmiWebSearchFallback,
                             onClose: closeTmiMode,
                             tmiScale: tmiScale,
                             trackName: (() => {

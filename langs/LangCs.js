@@ -2283,6 +2283,12 @@ window.LANG_CS = {
     "loadingTitle": "Čtení mezi řádky",
     "loading": "Zkoumání textů, zvuku, umělce a kulturního kontextu",
     "generating": "Generování…",
+    "aiGeneratedNotice": "Tyto informace vytváří AI a mohou obsahovat nepřesnosti.",
+    "webSearchFallbackTitle": "Webové vyhledávání se nezdařilo",
+    "webSearchFallbackWarning": "Webové vyhledávání nebylo dostupné, proto výzkum pokračuje bez něj. Výsledek může obsahovat více nepřesností.",
+    "fontControls": "Velikost textu",
+    "fontDecrease": "Zmenšit text",
+    "fontIncrease": "Zvětšit text",
     "errorTitle": "Výzkum se nepodařilo dokončit",
     "errorFetch": "Při vytváření výzkumného dokumentu došlo k chybě",
     "errorQuota": "Kvóta rozhraní API byla překročena",
@@ -2299,6 +2305,8 @@ window.LANG_CS = {
     "sections": {
       "overview": "Přehled",
       "information": "Základní informace",
+      "listeningGuide": "Průvodce poslechem",
+      "trivia": "Zajímavosti",
       "title": "Analýza názvu",
       "lyrics": "Lyrická analýza",
       "chorus": "Analýza sboru",
@@ -2328,6 +2336,8 @@ window.LANG_CS = {
     },
     "labels": {
       "original": "Text v původním jazyce",
+      "timeline": "Časová osa",
+      "sourceFootnote": "zdroj",
       "reading": "Výslovnost a čtení",
       "meaning": "Význam",
       "lyricConnection": "Spojení s texty",
@@ -2373,7 +2383,18 @@ window.LANG_CS = {
       "significance": "Umělecký význam",
       "similarities": "Podobnosti",
       "differences": "Rozdíly",
-      "whyItMatters": "Proč na srovnání záleží"
+      "whyItMatters": "Proč na srovnání záleží",
+      "listenHere": "Poslechnout odsud",
+      "listenFor": "Zaměřte se na",
+      "surprise": "Překvapení skladby",
+      "creationStory": "Jak skladba vznikala",
+      "creatorVoices": "Slovy tvůrců",
+      "creativeConnections": "Tvůrčí propojení",
+      "afterlife": "Život po vydání",
+      "mythCheck": "Mýtus a skutečnost",
+      "sample": "Sampl",
+      "cover": "Coververze",
+      "notableWork": "Významná tvorba"
     }
   },
   "learningMode": {

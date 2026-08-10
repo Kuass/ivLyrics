@@ -2283,6 +2283,12 @@ window.LANG_HI = {
     "loadingTitle": "पंक्तियों के बीच में पढ़ना",
     "loading": "गीत, ध्वनि, कलाकार और सांस्कृतिक संदर्भ पर शोध करना",
     "generating": "तैयार किया जा रहा है…",
+    "aiGeneratedNotice": "यह जानकारी AI द्वारा तैयार की गई है और इसमें गलतियाँ हो सकती हैं।",
+    "webSearchFallbackTitle": "वेब खोज विफल रही",
+    "webSearchFallbackWarning": "वेब खोज उपलब्ध नहीं थी, इसलिए रिसर्च उसके बिना जारी है। परिणाम में अधिक गलतियाँ हो सकती हैं।",
+    "fontControls": "टेक्स्ट का आकार",
+    "fontDecrease": "टेक्स्ट छोटा करें",
+    "fontIncrease": "टेक्स्ट बड़ा करें",
     "errorTitle": "शोध पूरा नहीं हो सका",
     "errorFetch": "शोध दस्तावेज़ बनाते समय एक त्रुटि उत्पन्न हुई",
     "errorQuota": "एपीआई कोटा पार हो गया",
@@ -2299,6 +2305,8 @@ window.LANG_HI = {
     "sections": {
       "overview": "सिंहावलोकन",
       "information": "बुनियादी जानकारी",
+      "listeningGuide": "सुनने की मार्गदर्शिका",
+      "trivia": "रोचक तथ्य",
       "title": "शीर्षक विश्लेषण",
       "lyrics": "गीतात्मक विश्लेषण",
       "chorus": "कोरस विश्लेषण",
@@ -2328,6 +2336,8 @@ window.LANG_HI = {
     },
     "labels": {
       "original": "मूल भाषा का पाठ",
+      "timeline": "समयरेखा",
+      "sourceFootnote": "स्रोत",
       "reading": "उच्चारण और पढ़ना",
       "meaning": "मतलब",
       "lyricConnection": "गीत के बोल से जुड़ाव",
@@ -2373,7 +2383,18 @@ window.LANG_HI = {
       "significance": "कलात्मक महत्व",
       "similarities": "समानताएँ",
       "differences": "मतभेद",
-      "whyItMatters": "तुलना क्यों मायने रखती है"
+      "whyItMatters": "तुलना क्यों मायने रखती है",
+      "listenHere": "यहाँ से सुनें",
+      "listenFor": "इस पर ध्यान दें",
+      "surprise": "गीत का अप्रत्याशित मोड़",
+      "creationStory": "गीत कैसे बना",
+      "creatorVoices": "रचनाकारों के शब्दों में",
+      "creativeConnections": "रचनात्मक संबंध",
+      "afterlife": "रिलीज़ के बाद का सफ़र",
+      "mythCheck": "मिथक बनाम तथ्य",
+      "sample": "सैंपल",
+      "cover": "कवर",
+      "notableWork": "उल्लेखनीय काम"
     }
   },
   "learningMode": {

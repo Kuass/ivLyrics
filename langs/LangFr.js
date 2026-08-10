@@ -2284,6 +2284,12 @@ window.LANG_FR = {
     "loadingTitle": "Lire entre les lignes",
     "loading": "Recherche des paroles, du son, de l'artiste et du contexte culturel",
     "generating": "Génération en cours…",
+    "aiGeneratedNotice": "Ces informations sont générées par une IA et peuvent contenir des inexactitudes.",
+    "webSearchFallbackTitle": "Échec de la recherche web",
+    "webSearchFallbackWarning": "La recherche web était indisponible. La recherche se poursuit donc sans elle et le résultat peut contenir davantage d’inexactitudes.",
+    "fontControls": "Taille du texte",
+    "fontDecrease": "Réduire le texte",
+    "fontIncrease": "Agrandir le texte",
     "errorTitle": "La recherche n'a pas pu être complétée",
     "errorFetch": "Une erreur s'est produite lors de la création du document de recherche",
     "errorQuota": "Quota d'API dépassé",
@@ -2300,6 +2306,8 @@ window.LANG_FR = {
     "sections": {
       "overview": "Aperçu",
       "information": "Informations de base",
+      "listeningGuide": "Guide d’écoute",
+      "trivia": "Anecdotes",
       "title": "Analyse du titre",
       "lyrics": "Analyse des paroles",
       "chorus": "Analyse du chœur",
@@ -2329,6 +2337,8 @@ window.LANG_FR = {
     },
     "labels": {
       "original": "Texte en langue originale",
+      "timeline": "Chronologie",
+      "sourceFootnote": "source",
       "reading": "Prononciation et lecture",
       "meaning": "Signification",
       "lyricConnection": "Lien avec les paroles",
@@ -2374,7 +2384,18 @@ window.LANG_FR = {
       "significance": "Importance artistique",
       "similarities": "Similitudes",
       "differences": "Différences",
-      "whyItMatters": "Pourquoi la comparaison est importante"
+      "whyItMatters": "Pourquoi la comparaison est importante",
+      "listenHere": "Écouter à partir d’ici",
+      "listenFor": "À écouter",
+      "surprise": "La surprise du morceau",
+      "creationStory": "La création du morceau",
+      "creatorVoices": "Paroles de créateurs",
+      "creativeConnections": "Connexions créatives",
+      "afterlife": "La vie après la sortie",
+      "mythCheck": "Mythe ou réalité",
+      "sample": "Sample",
+      "cover": "Reprise",
+      "notableWork": "Œuvre notable"
     }
   },
   "learningMode": {

@@ -2284,6 +2284,12 @@ window.LANG_PT = {
     "loadingTitle": "Lendo nas entrelinhas",
     "loading": "Pesquisando a letra, o som, o artista e o contexto cultural",
     "generating": "Gerando…",
+    "aiGeneratedNotice": "Estas informações são geradas por IA e podem conter imprecisões.",
+    "webSearchFallbackTitle": "Falha na pesquisa na web",
+    "webSearchFallbackWarning": "A pesquisa na web não estava disponível, então a pesquisa continua sem ela. O resultado pode conter mais imprecisões.",
+    "fontControls": "Tamanho do texto",
+    "fontDecrease": "Diminuir texto",
+    "fontIncrease": "Aumentar texto",
     "errorTitle": "A pesquisa não pôde ser concluída",
     "errorFetch": "Ocorreu um erro ao criar o documento de pesquisa",
     "errorQuota": "Cota de API excedida",
@@ -2300,6 +2306,8 @@ window.LANG_PT = {
     "sections": {
       "overview": "Visão geral",
       "information": "Informações básicas",
+      "listeningGuide": "Guia de escuta",
+      "trivia": "Curiosidades",
       "title": "Análise de título",
       "lyrics": "Análise de letras",
       "chorus": "Análise do refrão",
@@ -2329,6 +2337,8 @@ window.LANG_PT = {
     },
     "labels": {
       "original": "Texto no idioma original",
+      "timeline": "Linha do tempo",
+      "sourceFootnote": "fonte",
       "reading": "Pronúncia e leitura",
       "meaning": "Significado",
       "lyricConnection": "Conexão com as letras",
@@ -2374,7 +2384,18 @@ window.LANG_PT = {
       "significance": "Significado artístico",
       "similarities": "Semelhanças",
       "differences": "Diferenças",
-      "whyItMatters": "Por que a comparação é importante"
+      "whyItMatters": "Por que a comparação é importante",
+      "listenHere": "Ouvir a partir daqui",
+      "listenFor": "Preste atenção em",
+      "surprise": "A surpresa da música",
+      "creationStory": "Como a música foi criada",
+      "creatorVoices": "Nas palavras dos criadores",
+      "creativeConnections": "Conexões criativas",
+      "afterlife": "Vida após o lançamento",
+      "mythCheck": "Mito ou fato",
+      "sample": "Sample",
+      "cover": "Regravação",
+      "notableWork": "Trabalho de destaque"
     }
   },
   "learningMode": {

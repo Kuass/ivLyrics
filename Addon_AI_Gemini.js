@@ -30,6 +30,7 @@
             translate: true,    // 가사 번역/발음
             metadata: true,     // 메타데이터 번역
             tmi: true,          // TMI 생성
+            researchWebSearch: true,
             lyricsStudy: true,  // 학습 모드 생성
             characterPronunciation: true,
             culturalAnnotations: true
@@ -386,7 +387,16 @@
         }
     }
 
-    async function callGeminiAPIStream(prompt, onLine, onStreamReset, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
+    async function callGeminiAPIStream(
+        prompt,
+        onLine,
+        onStreamReset,
+        maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3,
+        transformResult = null,
+        requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000,
+        onRawChunk = null,
+        requestOverrides = {}
+    ) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) throw new Error('[Gemini] API key is required.');
         const model = getSelectedModel();
@@ -399,8 +409,9 @@
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 let emittedLineCount = 0;
                 let emittedProvisionalOutput = false;
+                let receivedStreamText = false;
                 const resetProvisionalOutput = (reason, error = null) => {
-                    if (!emittedProvisionalOutput) return;
+                    if (!emittedProvisionalOutput && !receivedStreamText) return;
 
                     try {
                         if (typeof onStreamReset === 'function') {
@@ -416,6 +427,7 @@
 
                     emittedProvisionalOutput = false;
                     emittedLineCount = 0;
+                    receivedStreamText = false;
                 };
 
                 try {
@@ -430,9 +442,10 @@
                                 systemInstruction: { parts: [{ text: systemPrompt }] }
                             } : {}),
                             contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-                            generationConfig: getGenerationConfig()
+                            generationConfig: getGenerationConfig(),
+                            ...requestOverrides
                         })
-                    });
+                    }, requestTimeoutMs);
 
                     if (response.status === 429 || response.status === 403) { break; }
                     if (!response.ok) {
@@ -461,7 +474,11 @@
                             true
                         );
                         const text = readGeminiResponseText(parsed, true);
-                        if (text) accumulated += text;
+                        if (text) {
+                            accumulated += text;
+                            receivedStreamText = true;
+                            if (typeof onRawChunk === 'function') onRawChunk(text);
+                        }
                         if (finishReason) finalFinishReason = finishReason;
                     };
 
@@ -905,7 +922,7 @@
             };
         },
 
-        async generateTMI({ title, artist, tmiPrompt }) {
+        async generateTMI({ title, artist, tmiPrompt, requestTimeoutMs, onResearchProgress, webSearch = true }) {
             if (!title || !artist) {
                 throw new Error('Title and artist are required');
             }
@@ -914,7 +931,25 @@
             if (!prompt) {
                 throw new Error('[Google Gemini] Central TMI prompt is unavailable.');
             }
-            return await callGeminiAPI(prompt);
+            let progressParser = window.AIAddonManager?.createResearchStreamProgressParser?.(onResearchProgress) || null;
+            const resetProgress = progressParser
+                ? (details) => {
+                    progressParser = window.AIAddonManager.createResearchStreamProgressParser(onResearchProgress);
+                    onResearchProgress(null, { ...details, reset: true });
+                }
+                : null;
+            return await callGeminiAPIStream(
+                prompt,
+                null,
+                resetProgress,
+                1,
+                extractJSON,
+                requestTimeoutMs,
+                progressParser ? chunk => progressParser.push(chunk) : null,
+                // The SDK uses `googleSearch`, while the raw generateContent
+                // REST request used here requires `google_search`.
+                webSearch === false ? {} : { tools: [{ google_search: {} }] }
+            );
         },
 
         async generateLyricsStudy(params) {

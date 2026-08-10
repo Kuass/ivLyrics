@@ -2284,6 +2284,12 @@ window.LANG_ES = {
     "loadingTitle": "Leyendo entre líneas",
     "loading": "Investigar la letra, el sonido, el artista y el contexto cultural.",
     "generating": "Generando…",
+    "aiGeneratedNotice": "Esta información ha sido generada por IA y puede contener inexactitudes.",
+    "webSearchFallbackTitle": "Falló la búsqueda web",
+    "webSearchFallbackWarning": "La búsqueda web no estaba disponible, así que la investigación continúa sin ella. El resultado puede contener más imprecisiones.",
+    "fontControls": "Tamaño del texto",
+    "fontDecrease": "Reducir el texto",
+    "fontIncrease": "Aumentar el texto",
     "errorTitle": "La investigación no se pudo completar",
     "errorFetch": "Se produjo un error al crear el documento de investigación.",
     "errorQuota": "Se superó la cuota de API",
@@ -2300,6 +2306,8 @@ window.LANG_ES = {
     "sections": {
       "overview": "Descripción general",
       "information": "Información básica",
+      "listeningGuide": "Guía de escucha",
+      "trivia": "Datos curiosos",
       "title": "Análisis de título",
       "lyrics": "Análisis lírico",
       "chorus": "Análisis de coro",
@@ -2329,6 +2337,8 @@ window.LANG_ES = {
     },
     "labels": {
       "original": "Texto en idioma original",
+      "timeline": "Cronología",
+      "sourceFootnote": "fuente",
       "reading": "Pronunciación y lectura",
       "meaning": "Significado",
       "lyricConnection": "Conexión con la letra",
@@ -2374,7 +2384,18 @@ window.LANG_ES = {
       "significance": "Importancia artística",
       "similarities": "Similitudes",
       "differences": "Diferencias",
-      "whyItMatters": "Por qué es importante la comparación"
+      "whyItMatters": "Por qué es importante la comparación",
+      "listenHere": "Escuchar desde aquí",
+      "listenFor": "Presta atención a",
+      "surprise": "El giro de la canción",
+      "creationStory": "Cómo se creó la canción",
+      "creatorVoices": "En palabras de sus creadores",
+      "creativeConnections": "Conexiones creativas",
+      "afterlife": "Vida después del lanzamiento",
+      "mythCheck": "Mito y realidad",
+      "sample": "Sample",
+      "cover": "Versión",
+      "notableWork": "Trabajo destacado"
     }
   },
   "learningMode": {

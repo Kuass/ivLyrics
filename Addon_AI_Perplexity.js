@@ -29,6 +29,7 @@
             translate: true,
             metadata: true,
             tmi: true,
+            researchWebSearch: true,
             lyricsStudy: true,
             characterPronunciation: true,
             culturalAnnotations: true
@@ -330,7 +331,16 @@
         }
     }
 
-    async function callPerplexityAPIStream(prompt, onLine, onStreamReset, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
+    async function callPerplexityAPIStream(
+        prompt,
+        onLine,
+        onStreamReset,
+        maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3,
+        transformResult = null,
+        requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000,
+        onRawChunk = null,
+        requestOverrides = {}
+    ) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) throw new Error('[Perplexity] API key is required.');
         const model = getSelectedModel();
@@ -341,8 +351,9 @@
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 let emittedLineCount = 0;
                 let emittedProvisionalOutput = false;
+                let receivedStreamText = false;
                 const resetProvisionalOutput = (reason, error = null) => {
-                    if (!emittedProvisionalOutput) return;
+                    if (!emittedProvisionalOutput && !receivedStreamText) return;
 
                     try {
                         if (typeof onStreamReset === 'function') {
@@ -358,14 +369,15 @@
 
                     emittedProvisionalOutput = false;
                     emittedLineCount = 0;
+                    receivedStreamText = false;
                 };
 
                 try {
                     const response = await window.ivLyricsFetch(`${BASE_URL}/chat/completions`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                        body: JSON.stringify({ model, messages: buildPromptMessages(prompt), ...getAdvancedRequestParams(), stream: true })
-                    });
+                        body: JSON.stringify({ model, messages: buildPromptMessages(prompt), ...getAdvancedRequestParams(), ...requestOverrides, stream: true })
+                    }, requestTimeoutMs);
                     if (response.status === 429 || response.status === 403) { break; }
                     if (!response.ok) {
                         let msg = `HTTP ${response.status}`;
@@ -389,7 +401,11 @@
                         if (String(parsed?.choices?.[0]?.finish_reason ?? '').trim().toLowerCase() === 'stop') {
                             sawStop = true;
                         }
-                        if (chunk) accumulated += chunk;
+                        if (chunk) {
+                            accumulated += chunk;
+                            receivedStreamText = true;
+                            if (typeof onRawChunk === 'function') onRawChunk(chunk);
+                        }
                     };
 
                     while (true) {
@@ -755,7 +771,7 @@
             };
         },
 
-        async generateTMI({ title, artist, tmiPrompt }) {
+        async generateTMI({ title, artist, tmiPrompt, requestTimeoutMs, onResearchProgress, webSearch = true }) {
             if (!title || !artist) {
                 throw new Error('Title and artist are required');
             }
@@ -764,7 +780,30 @@
             if (!prompt) {
                 throw new Error('[Perplexity] Central TMI prompt is unavailable.');
             }
-            return await callPerplexityAPI(prompt);
+            let progressParser = window.AIAddonManager?.createResearchStreamProgressParser?.(onResearchProgress) || null;
+            const resetProgress = progressParser
+                ? (details) => {
+                    progressParser = window.AIAddonManager.createResearchStreamProgressParser(onResearchProgress);
+                    onResearchProgress(null, { ...details, reset: true });
+                }
+                : null;
+            return await callPerplexityAPIStream(
+                prompt,
+                null,
+                resetProgress,
+                1,
+                extractJSON,
+                requestTimeoutMs,
+                progressParser ? chunk => progressParser.push(chunk) : null,
+                webSearch === false
+                    ? { disable_search: true, return_images: false }
+                    : {
+                        disable_search: false,
+                        search_mode: 'web',
+                        return_images: true,
+                        web_search_options: { search_context_size: 'high' }
+                    }
+            );
         },
 
         async generateLyricsStudy(params) {

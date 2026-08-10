@@ -2284,6 +2284,12 @@ window.LANG_VI = {
     "loadingTitle": "Đọc giữa dòng",
     "loading": "Nghiên cứu lời bài hát, âm thanh, nghệ sĩ và bối cảnh văn hóa",
     "generating": "Đang tạo…",
+    "aiGeneratedNotice": "Thông tin này do AI tạo và có thể chứa nội dung không chính xác.",
+    "webSearchFallbackTitle": "Tìm kiếm web thất bại",
+    "webSearchFallbackWarning": "Không thể sử dụng tìm kiếm web nên quá trình nghiên cứu đang tiếp tục mà không có nó. Kết quả có thể chứa nhiều thông tin thiếu chính xác hơn.",
+    "fontControls": "Cỡ chữ",
+    "fontDecrease": "Giảm cỡ chữ",
+    "fontIncrease": "Tăng cỡ chữ",
     "errorTitle": "Nghiên cứu không thể hoàn thành",
     "errorFetch": "Đã xảy ra lỗi khi tạo tài liệu Nghiên cứu",
     "errorQuota": "Đã vượt quá hạn ngạch API",
@@ -2300,6 +2306,8 @@ window.LANG_VI = {
     "sections": {
       "overview": "Tổng quan",
       "information": "Thông tin cơ bản",
+      "listeningGuide": "Hướng dẫn nghe",
+      "trivia": "Thông tin thú vị",
       "title": "Phân tích tiêu đề",
       "lyrics": "Phân tích lời bài hát",
       "chorus": "Phân tích hợp xướng",
@@ -2329,6 +2337,8 @@ window.LANG_VI = {
     },
     "labels": {
       "original": "Văn bản bằng ngôn ngữ gốc",
+      "timeline": "Dòng thời gian",
+      "sourceFootnote": "nguồn",
       "reading": "Phát âm và đọc",
       "meaning": "Ý nghĩa",
       "lyricConnection": "Kết nối với lời bài hát",
@@ -2374,7 +2384,18 @@ window.LANG_VI = {
       "significance": "Ý nghĩa nghệ thuật",
       "similarities": "Điểm tương đồng",
       "differences": "Sự khác biệt",
-      "whyItMatters": "Tại sao sự so sánh lại quan trọng"
+      "whyItMatters": "Tại sao sự so sánh lại quan trọng",
+      "listenHere": "Nghe từ đây",
+      "listenFor": "Hãy chú ý",
+      "surprise": "Điểm bất ngờ của bài hát",
+      "creationStory": "Quá trình tạo nên bài hát",
+      "creatorVoices": "Lời kể từ người sáng tạo",
+      "creativeConnections": "Mối liên hệ sáng tạo",
+      "afterlife": "Sức sống sau khi phát hành",
+      "mythCheck": "Lời đồn và sự thật",
+      "sample": "Bản sample",
+      "cover": "Bản cover",
+      "notableWork": "Tác phẩm tiêu biểu"
     }
   },
   "learningMode": {

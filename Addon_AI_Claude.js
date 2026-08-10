@@ -29,6 +29,7 @@
             translate: true,
             metadata: true,
             tmi: true,
+            researchWebSearch: true,
             lyricsStudy: true,
             characterPronunciation: true,
             culturalAnnotations: true
@@ -165,6 +166,22 @@
             };
         }
         return { systemPrompt: '', userPrompt: String(prompt ?? '') };
+    }
+
+    function getClaudeWebSearchTool(model) {
+        const normalizedModel = String(model || '').toLowerCase();
+        const supportsLatestSearch = /(?:claude-)?(?:opus-(?:4[-.]?[678]|5)|sonnet-(?:4[-.]?6|5)|fable-5|mythos(?:-preview|-5))/.test(normalizedModel);
+
+        if (supportsLatestSearch) {
+            return {
+                type: 'web_search_20260318',
+                name: 'web_search',
+                max_uses: 5,
+                allowed_callers: ['direct']
+            };
+        }
+
+        return { type: 'web_search_20250305', name: 'web_search', max_uses: 5 };
     }
 
     // ============================================
@@ -326,7 +343,16 @@
         }
     }
 
-    async function callClaudeAPIStream(prompt, onLine, onStreamReset, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
+    async function callClaudeAPIStream(
+        prompt,
+        onLine,
+        onStreamReset,
+        maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3,
+        transformResult = null,
+        requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000,
+        onRawChunk = null,
+        requestOverrides = {}
+    ) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[Claude] API key is required. Please configure your API key in settings.');
@@ -342,8 +368,9 @@
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 let emittedLineCount = 0;
                 let emittedProvisionalOutput = false;
+                let receivedStreamText = false;
                 const resetProvisionalOutput = (reason, error = null) => {
-                    if (!emittedProvisionalOutput) return;
+                    if (!emittedProvisionalOutput && !receivedStreamText) return;
 
                     try {
                         if (typeof onStreamReset === 'function') {
@@ -359,6 +386,7 @@
 
                     emittedProvisionalOutput = false;
                     emittedLineCount = 0;
+                    receivedStreamText = false;
                 };
 
                 try {
@@ -373,13 +401,14 @@
                         body: JSON.stringify({
                             model: model,
                             ...getAdvancedRequestParams(),
+                            ...requestOverrides,
                             ...(systemPrompt ? { system: systemPrompt } : {}),
                             stream: true,
                             messages: [
                                 { role: 'user', content: userPrompt }
                             ]
                         })
-                    });
+                    }, requestTimeoutMs);
 
                     if (response.status === 429 || response.status === 403) {
                         window.__ivLyricsDebugLog?.(`[Claude Addon] Stream: API key ${keyIndex + 1} failed (${response.status}), trying next...`);
@@ -438,11 +467,27 @@
                             return;
                         }
 
+                        if (parsedType === 'content_block_start') {
+                            const block = parsed?.content_block;
+                            const toolError = block?.type === 'web_search_tool_result'
+                                && block?.content?.type === 'web_search_tool_result_error'
+                                ? block.content
+                                : null;
+                            if (toolError) {
+                                throw new Error(`[Claude] Web search failed: ${toolError.error_code || 'unknown_error'}`);
+                            }
+                            return;
+                        }
+
                         if (parsedType === 'content_block_delta') {
                             const text = parsed?.delta?.type === 'text_delta' && typeof parsed?.delta?.text === 'string'
                                 ? parsed.delta.text
                                 : '';
-                            if (text) accumulated += text;
+                            if (text) {
+                                accumulated += text;
+                                receivedStreamText = true;
+                                if (typeof onRawChunk === 'function') onRawChunk(text);
+                            }
                             return;
                         }
 
@@ -838,7 +883,7 @@
             };
         },
 
-        async generateTMI({ title, artist, tmiPrompt }) {
+        async generateTMI({ title, artist, tmiPrompt, requestTimeoutMs, onResearchProgress, webSearch = true }) {
             if (!title || !artist) {
                 throw new Error('Title and artist are required');
             }
@@ -847,7 +892,25 @@
             if (!prompt) {
                 throw new Error('[Anthropic Claude] Central TMI prompt is unavailable.');
             }
-            return await callClaudeAPI(prompt);
+            let progressParser = window.AIAddonManager?.createResearchStreamProgressParser?.(onResearchProgress) || null;
+            const resetProgress = progressParser
+                ? (details) => {
+                    progressParser = window.AIAddonManager.createResearchStreamProgressParser(onResearchProgress);
+                    onResearchProgress(null, { ...details, reset: true });
+                }
+                : null;
+            return await callClaudeAPIStream(
+                prompt,
+                null,
+                resetProgress,
+                1,
+                extractJSON,
+                requestTimeoutMs,
+                progressParser ? chunk => progressParser.push(chunk) : null,
+                webSearch === false ? {} : {
+                    tools: [getClaudeWebSearchTool(getSelectedModel())]
+                }
+            );
         },
 
         async generateLyricsStudy(params) {

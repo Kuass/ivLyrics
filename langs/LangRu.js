@@ -2284,6 +2284,12 @@ window.LANG_RU = {
     "loadingTitle": "Чтение между строк",
     "loading": "Исследование текста, звука, исполнителя и культурного контекста.",
     "generating": "Создание…",
+    "aiGeneratedNotice": "Эта информация создана ИИ и может содержать неточности.",
+    "webSearchFallbackTitle": "Веб-поиск не удался",
+    "webSearchFallbackWarning": "Веб-поиск недоступен, поэтому исследование продолжается без него. Результат может содержать больше неточностей.",
+    "fontControls": "Размер текста",
+    "fontDecrease": "Уменьшить текст",
+    "fontIncrease": "Увеличить текст",
     "errorTitle": "Исследование не может быть завершено",
     "errorFetch": "Произошла ошибка при создании документа исследования.",
     "errorQuota": "Превышена квота API",
@@ -2300,6 +2306,8 @@ window.LANG_RU = {
     "sections": {
       "overview": "Обзор",
       "information": "Основная информация",
+      "listeningGuide": "Гид по прослушиванию",
+      "trivia": "Интересные факты",
       "title": "Анализ заголовка",
       "lyrics": "Лирический анализ",
       "chorus": "Хоровой анализ",
@@ -2329,6 +2337,8 @@ window.LANG_RU = {
     },
     "labels": {
       "original": "Текст на языке оригинала",
+      "timeline": "Хронология",
+      "sourceFootnote": "источник",
       "reading": "Произношение и чтение",
       "meaning": "Значение",
       "lyricConnection": "Связь с текстами песен",
@@ -2374,7 +2384,18 @@ window.LANG_RU = {
       "significance": "Художественное значение",
       "similarities": "Сходства",
       "differences": "Различия",
-      "whyItMatters": "Почему сравнение важно"
+      "whyItMatters": "Почему сравнение важно",
+      "listenHere": "Слушать отсюда",
+      "listenFor": "Обратите внимание",
+      "surprise": "Неожиданный поворот песни",
+      "creationStory": "Как создавалась песня",
+      "creatorVoices": "Словами создателей",
+      "creativeConnections": "Творческие связи",
+      "afterlife": "Жизнь после релиза",
+      "mythCheck": "Миф или факт",
+      "sample": "Сэмпл",
+      "cover": "Кавер",
+      "notableWork": "Значимая работа"
     }
   },
   "learningMode": {

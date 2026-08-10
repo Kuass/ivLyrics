@@ -7963,7 +7963,7 @@
             if (!trackId) return null;
 
             const userLang = lang || Spicetify.Locale?.getLocale()?.split('-')[0] || 'en';
-            const schema = window.AIAddonManager?.RESEARCH_CACHE_VERSION || 'research-v5';
+            const schema = window.AIAddonManager?.RESEARCH_CACHE_VERSION || 'research-v7';
             const cacheLang = `${userLang}:${schema}`;
 
             try {

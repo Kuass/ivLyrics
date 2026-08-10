@@ -2284,6 +2284,12 @@ window.LANG_ZH_CN = {
     "loadingTitle": "阅读字里行间",
     "loading": "研究歌词、声音、艺术家和文化背景",
     "generating": "正在生成…",
+    "aiGeneratedNotice": "本信息由 AI 生成，可能包含不准确的内容。",
+    "webSearchFallbackTitle": "网络搜索失败",
+    "webSearchFallbackWarning": "网络搜索暂不可用，研究将在不搜索的情况下继续生成，结果可能包含更多不准确信息。",
+    "fontControls": "文字大小",
+    "fontDecrease": "减小文字",
+    "fontIncrease": "增大文字",
     "errorTitle": "研究无法完成",
     "errorFetch": "创建研究文档时出错",
     "errorQuota": "超出 API 配额",
@@ -2300,6 +2306,8 @@ window.LANG_ZH_CN = {
     "sections": {
       "overview": "概述",
       "information": "基本信息",
+      "listeningGuide": "聆听指南",
+      "trivia": "趣味知识",
       "title": "标题分析",
       "lyrics": "歌词分析",
       "chorus": "副歌分析",
@@ -2329,6 +2337,8 @@ window.LANG_ZH_CN = {
     },
     "labels": {
       "original": "原文",
+      "timeline": "时间线",
+      "sourceFootnote": "来源",
       "reading": "读音",
       "meaning": "含义",
       "lyricConnection": "与歌词的联系",
@@ -2374,7 +2384,18 @@ window.LANG_ZH_CN = {
       "significance": "艺术意义",
       "similarities": "相似之处",
       "differences": "差异",
-      "whyItMatters": "为什么比较很重要"
+      "whyItMatters": "为什么比较很重要",
+      "listenHere": "从这里播放",
+      "listenFor": "值得留意",
+      "surprise": "歌曲的意外转折",
+      "creationStory": "歌曲创作过程",
+      "creatorVoices": "创作者原话",
+      "creativeConnections": "创作关联",
+      "afterlife": "发行后的生命力",
+      "mythCheck": "传闻与事实",
+      "sample": "采样",
+      "cover": "翻唱",
+      "notableWork": "代表作品"
     }
   },
   "learningMode": {

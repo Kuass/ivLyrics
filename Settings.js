@@ -11155,6 +11155,63 @@ const ConfigModal = ({
     margin-top: 4px;
 }
 
+#${APP_NAME}-config-container .ai-addon-toggle-setting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+#${APP_NAME}-config-container .ai-addon-toggle-copy {
+    min-width: 0;
+}
+
+#${APP_NAME}-config-container .ai-addon-toggle-label {
+    display: block;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+#${APP_NAME}-config-container .ai-addon-switch {
+    position: relative;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 20px;
+    padding: 0;
+    border: 0.5px solid var(--glass-border);
+    border-radius: 999px;
+    background: var(--input-bg);
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+#${APP_NAME}-config-container .ai-addon-switch > span {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: var(--text-tertiary);
+    transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+#${APP_NAME}-config-container .ai-addon-switch.active {
+    border-color: color-mix(in srgb, var(--accent-primary) 58%, transparent);
+    background: color-mix(in srgb, var(--accent-primary) 42%, transparent);
+}
+
+#${APP_NAME}-config-container .ai-addon-switch.active > span {
+    background: var(--accent-primary);
+    transform: translateX(16px);
+}
+
+#${APP_NAME}-config-container .ai-addon-switch:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
 #${APP_NAME}-config-container .ai-addon-input-group {
     display: flex;
     gap: 8px;

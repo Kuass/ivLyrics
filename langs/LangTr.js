@@ -2284,6 +2284,12 @@ window.LANG_TR = {
     "loadingTitle": "Satır aralarını okumak",
     "loading": "Şarkı sözlerini, sesi, sanatçıyı ve kültürel bağlamı araştırmak",
     "generating": "Oluşturuluyor…",
+    "aiGeneratedNotice": "Bu bilgiler yapay zekâ tarafından oluşturulur ve hatalar içerebilir.",
+    "webSearchFallbackTitle": "Web araması başarısız oldu",
+    "webSearchFallbackWarning": "Web araması kullanılamadığı için araştırma arama olmadan devam ediyor. Sonuç daha fazla yanlışlık içerebilir.",
+    "fontControls": "Metin boyutu",
+    "fontDecrease": "Metni küçült",
+    "fontIncrease": "Metni büyüt",
     "errorTitle": "Araştırma tamamlanamadı",
     "errorFetch": "Araştırma belgesi oluşturulurken bir hata oluştu",
     "errorQuota": "API kotası aşıldı",
@@ -2300,6 +2306,8 @@ window.LANG_TR = {
     "sections": {
       "overview": "Genel Bakış",
       "information": "Temel bilgiler",
+      "listeningGuide": "Dinleme rehberi",
+      "trivia": "İlginç bilgiler",
       "title": "Başlık analizi",
       "lyrics": "Şarkı sözü analizi",
       "chorus": "Koro analizi",
@@ -2329,6 +2337,8 @@ window.LANG_TR = {
     },
     "labels": {
       "original": "Orijinal dildeki metin",
+      "timeline": "Zaman çizelgesi",
+      "sourceFootnote": "kaynak",
       "reading": "Telaffuz ve okuma",
       "meaning": "Anlamı",
       "lyricConnection": "Şarkı sözleriyle bağlantı",
@@ -2374,7 +2384,18 @@ window.LANG_TR = {
       "significance": "Sanatsal önemi",
       "similarities": "benzerlikler",
       "differences": "Farklılıklar",
-      "whyItMatters": "Karşılaştırma neden önemlidir?"
+      "whyItMatters": "Karşılaştırma neden önemlidir?",
+      "listenHere": "Buradan dinle",
+      "listenFor": "Şuna kulak ver",
+      "surprise": "Şarkının sürprizi",
+      "creationStory": "Şarkı nasıl ortaya çıktı",
+      "creatorVoices": "Yaratıcılarının ağzından",
+      "creativeConnections": "Yaratıcı bağlantılar",
+      "afterlife": "Yayımdan sonraki yaşamı",
+      "mythCheck": "Efsane mi gerçek mi",
+      "sample": "Sample",
+      "cover": "Cover",
+      "notableWork": "Öne çıkan çalışma"
     }
   },
   "learningMode": {

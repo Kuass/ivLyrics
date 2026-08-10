@@ -2284,6 +2284,12 @@ window.LANG_IT = {
     "loadingTitle": "Leggere tra le righe",
     "loading": "Ricercare i testi, il suono, l'artista e il contesto culturale",
     "generating": "Generazione in corso…",
+    "aiGeneratedNotice": "Queste informazioni sono generate dall'IA e possono contenere inesattezze.",
+    "webSearchFallbackTitle": "Ricerca web non riuscita",
+    "webSearchFallbackWarning": "La ricerca web non era disponibile, quindi la ricerca continua senza di essa. Il risultato potrebbe contenere più imprecisioni.",
+    "fontControls": "Dimensione testo",
+    "fontDecrease": "Riduci il testo",
+    "fontIncrease": "Ingrandisci il testo",
     "errorTitle": "Non è stato possibile completare la ricerca",
     "errorFetch": "Si è verificato un errore durante la creazione del documento di ricerca",
     "errorQuota": "Quota API superata",
@@ -2300,6 +2306,8 @@ window.LANG_IT = {
     "sections": {
       "overview": "Panoramica",
       "information": "Informazioni di base",
+      "listeningGuide": "Guida all'ascolto",
+      "trivia": "Curiosità",
       "title": "Analisi del titolo",
       "lyrics": "Analisi lirica",
       "chorus": "Analisi del coro",
@@ -2329,6 +2337,8 @@ window.LANG_IT = {
     },
     "labels": {
       "original": "Testo in lingua originale",
+      "timeline": "Cronologia",
+      "sourceFootnote": "fonte",
       "reading": "Pronuncia e lettura",
       "meaning": "Significato",
       "lyricConnection": "Collegamento al testo",
@@ -2374,7 +2384,18 @@ window.LANG_IT = {
       "significance": "Significato artistico",
       "similarities": "Somiglianze",
       "differences": "Differenze",
-      "whyItMatters": "Perché il confronto è importante"
+      "whyItMatters": "Perché il confronto è importante",
+      "listenHere": "Ascolta da qui",
+      "listenFor": "Da notare",
+      "surprise": "La sorpresa del brano",
+      "creationStory": "Come è nato il brano",
+      "creatorVoices": "Le parole degli autori",
+      "creativeConnections": "Connessioni creative",
+      "afterlife": "La vita dopo l'uscita",
+      "mythCheck": "Mito e realtà",
+      "sample": "Campionamento",
+      "cover": "Cover",
+      "notableWork": "Opera significativa"
     }
   },
   "learningMode": {

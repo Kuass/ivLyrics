@@ -2293,6 +2293,12 @@ window.LANG_MS = {
     "loadingTitle": "Membaca antara baris",
     "loading": "Menyelidik lirik, bunyi, artis dan konteks budaya",
     "generating": "Sedang menjana…",
+    "aiGeneratedNotice": "Maklumat ini dijana oleh AI dan mungkin mengandungi ketidaktepatan.",
+    "webSearchFallbackTitle": "Carian web gagal",
+    "webSearchFallbackWarning": "Carian web tidak tersedia, jadi penyelidikan diteruskan tanpanya. Hasilnya mungkin mengandungi lebih banyak ketidaktepatan.",
+    "fontControls": "Saiz teks",
+    "fontDecrease": "Kecilkan teks",
+    "fontIncrease": "Besarkan teks",
     "errorTitle": "Penyelidikan tidak dapat diselesaikan",
     "errorFetch": "Ralat berlaku semasa membuat dokumen Penyelidikan",
     "errorQuota": "Kuota API melebihi",
@@ -2309,6 +2315,8 @@ window.LANG_MS = {
     "sections": {
       "overview": "Gambaran keseluruhan",
       "information": "Maklumat asas",
+      "listeningGuide": "Panduan mendengar",
+      "trivia": "Fakta Menarik",
       "title": "Analisis tajuk",
       "lyrics": "Analisis lirik",
       "chorus": "Analisis korus",
@@ -2338,6 +2346,8 @@ window.LANG_MS = {
     },
     "labels": {
       "original": "Teks bahasa asal",
+      "timeline": "Garis masa",
+      "sourceFootnote": "sumber",
       "reading": "Sebutan dan bacaan",
       "meaning": "Maknanya",
       "lyricConnection": "Sambungan kepada lirik",
@@ -2383,7 +2393,18 @@ window.LANG_MS = {
       "significance": "Kepentingan artistik",
       "similarities": "Persamaan",
       "differences": "Perbezaan",
-      "whyItMatters": "Mengapa perbandingan itu penting"
+      "whyItMatters": "Mengapa perbandingan itu penting",
+      "listenHere": "Dengar dari sini",
+      "listenFor": "Beri perhatian pada",
+      "surprise": "Kejutan lagu",
+      "creationStory": "Bagaimana lagu ini dihasilkan",
+      "creatorVoices": "Menurut penciptanya",
+      "creativeConnections": "Hubungan kreatif",
+      "afterlife": "Kehidupan selepas pelancaran",
+      "mythCheck": "Mitos dan fakta",
+      "sample": "Sampel",
+      "cover": "Lagu saduran",
+      "notableWork": "Karya penting"
     }
   },
   "learningMode": {

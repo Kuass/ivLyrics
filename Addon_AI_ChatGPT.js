@@ -30,6 +30,7 @@
             translate: true,    // 가사 번역/발음
             metadata: true,     // 메타데이터 번역
             tmi: true,          // TMI 생성
+            researchWebSearch: true,
             lyricsStudy: true,  // 학습 모드 생성
             characterPronunciation: true,
             culturalAnnotations: true
@@ -187,6 +188,11 @@
         window.AIAddonManager?.setAddonSetting(ADDON_INFO.id, key, value);
     }
 
+    function t(key, fallback) {
+        const value = window.I18n?.t?.(key);
+        return value && value !== key ? value : fallback;
+    }
+
     function getApiKeys() {
         // 새 키 먼저 확인, 없으면 기존 키 fallback
         let raw = getSetting('api-keys', '');
@@ -217,8 +223,13 @@
         }
     }
 
+    const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
+    function normalizeBaseUrl(value) {
+        return String(value || '').trim().replace(/\/+$/, '');
+    }
+
     function getBaseUrl() {
-        return getSetting('base-url', 'https://api.openai.com/v1') || 'https://api.openai.com/v1';
+        return getSetting('base-url', DEFAULT_OPENAI_BASE_URL) || DEFAULT_OPENAI_BASE_URL;
     }
 
     function getSelectedModel() {
@@ -333,6 +344,35 @@
         if (stream) mergedBody.stream = true;
 
         return mergedBody;
+    }
+
+    function buildResponsesRequestBody(model, prompt) {
+        const { systemPrompt, userPrompt } = normalizePromptRequest(prompt);
+        const patch = { ...getRequestBodyMergePatch() };
+
+        if (patch.max_output_tokens === undefined) {
+            patch.max_output_tokens = patch.max_completion_tokens ?? patch.max_tokens ?? 16000;
+        }
+        delete patch.max_completion_tokens;
+        delete patch.max_tokens;
+        delete patch.messages;
+        delete patch.input;
+        delete patch.instructions;
+        delete patch.model;
+        delete patch.stream;
+        delete patch.tools;
+
+        return mergeRequestBody({
+            model,
+            ...(systemPrompt ? { instructions: systemPrompt } : {}),
+            input: userPrompt,
+            tools: [{ type: 'web_search' }],
+            // Research explicitly starts with a live search attempt. If the
+            // selected model cannot call the tool, the manager retries without it.
+            tool_choice: 'required',
+            stream: true,
+            store: false
+        }, patch);
     }
 
     // ============================================
@@ -546,152 +586,197 @@
         }
     }
 
-    function createTopLevelJsonProgressParser(onDocument) {
-        let buffer = '';
-        let cursor = 0;
-        let depth = 0;
-        let rootStarted = false;
-        let inString = false;
-        let escaped = false;
-        let stringStart = -1;
-        let stringRole = '';
-        let expectingKey = false;
-        let expectingColon = false;
-        let expectingValue = false;
-        let awaitingComma = false;
-        let currentKey = '';
-        let valueStart = -1;
-        let valueKind = '';
-        const document = {};
+    function createResponsesAPIError(data, fallback = 'Responses API request failed') {
+        const response = data?.response || data;
+        const error = response?.error || data?.error;
+        const reason = response?.incomplete_details?.reason || response?.status || data?.type || '';
+        const message = error?.message || error?.code || reason || fallback;
+        return new Error(`[ChatGPT Web Search] ${message}`);
+    }
 
-        const emit = () => {
-            try {
-                onDocument({ ...document });
-            } catch (error) {
-                window.__ivLyricsDebugLog?.('[ChatGPT Addon] Research progress callback failed:', error?.message);
-            }
-        };
+    function readResponsesOutputText(data) {
+        if (data?.error || data?.status === 'failed' || data?.status === 'incomplete') {
+            throw createResponsesAPIError(data);
+        }
+        return (Array.isArray(data?.output) ? data.output : [])
+            .flatMap(item => Array.isArray(item?.content) ? item.content : [])
+            .filter(part => part?.type === 'output_text' && typeof part.text === 'string')
+            .map(part => part.text)
+            .join('');
+    }
 
-        const completeValue = (end) => {
-            if (!currentKey || valueStart < 0 || end <= valueStart) return;
-            try {
-                document[currentKey] = JSON.parse(buffer.slice(valueStart, end));
-                emit();
-            } catch {
-                return;
-            }
-            currentKey = '';
-            valueStart = -1;
-            valueKind = '';
-            expectingValue = false;
-            awaitingComma = true;
-        };
+    async function callResponsesAPIStream(
+        prompt,
+        onLine,
+        onStreamReset,
+        maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3,
+        transformResult = null,
+        requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000,
+        onRawChunk = null
+    ) {
+        const apiKeys = getApiKeys();
+        if (apiKeys.length === 0) {
+            throw new Error('[ChatGPT] API key is required. Please configure your API key in settings.');
+        }
 
-        return {
-            push(delta) {
-                if (!delta) return;
-                buffer += String(delta);
+        const baseUrl = getBaseUrl();
+        const model = getSelectedModel();
+        if (!model) {
+            throw new Error('[ChatGPT] Model is not selected. Please select a model in settings.');
+        }
+        let lastError = null;
 
-                for (; cursor < buffer.length; cursor++) {
-                    const char = buffer[cursor];
+        for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex++) {
+            const apiKey = apiKeys[keyIndex];
 
-                    if (inString) {
-                        if (escaped) {
-                            escaped = false;
-                            continue;
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                let emittedLineCount = 0;
+                let emittedProvisionalOutput = false;
+                let receivedStreamText = false;
+                const resetProvisionalOutput = (reason, error = null) => {
+                    if (!emittedProvisionalOutput && !receivedStreamText) return;
+                    try {
+                        if (typeof onStreamReset === 'function') {
+                            onStreamReset({ reason, error: error?.message || null });
+                        } else if (typeof onLine === 'function') {
+                            for (let index = 0; index < emittedLineCount; index++) onLine(index, '');
                         }
-                        if (char === '\\') {
-                            escaped = true;
-                            continue;
-                        }
-                        if (char !== '"') continue;
+                    } catch (resetError) {
+                        window.__ivLyricsDebugLog?.('[ChatGPT Addon] Failed to reset Responses API stream:', resetError?.message);
+                    }
+                    emittedLineCount = 0;
+                    emittedProvisionalOutput = false;
+                    receivedStreamText = false;
+                };
 
-                        inString = false;
-                        if (stringRole === 'key') {
-                            try {
-                                currentKey = JSON.parse(buffer.slice(stringStart, cursor + 1));
-                                expectingKey = false;
-                                expectingColon = true;
-                            } catch {
-                                currentKey = '';
-                            }
-                        } else if (stringRole === 'value') {
-                            completeValue(cursor + 1);
-                        }
-                        stringRole = '';
-                        continue;
+                try {
+                    const endpoint = `${normalizeBaseUrl(baseUrl)}/responses`;
+                    const response = await window.ivLyricsFetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify(buildResponsesRequestBody(model, prompt))
+                    }, requestTimeoutMs);
+
+                    if (response.status === 429 || response.status === 403) break;
+                    if (!response.ok) {
+                        let errorData = null;
+                        try { errorData = await response.json(); } catch { }
+                        throw createResponsesAPIError(errorData, `HTTP ${response.status}`);
                     }
 
-                    if (!rootStarted) {
-                        if (char === '{') {
-                            rootStarted = true;
-                            depth = 1;
-                            expectingKey = true;
+                    const contentType = String(response.headers?.get?.('content-type') || '').toLowerCase();
+                    if (!response.body || !contentType.includes('text/event-stream')) {
+                        const data = await response.json();
+                        const rawText = readResponsesOutputText(data);
+                        if (!rawText.trim()) throw new Error('[ChatGPT Web Search] Empty response from API');
+                        if (typeof onRawChunk === 'function') {
+                            receivedStreamText = true;
+                            onRawChunk(rawText);
                         }
-                        continue;
-                    }
-
-                    if (char === '"') {
-                        inString = true;
-                        escaped = false;
-                        stringStart = cursor;
-                        if (depth === 1 && expectingKey) {
-                            stringRole = 'key';
-                        } else if (depth === 1 && expectingValue && valueStart < 0) {
-                            valueStart = cursor;
-                            valueKind = 'string';
-                            expectingValue = false;
-                            stringRole = 'value';
-                        } else {
-                            stringRole = 'nested';
+                        const transformed = typeof transformResult === 'function'
+                            ? transformResult(rawText)
+                            : rawText;
+                        if (Array.isArray(transformed) && typeof onLine === 'function') {
+                            transformed.forEach((line, index) => onLine(index, line));
                         }
-                        continue;
+                        return transformed;
                     }
 
-                    if (char === '{' || char === '[') {
-                        if (depth === 1 && expectingValue && valueStart < 0) {
-                            valueStart = cursor;
-                            valueKind = 'container';
-                            expectingValue = false;
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let sseBuffer = '';
+                    let accumulated = '';
+                    let completed = false;
+                    const lineState = { index: 0, offset: 0 };
+
+                    const appendText = (text) => {
+                        if (!text) return;
+                        accumulated += text;
+                        receivedStreamText = true;
+                        if (typeof onRawChunk === 'function') onRawChunk(text);
+                    };
+
+                    const processSseLine = (line) => {
+                        const trimmedLine = String(line || '').trim();
+                        if (!trimmedLine.startsWith('data:')) return;
+                        const payload = trimmedLine.slice(5).trimStart();
+                        if (!payload || payload === '[DONE]') return;
+
+                        const event = JSON.parse(payload);
+                        if (event.type === 'response.output_text.delta') {
+                            appendText(typeof event.delta === 'string' ? event.delta : '');
+                            return;
                         }
-                        depth += 1;
-                        continue;
-                    }
-
-                    if (char === '}' || char === ']') {
-                        if (depth === 1 && valueKind === 'primitive') completeValue(cursor);
-                        const previousDepth = depth;
-                        depth = Math.max(0, depth - 1);
-                        if (valueKind === 'container' && previousDepth === 2 && depth === 1) {
-                            completeValue(cursor + 1);
+                        if (event.type === 'response.output_text.done') {
+                            if (!accumulated && typeof event.text === 'string') appendText(event.text);
+                            return;
                         }
-                        continue;
-                    }
+                        if (event.type === 'response.refusal.done' || event.type === 'response.refusal.delta') {
+                            throw new Error(`[ChatGPT Web Search] ${event.refusal || event.delta || 'Request refused'}`);
+                        }
+                        if (event.type === 'response.failed' || event.type === 'response.incomplete' || event.type === 'error') {
+                            throw createResponsesAPIError(event);
+                        }
+                        if (event.type === 'response.completed') {
+                            completed = true;
+                            if (!accumulated) appendText(readResponsesOutputText(event.response));
+                        }
+                    };
 
-                    if (depth !== 1) continue;
+                    const drainSseBuffer = (flush = false) => {
+                        const lines = sseBuffer.split(/\r?\n/);
+                        if (flush) sseBuffer = '';
+                        else sseBuffer = lines.pop() || '';
+                        for (const line of lines) processSseLine(line);
+                    };
 
-                    if (expectingColon && char === ':') {
-                        expectingColon = false;
-                        expectingValue = true;
-                        continue;
-                    }
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        sseBuffer += decoder.decode(value, { stream: true });
+                        drainSseBuffer();
 
-                    if (expectingValue && !/\s/.test(char)) {
-                        valueStart = cursor;
-                        valueKind = 'primitive';
-                        expectingValue = false;
-                    }
-
-                    if (char === ',') {
-                        if (valueKind === 'primitive') completeValue(cursor);
-                        if (awaitingComma || !currentKey) {
-                            awaitingComma = false;
-                            expectingKey = true;
+                        const beforeEmitCount = lineState.index;
+                        emitStreamingLines(accumulated, onLine, lineState);
+                        if (lineState.index > beforeEmitCount) {
+                            emittedProvisionalOutput = true;
+                            emittedLineCount = Math.max(emittedLineCount, lineState.index);
                         }
                     }
+
+                    sseBuffer += decoder.decode();
+                    drainSseBuffer(true);
+                    const beforeFlushCount = lineState.index;
+                    emitStreamingLines(accumulated, onLine, lineState, true);
+                    if (lineState.index > beforeFlushCount) {
+                        emittedProvisionalOutput = true;
+                        emittedLineCount = Math.max(emittedLineCount, lineState.index);
+                    }
+
+                    if (!completed) throw new Error('[ChatGPT Web Search] Responses API stream ended before completion');
+                    if (!accumulated.trim()) throw new Error('[ChatGPT Web Search] Empty response from streaming API');
+
+                    const transformed = typeof transformResult === 'function'
+                        ? transformResult(accumulated)
+                        : accumulated;
+                    if (Array.isArray(transformed) && typeof onLine === 'function') {
+                        transformed.forEach((line, index) => onLine(index, line));
+                    }
+                    return transformed;
+                } catch (error) {
+                    lastError = error;
+                    window.__ivLyricsDebugLog?.(`[ChatGPT Addon] Responses API attempt ${attempt + 1} failed:`, error.message);
+                    resetProvisionalOutput(attempt < maxRetries - 1 ? 'retry' : 'failed', error);
+                    if (/invalid api key|permission denied/i.test(error.message)) throw error;
+                    if (attempt < maxRetries - 1) await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
                 }
             }
-        };
+        }
+
+        throw lastError || new Error('[ChatGPT Web Search] All API keys and retries exhausted');
     }
 
     async function callChatGPTAPIStream(
@@ -1047,8 +1132,9 @@
                 }, []);
 
                 const handleBaseUrlChange = useCallback((e) => {
-                    setBaseUrl(e.target.value);
-                    setSetting('base-url', e.target.value);
+                    const value = e.target.value;
+                    setBaseUrl(value);
+                    setSetting('base-url', value);
                 }, []);
 
                 const handleModelChange = useCallback((e) => {
@@ -1267,7 +1353,7 @@
             };
         },
 
-        async generateTMI({ title, artist, tmiPrompt, requestTimeoutMs, onResearchProgress }) {
+        async generateTMI({ title, artist, tmiPrompt, requestTimeoutMs, onResearchProgress, webSearch = true }) {
             if (!title || !artist) {
                 throw new Error('Title and artist are required');
             }
@@ -1279,16 +1365,18 @@
             // Research uses SSE so an upstream proxy receives response bytes
             // while the long document is generated instead of closing an idle
             // non-streaming request before the client-side timeout expires.
-            let progressParser = typeof onResearchProgress === 'function'
-                ? createTopLevelJsonProgressParser(onResearchProgress)
-                : null;
+            let progressParser = window.AIAddonManager?.createResearchStreamProgressParser?.(onResearchProgress);
+            progressParser = progressParser || null;
             const resetProgress = progressParser
                 ? (details) => {
-                    progressParser = createTopLevelJsonProgressParser(onResearchProgress);
+                    progressParser = window.AIAddonManager.createResearchStreamProgressParser(onResearchProgress);
                     onResearchProgress(null, { ...details, reset: true });
                 }
                 : null;
-            return await callChatGPTAPIStream(
+            const request = webSearch !== false
+                ? callResponsesAPIStream
+                : callChatGPTAPIStream;
+            return await request(
                 prompt,
                 null,
                 resetProgress,

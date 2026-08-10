@@ -2284,6 +2284,12 @@ window.LANG_KO = {
     "loadingTitle": "가사 사이의 의미를 읽는 중",
     "loading": "가사, 사운드, 아티스트와 문화적 맥락을 조사하는 중",
     "generating": "생성 중…",
+    "aiGeneratedNotice": "본 정보는 AI가 생성하므로 올바르지 않은 정보를 포함할 수 있습니다.",
+    "webSearchFallbackTitle": "웹 검색 실패",
+    "webSearchFallbackWarning": "웹 검색을 사용할 수 없어 검색 없이 리서치를 생성하고 있습니다. 부정확한 정보가 더 포함될 수 있습니다.",
+    "fontControls": "글자 크기",
+    "fontDecrease": "글자 작게",
+    "fontIncrease": "글자 크게",
     "errorTitle": "리서치를 완료하지 못했습니다",
     "errorFetch": "리서치 문서를 만드는 중 오류가 발생했습니다",
     "errorQuota": "API 할당량을 초과했습니다",
@@ -2300,6 +2306,8 @@ window.LANG_KO = {
     "sections": {
       "overview": "개요",
       "information": "기본 정보",
+      "listeningGuide": "듣기 가이드",
+      "trivia": "재밌는 사실",
       "title": "제목 분석",
       "lyrics": "가사 분석",
       "chorus": "후렴 분석",
@@ -2329,6 +2337,8 @@ window.LANG_KO = {
     },
     "labels": {
       "original": "원문",
+      "timeline": "타임라인",
+      "sourceFootnote": "출처",
       "reading": "읽는 법",
       "meaning": "의미",
       "lyricConnection": "가사와의 연결",
@@ -2374,7 +2384,18 @@ window.LANG_KO = {
       "significance": "의미",
       "similarities": "공통점",
       "differences": "차이점",
-      "whyItMatters": "비교의 의미"
+      "whyItMatters": "비교의 의미",
+      "listenHere": "여기부터 듣기",
+      "listenFor": "들어볼 부분",
+      "surprise": "이 곡의 반전",
+      "creationStory": "곡이 만들어진 과정",
+      "creatorVoices": "아티스트의 말",
+      "creativeConnections": "이 곡을 만든 사람들",
+      "afterlife": "발매 이후의 생명",
+      "mythCheck": "소문과 사실",
+      "sample": "샘플",
+      "cover": "커버",
+      "notableWork": "대표 작업"
     }
   },
   "learningMode": {

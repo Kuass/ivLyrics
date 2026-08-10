@@ -2283,6 +2283,12 @@ window.LANG_AR = {
     "loadingTitle": "القراءة بين السطور",
     "loading": "البحث في الكلمات والصوت والفنان والسياق الثقافي",
     "generating": "جارٍ الإنشاء…",
+    "aiGeneratedNotice": "تم إنشاء هذه المعلومات بواسطة الذكاء الاصطناعي وقد تتضمن معلومات غير دقيقة.",
+    "webSearchFallbackTitle": "تعذر البحث على الويب",
+    "webSearchFallbackWarning": "تعذر استخدام البحث على الويب، لذا يستمر إنشاء البحث من دونه. قد تتضمن النتيجة مزيدًا من المعلومات غير الدقيقة.",
+    "fontControls": "حجم النص",
+    "fontDecrease": "تصغير حجم النص",
+    "fontIncrease": "تكبير حجم النص",
     "errorTitle": "لا يمكن إكمال البحث",
     "errorFetch": "حدث خطأ أثناء إنشاء مستند البحث",
     "errorQuota": "تم تجاوز حصة واجهة برمجة التطبيقات",
@@ -2299,6 +2305,8 @@ window.LANG_AR = {
     "sections": {
       "overview": "نظرة عامة",
       "information": "المعلومات الأساسية",
+      "listeningGuide": "دليل الاستماع",
+      "trivia": "حقائق ممتعة",
       "title": "تحليل العنوان",
       "lyrics": "تحليل غنائي",
       "chorus": "تحليل الكورس",
@@ -2328,6 +2336,8 @@ window.LANG_AR = {
     },
     "labels": {
       "original": "النص باللغة الأصلية",
+      "timeline": "الخط الزمني",
+      "sourceFootnote": "المصدر",
       "reading": "النطق والقراءة",
       "meaning": "معنى",
       "lyricConnection": "اتصال بالكلمات",
@@ -2373,7 +2383,18 @@ window.LANG_AR = {
       "significance": "أهمية فنية",
       "similarities": "التشابه",
       "differences": "الاختلافات",
-      "whyItMatters": "لماذا المقارنة مهمة"
+      "whyItMatters": "لماذا المقارنة مهمة",
+      "listenHere": "استمع من هنا",
+      "listenFor": "ما ينبغي سماعه",
+      "surprise": "المفاجأة في الأغنية",
+      "creationStory": "كيف صُنعت الأغنية",
+      "creatorVoices": "بكلمات صُنّاعها",
+      "creativeConnections": "الروابط الإبداعية",
+      "afterlife": "حياة الأغنية بعد الإصدار",
+      "mythCheck": "الشائعة والحقيقة",
+      "sample": "عينة موسيقية",
+      "cover": "نسخة معاد أداؤها",
+      "notableWork": "أعمال بارزة"
     }
   },
   "learningMode": {

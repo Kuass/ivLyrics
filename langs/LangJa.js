@@ -2284,6 +2284,12 @@ window.LANG_JA = {
     "loadingTitle": "行間を読む",
     "loading": "歌詞、サウンド、アーティスト、文化的背景の研究",
     "generating": "生成中…",
+    "aiGeneratedNotice": "この情報はAIが生成するため、誤った内容が含まれる場合があります。",
+    "webSearchFallbackTitle": "ウェブ検索に失敗しました",
+    "webSearchFallbackWarning": "ウェブ検索を利用できなかったため、検索なしでリサーチを続行しています。結果に不正確な情報が増える可能性があります。",
+    "fontControls": "文字サイズ",
+    "fontDecrease": "文字を小さくする",
+    "fontIncrease": "文字を大きくする",
     "errorTitle": "研究を完了できませんでした",
     "errorFetch": "研究文書の作成中にエラーが発生しました",
     "errorQuota": "API クォータを超過しました",
@@ -2300,6 +2306,8 @@ window.LANG_JA = {
     "sections": {
       "overview": "概要",
       "information": "基本情報",
+      "listeningGuide": "聴きどころ",
+      "trivia": "豆知識",
       "title": "タイトル分析",
       "lyrics": "歌詞分析",
       "chorus": "サビ分析",
@@ -2329,6 +2337,8 @@ window.LANG_JA = {
     },
     "labels": {
       "original": "原文",
+      "timeline": "タイムライン",
+      "sourceFootnote": "出典",
       "reading": "読み方・発音",
       "meaning": "意味",
       "lyricConnection": "歌詞とのつながり",
@@ -2374,7 +2384,18 @@ window.LANG_JA = {
       "significance": "作品上の意義",
       "similarities": "類似点",
       "differences": "違い",
-      "whyItMatters": "比較が重要な理由"
+      "whyItMatters": "比較が重要な理由",
+      "listenHere": "ここから聴く",
+      "listenFor": "注目ポイント",
+      "surprise": "この曲の意外な一面",
+      "creationStory": "楽曲ができるまで",
+      "creatorVoices": "アーティストの言葉",
+      "creativeConnections": "クリエイティブなつながり",
+      "afterlife": "リリース後の広がり",
+      "mythCheck": "噂と事実",
+      "sample": "サンプル",
+      "cover": "カバー",
+      "notableWork": "主な作品"
     }
   },
   "learningMode": {

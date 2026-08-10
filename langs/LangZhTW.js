@@ -2284,6 +2284,12 @@ window.LANG_ZH_TW = {
     "loadingTitle": "閱讀字裡行間",
     "loading": "研究歌詞、聲音、藝術家和文化背景",
     "generating": "正在生成…",
+    "aiGeneratedNotice": "本資訊由 AI 生成，可能包含不正確的內容。",
+    "webSearchFallbackTitle": "網路搜尋失敗",
+    "webSearchFallbackWarning": "網路搜尋暫時無法使用，研究將在不搜尋的情況下繼續生成，結果可能包含較多不準確資訊。",
+    "fontControls": "文字大小",
+    "fontDecrease": "縮小文字",
+    "fontIncrease": "放大文字",
     "errorTitle": "研究無法完成",
     "errorFetch": "建立研究文件時出錯",
     "errorQuota": "超出 API 配額",
@@ -2300,6 +2306,8 @@ window.LANG_ZH_TW = {
     "sections": {
       "overview": "概述",
       "information": "基本訊息",
+      "listeningGuide": "聆聽指南",
+      "trivia": "趣味知識",
       "title": "標題分析",
       "lyrics": "歌詞分析",
       "chorus": "副歌分析",
@@ -2329,6 +2337,8 @@ window.LANG_ZH_TW = {
     },
     "labels": {
       "original": "原文",
+      "timeline": "時間軸",
+      "sourceFootnote": "來源",
       "reading": "讀音",
       "meaning": "意義",
       "lyricConnection": "與歌詞的聯繫",
@@ -2374,7 +2384,18 @@ window.LANG_ZH_TW = {
       "significance": "藝術意義",
       "similarities": "相似之處",
       "differences": "差異",
-      "whyItMatters": "為什麼比較很重要"
+      "whyItMatters": "為什麼比較很重要",
+      "listenHere": "從這裡播放",
+      "listenFor": "值得留意",
+      "surprise": "歌曲的意外轉折",
+      "creationStory": "歌曲創作過程",
+      "creatorVoices": "創作者原話",
+      "creativeConnections": "創作關聯",
+      "afterlife": "發行後的生命力",
+      "mythCheck": "傳聞與事實",
+      "sample": "取樣",
+      "cover": "翻唱",
+      "notableWork": "代表作品"
     }
   },
   "learningMode": {

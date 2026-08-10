@@ -2283,6 +2283,12 @@ window.LANG_DE = {
     "loadingTitle": "Zwischen den Zeilen lesen",
     "loading": "Recherche zu Texten, Sound, Künstler und kulturellem Kontext",
     "generating": "Wird erstellt…",
+    "aiGeneratedNotice": "Diese Informationen werden von KI erstellt und können Ungenauigkeiten enthalten.",
+    "webSearchFallbackTitle": "Websuche fehlgeschlagen",
+    "webSearchFallbackWarning": "Die Websuche war nicht verfügbar. Die Recherche wird daher ohne sie fortgesetzt und kann mehr Ungenauigkeiten enthalten.",
+    "fontControls": "Textgröße",
+    "fontDecrease": "Text verkleinern",
+    "fontIncrease": "Text vergrößern",
     "errorTitle": "Die Recherche konnte nicht abgeschlossen werden",
     "errorFetch": "Beim Erstellen des Forschungsdokuments ist ein Fehler aufgetreten",
     "errorQuota": "API-Kontingent überschritten",
@@ -2299,6 +2305,8 @@ window.LANG_DE = {
     "sections": {
       "overview": "Übersicht",
       "information": "Grundlegende Informationen",
+      "listeningGuide": "Hörguide",
+      "trivia": "Spannende Fakten",
       "title": "Titelanalyse",
       "lyrics": "Lyrische Analyse",
       "chorus": "Choranalyse",
@@ -2328,6 +2336,8 @@ window.LANG_DE = {
     },
     "labels": {
       "original": "Originalsprachlicher Text",
+      "timeline": "Zeitleiste",
+      "sourceFootnote": "Quelle",
       "reading": "Aussprache und Lesen",
       "meaning": "Bedeutung",
       "lyricConnection": "Verbindung zum Liedtext",
@@ -2373,7 +2383,18 @@ window.LANG_DE = {
       "significance": "Künstlerische Bedeutung",
       "similarities": "Ähnlichkeiten",
       "differences": "Unterschiede",
-      "whyItMatters": "Warum der Vergleich wichtig ist"
+      "whyItMatters": "Warum der Vergleich wichtig ist",
+      "listenHere": "Ab hier anhören",
+      "listenFor": "Darauf achten",
+      "surprise": "Die überraschende Wendung",
+      "creationStory": "Wie der Song entstand",
+      "creatorVoices": "In den Worten der Beteiligten",
+      "creativeConnections": "Kreative Verbindungen",
+      "afterlife": "Nachleben des Songs",
+      "mythCheck": "Mythos und Fakten",
+      "sample": "Sample",
+      "cover": "Coverversion",
+      "notableWork": "Bekannte Arbeiten"
     }
   },
   "learningMode": {
