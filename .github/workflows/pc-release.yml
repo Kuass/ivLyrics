@@ -68,12 +68,7 @@ jobs:
           python3 .github/scripts/set_release_version.py check "$RELEASE_VERSION"
           node --check Utils.js
           node --check NoticeSystem.js
-          node --test .github/scripts/overlay-protocol.test.cjs
-          node --test .github/scripts/karaoke-italic-clipping.test.cjs
-          node --test .github/scripts/performance-frame-rate.test.cjs
-          node --test .github/scripts/creator-profile-sort-removal.test.cjs
-          node --test .github/scripts/creator-decoration-inputs.test.cjs
-          node --test .github/scripts/send_release_webhook.test.mjs
+          node --test tests/*.test.cjs .github/scripts/*.test.cjs .github/scripts/*.test.mjs
           python3 -m json.tool manifest.json >/dev/null
           git diff --check
 
