@@ -20715,7 +20715,22 @@ function openConfig(options = {}) {
   };
 
   let isClosing = false;
-  const closeOverlay = () => {
+  const finalizeClose = () => {
+    dom.unmountComponentAtNode?.(modalContainer);
+    if (overlay.parentNode) {
+      overlay.remove();
+    }
+    setSettingsVisibility(false);
+    window.removeEventListener("keydown", handleModalKeydown, true);
+    if (window.ivLyricsCloseConfig === closeOverlay) {
+      window.ivLyricsCloseConfig = null;
+    }
+    if (previouslyFocused && document.contains(previouslyFocused)) {
+      previouslyFocused.focus();
+    }
+  };
+
+  const closeOverlay = (immediate = false) => {
     if (isClosing) {
       return;
     }
@@ -20725,20 +20740,12 @@ function openConfig(options = {}) {
     overlay.classList.remove("is-entering");
     overlay.classList.add("is-closing");
 
-    window.setTimeout(() => {
-      dom.unmountComponentAtNode?.(modalContainer);
-      if (overlay.parentNode) {
-        overlay.remove();
-      }
-      setSettingsVisibility(false);
-      document.removeEventListener("keydown", handleModalKeydown);
-      if (window.ivLyricsCloseConfig === closeOverlay) {
-        window.ivLyricsCloseConfig = null;
-      }
-      if (previouslyFocused && document.contains(previouslyFocused)) {
-        previouslyFocused.focus();
-      }
-    }, getSettingsMotionDurationMs());
+    if (immediate === true || getEffectiveReducedMotionPreference()) {
+      finalizeClose();
+      return;
+    }
+
+    window.setTimeout(finalizeClose, getSettingsMotionDurationMs());
   };
   window.ivLyricsCloseConfig = closeOverlay;
 
@@ -20754,10 +20761,57 @@ function openConfig(options = {}) {
     'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
   )).filter((element) => !element.hidden && element.getAttribute("aria-hidden") !== "true");
 
+  let escapeReleaseGuardCleanup = null;
+  const guardEscapeUntilKeyup = () => {
+    if (escapeReleaseGuardCleanup) return;
+
+    let fallbackTimer = null;
+    const cleanup = () => {
+      window.removeEventListener("keydown", suppressEscape, true);
+      window.removeEventListener("keyup", suppressEscape, true);
+      if (fallbackTimer) {
+        window.clearTimeout(fallbackTimer);
+      }
+      escapeReleaseGuardCleanup = null;
+    };
+    const suppressEscape = (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      if (event.type === "keyup") {
+        cleanup();
+      }
+    };
+
+    escapeReleaseGuardCleanup = cleanup;
+    window.addEventListener("keydown", suppressEscape, true);
+    window.addEventListener("keyup", suppressEscape, true);
+    fallbackTimer = window.setTimeout(cleanup, 1500);
+  };
+
   const handleModalKeydown = (e) => {
     if (e.key === "Escape") {
+      guardEscapeUntilKeyup();
+
+      if (e.target?.closest?.(".config-hotkey-recorder.recording")) {
+        return;
+      }
+
       e.preventDefault();
-      closeOverlay();
+      e.stopPropagation();
+      e.stopImmediatePropagation?.();
+
+      const searchInput = e.target?.closest?.(".settings-search-input");
+      if (searchInput?.value) {
+        searchInput
+          .closest(".settings-search-wrapper")
+          ?.querySelector(".settings-search-clear")
+          ?.click();
+        return;
+      }
+
+      closeOverlay(true);
       return;
     }
 
@@ -20780,7 +20834,9 @@ function openConfig(options = {}) {
       }
     }
   };
-  document.addEventListener("keydown", handleModalKeydown);
+  // Capture Escape at the earliest DOM stage so Spotify/native fullscreen
+  // handlers cannot run before the settings surface has handled it.
+  window.addEventListener("keydown", handleModalKeydown, true);
 
   overlay.appendChild(modalContainer);
   document.body.appendChild(overlay);
