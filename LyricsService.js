@@ -7327,6 +7327,35 @@
             return snapshot;
         },
 
+        async sendLyricsSnapshotToConsumers(trackInfo, snapshot, options = {}) {
+            const lyrics = snapshot?.displayLyrics;
+            if (!trackInfo?.uri || snapshot?.trackUri !== trackInfo.uri
+                || !Array.isArray(lyrics) || lyrics.length === 0) {
+                return false;
+            }
+
+            await sendLyricsToConsumers({
+                trackInfo: {
+                    ...(snapshot.trackInfo || {}),
+                    ...trackInfo,
+                    uri: trackInfo.uri
+                },
+                lyrics,
+                sendToOverlay: options.sendToOverlay !== false,
+                forceResend: options.forceResend === true,
+                sendReason: options.sendReason || 'shared-snapshot',
+                presentationContext: {
+                    provider: snapshot.provider,
+                    lyricsType: snapshot.lyricsType,
+                    displayMode1: snapshot.displayMode1,
+                    displayMode2: snapshot.displayMode2,
+                    translationSourceText: snapshot.translationSourceText,
+                    presentationComplete: snapshot.presentationComplete
+                }
+            });
+            return true;
+        },
+
         clearLyricsPresentationSnapshot(trackUri) {
             if (trackUri) {
                 return lyricsPresentationSnapshots.delete(trackUri);
@@ -7595,6 +7624,7 @@
          * @param {string} options.displayMode1 - 첫 번째 표시 모드 (발음 등)
          * @param {string} options.displayMode2 - 두 번째 표시 모드 (번역 등)
          * @param {boolean} options.sendToOverlay - 오버레이로 전송 여부 (기본: true)
+         * @param {boolean} options.skipTranslation - 다른 표시 경로가 번역 중일 때 원문만 전송
          * @param {string[]} options.providerOrder - provider 순서
          * @returns {Promise<Object>} - { lyrics, provider, error }
          */
@@ -7602,7 +7632,8 @@
             const {
                 displayMode1 = null,
                 displayMode2 = null,
-                sendToOverlay = true
+                sendToOverlay = true,
+                skipTranslation = false
             } = options;
 
             try {
@@ -7679,7 +7710,8 @@
                 serviceDebug('[LyricsService] 언어 감지:', { detectedLanguage, friendlyLanguage, modeKey, mode1, mode2 });
 
                 // 5. 발음/번역 요청 (설정에 따라)
-                const needsTranslation = mode1 !== "none" || mode2 !== "none";
+                const translationConfigured = mode1 !== "none" || mode2 !== "none";
+                const needsTranslation = translationConfigured && !skipTranslation;
                 // multi-vocal 라인은 각 파트를 별도 요청 줄로 펼친 뒤 다시 파트별로 매핑한다.
                 const translationRequests = lyrics.flatMap((line, lineIndex) => {
                     const vocalParts = getDisplayedVocalParts(line);
@@ -7837,17 +7869,38 @@
                     }
                 }
 
+                const presentationComplete = !translationConfigured || !skipTranslation;
+                const sendReason = presentationComplete
+                    ? 'translation-complete'
+                    : 'translation-pending';
+                const finalPresentationContext = {
+                    ...overlayPresentationContext,
+                    presentationComplete
+                };
+
+                this.publishLyricsSnapshot({
+                    trackUri: info.uri,
+                    trackInfo: { uri: info.uri, title: info.title, artist: info.artist },
+                    displayLyrics: lyrics,
+                    provider,
+                    lyricsType,
+                    displayMode1: mode1,
+                    displayMode2: mode2,
+                    translationSourceText: overlayTranslationSourceText,
+                    presentationComplete,
+                    source: skipTranslation
+                        ? 'lyrics-service-original-fallback'
+                        : 'lyrics-service-presentation'
+                });
+
                 // 6. 오버레이 전송
                 await sendLyricsToConsumers({
                     trackInfo: { uri: info.uri, title: info.title, artist: info.artist },
                     lyrics,
                     sendToOverlay,
                     forceResend: true,
-                    sendReason: 'translation-complete',
-                    presentationContext: {
-                        ...overlayPresentationContext,
-                        presentationComplete: true
-                    }
+                    sendReason,
+                    presentationContext: finalPresentationContext
                 });
 
                 // 6. 이벤트 발생
@@ -7856,7 +7909,7 @@
                     lyrics,
                     provider,
                     contributors: lyricsResult.contributors || [],
-                    hasTranslation: mode1 !== 'none' || mode2 !== 'none'
+                    hasTranslation: needsTranslation
                 });
 
                 return { lyrics, provider, contributors: lyricsResult.contributors || [], error: null };
@@ -8175,15 +8228,11 @@
         static _metadataCache = new LRUCache(200);
         static _metadataInflightRequests = new Map();
 
-        // 특정 trackId에 대한 진행 중인 요청 정리 (곡 변경 시 호출)
+        // 네트워크 요청은 provider마다 실제 취소를 보장할 수 없다. 곡 변경 시
+        // 진행 중 promise를 Map에서 먼저 지우면 같은 곡으로 빠르게 돌아왔을 때
+        // 동일한 AI 요청이 하나 더 생성되므로, 완료될 때까지 dedupe 항목은 유지한다.
         static clearInflightRequests(trackId) {
             if (!trackId) return;
-
-            for (const key of _translatorInflightRequests.keys()) {
-                if (key.startsWith(`${trackId}:`)) {
-                    _translatorInflightRequests.delete(key);
-                }
-            }
 
             for (const key of _translatorPendingRetries.keys()) {
                 if (key.startsWith(`${trackId}:`)) {
