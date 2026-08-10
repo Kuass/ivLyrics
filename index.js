@@ -1028,6 +1028,8 @@ const IVLYRICS_FULLSCREEN_PRESENTATION_IDS = Object.freeze([
   "compact-vinyl",
   "video",
 ]);
+const IVLYRICS_FULLSCREEN_PRESENTATION_STORAGE_KEY =
+  "ivLyrics:visual:fullscreen-presentation";
 
 function normalizeIvLyricsFullscreenPresentation(value, fallback = "standard") {
   const normalized = String(value || "").trim();
@@ -1039,6 +1041,29 @@ function normalizeIvLyricsFullscreenPresentation(value, fallback = "standard") {
 function normalizeIvLyricsDefaultFullscreenPresentation(value) {
   const normalized = normalizeIvLyricsFullscreenPresentation(value, "vinyl");
   return normalized === "standard" ? "vinyl" : normalized;
+}
+
+function getRememberedIvLyricsFullscreenPresentation() {
+  try {
+    return normalizeIvLyricsFullscreenPresentation(
+      StorageManager.getItem(IVLYRICS_FULLSCREEN_PRESENTATION_STORAGE_KEY)
+    );
+  } catch (error) {
+    return "standard";
+  }
+}
+
+function rememberIvLyricsFullscreenPresentation(value) {
+  const normalized = normalizeIvLyricsFullscreenPresentation(value);
+  try {
+    StorageManager.setItem(
+      IVLYRICS_FULLSCREEN_PRESENTATION_STORAGE_KEY,
+      normalized
+    );
+  } catch (error) {
+    ivLyricsDebug("[ivLyrics] Failed to remember fullscreen presentation:", error);
+  }
+  return normalized;
 }
 
 function getIvLyricsGlobalBackgroundMode(visual = window.CONFIG?.visual || {}) {
@@ -4694,7 +4719,7 @@ class LyricsContainer extends react.Component {
       versionIndex: 0,
       versionIndex2: 0,
       isFullscreen: false,
-      fullscreenPresentation: "standard",
+      fullscreenPresentation: getRememberedIvLyricsFullscreenPresentation(),
       fullscreenLyricsHidden: false,
       isFloatingMenuOpen: false,
       isFloatingMenuClosing: false,
@@ -9007,6 +9032,14 @@ class LyricsContainer extends react.Component {
       lyricContainerUpdate();
     };
 
+    this.setFullscreenPresentation = (nextPresentation) => {
+      const normalized = rememberIvLyricsFullscreenPresentation(
+        nextPresentation
+      );
+      this.setState({ fullscreenPresentation: normalized });
+      return normalized;
+    };
+
     this.exitFullscreenPresentation = () => {
       if (
         normalizeIvLyricsFullscreenPresentation(
@@ -9016,12 +9049,17 @@ class LyricsContainer extends react.Component {
         return false;
       }
 
-      this.setState({ fullscreenPresentation: "standard" });
+      this.setFullscreenPresentation("standard");
       return true;
     };
 
     this.toggleFullscreen = () => {
       const isEnabled = !this.state.isFullscreen;
+      const rememberedPresentation = isEnabled
+        ? getRememberedIvLyricsFullscreenPresentation()
+        : rememberIvLyricsFullscreenPresentation(
+          this.state.fullscreenPresentation
+        );
       const usePageFullscreenUi = isEnabled
         ? CONFIG.visual["fullscreen-page-ui-only"] === true
         : this.fullscreenUsesPageUi === true;
@@ -9139,11 +9177,7 @@ class LyricsContainer extends react.Component {
       // 먼저 상태를 업데이트하여 React가 Portal 렌더링을 중단하게 함
       this.setState({
         isFullscreen: isEnabled,
-        fullscreenPresentation: isEnabled
-          ? normalizeIvLyricsFullscreenPresentation(
-            this.state.fullscreenPresentation
-          )
-          : "standard",
+        fullscreenPresentation: rememberedPresentation,
         fullscreenLyricsHidden: isEnabled ? this.state.fullscreenLyricsHidden : false,
         justEnteredFullscreen: isEnabled, // 전체화면 진입 시 true로 설정하여 축소 아이콘 대신 메뉴 아이콘 표시
         isFloatingMenuOpen: isEnabled ? this.state.isFloatingMenuOpen : false,
@@ -9167,11 +9201,7 @@ class LyricsContainer extends react.Component {
         event.detail?.type === "fullscreen-presentation"
         && this.state.isFullscreen
       ) {
-        this.setState({
-          fullscreenPresentation: normalizeIvLyricsFullscreenPresentation(
-            event.detail.value
-          )
-        });
+        this.setFullscreenPresentation(event.detail.value);
       }
     };
     window.addEventListener("ivLyrics", this.handleConfigChange);
@@ -10155,10 +10185,7 @@ class LyricsContainer extends react.Component {
         trackAccentUri: this.state.colorsUri || "",
         presentationMode: fullscreenPresentation,
         onPresentationModeChange: (nextPresentation) => {
-          const normalized = normalizeIvLyricsFullscreenPresentation(
-            nextPresentation
-          );
-          this.setState({ fullscreenPresentation: normalized });
+          this.setFullscreenPresentation(nextPresentation);
         },
         onExitFullscreen: this.toggleFullscreen
       }),

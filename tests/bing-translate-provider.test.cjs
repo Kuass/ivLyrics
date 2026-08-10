@@ -343,7 +343,17 @@ test('maps fullscreen number shortcuts to every presentation mode', () => {
     assert.match(globalShortcutsSource, /type: "fullscreen-presentation"/);
     assert.match(globalShortcutsSource, /fullscreen-tv-mode[\s\S]*toggleTvMode\(\)/);
     assert.match(pageSource, /event\.detail\?\.type === "fullscreen-presentation"[\s\S]*this\.state\.isFullscreen/);
-    assert.match(pageSource, /fullscreenPresentation: normalizeIvLyricsFullscreenPresentation\([\s\S]*event\.detail\.value/);
+    assert.match(pageSource, /this\.setFullscreenPresentation\(event\.detail\.value\)/);
+});
+
+test('remembers the last fullscreen presentation across exits and re-entry', () => {
+    assert.match(pageSource, /IVLYRICS_FULLSCREEN_PRESENTATION_STORAGE_KEY[\s\S]*ivLyrics:visual:fullscreen-presentation/);
+    assert.match(pageSource, /fullscreenPresentation: getRememberedIvLyricsFullscreenPresentation\(\)/);
+    assert.match(pageSource, /rememberIvLyricsFullscreenPresentation\([\s\S]*StorageManager\.setItem/);
+    assert.match(pageSource, /const rememberedPresentation = isEnabled[\s\S]*getRememberedIvLyricsFullscreenPresentation\(\)[\s\S]*rememberIvLyricsFullscreenPresentation\([\s\S]*this\.state\.fullscreenPresentation/);
+    assert.match(pageSource, /this\.setFullscreenPresentation\(event\.detail\.value\)/);
+    assert.match(pageSource, /onPresentationModeChange: \(nextPresentation\) => \{[\s\S]*this\.setFullscreenPresentation\(nextPresentation\)/);
+    assert.doesNotMatch(pageSource, /fullscreenPresentation: isEnabled[\s\S]*: "standard"/);
 });
 
 test('shows the AI provider hint only when translation is limited to keyless providers', () => {
