@@ -2,7 +2,10 @@
 set -euo pipefail
 
 URI="${1:-ivlyrics-updater://update}"
-INSTALLER_URL="https://raw.githubusercontent.com/ivLis-Studio/ivLyrics/main/updater/install.sh"
+INSTALLER_URLS=(
+    "https://raw.githubusercontent.com/ivLis-Studio/ivLyrics/main/updater/install.sh"
+    "https://ghfast.top/https://raw.githubusercontent.com/ivLis-Studio/ivLyrics/main/updater/install.sh"
+)
 export PATH="${HOME}/.spicetify:${HOME}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 if [[ "$(uname -s)" == "Darwin" ]]; then
@@ -47,6 +50,49 @@ log_stream() {
     while IFS= read -r line; do
         log "[installer] $line"
     done
+}
+
+download_installer() {
+    local destination="$1"
+    local installer_url=""
+    local download_status=1
+    local index=0
+
+    for installer_url in "${INSTALLER_URLS[@]}"; do
+        rm -f -- "$destination"
+        if command -v curl >/dev/null 2>&1; then
+            set +e
+            curl -fsSLo "$destination" --connect-timeout 20 "$installer_url" 2>&1 | log_stream
+            download_status=${PIPESTATUS[0]}
+            set -e
+        elif command -v wget >/dev/null 2>&1; then
+            set +e
+            wget --timeout=20 -O "$destination" "$installer_url" 2>&1 | log_stream
+            download_status=${PIPESTATUS[0]}
+            set -e
+        else
+            log "curl or wget is required."
+            return 1
+        fi
+
+        if [[ "$download_status" -eq 0 ]] \
+            && [[ -f "$destination" ]] \
+            && [[ "$(wc -c < "$destination")" -ge 512 ]] \
+            && grep -Fq '# ivLyrics Installer for macOS/Linux' "$destination"; then
+            if [[ "$index" -gt 0 ]]; then
+                log "Downloaded installer through the GitHub proxy."
+            fi
+            return 0
+        fi
+
+        if [[ "$index" -eq 0 ]]; then
+            log "Direct GitHub download failed; trying the GitHub proxy."
+        fi
+        index=$((index + 1))
+    done
+
+    rm -f -- "$destination"
+    return 1
 }
 
 get_action() {
@@ -99,26 +145,10 @@ run_update() {
     local installer_path="${temp_root}/install.sh"
 
     log "Downloading official installer."
-    local download_status=0
-    if command -v curl >/dev/null 2>&1; then
-        set +e
-        curl -fsSLo "$installer_path" "$INSTALLER_URL" 2>&1 | log_stream
-        download_status=${PIPESTATUS[0]}
-        set -e
-    elif command -v wget >/dev/null 2>&1; then
-        set +e
-        wget -O "$installer_path" "$INSTALLER_URL" 2>&1 | log_stream
-        download_status=${PIPESTATUS[0]}
-        set -e
-    else
-        log "curl or wget is required."
-        return 1
-    fi
-
-    if [[ "$download_status" -ne 0 ]]; then
-        log "Installer download failed with exit code ${download_status}."
+    if ! download_installer "$installer_path"; then
+        log "Installer download failed from both GitHub and the GitHub proxy."
         rm -rf "$temp_root"
-        return "$download_status"
+        return 1
     fi
 
     chmod +x "$installer_path"

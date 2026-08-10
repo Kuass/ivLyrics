@@ -3,7 +3,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$InstallerUrl = "https://raw.githubusercontent.com/ivLis-Studio/ivLyrics/main/updater/install.ps1"
+$InstallerUrls = @(
+    "https://raw.githubusercontent.com/ivLis-Studio/ivLyrics/main/updater/install.ps1",
+    "https://ghfast.top/https://raw.githubusercontent.com/ivLis-Studio/ivLyrics/main/updater/install.ps1"
+)
 
 function Get-IvLyricsUpdaterLocalAppDataDirectory {
     $knownFolderPath = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
@@ -29,6 +32,46 @@ function Write-UpdaterLog {
     $line = "[{0}] {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Message
     Add-Content -LiteralPath $LogPath -Value $line -Encoding UTF8
     Write-Host $Message
+}
+
+function Save-IvLyricsInstaller {
+    param([Parameter(Mandatory = $true)][string]$DestinationPath)
+
+    $lastError = $null
+    for ($index = 0; $index -lt $InstallerUrls.Count; $index++) {
+        $installerUrl = $InstallerUrls[$index]
+        try {
+            Invoke-WebRequest `
+                -UseBasicParsing `
+                -Uri $installerUrl `
+                -OutFile $DestinationPath `
+                -TimeoutSec 20 `
+                -ErrorAction Stop
+
+            $installerFile = Get-Item -LiteralPath $DestinationPath -ErrorAction Stop
+            $hasInstallerMarker = Select-String `
+                -LiteralPath $DestinationPath `
+                -SimpleMatch "# ivLyrics Installer for Windows" `
+                -Quiet
+            if ($installerFile.Length -lt 512 -or -not $hasInstallerMarker) {
+                throw "Downloaded installer is invalid."
+            }
+
+            if ($index -gt 0) {
+                Write-UpdaterLog "Downloaded installer through the GitHub proxy."
+            }
+            return
+        }
+        catch {
+            $lastError = $_
+            Remove-Item -LiteralPath $DestinationPath -Force -ErrorAction SilentlyContinue
+            if ($index + 1 -lt $InstallerUrls.Count) {
+                Write-UpdaterLog "Direct GitHub download failed; trying the GitHub proxy."
+            }
+        }
+    }
+
+    throw $lastError
 }
 
 function Get-UpdaterAction {
@@ -77,7 +120,7 @@ function Start-IvLyricsUpdate {
 
     try {
         Write-UpdaterLog "Downloading official installer."
-        Invoke-WebRequest -UseBasicParsing -Uri $InstallerUrl -OutFile $installerPath
+        Save-IvLyricsInstaller -DestinationPath $installerPath
 
         Write-UpdaterLog "Running installer."
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installerPath
@@ -115,7 +158,7 @@ catch {
     Write-UpdaterLog ("Update failed: " + $_.Exception.Message)
     Write-Host ""
     Write-Host "ivLyrics update failed. You can run the manual command instead:"
-    Write-Host "iwr -useb https://raw.githubusercontent.com/ivLis-Studio/ivLyrics/main/updater/install.ps1 | iex"
+    Write-Host '$u="https://raw.githubusercontent.com/ivLis-Studio/ivLyrics/main/updater/install.ps1"; try { iwr -useb -Uri $u -ErrorAction Stop | iex } catch { iwr -useb -Uri ("https://ghfast.top/" + $u) -ErrorAction Stop | iex }'
     Write-Host ""
     Read-Host "Press Enter to close"
     exit 1
