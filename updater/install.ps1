@@ -741,6 +741,7 @@ Write-Step 6 7 "Downloading ivLyrics..." "running"
 
 $TEMP_ROOT = $null
 $TEMP_ZIP = $null
+$TEMP_CHECKSUM = $null
 $TEMP_EXTRACT = $null
 
 try {
@@ -749,6 +750,7 @@ try {
     )
     New-Item -ItemType Directory -Path $TEMP_ROOT -Force -ErrorAction Stop | Out-Null
     $TEMP_ZIP = Join-Path $TEMP_ROOT "ivLyrics_latest.zip"
+    $TEMP_CHECKSUM = Join-Path $TEMP_ROOT "ivLyrics_latest.zip.sha256"
     $TEMP_EXTRACT = Join-Path $TEMP_ROOT "ivLyrics_extract"
 
     # Download with retry
@@ -768,8 +770,18 @@ try {
         }
 
         if ($CHECKSUM_URL) {
-            $checksumResponse = Invoke-WebRequest -Uri $CHECKSUM_URL -UseBasicParsing -ErrorAction Stop
-            $EXPECTED_SHA256 = (($checksumResponse.Content -split '\s+')[0]).ToLowerInvariant()
+            Invoke-WebRequest `
+                -Uri $CHECKSUM_URL `
+                -OutFile $TEMP_CHECKSUM `
+                -UseBasicParsing `
+                -ErrorAction Stop
+
+            $checksumText = Get-Content -LiteralPath $TEMP_CHECKSUM -Raw -ErrorAction Stop
+            $checksumMatch = [regex]::Match($checksumText, '(?i)\b[a-f0-9]{64}\b')
+            if (-not $checksumMatch.Success) {
+                throw "Release checksum file is invalid"
+            }
+            $EXPECTED_SHA256 = $checksumMatch.Value.ToLowerInvariant()
         }
         if ($EXPECTED_SHA256 -notmatch '^[a-f0-9]{64}$') {
             throw "Release checksum is missing or invalid"
