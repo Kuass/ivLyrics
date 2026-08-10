@@ -38,6 +38,13 @@
     };
 
     const BASE_URL = 'https://api.anthropic.com/v1';
+    const DEFAULT_RESEARCH_MAX_TOKENS = 16_000;
+    const claudeModelCapabilities = new Map();
+
+    const asPositiveInteger = (value) => {
+        const parsed = Number.parseInt(value, 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    };
 
     /**
      * Fetch available models from Claude API
@@ -66,7 +73,9 @@
                 .map(m => ({
                     id: m.id,
                     name: m.display_name || m.id,
-                    created_at: m.created_at
+                    created_at: m.created_at,
+                    max_input_tokens: asPositiveInteger(m.max_input_tokens),
+                    max_tokens: asPositiveInteger(m.max_tokens)
                 }))
                 // Sort to put newest models first (approximate by ID versioning or just specific priority)
                 .sort((a, b) => {
@@ -84,6 +93,9 @@
 
             if (models.length > 0) {
                 models[0].default = true;
+            }
+            for (const model of models) {
+                claudeModelCapabilities.set(model.id, model);
             }
 
             return models;
@@ -156,6 +168,19 @@
             params.max_tokens = parseInt(getSetting('adv-maxTokens-value', 16000)) || 16000;
         }
         return params;
+    }
+
+    async function getResearchMaxTokens() {
+        const selectedModel = getSelectedModel();
+        let capabilities = claudeModelCapabilities.get(selectedModel);
+        if (!capabilities) {
+            const models = await fetchAvailableModels(getApiKeys()[0]);
+            capabilities = models.find(model => model.id === selectedModel);
+        }
+
+        return asPositiveInteger(capabilities?.max_tokens)
+            || asPositiveInteger(getAdvancedRequestParams().max_tokens)
+            || DEFAULT_RESEARCH_MAX_TOKENS;
     }
 
     function normalizePromptRequest(prompt) {
@@ -899,6 +924,12 @@
                     onResearchProgress(null, { ...details, reset: true });
                 }
                 : null;
+            const requestOverrides = {
+                max_tokens: await getResearchMaxTokens(),
+                ...(webSearch === false ? {} : {
+                    tools: [getClaudeWebSearchTool(getSelectedModel())]
+                })
+            };
             return await callClaudeAPIStream(
                 prompt,
                 null,
@@ -907,9 +938,7 @@
                 extractJSON,
                 requestTimeoutMs,
                 progressParser ? chunk => progressParser.push(chunk) : null,
-                webSearch === false ? {} : {
-                    tools: [getClaudeWebSearchTool(getSelectedModel())]
-                }
+                requestOverrides
             );
         },
 

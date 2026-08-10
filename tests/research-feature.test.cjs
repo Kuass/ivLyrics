@@ -7,6 +7,10 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
 const managerSource = fs.readFileSync(path.join(root, 'AIAddonManager.js'), 'utf8');
 const chatGPTSource = fs.readFileSync(path.join(root, 'Addon_AI_ChatGPT.js'), 'utf8');
+const claudeSource = fs.readFileSync(path.join(root, 'Addon_AI_Claude.js'), 'utf8');
+const geminiSource = fs.readFileSync(path.join(root, 'Addon_AI_Gemini.js'), 'utf8');
+const groqSource = fs.readFileSync(path.join(root, 'Addon_AI_Groq.js'), 'utf8');
+const openRouterSource = fs.readFileSync(path.join(root, 'Addon_AI_OpenRouter.js'), 'utf8');
 const paxsenixSource = fs.readFileSync(path.join(root, 'Addon_AI_Paxsenix.js'), 'utf8');
 const perplexitySource = fs.readFileSync(path.join(root, 'Addon_AI_Perplexity.js'), 'utf8');
 const streamingResearchProviderFiles = [
@@ -190,6 +194,144 @@ function loadChatGPTAddonWithStream(responseText, requestedBodies, options = {})
   return registeredAddon;
 }
 
+function loadLongFormProviderAddon(source, provider, advertisedOutputLimit, requestedBodies) {
+  let registeredAddon = null;
+  const modelId = provider === 'gemini' ? 'gemini-test-model' : 'test-model';
+  const settings = new Map([
+    ['api-keys', 'test-key'],
+    ['model', modelId],
+    [provider === 'gemini' ? 'adv-maxOutputTokens-enabled' : 'adv-maxTokens-enabled', false],
+    [provider === 'gemini' ? 'adv-maxOutputTokens-value' : 'adv-maxTokens-value', 4000],
+  ]);
+  const responseText = JSON.stringify({
+    type: 'music_editorial_analysis',
+    metadata: { title: 'Long Song', artist: 'Long Artist' },
+  });
+  const encoder = new TextEncoder();
+  const streamChunk = provider === 'gemini'
+    ? `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: responseText }] }, finishReason: 'STOP' }] })}\n\n`
+    : provider === 'claude'
+      ? [
+          `event: content_block_delta\ndata: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: responseText } })}`,
+          `event: message_delta\ndata: ${JSON.stringify({ type: 'message_delta', delta: { stop_reason: 'end_turn' } })}`,
+        ].join('\n\n') + '\n\n'
+      : `data: ${JSON.stringify({ choices: [{ delta: { content: responseText }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`;
+
+  const ivLyricsFetch = async (endpoint, init = {}) => {
+    if (provider === 'gemini' && /\/models\?key=/.test(endpoint)) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ models: [{
+          name: `models/${modelId}`,
+          displayName: 'Test Model',
+          supportedGenerationMethods: ['generateContent'],
+          inputTokenLimit: 100000,
+          outputTokenLimit: advertisedOutputLimit,
+        }] }),
+      };
+    }
+    if (provider === 'paxsenix' && endpoint.endsWith('/v1/models')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [{
+          id: modelId,
+          name: 'Test Model',
+          type: 'chat.completions',
+          endpoint: '/v1/chat/completions',
+          status: 'available',
+          modalities: { input: ['text'], output: ['text'] },
+          max_context_tokens: 100000,
+          max_output_tokens: advertisedOutputLimit,
+        }] }),
+      };
+    }
+    if (provider === 'claude' && endpoint.endsWith('/models')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [{
+          id: modelId,
+          type: 'model',
+          display_name: 'Test Model',
+          created_at: '2026-01-01T00:00:00Z',
+          max_input_tokens: 100000,
+          max_tokens: advertisedOutputLimit,
+        }] }),
+      };
+    }
+    if (provider === 'groq' && endpoint.endsWith('/models')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [{
+          id: modelId,
+          context_window: 100000,
+          max_completion_tokens: advertisedOutputLimit,
+        }] }),
+      };
+    }
+    if (provider === 'openrouter' && endpoint.endsWith('/models')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [{
+          id: modelId,
+          name: 'Test Model',
+          context_length: 100000,
+          top_provider: { max_completion_tokens: advertisedOutputLimit },
+        }] }),
+      };
+    }
+
+    requestedBodies.push(JSON.parse(init.body));
+    let emitted = false;
+    return {
+      ok: true,
+      status: 200,
+      body: {
+        getReader: () => ({
+          read: async () => emitted
+            ? { value: undefined, done: true }
+            : (emitted = true, { value: encoder.encode(streamChunk), done: false }),
+        }),
+      },
+    };
+  };
+  ivLyricsFetch.DEFAULT_TIMEOUT_MS = 90_000;
+
+  const context = {
+    window: {
+      ivLyricsFetch,
+      AIAddonManager: {
+        register: (addon) => { registeredAddon = addon; },
+        getAddonSetting: (_id, key, fallback) => settings.has(key) ? settings.get(key) : fallback,
+        setAddonSetting: (_id, key, value) => settings.set(key, value),
+        getProviderRequestAttempts: () => 1,
+      },
+    },
+    Spicetify: { React: {} },
+    URL,
+    JSON,
+    Object,
+    Array,
+    String,
+    Number,
+    Boolean,
+    Map,
+    Promise,
+    Error,
+    TextDecoder,
+    TextEncoder,
+    console,
+    setTimeout,
+    clearTimeout,
+  };
+  vm.runInNewContext(source, context, { filename: `Addon_AI_${provider}.js` });
+  return registeredAddon;
+}
+
 test('Research prompt receives current lyrics and the complete editorial contract', () => {
   const contract = loadContract();
   const collected = contract.collectResearchLyricLines([
@@ -238,9 +380,17 @@ test('Research prompt receives current lyrics and the complete editorial contrac
   assert.match(prompt, /Put the main point in the first sentence/);
   assert.match(prompt, /normally 2-4 sentences each/);
   assert.match(prompt, /move comparable facts, chronology, or compact reference data into the existing structured fields/);
-  assert.match(prompt, /synced_lyrics/);
-  assert.match(prompt, /Select 3-5 pivotal moments by line_index/);
-  assert.match(prompt, /never write a timestamp/);
+  assert.doesNotMatch(prompt, /synced_lyrics/);
+  assert.doesNotMatch(prompt, /start_time_ms/);
+  assert.match(prompt, /plain text with one lyric line per newline/);
+  assert.match(prompt, /zero-based non-empty line position as line_index/);
+  assert.match(prompt, /Never write a timestamp/);
+  const researchInputStart = prompt.lastIndexOf('<research_input>') + '<research_input>'.length;
+  const researchInputEnd = prompt.indexOf('</research_input>', researchInputStart);
+  const researchInput = JSON.parse(prompt.slice(researchInputStart, researchInputEnd));
+  assert.equal(researchInput.lyrics, '揺れる波の向こうへ');
+  assert.equal(typeof researchInput.lyrics, 'string');
+  assert.equal('synced_lyrics' in researchInput, false);
   assert.match(prompt, /Treat every optional feature below as evidence-gated/);
   assert.match(prompt, /music_analysis\.creation_story/);
   assert.match(prompt, /music_analysis\.creator_quotes/);
@@ -443,6 +593,99 @@ test('Research retries the same provider without web search and reports the fall
   assert.equal(progress.at(-1).partial._research.web_search, 'fallback');
 });
 
+test('Research token truncation advances to the next provider without rerunning the same provider', async () => {
+  const contract = loadContract();
+  const attempts = [];
+  const truncated = new Error('[Gemini] Response rejected (MAX_TOKENS)');
+  truncated.code = 'GEMINI_RESPONSE_REJECTED';
+  truncated.reason = 'MAX_TOKENS';
+
+  contract.register({
+    id: 'truncated-gemini',
+    name: 'Truncated Gemini',
+    author: 'ivLyrics',
+    description: 'test provider',
+    version: '1.0.0',
+    supports: { tmi: true, researchWebSearch: true },
+    getSettingsUI: () => null,
+    generateTMI: async ({ webSearch }) => {
+      attempts.push(['gemini', webSearch]);
+      throw truncated;
+    },
+  });
+  contract.register({
+    id: 'working-paxsenix',
+    name: 'Working Paxsenix',
+    author: 'ivLyrics',
+    description: 'test provider',
+    version: '1.0.0',
+    supports: { tmi: true, researchWebSearch: true },
+    getSettingsUI: () => null,
+    generateTMI: async ({ webSearch }) => {
+      attempts.push(['paxsenix', webSearch]);
+      return { type: 'music_editorial_analysis', metadata: { title: 'Recovered' } };
+    },
+  });
+  contract.setProviderEnabled('truncated-gemini', true);
+  contract.setProviderEnabled('working-paxsenix', true);
+
+  const result = await contract.generateResearch({
+    trackId: 'token-track', title: 'Long Song', artist: 'Long Artist', lyrics: ['line'],
+  });
+
+  assert.deepEqual(attempts, [['gemini', true], ['paxsenix', true]]);
+  assert.equal(result._research.provider, 'working-paxsenix');
+  assert.equal(result._research.web_search, 'used');
+});
+
+test('Gemini and Paxsenix Research use each model advertised output capacity', async () => {
+  const geminiRequests = [];
+  const gemini = loadLongFormProviderAddon(geminiSource, 'gemini', 65536, geminiRequests);
+  await gemini.generateTMI({
+    title: 'Long Song', artist: 'Long Artist', tmiPrompt: 'Return JSON', webSearch: false,
+  });
+  assert.equal(geminiRequests.length, 1);
+  assert.equal(geminiRequests[0].generationConfig.maxOutputTokens, 65536);
+
+  const paxsenixRequests = [];
+  const paxsenix = loadLongFormProviderAddon(paxsenixSource, 'paxsenix', 24576, paxsenixRequests);
+  await paxsenix.generateTMI({
+    title: 'Long Song', artist: 'Long Artist', tmiPrompt: 'Return JSON', webSearch: false,
+  });
+  assert.equal(paxsenixRequests.length, 1);
+  assert.equal(paxsenixRequests[0].max_tokens, 24576);
+});
+
+test('Claude, Groq, and OpenRouter Research use advertised limits with a safe missing-field fallback', async () => {
+  const providers = [
+    { id: 'claude', source: claudeSource, requestField: 'max_tokens' },
+    { id: 'groq', source: groqSource, requestField: 'max_completion_tokens' },
+    { id: 'openrouter', source: openRouterSource, requestField: 'max_tokens' },
+  ];
+
+  for (const provider of providers) {
+    const advertisedRequests = [];
+    const advertisedAddon = loadLongFormProviderAddon(
+      provider.source, provider.id, 49152, advertisedRequests,
+    );
+    await advertisedAddon.generateTMI({
+      title: 'Long Song', artist: 'Long Artist', tmiPrompt: 'Return JSON', webSearch: false,
+    });
+    assert.equal(advertisedRequests.length, 1, `${provider.id}: advertised request count`);
+    assert.equal(advertisedRequests[0][provider.requestField], 49152, `${provider.id}: advertised limit`);
+
+    const fallbackRequests = [];
+    const fallbackAddon = loadLongFormProviderAddon(
+      provider.source, provider.id, null, fallbackRequests,
+    );
+    await fallbackAddon.generateTMI({
+      title: 'Long Song', artist: 'Long Artist', tmiPrompt: 'Return JSON', webSearch: false,
+    });
+    assert.equal(fallbackRequests.length, 1, `${provider.id}: fallback request count`);
+    assert.equal(fallbackRequests[0][provider.requestField], 16000, `${provider.id}: fallback limit`);
+  }
+});
+
 test('closing and reopening Research rejoins the active generation request', async () => {
   let serviceCalls = 0;
   let resolveRequest;
@@ -622,9 +865,6 @@ test('every Research-capable AI provider streams raw response chunks through the
     assert.match(source, /progressParser \? chunk => progressParser\.push\(chunk\) : null/, `${file}: raw chunk routing`);
   }
 
-  const claudeSource = fs.readFileSync(path.join(root, 'Addon_AI_Claude.js'), 'utf8');
-  const geminiSource = fs.readFileSync(path.join(root, 'Addon_AI_Gemini.js'), 'utf8');
-  const groqSource = fs.readFileSync(path.join(root, 'Addon_AI_Groq.js'), 'utf8');
   const pollinationsSource = fs.readFileSync(path.join(root, 'Addon_AI_Pollinations.js'), 'utf8');
   assert.match(claudeSource, /web_search_20260318/);
   assert.match(claudeSource, /web_search_20250305/);

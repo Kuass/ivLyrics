@@ -87,6 +87,22 @@
     const RESEARCH_CACHE_VERSION = 'research-v7';
     const RESEARCH_MAX_LYRIC_CHARS = 16_000;
     const RESEARCH_MAX_LYRIC_LINE_CHARS = 600;
+    const RESEARCH_WEB_SEARCH_ERROR_CODE = 'RESEARCH_WEB_SEARCH_FAILED';
+
+    const isResearchWebSearchFailure = (error) => {
+        if (!error) return false;
+        const message = String(error.message || '');
+        if (/(?:MAX[_\s-]*(?:OUTPUT[_\s-]*)?TOKENS?|max[_\s-]*(?:output[_\s-]*)?tokens?|finish[_\s-]*reason[^\n]*(?:length|token)|context[_\s-]*length)/i.test(message)) {
+            return false;
+        }
+        if (error.code === RESEARCH_WEB_SEARCH_ERROR_CODE || error.researchWebSearchFailed === true) {
+            return true;
+        }
+
+        return /\bweb[\s_-]*search\b[^\n]*(?:fail|error|unavailable|unsupported|disabled|timed?\s*out|empty)/i.test(message)
+            || /\b(?:google_search|web_search)\b/i.test(message)
+            || /\btools?\b[^\n]*(?:unsupported|not supported|unavailable|invalid|unknown)/i.test(message);
+    };
 
     const isResearchObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
 
@@ -1123,8 +1139,7 @@ ${JSON.stringify(payload)}`;
             release_date: asResearchText(params.releaseDate),
             spotify_url: asResearchText(params.spotifyUrl),
             isrc: asResearchText(params.isrc),
-            lyrics: lyricPayload.lines,
-            synced_lyrics: lyricPayload.timedLines.map(({ line_index, start_time_ms }) => ({ line_index, start_time_ms })),
+            lyrics: lyricPayload.lines.join('\n'),
             lyrics_truncated: lyricPayload.truncated
         };
 
@@ -1158,7 +1173,7 @@ RESEARCH AND FACT SAFETY
 - A YouTube watch, shorts, live, or youtu.be URL belongs in media_gallery.url with type="youtube"; the app derives its thumbnail. Use image_url only when the direct image URL itself was explicitly available and sourceable.
 - Treat every optional feature below as evidence-gated. If reliable evidence is unavailable, leave its strings and arrays empty. Never create a placeholder, generic example, inferred quote, invented relationship, or guessed listening timestamp just to fill the schema.
 - Every source_url used inside an optional feature must also appear verbatim in the top-level sources array.
-- Build listening_guide only when research_input.synced_lyrics contains trusted timing data. Select 3-5 pivotal moments by line_index from that array; never write a timestamp, copy a lyric, or select a line_index that is absent from the input. The client resolves the selected line_index to the original lyric and timestamp.
+- research_input.lyrics is plain text with one lyric line per newline. Build listening_guide by selecting 3-5 pivotal moments using the zero-based non-empty line position as line_index. Never write a timestamp or copy a lyric into the response; the client resolves line_index to its locally held lyric and timing data.
 - Build music_analysis.creation_story only from concrete, source-backed writing, recording, arrangement, production, or release-process events. Every stage requires source_url.
 - Build music_analysis.creator_quotes only from short, exact, source-backed statements by the artist, writer, producer, performer, director, or another directly involved creator. Preserve the original quote, name the speaker, add a target-language translation when useful, and require source_url.
 - Build artist_context.creative_connections only for source-backed contributors, samples/interpolations, or notable covers that reveal how the work connects to other creators. A Spotify link is optional and must be a verified open.spotify.com URL; every item still needs either source_url or spotify_url.
@@ -3188,6 +3203,12 @@ ${normalizedText}
                     try {
                         result = await callResearchProvider(true);
                     } catch (webSearchError) {
+                        // A generation failure (for example MAX_TOKENS) is not a
+                        // web-search failure. Retrying it without search would run
+                        // the same provider twice and discard the streamed draft.
+                        if (!isResearchWebSearchFailure(webSearchError)) {
+                            throw webSearchError;
+                        }
                         activeWebSearchStatus = 'fallback';
                         console.warn(`[AIAddonManager] Provider ${addon.id} web search failed; retrying without search:`, webSearchError.message);
                         reportProgress(null, {

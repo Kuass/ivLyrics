@@ -46,6 +46,14 @@
         models: [] // API에서 동적으로 로드
     };
 
+    const DEFAULT_MAX_OUTPUT_TOKENS = 32_768;
+    const geminiModelCapabilities = new Map();
+
+    const asPositiveInteger = (value) => {
+        const parsed = Number.parseInt(value, 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    };
+
     /**
      * Gemini API에서 사용 가능한 모델 목록을 가져옴 (텍스트 생성용 모델만)
      */
@@ -95,7 +103,9 @@
                     return {
                         id: id,
                         name: m.displayName || id,
-                        description: m.description || ''
+                        description: m.description || '',
+                        input_token_limit: asPositiveInteger(m.inputTokenLimit),
+                        max_output_tokens: asPositiveInteger(m.outputTokenLimit)
                     };
                 })
                 .sort((a, b) => {
@@ -112,6 +122,9 @@
             // 첫 번째 모델을 기본값으로 설정
             if (models.length > 0) {
                 models[0].default = true;
+            }
+            for (const model of models) {
+                geminiModelCapabilities.set(model.id, model);
             }
 
             return models;
@@ -196,7 +209,7 @@
         // maxOutputTokens
         const useMaxTokens = getSetting('adv-maxOutputTokens-enabled', true);
         if (useMaxTokens) {
-            config.maxOutputTokens = parseInt(getSetting('adv-maxOutputTokens-value', 20000)) || 20000;
+            config.maxOutputTokens = parseInt(getSetting('adv-maxOutputTokens-value', DEFAULT_MAX_OUTPUT_TOKENS)) || DEFAULT_MAX_OUTPUT_TOKENS;
         }
 
         // thinking config
@@ -210,6 +223,32 @@
         }
 
         return config;
+    }
+
+    async function getResearchGenerationConfig() {
+        const config = getGenerationConfig();
+        const selectedModel = getSelectedModel();
+        let capabilities = geminiModelCapabilities.get(selectedModel);
+
+        if (!capabilities) {
+            const models = await fetchAvailableModels(getApiKeys()[0], getBaseUrl());
+            capabilities = models.find(model => model.id === selectedModel);
+        }
+
+        const advertisedLimit = asPositiveInteger(capabilities?.max_output_tokens);
+        const configuredLimit = asPositiveInteger(config.maxOutputTokens) || DEFAULT_MAX_OUTPUT_TOKENS;
+        // Research is a long structured document. Use the model's advertised
+        // output capacity so an older persisted 4k/20k setting cannot truncate it.
+        config.maxOutputTokens = advertisedLimit || Math.max(configuredLimit, DEFAULT_MAX_OUTPUT_TOKENS);
+        return config;
+    }
+
+    function markGeminiWebSearchFailure(error) {
+        if (!error || error.reason === 'MAX_TOKENS') return error;
+        if (/\b(?:google_search|web[\s_-]*search)\b|\btools?\b[^\n]*(?:unsupported|not supported|unavailable|invalid|unknown)/i.test(String(error.message || ''))) {
+            error.researchWebSearchFailed = true;
+        }
+        return error;
     }
 
     function normalizePromptRequest(prompt) {
@@ -805,7 +844,7 @@
             function AdvancedParamsSection() {
                 const [expanded, setExpanded] = useState(getSetting('adv-expanded', false));
                 const [maxTokensEnabled, setMaxTokensEnabled] = useState(getSetting('adv-maxOutputTokens-enabled', true));
-                const [maxTokensValue, setMaxTokensValue] = useState(getSetting('adv-maxOutputTokens-value', 20000));
+                const [maxTokensValue, setMaxTokensValue] = useState(getSetting('adv-maxOutputTokens-value', DEFAULT_MAX_OUTPUT_TOKENS));
                 const [thinkingEnabled, setThinkingEnabled] = useState(getSetting('adv-thinking-enabled', false));
                 const [thinkingBudget, setThinkingBudget] = useState(getSetting('adv-thinking-budget', 1024));
 
@@ -834,7 +873,7 @@
                             React.createElement('input', {
                                 type: 'number', value: maxTokensValue, disabled: !maxTokensEnabled,
                                 style: { width: '80px', fontSize: '12px' },
-                                onChange: (e) => { const v = parseInt(e.target.value) || 20000; setMaxTokensValue(v); setSetting('adv-maxOutputTokens-value', v); }
+                                onChange: (e) => { const v = parseInt(e.target.value) || DEFAULT_MAX_OUTPUT_TOKENS; setMaxTokensValue(v); setSetting('adv-maxOutputTokens-value', v); }
                             })
                         ),
                         // Thinking
@@ -938,18 +977,26 @@
                     onResearchProgress(null, { ...details, reset: true });
                 }
                 : null;
-            return await callGeminiAPIStream(
-                prompt,
-                null,
-                resetProgress,
-                1,
-                extractJSON,
-                requestTimeoutMs,
-                progressParser ? chunk => progressParser.push(chunk) : null,
+            const requestOverrides = {
+                generationConfig: await getResearchGenerationConfig(),
                 // The SDK uses `googleSearch`, while the raw generateContent
                 // REST request used here requires `google_search`.
-                webSearch === false ? {} : { tools: [{ google_search: {} }] }
-            );
+                ...(webSearch === false ? {} : { tools: [{ google_search: {} }] })
+            };
+            try {
+                return await callGeminiAPIStream(
+                    prompt,
+                    null,
+                    resetProgress,
+                    1,
+                    extractJSON,
+                    requestTimeoutMs,
+                    progressParser ? chunk => progressParser.push(chunk) : null,
+                    requestOverrides
+                );
+            } catch (error) {
+                throw webSearch === false ? error : markGeminiWebSearchFailure(error);
+            }
         },
 
         async generateLyricsStudy(params) {

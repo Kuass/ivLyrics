@@ -40,6 +40,13 @@
     const API_ORIGIN = 'https://api.paxsenix.org';
     const BASE_URL = `${API_ORIGIN}/v1`;
     const CHAT_COMPLETIONS_ENDPOINT = '/v1/chat/completions';
+    const DEFAULT_MAX_TOKENS = 16_000;
+    const paxsenixModelCapabilities = new Map();
+
+    const asPositiveInteger = (value) => {
+        const parsed = Number.parseInt(value, 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    };
 
     /**
      * Paxsenix API에서 사용 가능한 모델 목록을 가져옴
@@ -80,10 +87,14 @@
                 .map(m => ({
                     id: m.id,
                     name: m.name || m.id,
-                    context_length: m.max_context_tokens,
-                    max_output_tokens: m.max_output_tokens
+                    context_length: asPositiveInteger(m.max_context_tokens),
+                    max_output_tokens: asPositiveInteger(m.max_output_tokens)
                 }))
                 .sort((a, b) => a.id.localeCompare(b.id));
+
+            for (const model of models) {
+                paxsenixModelCapabilities.set(model.id, model);
+            }
 
             return models;
         } catch (e) {
@@ -154,15 +165,34 @@
 
     function getAdvancedRequestParams() {
         const params = {};
-        const useMaxTokens = getSetting('adv-maxTokens-enabled', false);
+        const useMaxTokens = getSetting('adv-maxTokens-enabled', true);
         if (useMaxTokens) {
-            params.max_tokens = parseInt(getSetting('adv-maxTokens-value', 4000)) || 4000;
+            params.max_tokens = parseInt(getSetting('adv-maxTokens-value', DEFAULT_MAX_TOKENS)) || DEFAULT_MAX_TOKENS;
         }
         const useTemperature = getSetting('adv-temperature-enabled', false);
         if (useTemperature) {
             params.temperature = parseFloat(getSetting('adv-temperature-value', 0.3)) || 0.3;
         }
         return params;
+    }
+
+    async function getResearchRequestOverrides() {
+        const selectedModel = getSelectedModel();
+        const availableModels = await fetchAvailableModels(getApiKeys()[0]);
+        const capabilities = availableModels.find(model => model.id === selectedModel)
+            || paxsenixModelCapabilities.get(selectedModel);
+        const configuredLimit = asPositiveInteger(getAdvancedRequestParams().max_tokens) || DEFAULT_MAX_TOKENS;
+        return {
+            max_tokens: asPositiveInteger(capabilities?.max_output_tokens)
+                || Math.max(configuredLimit, DEFAULT_MAX_TOKENS)
+        };
+    }
+
+    function createResearchWebSearchError(message, cause = null) {
+        const error = new Error(message);
+        error.code = 'RESEARCH_WEB_SEARCH_FAILED';
+        if (cause) error.cause = cause;
+        return error;
     }
 
     function normalizePromptRequest(prompt) {
@@ -195,27 +225,32 @@
         const apiKey = getApiKeys()[0];
         if (!apiKey) throw new Error('[Paxsenix] API key is required.');
 
-        const query = `"${title}" "${artist}" song official interview credits release background performance fun facts`;
-        const response = await window.ivLyricsFetch(
-            `${API_ORIGIN}/tools/web-search?q=${encodeURIComponent(query)}`,
-            {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                }
-            },
-            requestTimeoutMs
-        );
-        const raw = await response.text();
-        let data = null;
-        try { data = JSON.parse(raw); } catch (e) { }
+        try {
+            const query = `"${title}" "${artist}" song official interview credits release background performance fun facts`;
+            const response = await window.ivLyricsFetch(
+                `${API_ORIGIN}/tools/web-search?q=${encodeURIComponent(query)}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    }
+                },
+                requestTimeoutMs
+            );
+            const raw = await response.text();
+            let data = null;
+            try { data = JSON.parse(raw); } catch (e) { }
 
-        if (!response.ok || data?.ok === false) {
-            throw new Error(`[Paxsenix] Web search failed: ${data?.message || data?.error || `HTTP ${response.status}`}`);
+            if (!response.ok || data?.ok === false) {
+                throw createResearchWebSearchError(`[Paxsenix] Web search failed: ${data?.message || data?.error || `HTTP ${response.status}`}`);
+            }
+            if (!raw.trim()) throw createResearchWebSearchError('[Paxsenix] Web search returned an empty response.');
+            return raw;
+        } catch (error) {
+            if (error?.code === 'RESEARCH_WEB_SEARCH_FAILED') throw error;
+            throw createResearchWebSearchError(`[Paxsenix] Web search failed: ${error?.message || 'Unknown error'}`, error);
         }
-        if (!raw.trim()) throw new Error('[Paxsenix] Web search returned an empty response.');
-        return raw;
     }
 
     // ============================================
@@ -758,8 +793,8 @@
 
             function AdvancedParamsSection() {
                 const [expanded, setExpanded] = useState(getSetting('adv-expanded', false));
-                const [maxTokensEnabled, setMaxTokensEnabled] = useState(getSetting('adv-maxTokens-enabled', false));
-                const [maxTokensValue, setMaxTokensValue] = useState(getSetting('adv-maxTokens-value', 4000));
+                const [maxTokensEnabled, setMaxTokensEnabled] = useState(getSetting('adv-maxTokens-enabled', true));
+                const [maxTokensValue, setMaxTokensValue] = useState(getSetting('adv-maxTokens-value', DEFAULT_MAX_TOKENS));
                 const [temperatureEnabled, setTemperatureEnabled] = useState(getSetting('adv-temperature-enabled', false));
                 const [temperatureValue, setTemperatureValue] = useState(getSetting('adv-temperature-value', 0.3));
 
@@ -781,7 +816,7 @@
                         React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
                             React.createElement('input', { type: 'checkbox', checked: maxTokensEnabled, onChange: (e) => { setMaxTokensEnabled(e.target.checked); setSetting('adv-maxTokens-enabled', e.target.checked); } }),
                             React.createElement('span', { style: { fontSize: '12px', minWidth: '110px' } }, 'Max Tokens'),
-                            React.createElement('input', { type: 'number', value: maxTokensValue, disabled: !maxTokensEnabled, style: { width: '80px', fontSize: '12px' }, onChange: (e) => { const v = parseInt(e.target.value) || 4000; setMaxTokensValue(v); setSetting('adv-maxTokens-value', v); } })
+                            React.createElement('input', { type: 'number', value: maxTokensValue, disabled: !maxTokensEnabled, style: { width: '80px', fontSize: '12px' }, onChange: (e) => { const v = parseInt(e.target.value) || DEFAULT_MAX_TOKENS; setMaxTokensValue(v); setSetting('adv-maxTokens-value', v); } })
                         ),
                         React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
                             React.createElement('input', { type: 'checkbox', checked: temperatureEnabled, onChange: (e) => { setTemperatureEnabled(e.target.checked); setSetting('adv-temperature-enabled', e.target.checked); } }),
@@ -884,7 +919,7 @@
                 extractJSON,
                 requestTimeoutMs,
                 progressParser ? chunk => progressParser.push(chunk) : null,
-                {}
+                await getResearchRequestOverrides()
             );
         },
 

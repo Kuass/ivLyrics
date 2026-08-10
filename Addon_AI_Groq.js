@@ -38,6 +38,13 @@
     };
 
     const BASE_URL = 'https://api.groq.com/openai/v1';
+    const DEFAULT_RESEARCH_MAX_TOKENS = 16_000;
+    const groqModelCapabilities = new Map();
+
+    const asPositiveInteger = (value) => {
+        const parsed = Number.parseInt(value, 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    };
 
     /**
      * Groq API에서 사용 가능한 모델 목록을 가져옴
@@ -64,7 +71,8 @@
                 .map(m => ({
                     id: m.id,
                     name: m.id,
-                    context_length: m.context_window
+                    context_length: asPositiveInteger(m.context_window),
+                    max_completion_tokens: asPositiveInteger(m.max_completion_tokens)
                 }))
                 .sort((a, b) => {
                     // 인기 모델 우선
@@ -79,6 +87,9 @@
 
             if (models.length > 0) {
                 models[0].default = true;
+            }
+            for (const model of models) {
+                groqModelCapabilities.set(model.id, model);
             }
 
             return models;
@@ -155,6 +166,19 @@
             params.temperature = parseFloat(getSetting('adv-temperature-value', 0.3)) || 0.3;
         }
         return params;
+    }
+
+    async function getResearchMaxCompletionTokens() {
+        const selectedModel = getSelectedModel();
+        let capabilities = groqModelCapabilities.get(selectedModel);
+        if (!capabilities) {
+            const models = await fetchAvailableModels(getApiKeys()[0]);
+            capabilities = models.find(model => model.id === selectedModel);
+        }
+
+        return asPositiveInteger(capabilities?.max_completion_tokens)
+            || asPositiveInteger(getAdvancedRequestParams().max_tokens)
+            || DEFAULT_RESEARCH_MAX_TOKENS;
     }
 
     function normalizePromptRequest(prompt) {
@@ -871,6 +895,18 @@
                     onResearchProgress(null, { ...details, reset: true });
                 }
                 : null;
+            const requestBody = {
+                // Prefer Groq's current parameter name for Research and remove
+                // the deprecated max_tokens value supplied by advanced settings.
+                max_tokens: undefined,
+                max_completion_tokens: await getResearchMaxCompletionTokens(),
+                ...(/^groq\/compound(?:-mini)?$/i.test(getSelectedModel() || '')
+                    // Groq documents tool allow-listing, but not an empty
+                    // list. Keep only the non-web tool so this final model
+                    // pass cannot start another search.
+                    ? { compound_custom: { tools: { enabled_tools: ['code_interpreter'] } } }
+                    : {})
+            };
             return await callGroqAPIStream(
                 prompt,
                 null,
@@ -881,12 +917,7 @@
                 progressParser ? chunk => progressParser.push(chunk) : null,
                 {
                     model: getSelectedModel(),
-                    body: /^groq\/compound(?:-mini)?$/i.test(getSelectedModel() || '')
-                        // Groq documents tool allow-listing, but not an empty
-                        // list. Keep only the non-web tool so this final model
-                        // pass cannot start another search.
-                        ? { compound_custom: { tools: { enabled_tools: ['code_interpreter'] } } }
-                        : {}
+                    body: requestBody
                 }
             );
         },

@@ -38,6 +38,13 @@
     };
 
     const BASE_URL = 'https://openrouter.ai/api/v1';
+    const DEFAULT_RESEARCH_MAX_TOKENS = 16_000;
+    const openRouterModelCapabilities = new Map();
+
+    const asPositiveInteger = (value) => {
+        const parsed = Number.parseInt(value, 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    };
 
     /**
      * OpenRouter API에서 사용 가능한 모델 목록을 가져옴
@@ -64,7 +71,10 @@
                 .map(m => ({
                     id: m.id,
                     name: m.name || m.id,
-                    context_length: m.context_length
+                    context_length: asPositiveInteger(m.context_length),
+                    max_completion_tokens: asPositiveInteger(
+                        m.top_provider?.max_completion_tokens ?? m.max_completion_tokens
+                    )
                 }))
                 .sort((a, b) => {
                     // 인기 모델 우선
@@ -79,6 +89,9 @@
 
             if (models.length > 0) {
                 models[0].default = true;
+            }
+            for (const model of models) {
+                openRouterModelCapabilities.set(model.id, model);
             }
 
             return models;
@@ -155,6 +168,19 @@
             params.temperature = parseFloat(getSetting('adv-temperature-value', 0.3)) || 0.3;
         }
         return params;
+    }
+
+    async function getResearchMaxTokens() {
+        const selectedModel = getSelectedModel();
+        let capabilities = openRouterModelCapabilities.get(selectedModel);
+        if (!capabilities) {
+            const models = await fetchAvailableModels(getApiKeys()[0]);
+            capabilities = models.find(model => model.id === selectedModel);
+        }
+
+        return asPositiveInteger(capabilities?.max_completion_tokens)
+            || asPositiveInteger(getAdvancedRequestParams().max_tokens)
+            || DEFAULT_RESEARCH_MAX_TOKENS;
     }
 
     function normalizePromptRequest(prompt) {
@@ -857,15 +883,9 @@
                     onResearchProgress(null, { ...details, reset: true });
                 }
                 : null;
-            return await callOpenRouterAPIStream(
-                prompt,
-                null,
-                resetProgress,
-                1,
-                extractJSON,
-                requestTimeoutMs,
-                progressParser ? chunk => progressParser.push(chunk) : null,
-                webSearch === false
+            const requestOverrides = {
+                max_tokens: await getResearchMaxTokens(),
+                ...(webSearch === false
                     ? { tools: [], plugins: [{ id: 'web', enabled: false }] }
                     : {
                         tools: [{
@@ -877,7 +897,17 @@
                             }
                         }],
                         tool_choice: 'required'
-                    }
+                    })
+            };
+            return await callOpenRouterAPIStream(
+                prompt,
+                null,
+                resetProgress,
+                1,
+                extractJSON,
+                requestTimeoutMs,
+                progressParser ? chunk => progressParser.push(chunk) : null,
+                requestOverrides
             );
         },
 
