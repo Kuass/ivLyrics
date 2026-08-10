@@ -14833,8 +14833,28 @@ html.is-lp-view-exit::view-transition-new(root) {
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
+  padding: 7px 11px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0);
   pointer-events: auto;
   row-gap: 4px;
+  transition: background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.lyrics-credit-footer {
+  transition: opacity 0.18s ease;
+}
+
+.lyrics-credit-footer:hover,
+.lyrics-credit-footer:focus-within {
+  opacity: 1 !important;
+}
+
+.lyrics-credit-footer-content:hover,
+.lyrics-credit-footer-content:focus-within {
+  background: rgba(0, 0, 0, 0.68);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
 }
 
 .lyrics-credit-footer-group {
