@@ -15193,37 +15193,72 @@ const ConfigModal = ({
 }
 
 /* The preview mirrors the real lyric line metrics and stays visible while typography is tuned. */
+#${APP_NAME}-config-container .settings-live-preview-spacer {
+    height: 30px;
+    pointer-events: none;
+}
+
 #${APP_NAME}-config-container .settings-live-preview-sticky {
     position: sticky;
-    top: 0;
+    top: calc(-1 * var(--settings-content-top-padding, 46px));
     z-index: 18;
-    margin: 30px 0 0;
-    padding: 12px 0 14px;
-    border-bottom: 1px solid var(--settings-divider);
-    background: rgba(var(--spice-rgb-main, 18, 18, 18), 0.98);
+    margin: 0 -12px;
+    padding: 10px 12px 12px;
+    border-bottom: 0.5px solid var(--settings-border);
+    background: var(--settings-page);
     isolation: isolate;
 }
 
 #${APP_NAME}-config-container[data-ui-theme="light"] .settings-live-preview-sticky {
-    background: rgba(246, 248, 251, 0.98);
+    background: var(--settings-page);
 }
 
 #${APP_NAME}-config-container .settings-live-preview-sticky > .section-title {
-    margin: 0 2px 9px !important;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-height: 52px;
+    margin: 0 !important;
+    padding: 11px 14px 9px !important;
+    border: 0.5px solid var(--settings-section-outline) !important;
+    border-bottom: 0 !important;
+    border-radius: 9px 9px 0 0 !important;
+    background: var(--settings-surface-1) !important;
+}
+
+#${APP_NAME}-config-container .settings-live-preview-sticky > .section-title::before {
+    content: "";
+    position: static;
+    display: block !important;
+    flex: 0 0 7px;
+    width: 7px;
+    height: 7px;
+    margin-top: 5px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+}
+
+#${APP_NAME}-config-container .settings-live-preview-sticky > .section-title .section-title-content {
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 #${APP_NAME}-config-container .settings-live-preview-sticky .font-preview-container {
     margin: 0;
     overflow: hidden;
+    border: 0.5px solid var(--settings-section-outline) !important;
+    border-top: 0.5px solid var(--settings-divider) !important;
+    border-radius: 0 0 9px 9px !important;
+    background: var(--settings-muted-surface) !important;
 }
 
 #${APP_NAME}-config-container .settings-live-preview-sticky .font-preview {
     --lyrics-color-active: #f5f7fa;
     --lyrics-color-inactive: rgba(245, 247, 250, 0.44);
-    min-height: 150px;
-    padding: 24px 22px 20px !important;
-    border-radius: 12px !important;
-    background: #121416 !important;
+    min-height: 142px;
+    padding: 22px 20px 18px !important;
+    border-radius: 0 0 8px 8px !important;
+    background: #101214 !important;
     color: #f5f7fa;
     overflow: visible;
 }
@@ -15287,9 +15322,13 @@ const ConfigModal = ({
 }
 
 @media (max-width: 800px) {
+    #${APP_NAME}-config-container .settings-live-preview-spacer {
+        height: 24px;
+    }
+
     #${APP_NAME}-config-container .settings-live-preview-sticky {
-        top: 0;
-        margin-top: 24px;
+        margin-inline: -8px;
+        padding: 8px 8px 10px;
     }
 
     #${APP_NAME}-config-container .opendb-cache-refresh-btn {
@@ -16098,6 +16137,7 @@ const ConfigModal = ({
 }
 
 #${APP_NAME}-config-container .settings-content {
+    --settings-content-top-padding: 46px;
     width: 100%;
     max-width: 1120px;
     margin: 0;
@@ -16578,6 +16618,7 @@ const ConfigModal = ({
     }
 
     #${APP_NAME}-config-container .settings-content {
+        --settings-content-top-padding: 30px;
         max-width: none;
         padding: 30px 28px 48px !important;
     }
@@ -16635,6 +16676,7 @@ const ConfigModal = ({
     }
 
     #${APP_NAME}-config-container .settings-content {
+        --settings-content-top-padding: 26px;
         padding: 26px 18px 40px !important;
     }
 
@@ -17050,6 +17092,10 @@ const ConfigModal = ({
               })
             );
           },
+        }),
+        react.createElement("div", {
+          className: "settings-live-preview-spacer",
+          "aria-hidden": "true",
         }),
         react.createElement(
           "div",
