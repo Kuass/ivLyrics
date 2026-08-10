@@ -18487,6 +18487,15 @@ html.is-lp-view-exit::view-transition-new(root) {
 }
 
 .research-state-view > small { margin-top: 7px; color: var(--research-faint); }
+
+.research-state-view > .research-error-detail {
+  max-width: min(560px, 86%);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: calc(10.5px * var(--research-scale, 1));
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .research-state-actions { margin-top: 22px; }
 
 .research-action {

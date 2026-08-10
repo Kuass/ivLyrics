@@ -234,7 +234,12 @@
         return typeof content === 'string' ? content : '';
     }
 
-    async function callPaxsenixAPIRaw(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
+    async function callPaxsenixAPIRaw(
+        prompt,
+        maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3,
+        transformResult = null,
+        requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000
+    ) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[Paxsenix] API key is required. Please configure your API key in settings.');
@@ -259,7 +264,7 @@
                             messages: buildPromptMessages(prompt),
                             ...getAdvancedRequestParams()
                         })
-                    });
+                    }, requestTimeoutMs);
 
                     if (response.status === 429 || response.status === 403) {
                         lastError = await createPaxsenixAPIError(response);
@@ -456,8 +461,12 @@
         throw lastError || new Error('[Paxsenix] All API keys and retries exhausted');
     }
 
-    async function callPaxsenixAPI(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3) {
-        const rawText = await callPaxsenixAPIRaw(prompt, maxRetries);
+    async function callPaxsenixAPI(
+        prompt,
+        maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3,
+        requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000
+    ) {
+        const rawText = await callPaxsenixAPIRaw(prompt, maxRetries, null, requestTimeoutMs);
         return extractJSON(rawText);
     }
 
@@ -795,7 +804,7 @@
             };
         },
 
-        async generateTMI({ title, artist, tmiPrompt }) {
+        async generateTMI({ title, artist, tmiPrompt, requestTimeoutMs }) {
             if (!title || !artist) {
                 throw new Error('Title and artist are required');
             }
@@ -804,7 +813,10 @@
             if (!prompt) {
                 throw new Error('[paxsenix] Central TMI prompt is unavailable.');
             }
-            return await callPaxsenixAPI(prompt);
+            // Research responses are much longer than translations. Use one
+            // extended request instead of exhausting the operation window on
+            // repeated 90-second request timeouts.
+            return await callPaxsenixAPI(prompt, 1, requestTimeoutMs);
         },
 
         async generateLyricsStudy(params) {

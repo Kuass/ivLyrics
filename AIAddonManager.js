@@ -81,7 +81,8 @@
     const MAX_PROVIDER_RETRY_COUNT = 5;
     const PROVIDER_RETRY_COUNT_STORAGE_KEY = `${STORAGE_PREFIX}provider-retry-count`;
     const PROVIDER_OPERATION_TIMEOUT_MS = 95_000;
-    const PROVIDER_RESEARCH_TIMEOUT_MS = 180_000;
+    const PROVIDER_RESEARCH_TIMEOUT_MS = 600_000;
+    const PROVIDER_RESEARCH_REQUEST_TIMEOUT_MS = 480_000;
     const RESEARCH_OUTPUT_VERSION = '5.0';
     const RESEARCH_CACHE_VERSION = 'research-v5';
     const RESEARCH_MAX_LYRIC_CHARS = 16_000;
@@ -2647,6 +2648,7 @@ ${normalizedText}
                     const result = await this._callProvider(addon, method, {
                         ...params,
                         researchPrompt,
+                        requestTimeoutMs: PROVIDER_RESEARCH_REQUEST_TIMEOUT_MS,
                         // Existing provider addons consume this property.
                         tmiPrompt: researchPrompt
                     });
@@ -2680,7 +2682,7 @@ ${normalizedText}
 
             const errorMsg = lastError?.message || this._t('aiProviders.allProvidersFailed', 'All AI providers failed to process the request.');
             this.emit('ai:request:error', { type: 'research', error: errorMsg });
-            return null;
+            throw new Error(errorMsg);
         }
 
         // Public compatibility alias for integrations using the former name.

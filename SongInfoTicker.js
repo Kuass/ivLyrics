@@ -578,6 +578,7 @@ const SongResearch = (() => {
                 react.createElement("span", { className: "research-eyebrow" }, t("research.title", "Research")),
                 react.createElement("h2", null, t("research.errorTitle", "Research could not be completed")),
                 react.createElement("p", null, isQuotaError ? t("research.errorQuota", "API quota exceeded") : t("research.errorFetch", "An error occurred while creating the research document")),
+                info.message && react.createElement("small", { className: "research-error-detail" }, info.message),
                 isQuotaError && react.createElement("small", null, t("research.errorQuotaHint", "Try again later or choose another AI provider in settings")),
                 react.createElement("div", { className: "research-state-actions" },
                     onRegenerate && react.createElement("button", { type: "button", className: "research-action research-action-primary", onClick: onRegenerate }, react.createElement(Icon, { name: "refresh" }), t("research.regenerate", "Research again")),

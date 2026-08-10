@@ -6,6 +6,7 @@ const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '..');
 const managerSource = fs.readFileSync(path.join(root, 'AIAddonManager.js'), 'utf8');
+const paxsenixSource = fs.readFileSync(path.join(root, 'Addon_AI_Paxsenix.js'), 'utf8');
 const serviceSource = fs.readFileSync(path.join(root, 'LyricsService.js'), 'utf8');
 const readerSource = fs.readFileSync(path.join(root, 'SongInfoTicker.js'), 'utf8');
 const fullscreenSource = fs.readFileSync(path.join(root, 'FullscreenOverlay.js'), 'utf8');
@@ -149,9 +150,16 @@ test('Research is wired through provider fallback, versioned cache, lyrics snaps
   assert.doesNotMatch(managerSource, /window\.ivLyricsResearch/);
   assert.match(managerSource, /normalizeResearchResult\(raw, context = \{\}\)/);
   assert.match(managerSource, /async generateResearch\(params\)/);
-  assert.match(managerSource, /PROVIDER_RESEARCH_TIMEOUT_MS = 180_000/);
+  assert.match(managerSource, /PROVIDER_RESEARCH_TIMEOUT_MS = 600_000/);
+  assert.match(managerSource, /PROVIDER_RESEARCH_REQUEST_TIMEOUT_MS = 480_000/);
+  assert.match(managerSource, /requestTimeoutMs: PROVIDER_RESEARCH_REQUEST_TIMEOUT_MS/);
+  assert.match(paxsenixSource, /}, requestTimeoutMs\);/);
+  assert.match(paxsenixSource, /callPaxsenixAPI\(prompt, 1, requestTimeoutMs\)/);
+  assert.match(managerSource, /throw new Error\(errorMsg\);/);
+  assert.match(serviceSource, /getResearch failed:[\s\S]*throw e;/);
+  assert.match(readerSource, /research-error-detail/);
   assert.match(managerSource, /getEnabledProvidersFor\('research'\)/);
-  assert.match(managerSource, /researchPrompt,\s*\/\/ Existing provider addons consume this property\.\s*tmiPrompt: researchPrompt/);
+  assert.match(managerSource, /researchPrompt,[\s\S]*tmiPrompt: researchPrompt/);
   assert.match(serviceSource, /const cacheLang = `\$\{userLang\}:\$\{schema\}`/);
   assert.match(serviceSource, /window\.AIAddonManager\.generateResearch/);
   assert.match(readerSource, /snapshot\?\.displayLyrics/);
@@ -160,6 +168,7 @@ test('Research is wired through provider fallback, versioned cache, lyrics snaps
   assert.match(readerSource, /rel: "noopener noreferrer"/);
   assert.match(fullscreenSource, /getEnabledProvidersFor\('research'\)/);
   assert.match(styleSource, /\.research-view/);
+  assert.match(styleSource, /\.research-error-detail/);
   assert.match(styleSource, /\.research-nav button:focus-visible/);
   assert.match(styleSource, /@media \(prefers-reduced-motion: reduce\)/);
 });

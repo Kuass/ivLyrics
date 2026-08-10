@@ -7995,6 +7995,7 @@
                 }
             } catch (e) {
                 console.warn('[LyricsService] getResearch failed:', e);
+                throw e;
             }
             return null;
         },
