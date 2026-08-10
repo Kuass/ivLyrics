@@ -288,7 +288,7 @@
     const LRCLIB_ARTIST_MATCH_THRESHOLD = 0.9;
     const LRCLIB_FALLBACK_TITLE_MATCH_THRESHOLD = 0.98;
     const LRCLIB_ENABLE_INEXACT_SEARCH = true;
-    const LRCLIB_CACHE_VERSION_BASE = '2026-07-31-lyricsfile-karaoke-1';
+    const LRCLIB_CACHE_VERSION_BASE = '2026-08-11-sync-source-identity-1';
     const LRCLIB_ENGLISH_ACCEPT_LANGUAGE = 'en-US,en;q=0.9';
     const LRCLIB_LYRICSFILE_VERSION = '1.0';
     const LRCLIB_LYRICSFILE_MAX_LENGTH = 2 * 1024 * 1024;
@@ -1609,6 +1609,10 @@
 
     function applyCandidateLyricsToResult(result, candidate) {
         if (!result || !candidate) return false;
+
+        if (candidate.id !== undefined && candidate.id !== null && String(candidate.id).trim()) {
+            result.lrclibId = String(candidate.id).trim();
+        }
 
         if (candidate.instrumental) {
             result.synced = [{ startTime: 0, text: '♪ Instrumental ♪' }];
@@ -3149,6 +3153,10 @@
                         selectedSource
                     });
                     return result;
+                }
+
+                if (body.id !== undefined && body.id !== null && String(body.id).trim()) {
+                    result.lrclibId = String(body.id).trim();
                 }
 
                 if (body.instrumental) {

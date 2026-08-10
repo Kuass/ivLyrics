@@ -14,3 +14,4 @@ __pycache__/
 !tests/bing-translate-provider.test.cjs
 !tests/i18n-integrity.test.cjs
 !tests/sync-creator-split-timing.test.cjs
+!tests/sync-data-lrclib-compatibility.test.cjs

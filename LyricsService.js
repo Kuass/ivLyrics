@@ -185,8 +185,34 @@
         });
     })();
 
+    const SyncDataSourceCompatibility = (() => {
+        const normalizeProvider = (value) => String(value || '').trim().toLowerCase();
+        const normalizeLrclibId = (value) => (
+            value === undefined || value === null ? '' : String(value).trim()
+        );
+
+        const canApplyLrclibFingerprintFallback = ({
+            syncSource,
+            currentProvider,
+            currentLrclibId,
+            hasExactLineShape
+        } = {}) => {
+            if (hasExactLineShape !== true) return false;
+            if (normalizeProvider(syncSource?.provider) !== 'lrclib') return false;
+            if (normalizeProvider(currentProvider) !== 'lrclib') return false;
+
+            const expectedId = normalizeLrclibId(syncSource?.lrclibId ?? syncSource?.id);
+            const actualId = normalizeLrclibId(currentLrclibId);
+            return !!expectedId && !!actualId && expectedId === actualId;
+        };
+
+        return Object.freeze({
+            canApplyLrclibFingerprintFallback
+        });
+    })();
+
     if (typeof module === "object" && module.exports && typeof window === "undefined") {
-        module.exports = { KaraokeWordTiming };
+        module.exports = { KaraokeWordTiming, SyncDataSourceCompatibility };
         return;
     }
 
@@ -4826,9 +4852,11 @@
             const baseLyricsText = baseLyricsLines.join('\n');
             let normalizedSyncLines = syncLines;
             let sourceLinePrefix = 0;
+            let hasExactSourceLineShape = false;
             const sourceLineCharCounts = hasNormalizedSourceLineShape ? syncSource.lineCharCounts : null;
             if (sourceLineCharCounts) {
                 const baseLineCharCounts = getSyncDataLineCharCounts(baseLyricsLines);
+                hasExactSourceLineShape = hasExactSyncDataLineShape(sourceLineCharCounts, baseLineCharCounts);
                 sourceLinePrefix = findSyncDataLineShapePrefix(sourceLineCharCounts, baseLineCharCounts);
                 if (sourceLinePrefix < 0) {
                     window.__ivLyricsDebugLog?.('[SyncDataService] Sync-data source line shape mismatch; skipping karaoke render', {
@@ -4857,14 +4885,34 @@
             if (sourceLinePrefix === 0 && syncSource?.lyricsFingerprint) {
                 const baseLyricsFingerprint = getSyncDataLyricsFingerprint(baseLyricsText);
                 if (syncSource.lyricsFingerprint !== baseLyricsFingerprint) {
-                    window.__ivLyricsDebugLog?.('[SyncDataService] Sync-data source fingerprint mismatch; skipping karaoke render', {
-                        expected: syncSource.lyricsFingerprint,
-                        actual: baseLyricsFingerprint,
-                        provider: syncData.provider,
-                        sourceProvider: syncSource?.provider,
-                        lrclibId: syncSource?.lrclibId
-                    });
-                    return null;
+                    const currentLrclibId = options?.currentLrclibId
+                        ?? options?.result?.lrclibId
+                        ?? null;
+                    const canApplyLrclibFingerprintFallback = SyncDataSourceCompatibility
+                        .canApplyLrclibFingerprintFallback({
+                            syncSource,
+                            currentProvider: options?.result?.provider ?? options?.provider,
+                            currentLrclibId,
+                            hasExactLineShape: hasExactSourceLineShape
+                        });
+                    if (canApplyLrclibFingerprintFallback) {
+                        window.__ivLyricsDebugLog?.('[SyncDataService] LRCLIB lyrics fingerprint changed with the same source ID and exact line shape; applying sync-data compatibility fallback', {
+                            expected: syncSource.lyricsFingerprint,
+                            actual: baseLyricsFingerprint,
+                            provider: syncData.provider,
+                            sourceProvider: syncSource?.provider,
+                            lrclibId: syncSource?.lrclibId
+                        });
+                    } else {
+                        window.__ivLyricsDebugLog?.('[SyncDataService] Sync-data source fingerprint mismatch; skipping karaoke render', {
+                            expected: syncSource.lyricsFingerprint,
+                            actual: baseLyricsFingerprint,
+                            provider: syncData.provider,
+                            sourceProvider: syncSource?.provider,
+                            lrclibId: syncSource?.lrclibId
+                        });
+                        return null;
+                    }
                 }
             }
             const durationAdjustment = getSyncDataDurationOffsetMs(syncData, syncBody, options);

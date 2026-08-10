@@ -1205,7 +1205,8 @@
                             const baseLyrics = resultHasSynced ? result.synced : result.unsynced;
                             const karaoke = window.SyncDataService.applySyncDataToLyrics(baseLyrics, syncData, {
                                 durationMs: info.durationMs || info.duration_ms || info.duration,
-                                trackInfo: info
+                                trackInfo: info,
+                                result
                             });
 
                             if (hasLyricsContent(karaoke)) {
