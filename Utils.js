@@ -3314,7 +3314,7 @@ const Utils = {
         tx.onerror = () => reject(tx.error);
       });
 
-      // 오래된 항목 정리 (30일 이상)
+      // 오래된 항목 정리 (1년 이상)
       this._cleanupOldSelectedVideos(db).catch(() => { });
 
       db.close();
@@ -3327,10 +3327,10 @@ const Utils = {
   },
 
   /**
-   * 오래된 선택 영상 정리 (30일 이상)
+   * 오래된 선택 영상 정리 (1년 이상)
    */
   async _cleanupOldSelectedVideos(db) {
-    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    const oneYearAgo = Date.now() - (365 * 24 * 60 * 60 * 1000);
     const tx = db.transaction('selectedVideos', 'readwrite');
     const store = tx.objectStore('selectedVideos');
 
@@ -3338,7 +3338,7 @@ const Utils = {
     request.onsuccess = (event) => {
       const cursor = event.target.result;
       if (cursor) {
-        if (cursor.value.savedAt && cursor.value.savedAt < thirtyDaysAgo) {
+        if (cursor.value.savedAt && cursor.value.savedAt < oneYearAgo) {
           cursor.delete();
         }
         cursor.continue();

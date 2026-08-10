@@ -1404,20 +1404,23 @@
     const LyricsCache = {
         DB_NAME: 'ivLyricsCache',
         DB_VERSION: 7,
+        MAX_TOTAL_BYTES: 10 * 1024 * 1024 * 1024,
 
         EXPIRY: {
-            lyrics: 7,
-            translation: 30,
-            phonetic: 30,
-            cultural: 30,
-            metadata: 30,
-            sync: 7,
-            youtube: 7,
-            tmi: 30
+            lyrics: 365,
+            translation: 365,
+            phonetic: 365,
+            cultural: 365,
+            metadata: 365,
+            sync: 365,
+            youtube: 365,
+            tmi: 365
         },
 
         _db: null,
         _dbPromise: null,
+        _sizeEnforcementTimer: null,
+        _persistentStorageRequested: false,
 
         async _openDB() {
             if (this._db) return this._db;
@@ -1434,6 +1437,7 @@
 
                 request.onsuccess = () => {
                     this._db = request.result;
+                    this._requestPersistentStorage();
                     resolve(this._db);
                 };
 
@@ -1483,9 +1487,98 @@
             return this._dbPromise;
         },
 
+        _requestPersistentStorage() {
+            if (this._persistentStorageRequested) return;
+            this._persistentStorageRequested = true;
+            const storage = globalThis.navigator?.storage;
+            if (typeof storage?.persist === 'function') {
+                Promise.resolve(storage.persist()).catch(() => false);
+            }
+        },
+
+        _withSize(record) {
+            const sized = { ...record, sizeBytes: 0 };
+            try {
+                const encoded = JSON.stringify(sized);
+                sized.sizeBytes = typeof TextEncoder === 'function'
+                    ? new TextEncoder().encode(encoded).byteLength
+                    : encoded.length * 2;
+            } catch {
+                sized.sizeBytes = 0;
+            }
+            return sized;
+        },
+
+        _scheduleSizeEnforcement() {
+            if (this._sizeEnforcementTimer) return;
+            this._sizeEnforcementTimer = setTimeout(() => {
+                this._sizeEnforcementTimer = null;
+                this._enforceSizeLimit().catch((error) => {
+                    console.error('[LyricsCache] size enforcement error:', error);
+                });
+            }, 1000);
+        },
+
+        async _enforceSizeLimit() {
+            const db = await this._openDB();
+            const stores = ['lyrics', 'translations', 'youtube', 'metadata', 'sync', 'tmi']
+                .filter((name) => db.objectStoreNames.contains(name));
+            const entries = [];
+
+            for (const storeName of stores) {
+                const tx = db.transaction(storeName, 'readonly');
+                const store = tx.objectStore(storeName);
+                await new Promise((resolve, reject) => {
+                    const request = store.openCursor();
+                    request.onsuccess = (event) => {
+                        const cursor = event.target.result;
+                        if (!cursor) {
+                            resolve();
+                            return;
+                        }
+                        const value = cursor.value;
+                        const sizeBytes = Number(value?.sizeBytes) > 0
+                            ? Number(value.sizeBytes)
+                            : this._withSize(value).sizeBytes;
+                        entries.push({
+                            storeName,
+                            key: cursor.primaryKey,
+                            cachedAt: Number(value?.cachedAt) || 0,
+                            sizeBytes
+                        });
+                        cursor.continue();
+                    };
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            let totalBytes = entries.reduce((sum, entry) => sum + entry.sizeBytes, 0);
+            if (totalBytes <= this.MAX_TOTAL_BYTES) return;
+
+            const removalsByStore = new Map();
+            for (const entry of entries.sort((a, b) => a.cachedAt - b.cachedAt)) {
+                if (totalBytes <= this.MAX_TOTAL_BYTES) break;
+                const keys = removalsByStore.get(entry.storeName) || [];
+                keys.push(entry.key);
+                removalsByStore.set(entry.storeName, keys);
+                totalBytes -= entry.sizeBytes;
+            }
+
+            for (const [storeName, keys] of removalsByStore) {
+                const tx = db.transaction(storeName, 'readwrite');
+                const store = tx.objectStore(storeName);
+                keys.forEach((key) => store.delete(key));
+                await new Promise((resolve, reject) => {
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                    tx.onabort = () => reject(tx.error);
+                });
+            }
+        },
+
         _isExpired(cachedAt, type) {
             if (!cachedAt) return true;
-            const expiryDays = this.EXPIRY[type] || 7;
+            const expiryDays = this.EXPIRY[type] || 365;
             const expiryMs = expiryDays * 24 * 60 * 60 * 1000;
             return Date.now() - cachedAt > expiryMs;
         },
@@ -1525,19 +1618,20 @@
                 const store = tx.objectStore('lyrics');
                 const cacheKey = this._getLyricsKey(trackId, provider);
 
-                store.put({
+                store.put(this._withSize({
                     cacheKey,
                     trackId,
                     provider,
                     data: redactLyricsCacheDataForPersistence(data),
                     cachedAt: Date.now()
-                });
+                }));
 
                 await new Promise((resolve, reject) => {
                     tx.oncomplete = () => resolve();
                     tx.onerror = () => reject(tx.error);
                 });
 
+                this._scheduleSizeEnforcement();
                 return true;
             } catch (error) {
                 console.error('[LyricsCache] setLyrics error:', error);
@@ -1589,7 +1683,7 @@
                 const store = tx.objectStore('translations');
                 const cacheKey = this._getTranslationKey(trackId, lang, isPhonetic, provider, sourceHash);
 
-                store.put({
+                store.put(this._withSize({
                     cacheKey,
                     trackId,
                     lang,
@@ -1598,13 +1692,14 @@
                     sourceHash,
                     data,
                     cachedAt: Date.now()
-                });
+                }));
 
                 await new Promise((resolve, reject) => {
                     tx.oncomplete = () => resolve();
                     tx.onerror = () => reject(tx.error);
                 });
 
+                this._scheduleSizeEnforcement();
                 return true;
             } catch (error) {
                 console.error('[LyricsCache] setTranslation error:', error);
@@ -1656,7 +1751,7 @@
                     provider,
                     sourceHash
                 );
-                store.put({
+                store.put(this._withSize({
                     cacheKey,
                     trackId,
                     lang: targetLang,
@@ -1666,12 +1761,13 @@
                     type: 'cultural',
                     data,
                     cachedAt: Date.now()
-                });
+                }));
 
                 await new Promise((resolve, reject) => {
                     tx.oncomplete = () => resolve();
                     tx.onerror = () => reject(tx.error);
                 });
+                this._scheduleSizeEnforcement();
                 return true;
             } catch (error) {
                 console.error('[LyricsCache] setCulturalAnnotations error:', error);
@@ -1746,19 +1842,20 @@
                 const store = tx.objectStore('metadata');
                 const cacheKey = `${trackId}:${lang}`;
 
-                store.put({
+                store.put(this._withSize({
                     cacheKey,
                     trackId,
                     lang,
                     data,
                     cachedAt: Date.now()
-                });
+                }));
 
                 await new Promise((resolve, reject) => {
                     tx.oncomplete = () => resolve();
                     tx.onerror = () => reject(tx.error);
                 });
 
+                this._scheduleSizeEnforcement();
                 return true;
             } catch (error) {
                 console.error('[LyricsCache] setMetadata error:', error);
@@ -1795,17 +1892,18 @@
                 const tx = db.transaction('youtube', 'readwrite');
                 const store = tx.objectStore('youtube');
 
-                store.put({
+                store.put(this._withSize({
                     trackId,
                     data,
                     cachedAt: Date.now()
-                });
+                }));
 
                 await new Promise((resolve, reject) => {
                     tx.oncomplete = () => resolve();
                     tx.onerror = () => reject(tx.error);
                 });
 
+                this._scheduleSizeEnforcement();
                 return true;
             } catch (error) {
                 console.error('[LyricsCache] setYouTube error:', error);
@@ -1852,17 +1950,18 @@
                 const tx = db.transaction('sync', 'readwrite');
                 const store = tx.objectStore('sync');
 
-                store.put({
+                store.put(this._withSize({
                     trackId,
                     data,
                     cachedAt: Date.now()
-                });
+                }));
 
                 await new Promise((resolve, reject) => {
                     tx.oncomplete = () => resolve();
                     tx.onerror = () => reject(tx.error);
                 });
 
+                this._scheduleSizeEnforcement();
                 return true;
             } catch (error) {
                 console.error('[LyricsCache] setSync error:', error);
@@ -1936,19 +2035,20 @@
                 const store = tx.objectStore('tmi');
                 const cacheKey = `${trackId}:${lang}`;
 
-                store.put({
+                store.put(this._withSize({
                     cacheKey,
                     trackId,
                     lang,
                     data,
                     cachedAt: Date.now()
-                });
+                }));
 
                 await new Promise((resolve, reject) => {
                     tx.oncomplete = () => resolve();
                     tx.onerror = () => reject(tx.error);
                 });
 
+                this._scheduleSizeEnforcement();
                 return true;
             } catch (error) {
                 console.error('[LyricsCache] setTMI error:', error);
@@ -1969,22 +2069,31 @@
                     const tx = db.transaction(storeName, 'readwrite');
                     const store = tx.objectStore(storeName);
 
-                    const request = store.openCursor();
-                    request.onsuccess = (event) => {
-                        const cursor = event.target.result;
-                        if (cursor) {
-                            const type = storeName === 'translations'
-                                ? (cursor.value.isPhonetic ? 'phonetic' : 'translation')
-                                : storeName;
+                    await new Promise((resolve, reject) => {
+                        const request = store.openCursor();
+                        request.onsuccess = (event) => {
+                            const cursor = event.target.result;
+                            if (cursor) {
+                                const type = storeName === 'translations'
+                                    ? (cursor.value.type === 'cultural'
+                                        ? 'cultural'
+                                        : (cursor.value.isPhonetic ? 'phonetic' : 'translation'))
+                                    : storeName;
 
-                            if (this._isExpired(cursor.value.cachedAt, type)) {
-                                cursor.delete();
+                                if (this._isExpired(cursor.value.cachedAt, type)) {
+                                    cursor.delete();
+                                }
+                                cursor.continue();
                             }
-                            cursor.continue();
-                        }
-                    };
+                        };
+                        request.onerror = () => reject(request.error);
+                        tx.oncomplete = resolve;
+                        tx.onerror = () => reject(tx.error);
+                        tx.onabort = () => reject(tx.error);
+                    });
                 }
 
+                await this._enforceSizeLimit();
                 serviceDebug('[LyricsCache] Cleanup completed');
             } catch (error) {
                 console.error('[LyricsCache] cleanup error:', error);
