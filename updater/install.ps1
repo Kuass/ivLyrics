@@ -176,6 +176,11 @@ function Get-CurrentVersion {
     return $null
 }
 
+function Get-NormalizedVersion {
+    param([AllowNull()][string]$Version)
+    return (($Version -replace '\s', '') -replace '^[vV]', '')
+}
+
 function Test-SpicetifyInstalled {
     try {
         $null = Get-Command spicetify -ErrorAction Stop
@@ -710,9 +715,16 @@ catch {
 }
 
 # Check if already up to date
-if ($IsUpdate -and $CurrentVersion -eq $VERSION_TAG -and -not $Force) {
+$currentVersionNormalized = Get-NormalizedVersion -Version $CurrentVersion
+$latestVersionNormalized = Get-NormalizedVersion -Version $VERSION_TAG
+if ([string]::IsNullOrWhiteSpace($latestVersionNormalized)) {
+    Write-SubStep "Latest version is invalid" "error"
+    exit 1
+}
+
+if ($IsUpdate -and $currentVersionNormalized -eq $latestVersionNormalized -and -not $Force) {
     Write-Host ""
-    Write-Colored "  Already up to date! (v$VERSION_TAG)" $Colors.Success
+    Write-Colored "  Already up to date! (v$latestVersionNormalized)" $Colors.Success
     Write-Colored "  Use -Force to reinstall anyway." $Colors.Muted
     Write-Host ""
     Write-SubStep "Checking updater protocol..." "info"

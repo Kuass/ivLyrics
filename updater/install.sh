@@ -180,6 +180,10 @@ get_current_version() {
     fi
 }
 
+normalize_version() {
+    printf '%s' "$1" | tr -d '[:space:]' | sed 's/^[vV]//'
+}
+
 check_network() {
     if curl --fail --silent --show-error --proto '=https' --tlsv1.2 --connect-timeout 5 "https://api.github.com" > /dev/null 2>&1; then
         return 0
@@ -417,9 +421,16 @@ else
 fi
 
 # Check if already up to date
-if [ "$IS_UPDATE" = true ] && [ "$CURRENT_VERSION" = "$VERSION_TAG" ] && [ "$FORCE_INSTALL" = false ]; then
+CURRENT_VERSION_NORMALIZED=$(normalize_version "$CURRENT_VERSION")
+LATEST_VERSION_NORMALIZED=$(normalize_version "$VERSION_TAG")
+if [ -z "$LATEST_VERSION_NORMALIZED" ]; then
+    print_substep "Latest version is invalid" "error"
+    exit 1
+fi
+
+if [ "$IS_UPDATE" = true ] && [ "$CURRENT_VERSION_NORMALIZED" = "$LATEST_VERSION_NORMALIZED" ] && [ "$FORCE_INSTALL" = false ]; then
     echo ""
-    echo -e "  ${GREEN}Already up to date! (v$VERSION_TAG)${NC}"
+    echo -e "  ${GREEN}Already up to date! (v$LATEST_VERSION_NORMALIZED)${NC}"
     echo -e "  ${GRAY}Use --force to reinstall anyway.${NC}"
     echo ""
     print_substep "Checking updater protocol..." "info"
