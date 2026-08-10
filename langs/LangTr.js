@@ -2283,6 +2283,7 @@ window.LANG_TR = {
     "cancel": "İptal",
     "loadingTitle": "Satır aralarını okumak",
     "loading": "Şarkı sözlerini, sesi, sanatçıyı ve kültürel bağlamı araştırmak",
+    "generating": "Oluşturuluyor…",
     "errorTitle": "Araştırma tamamlanamadı",
     "errorFetch": "Araştırma belgesi oluşturulurken bir hata oluştu",
     "errorQuota": "API kotası aşıldı",

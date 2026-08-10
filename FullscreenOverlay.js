@@ -1904,6 +1904,7 @@ const FullscreenOverlay = (() => {
         const hideTimerRef = useRef(null);
         const uiVisibleRef = useRef(true);
         const tmiOpeningRef = useRef(false);
+        const tmiRequestRef = useRef(0);
         const albumPressTimerRef = useRef(null);
         const albumPressStartRef = useRef(null);
         const suppressAlbumClickRef = useRef(false);
@@ -2154,6 +2155,35 @@ const FullscreenOverlay = (() => {
             }, 800);
         }, []);
 
+        const loadResearch = useCallback(async (trackId, regenerate = false) => {
+            if (!trackId) return null;
+
+            const requestId = ++tmiRequestRef.current;
+            setTmiData(null);
+            setTmiLoading(true);
+
+            try {
+                const data = await window.SongInfoTMI?.fetchSongInfo(trackId, regenerate, {
+                    onProgress: (partial, details = {}) => {
+                        if (requestId !== tmiRequestRef.current) return;
+                        if (!partial || details.reset) {
+                            setTmiData(null);
+                            return;
+                        }
+                        setTmiData(partial);
+                    }
+                });
+                if (requestId === tmiRequestRef.current) setTmiData(data);
+                return data;
+            } catch (error) {
+                console.error('[Research] Fetch error:', error);
+                if (requestId === tmiRequestRef.current) setTmiData(null);
+                return null;
+            } finally {
+                if (requestId === tmiRequestRef.current) setTmiLoading(false);
+            }
+        }, []);
+
         // Research is intentionally opened only through context click or a long press.
         const openTmiMode = useCallback(async () => {
             if (tmiMode || tmiOpeningRef.current) return;
@@ -2170,19 +2200,13 @@ const FullscreenOverlay = (() => {
 
             tmiOpeningRef.current = true;
             setTmiMode(true);
-            setTmiLoading(true);
 
             try {
-                const data = await window.SongInfoTMI?.fetchSongInfo(trackId);
-                setTmiData(data);
-            } catch (e) {
-                console.error('[TMI] Fetch error:', e);
-                setTmiData(null);
+                await loadResearch(trackId);
             } finally {
-                setTmiLoading(false);
                 tmiOpeningRef.current = false;
             }
-        }, [tmiMode, trackUri]);
+        }, [loadResearch, tmiMode, trackUri]);
 
         const handleAlbumModeClick = useCallback((event) => {
             event?.preventDefault?.();
@@ -2314,6 +2338,7 @@ const FullscreenOverlay = (() => {
         }, [handleAlbumContextMenu, handleAlbumModeClick]);
 
         useEffect(() => () => {
+            tmiRequestRef.current += 1;
             clearAlbumPressTimer();
             if (suppressAlbumClickTimerRef.current) {
                 window.clearTimeout(suppressAlbumClickTimerRef.current);
@@ -2335,22 +2360,15 @@ const FullscreenOverlay = (() => {
             const trackId = trackUri?.split(":")[2];
             if (!trackId) return;
 
-            setTmiLoading(true);
-            try {
-                // Pass true for regenerate
-                const data = await window.SongInfoTMI?.fetchSongInfo(trackId, true);
-                setTmiData(data);
-            } catch (e) {
-                console.error('[TMI] Regenerate error:', e);
-            } finally {
-                setTmiLoading(false);
-            }
-        }, [trackUri]);
+            await loadResearch(trackId, true);
+        }, [loadResearch, trackUri]);
 
         // Close TMI mode
         const closeTmiMode = useCallback(() => {
+            tmiRequestRef.current += 1;
             tmiOpeningRef.current = false;
             setTmiMode(false);
+            setTmiLoading(false);
         }, []);
 
         // Reset TMI mode when track changes
@@ -2358,17 +2376,14 @@ const FullscreenOverlay = (() => {
             if (tmiMode) {
                 const trackId = trackUri?.split(":")[2];
                 if (trackId) {
-                    setTmiLoading(true);
-                    setTmiData(null);
-                    window.SongInfoTMI?.fetchSongInfo(trackId).then(data => {
-                        setTmiData(data);
-                        setTmiLoading(false);
-                    }).catch(() => setTmiLoading(false));
+                    loadResearch(trackId);
                 }
             } else {
+                tmiRequestRef.current += 1;
                 setTmiData(null);
+                setTmiLoading(false);
             }
-        }, [trackUri]);
+        }, [loadResearch, trackUri]);
 
         const currentPlayerItem = Spicetify.Player.data?.item;
         const currentPlayerMetadata = currentPlayerItem?.metadata;
@@ -2607,13 +2622,14 @@ const FullscreenOverlay = (() => {
             (tvModeEnabled || isPortraitFullscreen) && tmiMode && react.createElement("div", {
                 className: "fullscreen-tv-tmi-overlay"
             },
-                tmiLoading ?
+                tmiLoading && !tmiData ?
                     react.createElement(window.SongInfoTMI?.TMILoadingView || 'div', {
                         onClose: closeTmiMode,
                         tmiScale: tmiScale
                     }) :
                     react.createElement(window.SongInfoTMI?.TMIFullView || 'div', {
                         info: tmiData,
+                        isGenerating: tmiLoading,
                         onClose: closeTmiMode,
                         tmiScale: tmiScale,
                         trackName: (() => {
@@ -3008,13 +3024,14 @@ const FullscreenOverlay = (() => {
             },
                 // TMI Mode View
                 tmiMode ? (
-                    tmiLoading ?
+                    tmiLoading && !tmiData ?
                         react.createElement(window.SongInfoTMI?.TMILoadingView || 'div', {
                             onClose: closeTmiMode,
                             tmiScale: tmiScale
                         }) :
                         react.createElement(window.SongInfoTMI?.TMIFullView || 'div', {
                             info: tmiData,
+                            isGenerating: tmiLoading,
                             onClose: closeTmiMode,
                             tmiScale: tmiScale,
                             trackName: (() => {

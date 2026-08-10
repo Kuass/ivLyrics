@@ -2283,6 +2283,7 @@ window.LANG_FR = {
     "cancel": "Annuler",
     "loadingTitle": "Lire entre les lignes",
     "loading": "Recherche des paroles, du son, de l'artiste et du contexte culturel",
+    "generating": "Génération en cours…",
     "errorTitle": "La recherche n'a pas pu être complétée",
     "errorFetch": "Une erreur s'est produite lors de la création du document de recherche",
     "errorQuota": "Quota d'API dépassé",

@@ -2282,6 +2282,7 @@ window.LANG_SV = {
     "cancel": "Avbryt",
     "loadingTitle": "Läser mellan raderna",
     "loading": "Undersöker texter, ljud, artist och kulturella sammanhang",
+    "generating": "Genererar…",
     "errorTitle": "Forskningen kunde inte slutföras",
     "errorFetch": "Ett fel uppstod när forskningsdokumentet skapades",
     "errorQuota": "API-kvoten har överskridits",

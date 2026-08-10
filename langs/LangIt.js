@@ -2283,6 +2283,7 @@ window.LANG_IT = {
     "cancel": "Annulla",
     "loadingTitle": "Leggere tra le righe",
     "loading": "Ricercare i testi, il suono, l'artista e il contesto culturale",
+    "generating": "Generazione in corso…",
     "errorTitle": "Non è stato possibile completare la ricerca",
     "errorFetch": "Si è verificato un errore durante la creazione del documento di ricerca",
     "errorQuota": "Quota API superata",

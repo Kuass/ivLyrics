@@ -720,6 +720,7 @@ DEPTH
 
 RETURN CONTRACT
 - Return exactly one valid JSON object and nothing else. No Markdown code fence or commentary outside JSON.
+- Emit top-level keys in the exact order shown below and finish each top-level value before moving to the next so the client can display completed sections progressively.
 - Use empty strings/arrays for unavailable information. Do not remove top-level keys.
 - Every paragraphs item must be one complete paragraph, not a heading or fragment.
 - verification_status must be one of: verified, interpretation, uncertain, disputed.
@@ -2642,6 +2643,26 @@ ${normalizedText}
                 const method = typeof addon.generateResearch === 'function' ? 'generateResearch' : 'generateTMI';
                 if (typeof addon[method] !== 'function') continue;
 
+                const reportProgress = (partial, details = {}) => {
+                    if (typeof params?.onProgress !== 'function') return;
+                    try {
+                        if (!partial || typeof partial !== 'object') {
+                            params.onProgress(null, { provider: addon.id, ...details });
+                            return;
+                        }
+                        const normalizedPartial = normalizeResearchResult(partial, params);
+                        normalizedPartial._research = {
+                            ...(normalizedPartial._research || {}),
+                            provider: addon.id,
+                            schema: RESEARCH_CACHE_VERSION,
+                            streaming: details.complete !== true
+                        };
+                        params.onProgress(normalizedPartial, { provider: addon.id, ...details });
+                    } catch (progressError) {
+                        window.__ivLyricsDebugLog?.('[AIAddonManager] Research progress callback failed:', progressError?.message);
+                    }
+                };
+
                 try {
                     window.__ivLyricsDebugLog?.(`[AIAddonManager] Trying Research provider: ${addon.id}`);
                     const researchPrompt = this.buildResearchPrompt(params);
@@ -2649,6 +2670,7 @@ ${normalizedText}
                         ...params,
                         researchPrompt,
                         requestTimeoutMs: PROVIDER_RESEARCH_REQUEST_TIMEOUT_MS,
+                        onResearchProgress: reportProgress,
                         // Existing provider addons consume this property.
                         tmiPrompt: researchPrompt
                     });
@@ -2660,8 +2682,11 @@ ${normalizedText}
                         ...(normalized._research || {}),
                         provider: addon.id,
                         generated_at: new Date().toISOString(),
-                        schema: RESEARCH_CACHE_VERSION
+                        schema: RESEARCH_CACHE_VERSION,
+                        streaming: false
                     };
+
+                    reportProgress(normalized, { complete: true });
 
                     if (window.AddonDebug?.isEnabled()) {
                         window.AddonDebug.timeEnd('ai', 'generateResearch');
@@ -2670,6 +2695,7 @@ ${normalizedText}
                     return normalized;
                 } catch (error) {
                     console.warn(`[AIAddonManager] Provider ${addon.id} failed for generateResearch:`, error.message);
+                    reportProgress(null, { reset: true, error: error.message });
                     lastError = error;
                 }
             }

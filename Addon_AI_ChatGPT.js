@@ -546,13 +546,162 @@
         }
     }
 
+    function createTopLevelJsonProgressParser(onDocument) {
+        let buffer = '';
+        let cursor = 0;
+        let depth = 0;
+        let rootStarted = false;
+        let inString = false;
+        let escaped = false;
+        let stringStart = -1;
+        let stringRole = '';
+        let expectingKey = false;
+        let expectingColon = false;
+        let expectingValue = false;
+        let awaitingComma = false;
+        let currentKey = '';
+        let valueStart = -1;
+        let valueKind = '';
+        const document = {};
+
+        const emit = () => {
+            try {
+                onDocument({ ...document });
+            } catch (error) {
+                window.__ivLyricsDebugLog?.('[ChatGPT Addon] Research progress callback failed:', error?.message);
+            }
+        };
+
+        const completeValue = (end) => {
+            if (!currentKey || valueStart < 0 || end <= valueStart) return;
+            try {
+                document[currentKey] = JSON.parse(buffer.slice(valueStart, end));
+                emit();
+            } catch {
+                return;
+            }
+            currentKey = '';
+            valueStart = -1;
+            valueKind = '';
+            expectingValue = false;
+            awaitingComma = true;
+        };
+
+        return {
+            push(delta) {
+                if (!delta) return;
+                buffer += String(delta);
+
+                for (; cursor < buffer.length; cursor++) {
+                    const char = buffer[cursor];
+
+                    if (inString) {
+                        if (escaped) {
+                            escaped = false;
+                            continue;
+                        }
+                        if (char === '\\') {
+                            escaped = true;
+                            continue;
+                        }
+                        if (char !== '"') continue;
+
+                        inString = false;
+                        if (stringRole === 'key') {
+                            try {
+                                currentKey = JSON.parse(buffer.slice(stringStart, cursor + 1));
+                                expectingKey = false;
+                                expectingColon = true;
+                            } catch {
+                                currentKey = '';
+                            }
+                        } else if (stringRole === 'value') {
+                            completeValue(cursor + 1);
+                        }
+                        stringRole = '';
+                        continue;
+                    }
+
+                    if (!rootStarted) {
+                        if (char === '{') {
+                            rootStarted = true;
+                            depth = 1;
+                            expectingKey = true;
+                        }
+                        continue;
+                    }
+
+                    if (char === '"') {
+                        inString = true;
+                        escaped = false;
+                        stringStart = cursor;
+                        if (depth === 1 && expectingKey) {
+                            stringRole = 'key';
+                        } else if (depth === 1 && expectingValue && valueStart < 0) {
+                            valueStart = cursor;
+                            valueKind = 'string';
+                            expectingValue = false;
+                            stringRole = 'value';
+                        } else {
+                            stringRole = 'nested';
+                        }
+                        continue;
+                    }
+
+                    if (char === '{' || char === '[') {
+                        if (depth === 1 && expectingValue && valueStart < 0) {
+                            valueStart = cursor;
+                            valueKind = 'container';
+                            expectingValue = false;
+                        }
+                        depth += 1;
+                        continue;
+                    }
+
+                    if (char === '}' || char === ']') {
+                        if (depth === 1 && valueKind === 'primitive') completeValue(cursor);
+                        const previousDepth = depth;
+                        depth = Math.max(0, depth - 1);
+                        if (valueKind === 'container' && previousDepth === 2 && depth === 1) {
+                            completeValue(cursor + 1);
+                        }
+                        continue;
+                    }
+
+                    if (depth !== 1) continue;
+
+                    if (expectingColon && char === ':') {
+                        expectingColon = false;
+                        expectingValue = true;
+                        continue;
+                    }
+
+                    if (expectingValue && !/\s/.test(char)) {
+                        valueStart = cursor;
+                        valueKind = 'primitive';
+                        expectingValue = false;
+                    }
+
+                    if (char === ',') {
+                        if (valueKind === 'primitive') completeValue(cursor);
+                        if (awaitingComma || !currentKey) {
+                            awaitingComma = false;
+                            expectingKey = true;
+                        }
+                    }
+                }
+            }
+        };
+    }
+
     async function callChatGPTAPIStream(
         prompt,
         onLine,
         onStreamReset,
         maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3,
         transformResult = null,
-        requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000
+        requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000,
+        onRawChunk = null
     ) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
@@ -572,8 +721,9 @@
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 let emittedLineCount = 0;
                 let emittedProvisionalOutput = false;
+                let receivedStreamText = false;
                 const resetProvisionalOutput = (reason, error = null) => {
-                    if (!emittedProvisionalOutput) return;
+                    if (!emittedProvisionalOutput && !receivedStreamText) return;
 
                     try {
                         if (typeof onStreamReset === 'function') {
@@ -589,6 +739,7 @@
 
                     emittedProvisionalOutput = false;
                     emittedLineCount = 0;
+                    receivedStreamText = false;
                 };
 
                 try {
@@ -628,6 +779,10 @@
                         const data = await response.json();
                         const rawText = readChatGPTResponseText(data);
                         if (!rawText.trim()) throw new Error('[ChatGPT] Empty response from API');
+                        if (typeof onRawChunk === 'function') {
+                            receivedStreamText = true;
+                            onRawChunk(rawText);
+                        }
 
                         const transformed = typeof transformResult === 'function'
                             ? transformResult(rawText)
@@ -654,7 +809,11 @@
 
                         const parsed = JSON.parse(payload);
                         const chunk = readChatGPTStreamChunk(parsed);
-                        if (chunk.text) accumulated += chunk.text;
+                        if (chunk.text) {
+                            accumulated += chunk.text;
+                            receivedStreamText = true;
+                            if (typeof onRawChunk === 'function') onRawChunk(chunk.text);
+                        }
                         if (chunk.finishReason) finalFinishReason = chunk.finishReason;
                     };
 
@@ -1108,7 +1267,7 @@
             };
         },
 
-        async generateTMI({ title, artist, tmiPrompt, requestTimeoutMs }) {
+        async generateTMI({ title, artist, tmiPrompt, requestTimeoutMs, onResearchProgress }) {
             if (!title || !artist) {
                 throw new Error('Title and artist are required');
             }
@@ -1120,7 +1279,24 @@
             // Research uses SSE so an upstream proxy receives response bytes
             // while the long document is generated instead of closing an idle
             // non-streaming request before the client-side timeout expires.
-            return await callChatGPTAPIStream(prompt, null, null, 1, extractJSON, requestTimeoutMs);
+            let progressParser = typeof onResearchProgress === 'function'
+                ? createTopLevelJsonProgressParser(onResearchProgress)
+                : null;
+            const resetProgress = progressParser
+                ? (details) => {
+                    progressParser = createTopLevelJsonProgressParser(onResearchProgress);
+                    onResearchProgress(null, { ...details, reset: true });
+                }
+                : null;
+            return await callChatGPTAPIStream(
+                prompt,
+                null,
+                resetProgress,
+                1,
+                extractJSON,
+                requestTimeoutMs,
+                progressParser ? chunk => progressParser.push(chunk) : null
+            );
         },
 
         async generateLyricsStudy(params) {

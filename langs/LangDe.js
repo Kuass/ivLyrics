@@ -2282,6 +2282,7 @@ window.LANG_DE = {
     "cancel": "Abbrechen",
     "loadingTitle": "Zwischen den Zeilen lesen",
     "loading": "Recherche zu Texten, Sound, Künstler und kulturellem Kontext",
+    "generating": "Wird erstellt…",
     "errorTitle": "Die Recherche konnte nicht abgeschlossen werden",
     "errorFetch": "Beim Erstellen des Forschungsdokuments ist ein Fehler aufgetreten",
     "errorQuota": "API-Kontingent überschritten",

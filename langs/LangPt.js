@@ -2283,6 +2283,7 @@ window.LANG_PT = {
     "cancel": "Cancelar",
     "loadingTitle": "Lendo nas entrelinhas",
     "loading": "Pesquisando a letra, o som, o artista e o contexto cultural",
+    "generating": "Gerando…",
     "errorTitle": "A pesquisa não pôde ser concluída",
     "errorFetch": "Ocorreu um erro ao criar o documento de pesquisa",
     "errorQuota": "Cota de API excedida",

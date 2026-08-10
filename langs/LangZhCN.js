@@ -2283,6 +2283,7 @@ window.LANG_ZH_CN = {
     "cancel": "取消",
     "loadingTitle": "阅读字里行间",
     "loading": "研究歌词、声音、艺术家和文化背景",
+    "generating": "正在生成…",
     "errorTitle": "研究无法完成",
     "errorFetch": "创建研究文档时出错",
     "errorQuota": "超出 API 配额",

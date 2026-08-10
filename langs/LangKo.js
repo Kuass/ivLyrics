@@ -2283,6 +2283,7 @@ window.LANG_KO = {
     "cancel": "취소",
     "loadingTitle": "가사 사이의 의미를 읽는 중",
     "loading": "가사, 사운드, 아티스트와 문화적 맥락을 조사하는 중",
+    "generating": "생성 중…",
     "errorTitle": "리서치를 완료하지 못했습니다",
     "errorFetch": "리서치 문서를 만드는 중 오류가 발생했습니다",
     "errorQuota": "API 할당량을 초과했습니다",

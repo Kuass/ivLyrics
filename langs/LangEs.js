@@ -2283,6 +2283,7 @@ window.LANG_ES = {
     "cancel": "Cancelar",
     "loadingTitle": "Leyendo entre líneas",
     "loading": "Investigar la letra, el sonido, el artista y el contexto cultural.",
+    "generating": "Generando…",
     "errorTitle": "La investigación no se pudo completar",
     "errorFetch": "Se produjo un error al crear el documento de investigación.",
     "errorQuota": "Se superó la cuota de API",

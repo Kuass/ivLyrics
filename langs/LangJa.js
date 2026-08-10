@@ -2283,6 +2283,7 @@ window.LANG_JA = {
     "cancel": "キャンセル",
     "loadingTitle": "行間を読む",
     "loading": "歌詞、サウンド、アーティスト、文化的背景の研究",
+    "generating": "生成中…",
     "errorTitle": "研究を完了できませんでした",
     "errorFetch": "研究文書の作成中にエラーが発生しました",
     "errorQuota": "API クォータを超過しました",

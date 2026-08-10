@@ -2282,6 +2282,7 @@ window.LANG_CS = {
     "cancel": "Zrušit",
     "loadingTitle": "Čtení mezi řádky",
     "loading": "Zkoumání textů, zvuku, umělce a kulturního kontextu",
+    "generating": "Generování…",
     "errorTitle": "Výzkum se nepodařilo dokončit",
     "errorFetch": "Při vytváření výzkumného dokumentu došlo k chybě",
     "errorQuota": "Kvóta rozhraní API byla překročena",

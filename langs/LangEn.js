@@ -2283,6 +2283,7 @@ window.LANG_EN = {
     "cancel": "Cancel",
     "loadingTitle": "Reading between the lines",
     "loading": "Researching the lyrics, sound, artist, and cultural context",
+    "generating": "Generating…",
     "errorTitle": "Research could not be completed",
     "errorFetch": "An error occurred while creating the Research document",
     "errorQuota": "API quota exceeded",

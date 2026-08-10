@@ -2283,6 +2283,7 @@ window.LANG_VI = {
     "cancel": "Hủy bỏ",
     "loadingTitle": "Đọc giữa dòng",
     "loading": "Nghiên cứu lời bài hát, âm thanh, nghệ sĩ và bối cảnh văn hóa",
+    "generating": "Đang tạo…",
     "errorTitle": "Nghiên cứu không thể hoàn thành",
     "errorFetch": "Đã xảy ra lỗi khi tạo tài liệu Nghiên cứu",
     "errorQuota": "Đã vượt quá hạn ngạch API",

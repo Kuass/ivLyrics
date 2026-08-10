@@ -100,7 +100,8 @@ const SongResearch = (() => {
             const input = {
                 ...getTrackContext(trackId, context),
                 lang,
-                ignoreCache: regenerate
+                ignoreCache: regenerate,
+                onProgress: typeof context.onProgress === "function" ? context.onProgress : undefined
             };
             const result = lyricsService.getResearch
                 ? await lyricsService.getResearch(input)
@@ -509,7 +510,7 @@ const SongResearch = (() => {
         return sections;
     };
 
-    const ResearchFullView = react.memo(({ info, onClose, trackName, artistName, coverUrl, onRegenerate, tmiScale: legacyScale, researchScale: propScale }) => {
+    const ResearchFullView = react.memo(({ info, isGenerating = false, onClose, trackName, artistName, coverUrl, onRegenerate, tmiScale: legacyScale, researchScale: propScale }) => {
         const researchScale = propScale ?? legacyScale ?? (CONFIG?.visual?.["fullscreen-tmi-font-size"] || 100) / 100;
         const contentRef = useRef(null);
         const sectionRefs = useRef(new Map());
@@ -559,6 +560,11 @@ const SongResearch = (() => {
             };
         }, [sectionDefinitions]);
 
+        useEffect(() => {
+            if (sectionDefinitions.some(([id]) => id === activeSection)) return;
+            if (sectionDefinitions[0]?.[0]) setActiveSection(sectionDefinitions[0][0]);
+        }, [activeSection, sectionDefinitions]);
+
         const scrollTo = (id) => {
             const node = sectionRefs.current.get(id);
             if (!node) return;
@@ -591,7 +597,8 @@ const SongResearch = (() => {
             className: "research-view",
             style: { "--research-scale": researchScale },
             role: "document",
-            "aria-labelledby": "research-document-title"
+            "aria-labelledby": "research-document-title",
+            "aria-busy": isGenerating
         },
             react.createElement("header", { className: "research-hero" },
                 coverUrl && react.createElement("img", { src: coverUrl, className: "research-hero-cover", alt: "" }),
@@ -621,7 +628,7 @@ const SongResearch = (() => {
                     thesis.one_sentence && thesis.expanded && react.createElement("p", null, react.createElement(InlineText, null, thesis.expanded))
                 )
             ),
-            react.createElement("nav", { className: "research-nav", "aria-label": t("research.contents", "Contents") },
+            sectionDefinitions.length > 0 && react.createElement("nav", { className: "research-nav", "aria-label": t("research.contents", "Contents") },
                 sectionDefinitions.map(([id, icon, label]) => react.createElement("button", {
                     key: id,
                     type: "button",
@@ -632,6 +639,18 @@ const SongResearch = (() => {
             ),
             react.createElement("main", { className: "research-content", ref: contentRef },
                 react.createElement(ResearchDocument, { info: normalized, register }),
+                isGenerating && react.createElement("div", {
+                    className: "research-generating-status",
+                    role: "status",
+                    "aria-live": "polite"
+                },
+                    react.createElement("span", { className: "research-generating-dots", "aria-hidden": "true" },
+                        react.createElement("span"),
+                        react.createElement("span"),
+                        react.createElement("span")
+                    ),
+                    react.createElement("span", null, t("research.generating", "Generating…"))
+                ),
                 react.createElement("footer", { className: "research-document-footer" },
                     react.createElement(Icon, { name: "quality", size: 14 }),
                     react.createElement("span", null, t("research.disclaimer", "AI-generated research may contain inaccuracies. Check the linked sources before relying on factual claims"))

@@ -2282,6 +2282,7 @@ window.LANG_ID = {
     "cancel": "Batalkan",
     "loadingTitle": "Membaca yang tersirat",
     "loading": "Meneliti lirik, suara, artis, dan konteks budaya",
+    "generating": "Sedang membuat…",
     "errorTitle": "Penelitian tidak dapat diselesaikan",
     "errorFetch": "Terjadi kesalahan saat membuat dokumen Penelitian",
     "errorQuota": "Kuota API terlampaui",

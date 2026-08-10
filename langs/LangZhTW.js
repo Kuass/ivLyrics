@@ -2283,6 +2283,7 @@ window.LANG_ZH_TW = {
     "cancel": "取消",
     "loadingTitle": "閱讀字裡行間",
     "loading": "研究歌詞、聲音、藝術家和文化背景",
+    "generating": "正在生成…",
     "errorTitle": "研究無法完成",
     "errorFetch": "建立研究文件時出錯",
     "errorQuota": "超出 API 配額",

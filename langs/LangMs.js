@@ -2292,6 +2292,7 @@ window.LANG_MS = {
     "cancel": "Batal",
     "loadingTitle": "Membaca antara baris",
     "loading": "Menyelidik lirik, bunyi, artis dan konteks budaya",
+    "generating": "Sedang menjana…",
     "errorTitle": "Penyelidikan tidak dapat diselesaikan",
     "errorFetch": "Ralat berlaku semasa membuat dokumen Penyelidikan",
     "errorQuota": "Kuota API melebihi",
