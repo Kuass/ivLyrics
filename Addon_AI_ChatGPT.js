@@ -324,11 +324,15 @@
             ]
         };
 
-        if (stream) {
-            requestBody.stream = true;
-        }
+        const mergedBody = mergeRequestBody(requestBody, getRequestBodyMergePatch());
 
-        return mergeRequestBody(requestBody, getRequestBodyMergePatch());
+        // Streaming callers rely on receiving an early response byte so long
+        // generations are not dropped by an upstream proxy while it waits for
+        // the complete JSON document. Do not let an advanced merge patch turn
+        // streaming back off for those calls.
+        if (stream) mergedBody.stream = true;
+
+        return mergedBody;
     }
 
     // ============================================
@@ -542,7 +546,14 @@
         }
     }
 
-    async function callChatGPTAPIStream(prompt, onLine, onStreamReset, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
+    async function callChatGPTAPIStream(
+        prompt,
+        onLine,
+        onStreamReset,
+        maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3,
+        transformResult = null,
+        requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000
+    ) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[ChatGPT] API key is required. Please configure your API key in settings.');
@@ -590,7 +601,7 @@
                             'Authorization': `Bearer ${apiKey}`
                         },
                         body: JSON.stringify(buildChatGPTRequestBody(model, prompt, { stream: true }))
-                    });
+                    }, requestTimeoutMs);
 
                     if (response.status === 429 || response.status === 403) {
                         window.__ivLyricsDebugLog?.(`[ChatGPT Addon] Stream: API key ${keyIndex + 1} failed (${response.status}), trying next...`);
@@ -607,6 +618,24 @@
                         let errorMessage = `HTTP ${response.status}`;
                         try { const d = await response.json(); if (d.error?.message) errorMessage = d.error.message; } catch (e) { }
                         throw new Error(`[ChatGPT] ${errorMessage}`);
+                    }
+
+                    // Some compatible APIs accept `stream: true` but still
+                    // return a regular JSON completion. Preserve compatibility
+                    // with those servers while preferring SSE for long requests.
+                    const contentType = String(response.headers?.get?.('content-type') || '').toLowerCase();
+                    if (!response.body || !contentType.includes('text/event-stream')) {
+                        const data = await response.json();
+                        const rawText = readChatGPTResponseText(data);
+                        if (!rawText.trim()) throw new Error('[ChatGPT] Empty response from API');
+
+                        const transformed = typeof transformResult === 'function'
+                            ? transformResult(rawText)
+                            : rawText;
+                        if (Array.isArray(transformed) && typeof onLine === 'function') {
+                            transformed.forEach((line, index) => onLine(index, line));
+                        }
+                        return transformed;
                     }
 
                     const reader = response.body.getReader();
@@ -1088,10 +1117,10 @@
             if (!prompt) {
                 throw new Error('[OpenAI ChatGPT] Central TMI prompt is unavailable.');
             }
-            // Research uses the manager-provided extended timeout. A single
-            // long request avoids retrying the same expensive generation at
-            // the shared 90-second translation boundary.
-            return await callChatGPTAPI(prompt, 1, requestTimeoutMs);
+            // Research uses SSE so an upstream proxy receives response bytes
+            // while the long document is generated instead of closing an idle
+            // non-streaming request before the client-side timeout expires.
+            return await callChatGPTAPIStream(prompt, null, null, 1, extractJSON, requestTimeoutMs);
         },
 
         async generateLyricsStudy(params) {

@@ -157,7 +157,9 @@ test('Research is wired through provider fallback, versioned cache, lyrics snaps
   assert.match(paxsenixSource, /}, requestTimeoutMs\);/);
   assert.match(paxsenixSource, /callPaxsenixAPI\(prompt, 1, requestTimeoutMs\)/);
   assert.match(chatGPTSource, /}, requestTimeoutMs\);/);
-  assert.match(chatGPTSource, /callChatGPTAPI\(prompt, 1, requestTimeoutMs\)/);
+  assert.match(chatGPTSource, /callChatGPTAPIStream\(prompt, null, null, 1, extractJSON, requestTimeoutMs\)/);
+  assert.match(chatGPTSource, /if \(stream\) mergedBody\.stream = true/);
+  assert.match(chatGPTSource, /contentType\.includes\('text\/event-stream'\)/);
   assert.match(managerSource, /throw new Error\(errorMsg\);/);
   assert.match(serviceSource, /getResearch failed:[\s\S]*throw e;/);
   assert.match(readerSource, /research-error-detail/);
