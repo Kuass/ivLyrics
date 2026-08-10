@@ -1,6 +1,6 @@
 /**
  * Pollinations.ai AI Addon for ivLyrics
- * Pollinations.ai를 사용한 번역, 발음, TMI 생성 (무료 API)
+ * Pollinations.ai를 사용한 번역, 발음, Research 생성
  * 
  * @author default
  * @version 1.1.1
@@ -18,10 +18,10 @@
         name: 'Pollinations.ai',
         author: 'default',
         description: {
-            ko: 'Pollinations.ai를 사용한 번역, 발음, TMI 생성 (API 키 필요)',
-            en: 'Translation, pronunciation, and TMI generation using Pollinations.ai (API Key Required)',
-            ja: 'Pollinations.aiを使用した翻訳、発音、TMI生成（APIキー必要）',
-            'zh-CN': '使用 Pollinations.ai 进行翻译、发音和 TMI 生成（需要 API 密钥）',
+            ko: 'Pollinations.ai를 사용한 번역, 발음, 음악 리서치 (API 키 필요)',
+            en: 'Translation, pronunciation, and music research using Pollinations.ai (API key required)',
+            ja: 'Pollinations.aiを使用した翻訳、発音、音楽リサーチ（APIキー必要）',
+            'zh-CN': '使用 Pollinations.ai 进行翻译、发音和音乐深度研究（需要 API 密钥）',
         },
         version: '1.1.1',
         apiKeyUrl: 'https://enter.pollinations.ai',

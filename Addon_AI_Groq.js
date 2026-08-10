@@ -1,6 +1,6 @@
 /**
  * Groq AI Addon for ivLyrics
- * Groq의 초고속 추론을 사용한 번역, 발음, TMI 생성
+ * Groq의 초고속 추론을 사용한 번역, 발음, Research 생성
  * 
  * @author default
  * @version 1.0.1
@@ -18,10 +18,10 @@
         name: 'Groq',
         author: 'default',
         description: {
-            ko: 'Groq의 초고속 AI 추론을 사용한 번역, 발음, TMI 생성 (Llama, Mixtral 등)',
-            en: 'Ultra-fast AI inference with Groq for translation, pronunciation, and TMI (Llama, Mixtral, etc.)',
-            ja: 'Groqの超高速AI推論を使用した翻訳、発音、TMI生成（Llama、Mixtralなど）',
-            'zh-CN': '使用 Groq 超快速 AI 推理进行翻译、发音和 TMI 生成（Llama、Mixtral 等）',
+            ko: 'Groq의 초고속 AI 추론을 사용한 번역, 발음, 음악 리서치 (Llama, Mixtral 등)',
+            en: 'Ultra-fast AI inference with Groq for translation, pronunciation, and music research (Llama, Mixtral, etc.)',
+            ja: 'Groqの超高速AI推論を使用した翻訳、発音、音楽リサーチ（Llama、Mixtralなど）',
+            'zh-CN': '使用 Groq 超快速 AI 推理进行翻译、发音和音乐深度研究（Llama、Mixtral 等）',
         },
         version: '1.0.1',
         apiKeyUrl: 'https://console.groq.com/keys',

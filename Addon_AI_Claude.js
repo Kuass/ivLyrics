@@ -1,6 +1,6 @@
 /**
  * Claude AI Addon for ivLyrics
- * Anthropic Claude를 사용한 번역, 발음, TMI 생성
+ * Anthropic Claude를 사용한 번역, 발음, Research 생성
  * 
  * @author default
  * @version 1.0.1
@@ -18,10 +18,10 @@
         name: 'Anthropic Claude',
         author: 'default',
         description: {
-            ko: 'Anthropic Claude를 사용한 번역, 발음, TMI 생성',
-            en: 'Translation, pronunciation, and TMI generation using Anthropic Claude',
-            ja: 'Anthropic Claudeを使用した翻訳、発音、TMI生成',
-            'zh-CN': '使用 Anthropic Claude 进行翻译、发音和 TMI 生成',
+            ko: 'Anthropic Claude를 사용한 번역, 발음, 음악 리서치',
+            en: 'Translation, pronunciation, and music research using Anthropic Claude',
+            ja: 'Anthropic Claudeを使用した翻訳、発音、音楽リサーチ',
+            'zh-CN': '使用 Anthropic Claude 进行翻译、发音和音乐深度研究',
         },
         version: '1.0.1',
         apiKeyUrl: 'https://console.anthropic.com/settings/keys',

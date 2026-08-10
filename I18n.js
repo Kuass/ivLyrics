@@ -13,6 +13,29 @@
     var LANGUAGE_CODES = ["ko", "en", "zh-CN", "zh-TW", "ja", "es", "fr", "de", "it", "ru", "sv", "pt", "hi", "ar", "fa", "bn", "cs", "th", "tr", "vi", "id", "ms"];
     var AVAILABLE_LANGUAGES = [];
     var KEY_PATH_CACHE_LIMIT = 2048;
+    var RESEARCH_KEY_ALIASES = {
+        "tmi.title": "research.title",
+        "tmi.requireKey": "research.requireProvider",
+        "tmi.disclaimer": "research.disclaimer",
+        "tmi.loading": "research.loading",
+        "tmi.close": "research.close",
+        "tmi.cancel": "research.cancel",
+        "tmi.regenerate": "research.regenerate",
+        "tmi.errorFetch": "research.errorFetch",
+        "tmi.errorQuota": "research.errorQuota",
+        "tmi.errorQuotaHint": "research.errorQuotaHint",
+        "tmi.viewInfo": "research.gestureHint",
+        "tmi.clickForTMI": "research.title",
+        "vinyl.tmiHint": "research.gestureHint",
+        "vinyl.tmiGesture": "research.gesture",
+        "settings.aiProviders.providerSelectionDesc": "research.providerDescription",
+        "settings.aiProviders.tmiProvider": "research.title",
+        "settings.aiProviders.supports.tmi": "research.title",
+        "settingsAdvanced.tmiStyle.title": "research.styleTitle",
+        "settingsAdvanced.tmiStyle.subtitle": "research.styleSubtitle",
+        "settingsAdvanced.tmiStyle.fontSize.desc": "research.fontSizeDesc",
+        "settingsAdvanced.tmiStyle.fontSize.info": "research.fontSizeInfo"
+    };
     var keyPathCache = new Map();
     var keyPathSplit = null;
     var lastKeyPath = null;
@@ -222,6 +245,7 @@
      */
     function getString(keyPath, params) {
         if (!keyPath) return "";
+        keyPath = RESEARCH_KEY_ALIASES[keyPath] || keyPath;
 
         // Try to initialize if not done yet
         if (currentLanguage === null) {
@@ -379,6 +403,7 @@
      */
     function getAllTranslations(keyPath) {
         if (!keyPath) return [];
+        keyPath = RESEARCH_KEY_ALIASES[keyPath] || keyPath;
         var translations = [];
         var availableLanguages = refreshAvailableLanguages();
         for (var i = 0; i < availableLanguages.length; i++) {

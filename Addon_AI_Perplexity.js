@@ -1,6 +1,6 @@
 /**
  * Perplexity AI Addon for ivLyrics
- * Perplexity AI를 사용한 번역, 발음, TMI 생성
+ * Perplexity AI를 사용한 번역, 발음, Research 생성
  * 
  * @author default
  * @version 1.0.1
@@ -18,10 +18,10 @@
         name: 'Perplexity',
         author: 'default',
         description: {
-            ko: 'Perplexity AI를 사용한 번역, 발음, TMI 생성 (실시간 웹 검색 지원)',
-            en: 'Translation, pronunciation, and TMI generation using Perplexity AI (with real-time web search)',
-            ja: 'Perplexity AIを使用した翻訳、発音、TMI生成（リアルタイムウェブ検索対応）',
-            'zh-CN': '使用 Perplexity AI 进行翻译、发音和 TMI 生成（支持实时网络搜索）',
+            ko: 'Perplexity AI를 사용한 번역, 발음, 음악 리서치 (실시간 웹 검색 지원)',
+            en: 'Translation, pronunciation, and music research using Perplexity AI (with real-time web search)',
+            ja: 'Perplexity AIを使用した翻訳、発音、音楽リサーチ（リアルタイムウェブ検索対応）',
+            'zh-CN': '使用 Perplexity AI 进行翻译、发音和音乐深度研究（支持实时网络搜索）',
         },
         version: '1.0.1',
         apiKeyUrl: 'https://www.perplexity.ai/settings/api',

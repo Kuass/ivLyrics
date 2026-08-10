@@ -1295,7 +1295,7 @@ const AddonSettingsCard = ({ addon, isEnabled, onToggle, isExpanded, onExpandTog
       badges.push(react.createElement(ProviderSupportIconChip, { key: "metadata", type: "metadata", label: I18n.t("settings.aiProviders.supports.metadata") || "Metadata" }));
     }
     if (addon.supports?.tmi) {
-      badges.push(react.createElement(ProviderSupportIconChip, { key: "tmi", type: "tmi", label: I18n.t("settings.aiProviders.supports.tmi") || "TMI" }));
+      badges.push(react.createElement(ProviderSupportIconChip, { key: "tmi", type: "tmi", label: I18n.t("settings.aiProviders.supports.tmi") || "Research" }));
     }
     if (addon.supports?.lyricsStudy) {
       badges.push(react.createElement(ProviderSupportIconChip, { key: "lyricsStudy", type: "lyricsStudy", label: I18n.t("settings.aiProviders.supports.lyricsStudy") || "Lyrics study" }));

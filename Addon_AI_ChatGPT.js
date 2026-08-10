@@ -1,6 +1,6 @@
 /**
  * ChatGPT AI Addon for ivLyrics
- * OpenAI ChatGPT를 사용한 번역, 발음, TMI 생성
+ * OpenAI ChatGPT를 사용한 번역, 발음, Research 생성
  * 
  * @author default
  * @version 1.0.1
@@ -18,10 +18,10 @@
         name: 'OpenAI ChatGPT',
         author: 'default',
         description: {
-            ko: 'OpenAI ChatGPT를 사용한 번역, 발음, TMI 생성 (OpenAI 호환 API 지원)',
-            en: 'Translation, pronunciation, and TMI generation using OpenAI ChatGPT (supports OpenAI-compatible APIs)',
-            ja: 'OpenAI ChatGPTを使用した翻訳、発音、TMI生成（OpenAI互換API対応）',
-            'zh-CN': '使用 OpenAI ChatGPT 进行翻译、发音和 TMI 生成（支持 OpenAI 兼容 API）',
+            ko: 'OpenAI ChatGPT를 사용한 번역, 발음, 음악 리서치 (OpenAI 호환 API 지원)',
+            en: 'Translation, pronunciation, and music research using OpenAI ChatGPT (supports OpenAI-compatible APIs)',
+            ja: 'OpenAI ChatGPTを使用した翻訳、発音、音楽リサーチ（OpenAI互換API対応）',
+            'zh-CN': '使用 OpenAI ChatGPT 进行翻译、发音和音乐深度研究（支持 OpenAI 兼容 API）',
         },
         version: '1.0.1',
         apiKeyUrl: 'https://platform.openai.com/api-keys',

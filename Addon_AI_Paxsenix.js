@@ -1,6 +1,6 @@
 /**
  * Paxsenix AI Addon for ivLyrics
- * Paxsenix OpenAI 호환 API를 사용한 번역, 발음, TMI 생성
+ * Paxsenix OpenAI 호환 API를 사용한 번역, 발음, Research 생성
  *
  * @author default
  * @version 1.0.1
@@ -18,10 +18,10 @@
         name: 'paxsenix',
         author: 'default',
         description: {
-            ko: 'Paxsenix OpenAI 호환 API로 번역, 발음, TMI를 생성합니다',
-            en: 'Generate translations, pronunciations, and TMI with the Paxsenix OpenAI-compatible API',
-            ja: 'PaxsenixのOpenAI互換APIで翻訳、発音、TMIを生成します',
-            'zh-CN': '使用 Paxsenix OpenAI 兼容 API 生成翻译、发音和 TMI',
+            ko: 'Paxsenix OpenAI 호환 API로 번역, 발음, 음악 리서치를 생성합니다',
+            en: 'Generate translations, pronunciations, and music research with the Paxsenix OpenAI-compatible API',
+            ja: 'PaxsenixのOpenAI互換APIで翻訳、発音、音楽リサーチを生成します',
+            'zh-CN': '使用 Paxsenix OpenAI 兼容 API 生成翻译、发音和音乐深度研究',
         },
         version: '1.0.1',
         apiKeyUrl: 'https://api.paxsenix.org/dashboard',

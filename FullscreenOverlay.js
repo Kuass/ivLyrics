@@ -2154,12 +2154,11 @@ const FullscreenOverlay = (() => {
             }, 800);
         }, []);
 
-        // TMI is intentionally opened only through context click or a long press.
+        // Research is intentionally opened only through context click or a long press.
         const openTmiMode = useCallback(async () => {
             if (tmiMode || tmiOpeningRef.current) return;
 
-            // Check if any AI provider is available for TMI generation
-            const hasAIProvider = window.AIAddonManager?.getEnabledProvidersFor('tmi')?.length > 0;
+            const hasAIProvider = window.AIAddonManager?.getEnabledProvidersFor('research')?.length > 0;
 
             if (!hasAIProvider) {
                 Toast.error(I18n.t("tmi.requireKey"));

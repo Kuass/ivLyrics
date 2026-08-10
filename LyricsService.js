@@ -7954,46 +7954,54 @@
         },
 
         /**
-         * TMI(Trivia) 가져오기
-         * @param {Object} info - 트랙 정보 { trackId, title, artist, lang, ignoreCache }
+         * 장문 음악 Research 가져오기
+         * @param {Object} info - 곡/앨범 메타데이터, 현재 가사, 언어와 캐시 옵션
          * @returns {Promise<Object|null>}
          */
-        async getTMI(info) {
-            const { trackId, title, artist, lang, ignoreCache } = info;
+        async getResearch(info) {
+            const { trackId, lang, ignoreCache } = info;
             if (!trackId) return null;
 
             const userLang = lang || Spicetify.Locale?.getLocale()?.split('-')[0] || 'en';
+            const schema = window.AIAddonManager?.RESEARCH_CACHE_VERSION || 'research-v5';
+            const cacheLang = `${userLang}:${schema}`;
 
             try {
                 // 1. 로컬 캐시 확인 (ignoreCache가 true면 스킵)
                 if (!ignoreCache) {
-                    const cached = await LyricsCache.getTMI(trackId, userLang);
+                    const cached = await LyricsCache.getTMI(trackId, cacheLang);
                     if (cached) {
-                        serviceDebug(`[LyricsService] getTMI: Using cached data for ${trackId}`);
-                        return cached;
+                        serviceDebug(`[LyricsService] getResearch: Using cached data for ${trackId}`);
+                        return window.AIAddonManager?.normalizeResearchResult
+                            ? window.AIAddonManager.normalizeResearchResult(cached, info)
+                            : cached;
                     }
                 }
 
                 // 2. Addon_AI 요청
                 if (window.AIAddonManager) {
-                    serviceDebug(`[LyricsService] getTMI: Requesting from AIAddonManager${ignoreCache ? ' (ignoring cache)' : ''}`);
-                    const result = await window.AIAddonManager.generateTMI({
+                    serviceDebug(`[LyricsService] getResearch: Requesting from AIAddonManager${ignoreCache ? ' (ignoring cache)' : ''}`);
+                    const result = await window.AIAddonManager.generateResearch({
+                        ...info,
                         trackId,
-                        title,
-                        artist,
                         lang: userLang
                     });
 
                     if (result) {
                         // 캐시 저장
-                        await LyricsCache.setTMI(trackId, userLang, result);
+                        await LyricsCache.setTMI(trackId, cacheLang, result);
                         return result;
                     }
                 }
             } catch (e) {
-                console.warn('[LyricsService] getTMI failed:', e);
+                console.warn('[LyricsService] getResearch failed:', e);
             }
             return null;
+        },
+
+        // Existing extensions may still call this name.
+        async getTMI(info) {
+            return this.getResearch(info);
         }
     };
 

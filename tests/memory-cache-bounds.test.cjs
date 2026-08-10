@@ -5,11 +5,11 @@ const assert = require('node:assert/strict');
 
 const root = path.resolve(__dirname, '..');
 
-test('TMI memory cache evicts least-recently-used entries', () => {
+test('Research memory cache evicts least-recently-used entries', () => {
   const source = fs.readFileSync(path.join(root, 'SongInfoTicker.js'), 'utf8');
-  assert.match(source, /MAX_TMI_CACHE_ENTRIES\s*=\s*100/);
-  assert.match(source, /while \(tmiCache\.size > MAX_TMI_CACHE_ENTRIES\)/);
-  assert.match(source, /tmiCache\.delete\(tmiCache\.keys\(\)\.next\(\)\.value\)/);
+  assert.match(source, /MAX_RESEARCH_CACHE_ENTRIES\s*=\s*100/);
+  assert.match(source, /while \(researchCache\.size > MAX_RESEARCH_CACHE_ENTRIES\)/);
+  assert.match(source, /researchCache\.delete\(researchCache\.keys\(\)\.next\(\)\.value\)/);
 });
 
 test('metadata translation memory cache uses bounded LRU storage', () => {
