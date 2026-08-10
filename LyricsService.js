@@ -529,6 +529,14 @@
         clear() {
             this.cache.clear();
         }
+
+        delete(key) {
+            return this.cache.delete(key);
+        }
+
+        *keys() {
+            yield* this.cache.keys();
+        }
     }
 
     // ============================================
@@ -7998,7 +8006,7 @@
 
     class Translator {
         // 메타데이터 번역 캐시 (메모리)
-        static _metadataCache = new Map();
+        static _metadataCache = new LRUCache(200);
         static _metadataInflightRequests = new Map();
 
         // 특정 trackId에 대한 진행 중인 요청 정리 (곡 변경 시 호출)

@@ -9,6 +9,23 @@ const SongInfoTMI = (() => {
 
     // Cache for TMI data (메모리 캐시 - 빠른 조회용, IndexedDB도 함께 사용)
     const tmiCache = new Map();
+    const MAX_TMI_CACHE_ENTRIES = 100;
+
+    const getCachedTMI = (key) => {
+        if (!tmiCache.has(key)) return null;
+        const value = tmiCache.get(key);
+        tmiCache.delete(key);
+        tmiCache.set(key, value);
+        return value;
+    };
+
+    const cacheTMI = (key, value) => {
+        tmiCache.delete(key);
+        tmiCache.set(key, value);
+        while (tmiCache.size > MAX_TMI_CACHE_ENTRIES) {
+            tmiCache.delete(tmiCache.keys().next().value);
+        }
+    };
 
     // Simple markdown bold parser
     const renderMarkdown = (text) => {
@@ -32,7 +49,7 @@ const SongInfoTMI = (() => {
 
         // Check memory cache first (skip if regenerating)
         if (!regenerate && tmiCache.has(cacheKey)) {
-            return tmiCache.get(cacheKey);
+            return getCachedTMI(cacheKey);
         }
 
         try {
@@ -67,7 +84,7 @@ const SongInfoTMI = (() => {
             });
 
             if (result) {
-                tmiCache.set(cacheKey, result);
+                cacheTMI(cacheKey, result);
                 return result;
             }
         } catch (e) {
