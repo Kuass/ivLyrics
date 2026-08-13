@@ -12543,6 +12543,89 @@ html.is-lp-view-exit::view-transition-new(root) {
   background: var(--iv-sync-bg) !important;
 }
 
+.ivlyrics-sync-creator-shell .sync-creator-range-style-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
+  align-items: start;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.ivlyrics-sync-creator-shell .sync-creator-range-style-pane {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.ivlyrics-sync-creator-shell .sync-creator-range-style-pane-title {
+  margin-bottom: 8px;
+  color: var(--spice-subtext);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ivlyrics-sync-creator-shell .sync-creator-range-effect-picker .sync-creator-effect-strip {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: 100% !important;
+  max-width: none !important;
+  gap: 6px !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+.ivlyrics-sync-creator-shell .sync-creator-range-effect-picker .ivlyrics-sync-effect-card {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 46px !important;
+  padding-inline: 8px !important;
+}
+
+.ivlyrics-sync-creator-shell .sync-creator-range-effect-picker .ivlyrics-sync-kind-preview {
+  font-size: 14px !important;
+}
+
+.ivlyrics-sync-creator-shell .sync-creator-range-speaker-palette .sync-creator-speaker-groups {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+.ivlyrics-sync-creator-shell .sync-creator-range-speaker-palette .sync-creator-speaker-group {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.ivlyrics-sync-creator-shell .sync-creator-range-speaker-palette .sync-creator-speaker-group-title {
+  margin: 0 !important;
+}
+
+.ivlyrics-sync-creator-shell .sync-creator-range-speaker-palette .sync-creator-speaker-grid {
+  grid-template-columns: repeat(auto-fit, minmax(66px, 110px)) !important;
+  justify-content: start;
+  gap: 5px !important;
+}
+
+.ivlyrics-sync-creator-shell .sync-creator-range-speaker-palette .sync-creator-speaker-choice {
+  grid-column: auto !important;
+  width: 100% !important;
+  min-height: 32px !important;
+  gap: 6px !important;
+  padding: 0 10px !important;
+  font-size: 10.5px !important;
+}
+
+.ivlyrics-sync-creator-shell .sync-creator-range-speaker-palette .sync-creator-speaker-dot {
+  width: 7px !important;
+  height: 7px !important;
+}
+
 .ivlyrics-sync-creator-shell .sync-creator-header-back:hover:not(:disabled),
 .ivlyrics-sync-creator-shell .sync-creator-source-rail button:hover:not(:disabled),
 .ivlyrics-sync-creator-shell .sync-creator-inspector-rail button:not(.sync-creator-history-row):hover:not(:disabled) {
