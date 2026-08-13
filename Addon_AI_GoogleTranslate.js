@@ -3,7 +3,7 @@
  * Uses the public web translation endpoint as an experimental, keyless
  * translation-only provider.
  *
- * @author ivLis STUDIO
+ * @author default
  * @version 1.0.0
  */
 
@@ -13,7 +13,7 @@
     const ADDON_INFO = {
         id: 'google-translate',
         name: 'Google Translate',
-        author: 'ivLis STUDIO',
+        author: 'default',
         description: {
             ko: 'Google 번역 웹 엔드포인트를 사용하는 실험적 번역 전용 제공자 (API 키 불필요)',
             en: 'Experimental translation-only provider using the Google Translate web endpoint (no API key required)',

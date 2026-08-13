@@ -6,7 +6,7 @@
  * Protocol flow adapted from plainheart/bing-translate-api (MIT):
  * https://github.com/plainheart/bing-translate-api
  *
- * @author ivLis STUDIO
+ * @author default
  * @version 1.0.0
  */
 
@@ -16,7 +16,7 @@
     const ADDON_INFO = {
         id: 'bing-translate',
         name: 'Bing Translate',
-        author: 'ivLis STUDIO',
+        author: 'default',
         description: {
             ko: 'Bing 번역 웹 서비스를 사용하는 실험적 번역 전용 제공자 (API 키 불필요)',
             en: 'Experimental translation-only provider using the Bing Translator web service (no API key required)',
