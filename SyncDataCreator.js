@@ -59,6 +59,19 @@ const SYNC_CREATOR_PROGRESS_COLOR = 'rgb(var(--spice-rgb-accent, 30, 215, 96))';
 const SYNC_CREATOR_PROGRESS_BACKGROUND = 'rgba(var(--spice-rgb-accent, 30, 215, 96), 0.18)';
 const SYNC_CREATOR_SYNCED_BACKGROUND = 'rgba(255, 255, 255, 0.055)';
 const SYNC_CREATOR_RECORDING_BACKGROUND = 'rgba(255, 152, 0, 0.6)';
+const getSyncCreatorPronunciationTargetLanguage = () => {
+	const configuredLanguage = window.CONFIG?.visual?.['translate:target-language']
+		|| localStorage.getItem('ivLyrics:visual:translate:target-language');
+	if (configuredLanguage && configuredLanguage !== 'auto') {
+		return configuredLanguage;
+	}
+
+	return window.I18n?.getCurrentLanguage?.()
+		|| window.CONFIG?.visual?.language
+		|| Spicetify.Locale?.getLocale?.()?.split('-')[0]
+		|| navigator.language?.split('-')[0]
+		|| 'en';
+};
 const getSyncCreatorLockedPlaybackProgressIndex = (previewIndex, lockIndex, recordingIndex) => {
 	const numericLockIndex = Number(lockIndex);
 	const numericRecordingIndex = Number(recordingIndex);
@@ -3846,6 +3859,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		);
 
 		try {
+			const pronunciationTargetLanguage = getSyncCreatorPronunciationTargetLanguage();
 			const handleProgress = (progress) => {
 				const nextProgress = progress || null;
 				setCharacterPronunciationProgress(nextProgress);
@@ -3860,7 +3874,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				artist: artistName,
 				lines: lyricsLines,
 				sourceLang: lyricsLanguage || 'auto',
-				lang: 'ko',
+				lang: pronunciationTargetLanguage,
 				onProgress: handleProgress
 			});
 			const hasAnyPronunciation = result?.lines?.some(line =>
