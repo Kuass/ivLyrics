@@ -1585,6 +1585,31 @@ const buildSyncCreatorVisualPronunciationUnits = (lineChars, pronunciationMap) =
 	return units.filter(unit => unit.pronunciation);
 };
 
+const hasSyncCreatorCharacterPronunciation = (result) => (
+	Array.isArray(result?.lines) && result.lines.some(line => (
+		(Array.isArray(line?.chars) && line.chars.some(item => item?.pronunciation))
+		|| (Array.isArray(line?.units) && line.units.some(item => item?.pronunciation))
+	))
+);
+
+const isSyncCreatorCharacterPronunciationCompatible = (result, lyricsLines) => {
+	const sourceLines = Array.isArray(lyricsLines) ? lyricsLines : [];
+	if (!Array.isArray(result?.lines) || result.lines.length !== sourceLines.length) return false;
+
+	return sourceLines.every((text, lineIndex) => {
+		const resultLine = result.lines.find(line => Number(line?.index) === lineIndex)
+			|| result.lines[lineIndex];
+		const sourceChars = Array.from(String(text || ''));
+		if (!Array.isArray(resultLine?.chars) || resultLine.chars.length !== sourceChars.length) {
+			return false;
+		}
+		return resultLine.chars.every((item, charIndex) => (
+			Number(item?.i ?? charIndex) === charIndex
+			&& String(item?.char ?? '') === sourceChars[charIndex]
+		));
+	});
+};
+
 const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const { useState, useEffect, useRef, useCallback, useMemo } = react;
 	const syncCreatorDraftStore = window.SyncCreatorDraftStore || null;
@@ -2806,6 +2831,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const historyPanelRef = useRef(null);
 	const historyResizeDragRef = useRef(null);
 	const styleRangeDragRef = useRef(null);
+	const characterPronunciationCacheRequestRef = useRef(0);
+	const characterPronunciationGenerationRequestRef = useRef(0);
+	const characterPronunciationProgressOwnerRef = useRef(0);
 	const nextSessionClientRevision = useCallback(() => {
 		const wallClockRevision = Date.now() * 1000;
 		sessionClientRevisionRef.current = Math.max(
@@ -3488,12 +3516,6 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		[lyricsLines]
 	);
 
-	useEffect(() => {
-		setCharacterPronunciations(null);
-		setShowCharacterPronunciations(false);
-		setIsGeneratingCharacterPronunciations(false);
-	}, [lyricsText]);
-
 	const totalChars = useMemo(() => {
 		// NFC 정규화된 lyricsLines를 사용하므로 Array.from()이 정확한 문자 수를 반환
 		return lyricsLines.reduce((sum, line) => sum + Array.from(line).length, 0);
@@ -4014,6 +4036,71 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (detected) return detected;
 		return SYNC_CREATOR_JAPANESE_KANA_REGEX.test(`${lyricsLines.join('\n')} ${trackName} ${artistName}`) ? 'ja' : null;
 	}, [lyricsLines, trackName, artistName]);
+	const characterPronunciationTargetLanguage = getSyncCreatorPronunciationTargetLanguage();
+	const characterPronunciationCacheOptions = useMemo(() => ({
+		trackKey: sessionTrackKey,
+		lyricsFingerprint: sessionLyricsFingerprint,
+		sourceLang: lyricsLanguage || 'auto',
+		targetLang: characterPronunciationTargetLanguage
+	}), [
+		characterPronunciationTargetLanguage,
+		lyricsLanguage,
+		sessionLyricsFingerprint,
+		sessionTrackKey
+	]);
+	const readCachedCharacterPronunciation = useCallback(async () => {
+		if (
+			!lyricsLines.length
+			|| typeof syncCreatorDraftStore?.getCharacterPronunciationCache !== 'function'
+		) return null;
+
+		try {
+			const cached = await syncCreatorDraftStore.getCharacterPronunciationCache(
+				characterPronunciationCacheOptions
+			);
+			return isSyncCreatorCharacterPronunciationCompatible(cached, lyricsLines)
+				? cached
+				: null;
+		} catch (error) {
+			console.warn('[SyncDataCreator] Failed to load cached character pronunciation:', error);
+			return null;
+		}
+	}, [characterPronunciationCacheOptions, lyricsLines, syncCreatorDraftStore]);
+
+	useEffect(() => {
+		const cacheRequestId = ++characterPronunciationCacheRequestRef.current;
+		const previousGenerationRequestId = characterPronunciationGenerationRequestRef.current;
+		characterPronunciationGenerationRequestRef.current = previousGenerationRequestId + 1;
+		if (
+			previousGenerationRequestId > 0
+			&& characterPronunciationProgressOwnerRef.current === previousGenerationRequestId
+		) {
+			characterPronunciationProgressOwnerRef.current = 0;
+			Toast.dismissProgress?.();
+		}
+		setCharacterPronunciations(null);
+		setShowCharacterPronunciations(false);
+		setIsGeneratingCharacterPronunciations(false);
+		setCharacterPronunciationProgress(null);
+
+		let cancelled = false;
+		readCachedCharacterPronunciation().then((cached) => {
+			if (
+				cancelled
+				|| cacheRequestId !== characterPronunciationCacheRequestRef.current
+				|| !cached
+			) return;
+			setCharacterPronunciations(cached);
+			setShowCharacterPronunciations(true);
+		});
+
+		return () => {
+			cancelled = true;
+			if (characterPronunciationCacheRequestRef.current === cacheRequestId) {
+				characterPronunciationCacheRequestRef.current += 1;
+			}
+		};
+	}, [readCachedCharacterPronunciation]);
 	const currentGranularityRanges = useMemo(() => (
 		getSyncCreatorGranularityRanges(currentLineChars, syncGranularity, lyricsLanguage || undefined)
 	), [currentLineChars, syncGranularity, lyricsLanguage]);
@@ -4215,12 +4302,22 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	}, []);
 
 	const handleCharacterPronunciationToggle = useCallback(async (options = {}) => {
-		if (characterPronunciations) {
+		if (
+			characterPronunciations
+			&& isSyncCreatorCharacterPronunciationCompatible(characterPronunciations, lyricsLines)
+		) {
 			setShowCharacterPronunciations(value => !value);
 			return;
 		}
 
 		if (!lyricsLines.length) {
+			return;
+		}
+
+		const cachedPronunciation = await readCachedCharacterPronunciation();
+		if (cachedPronunciation) {
+			setCharacterPronunciations(cachedPronunciation);
+			setShowCharacterPronunciations(true);
 			return;
 		}
 
@@ -4234,6 +4331,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			return;
 		}
 
+		const generationRequestId = ++characterPronunciationGenerationRequestRef.current;
+		characterPronunciationProgressOwnerRef.current = generationRequestId;
 		setIsGeneratingCharacterPronunciations(true);
 		setCharacterPronunciationProgress({
 			phase: 'prepared',
@@ -4249,8 +4348,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		);
 
 		try {
-			const pronunciationTargetLanguage = getSyncCreatorPronunciationTargetLanguage();
 			const handleProgress = (progress) => {
+				if (generationRequestId !== characterPronunciationGenerationRequestRef.current) return;
 				const nextProgress = progress || null;
 				setCharacterPronunciationProgress(nextProgress);
 				const progressInfo = getSyncCreatorCharacterPronunciationProgressInfo(nextProgress);
@@ -4263,17 +4362,29 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				title: trackName,
 				artist: artistName,
 				lines: lyricsLines,
-				sourceLang: lyricsLanguage || 'auto',
-				lang: pronunciationTargetLanguage,
+				sourceLang: characterPronunciationCacheOptions.sourceLang,
+				lang: characterPronunciationCacheOptions.targetLang,
 				onProgress: handleProgress
 			});
-			const hasAnyPronunciation = result?.lines?.some(line =>
-				(Array.isArray(line?.chars) && line.chars.some(item => item?.pronunciation))
-				|| (Array.isArray(line?.units) && line.units.some(item => item?.pronunciation))
-			);
+			if (generationRequestId !== characterPronunciationGenerationRequestRef.current) return;
+			if (!isSyncCreatorCharacterPronunciationCompatible(result, lyricsLines)) {
+				throw new Error('Generated character pronunciation does not match the current lyrics.');
+			}
+			const hasAnyPronunciation = hasSyncCreatorCharacterPronunciation(result);
 
 			setCharacterPronunciations(result);
 			setShowCharacterPronunciations(true);
+			if (typeof syncCreatorDraftStore?.setCharacterPronunciationCache === 'function') {
+				try {
+					await syncCreatorDraftStore.setCharacterPronunciationCache(
+						characterPronunciationCacheOptions,
+						result
+					);
+				} catch (cacheError) {
+					console.warn('[SyncDataCreator] Failed to cache character pronunciation:', cacheError);
+				}
+			}
+			if (generationRequestId !== characterPronunciationGenerationRequestRef.current) return;
 
 			if (hasAnyPronunciation) {
 				Toast.success(I18n.t('syncCreator.characterPronunciationGenerated') || 'Generated AI character pronunciation.');
@@ -4281,14 +4392,27 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				Toast.warning(I18n.t('syncCreator.characterPronunciationEmpty') || 'Generated character pronunciation is empty.');
 			}
 		} catch (e) {
+			if (generationRequestId !== characterPronunciationGenerationRequestRef.current) return;
 			console.error('[SyncDataCreator] Character pronunciation generation failed:', e);
 			Toast.error((I18n.t('syncCreator.characterPronunciationError') || 'Failed to generate character pronunciation') + ': ' + (e?.message || e));
 		} finally {
-			setIsGeneratingCharacterPronunciations(false);
-			setCharacterPronunciationProgress(null);
-			Toast.dismissProgress?.();
+			if (generationRequestId === characterPronunciationGenerationRequestRef.current) {
+				characterPronunciationProgressOwnerRef.current = 0;
+				setIsGeneratingCharacterPronunciations(false);
+				setCharacterPronunciationProgress(null);
+				Toast.dismissProgress?.();
+			}
 		}
-	}, [characterPronunciations, lyricsLines, lyricsLanguage, trackId, trackName, artistName]);
+	}, [
+		artistName,
+		characterPronunciationCacheOptions,
+		characterPronunciations,
+		lyricsLines,
+		readCachedCharacterPronunciation,
+		syncCreatorDraftStore,
+		trackId,
+		trackName
+	]);
 
 	// Visibility Observer
 	useEffect(() => {

@@ -13,11 +13,14 @@
   "use strict";
 
   const DB_NAME = "ivLyricsSyncCreatorDrafts";
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const STORE_NAME = "drafts";
+  const CHARACTER_PRONUNCIATION_STORE_NAME = "characterPronunciations";
   const RECORD_VERSION = 1;
+  const CHARACTER_PRONUNCIATION_CACHE_VERSION = 1;
   const MAX_HISTORY_STATES = 40;
   const MAX_TRACK_DRAFTS = 6;
+  const MAX_CHARACTER_PRONUNCIATION_CACHE_ENTRIES = 100;
 
   let databasePromise = null;
   let writeQueue = Promise.resolve();
@@ -86,6 +89,89 @@
   };
 
   const normalizeTrackKey = (value) => normalizeText(value).trim();
+
+  const normalizeLanguageCode = (value, fallback = "auto") => (
+    normalizeText(value).trim().toLowerCase() || fallback
+  );
+
+  const createCharacterPronunciationCacheKey = ({
+    trackKey,
+    lyricsFingerprint,
+    sourceLang,
+    targetLang,
+  } = {}) => {
+    const normalizedTrackKey = normalizeTrackKey(trackKey);
+    const normalizedFingerprint = normalizeText(lyricsFingerprint).trim();
+    const normalizedTargetLang = normalizeLanguageCode(targetLang, "");
+    if (!normalizedTrackKey || !normalizedFingerprint || !normalizedTargetLang) return "";
+
+    const cacheIdentity = [
+      CHARACTER_PRONUNCIATION_CACHE_VERSION,
+      normalizedTrackKey,
+      normalizedFingerprint,
+      normalizeLanguageCode(sourceLang),
+      normalizedTargetLang,
+    ].join("|");
+    return `character-pronunciation:${hashText(cacheIdentity)}`;
+  };
+
+  const normalizeCharacterPronunciationResult = (result) => {
+    if (!isPlainObject(result) || !Array.isArray(result.lines) || hasInvalidNumber(result)) {
+      return null;
+    }
+    const hasValidLines = result.lines.every((line) => (
+      isPlainObject(line)
+        && Array.isArray(line.chars)
+        && line.chars.every(isPlainObject)
+        && (!Object.prototype.hasOwnProperty.call(line, "units")
+          || (Array.isArray(line.units) && line.units.every(isPlainObject)))
+    ));
+    return hasValidLines ? cloneValue(result) : null;
+  };
+
+  const normalizeCharacterPronunciationRecord = (record) => {
+    if (
+      !isPlainObject(record)
+      || record.cacheVersion !== CHARACTER_PRONUNCIATION_CACHE_VERSION
+    ) return null;
+
+    const trackKey = normalizeTrackKey(record.trackKey);
+    const lyricsFingerprint = normalizeText(record.lyricsFingerprint).trim();
+    const sourceLang = normalizeLanguageCode(record.sourceLang);
+    const targetLang = normalizeLanguageCode(record.targetLang, "");
+    const cacheKey = normalizeText(record.cacheKey).trim();
+    const expectedCacheKey = createCharacterPronunciationCacheKey({
+      trackKey,
+      lyricsFingerprint,
+      sourceLang,
+      targetLang,
+    });
+    const result = normalizeCharacterPronunciationResult(record.result);
+    const createdAt = normalizeTimestamp(record.createdAt);
+    const updatedAt = normalizeTimestamp(record.updatedAt);
+    if (
+      !trackKey
+      || !lyricsFingerprint
+      || !targetLang
+      || !cacheKey
+      || cacheKey !== expectedCacheKey
+      || !result
+      || !createdAt
+      || !updatedAt
+    ) return null;
+
+    return {
+      cacheVersion: CHARACTER_PRONUNCIATION_CACHE_VERSION,
+      cacheKey,
+      trackKey,
+      lyricsFingerprint,
+      sourceLang,
+      targetLang,
+      createdAt,
+      updatedAt,
+      result,
+    };
+  };
 
   const createDraftKey = ({
     trackKey,
@@ -300,6 +386,14 @@
           store.createIndex("trackKey", "trackKey", { unique: false });
           store.createIndex("updatedAt", "updatedAt", { unique: false });
         }
+        if (!database.objectStoreNames.contains(CHARACTER_PRONUNCIATION_STORE_NAME)) {
+          const pronunciationStore = database.createObjectStore(
+            CHARACTER_PRONUNCIATION_STORE_NAME,
+            { keyPath: "cacheKey" },
+          );
+          pronunciationStore.createIndex("trackKey", "trackKey", { unique: false });
+          pronunciationStore.createIndex("updatedAt", "updatedAt", { unique: false });
+        }
       };
       request.onsuccess = () => {
         const database = request.result;
@@ -362,11 +456,87 @@
     (await getDraftsForTrack(trackKey))[0] || null
   );
 
+  const getCharacterPronunciationCache = async (options = {}) => {
+    const cacheKey = createCharacterPronunciationCacheKey(options);
+    if (!cacheKey) return null;
+    await waitForWrites();
+    const database = await openDatabase();
+    const transaction = database.transaction(CHARACTER_PRONUNCIATION_STORE_NAME, "readonly");
+    const storedRecord = await requestResult(
+      transaction.objectStore(CHARACTER_PRONUNCIATION_STORE_NAME).get(cacheKey),
+    );
+    const record = normalizeCharacterPronunciationRecord(storedRecord);
+    return record ? cloneValue(record.result) : null;
+  };
+
   const enqueueWrite = (operation) => {
     const next = writeQueue.catch(() => undefined).then(operation);
     writeQueue = next.catch(() => undefined);
     return next;
   };
+
+  const setCharacterPronunciationCache = (options = {}, result) => enqueueWrite(async () => {
+    const cacheKey = createCharacterPronunciationCacheKey(options);
+    const normalizedResult = normalizeCharacterPronunciationResult(result);
+    if (!cacheKey || !normalizedResult) {
+      throw new Error("Invalid Sync Creator character pronunciation cache entry.");
+    }
+
+    const now = Date.now();
+    const normalizedRecord = normalizeCharacterPronunciationRecord({
+      cacheVersion: CHARACTER_PRONUNCIATION_CACHE_VERSION,
+      cacheKey,
+      trackKey: options.trackKey,
+      lyricsFingerprint: options.lyricsFingerprint,
+      sourceLang: options.sourceLang,
+      targetLang: options.targetLang,
+      createdAt: now,
+      updatedAt: now,
+      result: normalizedResult,
+    });
+    if (!normalizedRecord) {
+      throw new Error("Invalid Sync Creator character pronunciation cache record.");
+    }
+
+    const database = await openDatabase();
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction(CHARACTER_PRONUNCIATION_STORE_NAME, "readwrite");
+      const store = transaction.objectStore(CHARACTER_PRONUNCIATION_STORE_NAME);
+      const existingRequest = store.get(cacheKey);
+
+      existingRequest.onsuccess = () => {
+        const existing = normalizeCharacterPronunciationRecord(existingRequest.result);
+        store.put({
+          ...normalizedRecord,
+          createdAt: existing?.createdAt || normalizedRecord.createdAt,
+        });
+
+        const allRecordsRequest = store.getAll();
+        allRecordsRequest.onsuccess = () => {
+          const records = (Array.isArray(allRecordsRequest.result) ? allRecordsRequest.result : [])
+            .map(normalizeCharacterPronunciationRecord)
+            .filter(Boolean)
+            .sort((left, right) => right.updatedAt - left.updatedAt);
+          records
+            .filter((record) => record.cacheKey !== cacheKey)
+            .slice(Math.max(0, MAX_CHARACTER_PRONUNCIATION_CACHE_ENTRIES - 1))
+            .forEach((record) => store.delete(record.cacheKey));
+        };
+      };
+      existingRequest.onerror = () => reject(
+        existingRequest.error || new Error("Failed to inspect the character pronunciation cache."),
+      );
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(
+        transaction.error || new Error("Failed to cache character pronunciation."),
+      );
+      transaction.onabort = () => reject(
+        transaction.error || new Error("Character pronunciation cache update was aborted."),
+      );
+    });
+
+    return cloneValue(normalizedRecord.result);
+  });
 
   const mutateDraft = (draftKey, updater) => enqueueWrite(async () => {
     const database = await openDatabase();
@@ -609,14 +779,18 @@
   return {
     DB_NAME,
     RECORD_VERSION,
+    CHARACTER_PRONUNCIATION_CACHE_VERSION,
     MAX_HISTORY_STATES,
     cloneValue,
     createLyricsFingerprint,
     createDraftKey,
+    createCharacterPronunciationCacheKey,
     normalizeRecord,
     getDraft,
     getDraftsForTrack,
     getLatestDraftForTrack,
+    getCharacterPronunciationCache,
+    setCharacterPronunciationCache,
     saveDraft,
     appendCheckpoint,
     getCheckpointCandidate,
@@ -629,6 +803,8 @@
       mergeRestoredRecord,
       decodeStoredRecord,
       normalizeDraft,
+      normalizeCharacterPronunciationResult,
+      normalizeCharacterPronunciationRecord,
     },
   };
 });
