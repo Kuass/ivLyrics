@@ -44,11 +44,10 @@ const SYNC_CREATOR_SPEAKER_TEXT_COLORS = {
 const SYNC_CREATOR_DEFAULT_SPEAKER = 'NORMAL';
 const SYNC_CREATOR_DEFAULT_KIND = 'vocal';
 const SYNC_CREATOR_MAX_MERGED_LINES = 5;
-const SYNC_CREATOR_SYNC_DATA_VERSION = 4;
+const SYNC_CREATOR_SYNC_DATA_VERSION = 5;
 const SYNC_CREATOR_SOURCE_ADDON_ID = 'lrclib';
 const SYNC_CREATOR_GRANULARITIES = new Set(['line', 'word', 'character']);
 const SYNC_CREATOR_DEFAULT_GRANULARITY = 'character';
-const SYNC_CREATOR_GRANULARITY_STORAGE_KEY = 'ivLyrics:syncCreator:granularity';
 const SYNC_CREATOR_MIN_SEQUENTIAL_STEP_SEC = 0.001;
 const SYNC_CREATOR_PREVIEW_POSITION_UPDATE_INTERVAL_MS = 100;
 const SYNC_CREATOR_RECORD_POSITION_UPDATE_INTERVAL_MS = 50;
@@ -396,6 +395,29 @@ const getSyncCreatorSyncDataValidationError = (data) => {
 				`Line ${lineIndex + 1}, hiddenRanges`
 			);
 			if (hiddenError) return hiddenError;
+		}
+
+		if (line.styleRanges !== undefined) {
+			const styleError = getSyncCreatorRangesValidationError(
+				line.styleRanges,
+				start,
+				end,
+				`Line ${lineIndex + 1}, styleRanges`
+			);
+			if (styleError) return styleError;
+			for (let styleIndex = 0; styleIndex < line.styleRanges.length; styleIndex++) {
+				const styleRange = line.styleRanges[styleIndex];
+				const styleSpeakerMeta = getSyncCreatorStyleRangeSpeakerMeta(styleRange);
+				if (!normalizeSyncCreatorKind(styleRange?.kind) && !styleSpeakerMeta) {
+					return `Line ${lineIndex + 1}, style range ${styleIndex + 1}: effect or speaker color is required`;
+				}
+				if (styleRange?.kind !== undefined && !normalizeSyncCreatorKind(styleRange.kind)) {
+					return `Line ${lineIndex + 1}, style range ${styleIndex + 1}: invalid text effect`;
+				}
+				if (styleRange?.speaker !== undefined && !styleSpeakerMeta) {
+					return `Line ${lineIndex + 1}, style range ${styleIndex + 1}: invalid speaker color`;
+				}
+			}
 		}
 
 		const parts = Array.isArray(line?.parallel?.parts) ? line.parallel.parts : [];
@@ -804,6 +826,9 @@ const shiftSyncCreatorLineIndexes = (lines, charOffset) => {
 				start: Math.max(0, Number(line.start) - charOffset),
 				end: Math.max(0, Number(line.end) - charOffset)
 			};
+			if (Array.isArray(line.styleRanges)) {
+				shifted.styleRanges = shiftSyncCreatorRanges(line.styleRanges, charOffset);
+			}
 
 			if (line?.parallel) {
 				shifted.parallel = {
@@ -1067,6 +1092,142 @@ const getSyncCreatorKindLabel = (value) => {
 const normalizeSyncCreatorKind = (value) => (
 	SYNC_CREATOR_KIND_LABELS.has(value) ? value : ''
 );
+
+const getSyncCreatorStyleRangeSpeakerMeta = (range = {}) => {
+	const sourceSpeaker = range?.speaker;
+	const speaker = normalizeSyncCreatorSpeaker(sourceSpeaker);
+	if (!speaker) return null;
+	const speakerFallback = sanitizeSyncCreatorSpeakerFallback(
+		speaker,
+		range?.['speaker-fallback'],
+		true,
+		sourceSpeaker
+	);
+	const speakerColor = sanitizeSyncCreatorSpeakerColor(
+		speaker,
+		range?.['speaker-color'],
+		true,
+		speakerFallback
+	);
+	return {
+		speaker,
+		...(speakerColor ? { 'speaker-color': speakerColor } : {}),
+		...(speakerFallback ? { 'speaker-fallback': speakerFallback } : {})
+	};
+};
+
+const getSyncCreatorStyleRangeKey = (range = {}) => [
+	range?.kind || '',
+	range?.speaker || '',
+	range?.['speaker-color'] || '',
+	range?.['speaker-fallback'] || ''
+].join('|');
+
+const normalizeSyncCreatorStyleRanges = (ranges, lineStart = 0, lineEnd = Number.MAX_SAFE_INTEGER) => {
+	if (!Array.isArray(ranges)) return [];
+	const normalized = ranges
+		.map((range) => {
+			const start = Number(range?.start);
+			const end = Number(range?.end);
+			if (!Number.isInteger(start) || !Number.isInteger(end) || end < start) return null;
+			const clippedStart = Math.max(lineStart, start);
+			const clippedEnd = Math.min(lineEnd, end);
+			if (clippedEnd < clippedStart) return null;
+			const kind = normalizeSyncCreatorKind(range?.kind);
+			const speakerMeta = getSyncCreatorStyleRangeSpeakerMeta(range);
+			if (!kind && !speakerMeta) return null;
+			return {
+				start: clippedStart,
+				end: clippedEnd,
+				...(kind ? { kind } : {}),
+				...(speakerMeta || {})
+			};
+		})
+		.filter(Boolean)
+		.sort((left, right) => left.start - right.start || left.end - right.end);
+
+	const boundaries = new Set();
+	for (const range of normalized) {
+		boundaries.add(range.start);
+		boundaries.add(range.end + 1);
+	}
+	const points = [...boundaries].sort((left, right) => left - right);
+	const flattened = [];
+	for (let index = 0; index < points.length - 1; index++) {
+		const start = points[index];
+		const end = points[index + 1] - 1;
+		const covering = normalized.filter(range => range.start <= start && range.end >= end);
+		if (!covering.length) continue;
+		const reversed = [...covering].reverse();
+		const kind = reversed.map(range => range.kind).find(Boolean) || '';
+		const speakerRange = reversed.find(range => range.speaker) || null;
+		if (!kind && !speakerRange) continue;
+		const flattenedRange = {
+			start,
+			end,
+			...(kind ? { kind } : {}),
+			...(speakerRange ? {
+				speaker: speakerRange.speaker,
+				...(speakerRange['speaker-color'] ? { 'speaker-color': speakerRange['speaker-color'] } : {}),
+				...(speakerRange['speaker-fallback'] ? { 'speaker-fallback': speakerRange['speaker-fallback'] } : {})
+			} : {})
+		};
+		const previous = flattened[flattened.length - 1];
+		if (previous && previous.end + 1 === start && getSyncCreatorStyleRangeKey(previous) === getSyncCreatorStyleRangeKey(flattenedRange)) {
+			previous.end = end;
+			continue;
+		}
+		flattened.push(flattenedRange);
+	}
+	return flattened;
+};
+
+const applySyncCreatorStyleRangePatch = (ranges, start, end, patch, lineStart, lineEnd) => {
+	const selectionStart = Math.max(lineStart, Math.min(Number(start), Number(end)));
+	const selectionEnd = Math.min(lineEnd, Math.max(Number(start), Number(end)));
+	if (!Number.isInteger(selectionStart) || !Number.isInteger(selectionEnd) || selectionEnd < selectionStart) {
+		return normalizeSyncCreatorStyleRanges(ranges, lineStart, lineEnd);
+	}
+	const source = normalizeSyncCreatorStyleRanges(ranges, lineStart, lineEnd);
+	const boundaries = new Set([selectionStart, selectionEnd + 1]);
+	for (const range of source) {
+		boundaries.add(range.start);
+		boundaries.add(range.end + 1);
+	}
+	const points = [...boundaries].sort((left, right) => left - right);
+	const next = [];
+	for (let index = 0; index < points.length - 1; index++) {
+		const segmentStart = points[index];
+		const segmentEnd = points[index + 1] - 1;
+		if (segmentEnd < lineStart || segmentStart > lineEnd) continue;
+		const sourceRange = source.find(range => range.start <= segmentStart && range.end >= segmentEnd);
+		let kind = sourceRange?.kind || '';
+		let speaker = sourceRange?.speaker || '';
+		let speakerColor = sourceRange?.['speaker-color'] || '';
+		let speakerFallback = sourceRange?.['speaker-fallback'] || '';
+		if (segmentStart >= selectionStart && segmentEnd <= selectionEnd) {
+			if (Object.prototype.hasOwnProperty.call(patch, 'kind')) {
+				kind = patch.kind === null ? '' : normalizeSyncCreatorKind(patch.kind);
+			}
+			if (Object.prototype.hasOwnProperty.call(patch, 'speaker')) {
+				const speakerMeta = patch.speaker === null ? null : getSyncCreatorStyleRangeSpeakerMeta(patch);
+				speaker = speakerMeta?.speaker || '';
+				speakerColor = speakerMeta?.['speaker-color'] || '';
+				speakerFallback = speakerMeta?.['speaker-fallback'] || '';
+			}
+		}
+		if (!kind && !speaker) continue;
+		next.push({
+			start: Math.max(lineStart, segmentStart),
+			end: Math.min(lineEnd, segmentEnd),
+			...(kind ? { kind } : {}),
+			...(speaker ? { speaker } : {}),
+			...(speakerColor ? { 'speaker-color': speakerColor } : {}),
+			...(speakerFallback ? { 'speaker-fallback': speakerFallback } : {})
+		});
+	}
+	return normalizeSyncCreatorStyleRanges(next, lineStart, lineEnd);
+};
 
 const getSyncCreatorParenthesisClose = (char) => {
 	if (char === '(') return ')';
@@ -2182,15 +2343,22 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			} else {
 				delete nextLine.hiddenRanges;
 			}
+			const styleRanges = normalizeSyncCreatorStyleRanges(nextLine.styleRanges, lineStart, lineEnd);
+			if (styleRanges.length > 0) {
+				nextLine.styleRanges = styleRanges;
+			} else {
+				delete nextLine.styleRanges;
+			}
 			nextLine = repairSyncCreatorLineCharsFromParallel(nextLine);
 			return nextLine;
 		});
 		const hasParallelLines = lines.some(line => Array.isArray(line?.parallel?.parts) && line.parallel.parts.length > 1);
+		const hasInlineStyleRanges = lines.some(line => Array.isArray(line?.styleRanges) && line.styleRanges.length > 0);
 		const version = Number(data.version);
 
 		return {
 			...data,
-			...(hasParallelLines || migratedParallelRanges
+			...(hasParallelLines || migratedParallelRanges || hasInlineStyleRanges
 				? { version: Math.max(Number.isFinite(version) ? version : 1, SYNC_CREATOR_SYNC_DATA_VERSION) }
 				: {}),
 			lines
@@ -2529,6 +2697,14 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const [mergedLineDrafts, setMergedLineDrafts] = useState({});
 	const [isParallelSplitCollapsed, setIsParallelSplitCollapsed] = useState(false);
 	const [lineMetaDrafts, setLineMetaDrafts] = useState({});
+	const [lineStyleDrafts, setLineStyleDrafts] = useState({});
+	const [styleRangeSelection, setStyleRangeSelection] = useState(null);
+	const [styleRangeEffect, setStyleRangeEffect] = useState('wave');
+	const [styleRangeSpeaker, setStyleRangeSpeaker] = useState(SYNC_CREATOR_DEFAULT_SPEAKER);
+	const [styleRangeSpeakerColor, setStyleRangeSpeakerColor] = useState('');
+	const [styleRangeSpeakerFallback, setStyleRangeSpeakerFallback] = useState(SYNC_CREATOR_DEFAULT_CUSTOM_FALLBACK);
+	const [isStyleRangeEditorExpanded, setIsStyleRangeEditorExpanded] = useState(false);
+	const [isStyleRangePaletteOpen, setIsStyleRangePaletteOpen] = useState(false);
 	const [multiVocalMode, setMultiVocalMode] = useState(false);
 	const [pendingMultiVocalDecision, setPendingMultiVocalDecision] = useState(null);
 	const [syncData, setSyncData] = useState(null);
@@ -2540,15 +2716,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const [characterPronunciationProgress, setCharacterPronunciationProgress] = useState(null);
 	const [showCharacterPronunciationConsent, setShowCharacterPronunciationConsent] = useState(false);
 	const [mode, setMode] = useState('idle');
-	const [syncGranularity, setSyncGranularity] = useState(() => {
-		try {
-			return normalizeSyncCreatorGranularity(
-				window.localStorage?.getItem(SYNC_CREATOR_GRANULARITY_STORAGE_KEY)
-			);
-		} catch (error) {
-			return SYNC_CREATOR_DEFAULT_GRANULARITY;
-		}
-	});
+	const [syncGranularity, setSyncGranularity] = useState(SYNC_CREATOR_DEFAULT_GRANULARITY);
 	const [position, setPosition] = useState(0);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [recordingCharIndex, setRecordingCharIndex] = useState(-1);
@@ -2638,6 +2806,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const historyListRef = useRef(null);
 	const historyPanelRef = useRef(null);
 	const historyResizeDragRef = useRef(null);
+	const styleRangeDragRef = useRef(null);
 	const nextSessionClientRevision = useCallback(() => {
 		const wallClockRevision = Date.now() * 1000;
 		sessionClientRevisionRef.current = Math.max(
@@ -3549,6 +3718,19 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			kind: normalizeSyncCreatorKind(draft.kind || currentExistingLineData?.kind) || SYNC_CREATOR_DEFAULT_KIND
 		};
 	}, [lineMetaDrafts, currentLineStart, currentExistingLineData]);
+	const currentLineStyleRanges = useMemo(() => {
+		const hasDraft = Object.prototype.hasOwnProperty.call(lineStyleDrafts, currentLineStart);
+		const currentLineEnd = currentLineStart + Math.max(0, currentFullLineChars.length - 1);
+		const persistedRanges = (Array.isArray(syncData?.lines) ? syncData.lines : [])
+			.filter(line => Number(line?.end) >= currentLineStart && Number(line?.start) <= currentLineEnd)
+			.flatMap(line => Array.isArray(line?.styleRanges) ? line.styleRanges : []);
+		const source = hasDraft ? lineStyleDrafts[currentLineStart] : persistedRanges;
+		return normalizeSyncCreatorStyleRanges(
+			source,
+			currentLineStart,
+			currentLineEnd
+		);
+	}, [lineStyleDrafts, currentLineStart, currentFullLineChars.length, syncData?.lines]);
 	const getParallelTemplateForLine = useCallback((lineChars, lineStart, manualSplitPointsOverride = null) => {
 		const splitPoints = [
 			...getAutoMergeSplitPointsForLine(lineStart),
@@ -5280,6 +5462,13 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 		}
 
+		const normalizedStyleRanges = normalizeSyncCreatorStyleRanges(currentLineStyleRanges, lineStart, lineEnd);
+		if (normalizedStyleRanges.length > 0) {
+			lineData.styleRanges = normalizedStyleRanges;
+		} else {
+			delete lineData.styleRanges;
+		}
+
 		lineData = repairSyncCreatorLineCharsFromParallel(lineData);
 
 		if (existingIndex >= 0) {
@@ -5338,6 +5527,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		currentParallelData,
 		currentParallelParts,
 		currentLineMeta,
+		currentLineStyleRanges,
 		lineMetaDrafts,
 		multiVocalMode,
 		currentLineMergedWithNext,
@@ -5485,11 +5675,6 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		claimSessionForLocalEditing();
 		resetCurrentSyncInput();
 		setSyncGranularity(nextGranularity);
-		try {
-			window.localStorage?.setItem(SYNC_CREATOR_GRANULARITY_STORAGE_KEY, nextGranularity);
-		} catch (error) {
-			// Keep the selected value for this session when storage is unavailable.
-		}
 	}, [claimSessionForLocalEditing, resetCurrentSyncInput, syncGranularity]);
 
 	const handleCharacterContextMenu = useCallback((charIndex, e) => {
@@ -6535,6 +6720,75 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		});
 	}, [lineCharOffsets, currentLineIndex, multiVocalMode, claimSessionForLocalEditing]);
 
+	const beginStyleRangeSelection = useCallback((localIndex, event) => {
+		if (!Number.isInteger(localIndex) || localIndex < 0 || localIndex >= currentFullLineChars.length) return;
+		event?.preventDefault?.();
+		event?.stopPropagation?.();
+		styleRangeDragRef.current = { anchor: localIndex };
+		setStyleRangeSelection({ anchor: localIndex, focus: localIndex });
+	}, [currentFullLineChars.length]);
+
+	const extendStyleRangeSelection = useCallback((localIndex) => {
+		const drag = styleRangeDragRef.current;
+		if (!drag || !Number.isInteger(localIndex)) return;
+		setStyleRangeSelection({ anchor: drag.anchor, focus: localIndex });
+	}, []);
+
+	useEffect(() => {
+		const finishSelection = () => {
+			styleRangeDragRef.current = null;
+		};
+		document.addEventListener('pointerup', finishSelection, true);
+		document.addEventListener('pointercancel', finishSelection, true);
+		return () => {
+			document.removeEventListener('pointerup', finishSelection, true);
+			document.removeEventListener('pointercancel', finishSelection, true);
+		};
+	}, []);
+
+	useEffect(() => {
+		styleRangeDragRef.current = null;
+		setStyleRangeSelection(null);
+		setIsStyleRangePaletteOpen(false);
+	}, [currentLineStart, currentFullLineChars.length]);
+
+	const updateCurrentLineStyleRanges = useCallback((patch) => {
+		if (!styleRangeSelection || currentFullLineChars.length === 0) return false;
+		const localStart = Math.min(styleRangeSelection.anchor, styleRangeSelection.focus);
+		const localEnd = Math.max(styleRangeSelection.anchor, styleRangeSelection.focus);
+		const lineEnd = currentLineStart + currentFullLineChars.length - 1;
+		const nextRanges = applySyncCreatorStyleRangePatch(
+			currentLineStyleRanges,
+			currentLineStart + localStart,
+			currentLineStart + localEnd,
+			patch,
+			currentLineStart,
+			lineEnd
+		);
+		claimSessionForLocalEditing();
+		setLineStyleDrafts(prev => ({ ...prev, [currentLineStart]: nextRanges }));
+		setSyncData(prev => {
+			if (!prev || !Array.isArray(prev.lines)) return prev;
+			let changed = false;
+			const lines = prev.lines.map(line => {
+				if (line.start !== currentLineStart) return line;
+				changed = true;
+				const nextLine = { ...line };
+				if (nextRanges.length) nextLine.styleRanges = nextRanges;
+				else delete nextLine.styleRanges;
+				return nextLine;
+			});
+			return changed ? { ...prev, version: SYNC_CREATOR_SYNC_DATA_VERSION, lines } : prev;
+		});
+		return true;
+	}, [
+		claimSessionForLocalEditing,
+		currentFullLineChars.length,
+		currentLineStart,
+		currentLineStyleRanges,
+		styleRangeSelection
+	]);
+
 	const applySongVocalSpeaker = useCallback((value, customMeta = {}) => {
 		const speakerMeta = resolveSyncCreatorBulkSpeakerMeta(
 			value,
@@ -6986,6 +7240,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setPendingParentheticalLayoutDecision(null);
 		setMergedLineDrafts({});
 		setLineMetaDrafts({});
+		setLineStyleDrafts({});
+		setStyleRangeSelection(null);
 		setGlobalOffset(0);
 		setMode('idle');
 		const draftKey = activeSessionDraftKeyRef.current;
@@ -7105,6 +7361,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			parentheticalLayoutDrafts: syncCreatorDraftStore.cloneValue(parentheticalLayoutDrafts),
 			mergedLineDrafts: syncCreatorDraftStore.cloneValue(mergedLineDrafts),
 			lineMetaDrafts: syncCreatorDraftStore.cloneValue(lineMetaDrafts),
+			lineStyleDrafts: syncCreatorDraftStore.cloneValue(lineStyleDrafts),
 			selectedLrclibCandidateKey,
 			...editorOverrides
 		};
@@ -7148,6 +7405,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		currentLineIndex,
 		globalOffset,
 		lineMetaDrafts,
+		lineStyleDrafts,
 		lyricsFullTextChars,
 		lyricsLanguage,
 		lyrics?.karaokeSource,
@@ -7287,6 +7545,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setParentheticalLayoutDrafts(restoreObject(editor.parentheticalLayoutDrafts));
 		setMergedLineDrafts(restoreObject(editor.mergedLineDrafts));
 		setLineMetaDrafts(restoreObject(editor.lineMetaDrafts));
+		setLineStyleDrafts(restoreObject(editor.lineStyleDrafts));
 		setPendingMultiVocalDecision(null);
 		setPendingParentheticalLayoutDecision(null);
 		setError(null);
@@ -7884,7 +8143,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		});
 		return {
 			...sourceData,
-			version: lines.some(line => Array.isArray(line?.parallel?.parts) && line.parallel.parts.length > 1)
+			version: lines.some(line => (
+				(Array.isArray(line?.parallel?.parts) && line.parallel.parts.length > 1)
+				|| (Array.isArray(line?.styleRanges) && line.styleRanges.length > 0)
+			))
 				? SYNC_CREATOR_SYNC_DATA_VERSION
 				: sourceData.version,
 			lines
@@ -9059,7 +9321,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			gridTemplateColumns: 'auto minmax(0, 1fr)',
 			alignItems: 'center',
 			gap: '12px',
-			marginTop: 'auto',
+			marginTop: '4px',
 			padding: '12px 0 0',
 			borderTop: `1px solid ${TOSS_BORDER}`,
 			containerType: 'inline-size',
@@ -9559,9 +9821,20 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		statValue: { fontSize: '18px', fontWeight: '800', color: 'var(--spice-text)', fontVariantNumeric: 'tabular-nums' },
 		statLabel: { fontSize: '11px', color: 'var(--spice-subtext)', marginTop: '4px', fontWeight: '700' },
 		actionGrid: { display: 'flex', flexWrap: 'wrap', gap: '3px' },
-		stagePanel: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '18px 22px', overflow: 'hidden', borderBottom: 'none' },
-		stageBody: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', overflow: 'hidden' },
-		stageLyricsBox: { flex: 1, minHeight: '360px', marginBottom: '14px' },
+		stagePanel: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '14px 18px 10px', overflow: 'hidden', borderBottom: 'none' },
+		stageBody: {
+			flex: 1,
+			minHeight: 0,
+			display: 'flex',
+			flexDirection: 'column',
+			justifyContent: 'flex-start',
+			overflowY: 'auto',
+			overflowX: 'hidden',
+			overscrollBehavior: 'contain',
+			scrollbarGutter: 'stable',
+			paddingRight: '4px'
+		},
+		stageLyricsBox: { flex: '1 0 auto', minHeight: 'clamp(220px, 34vh, 360px)', marginBottom: '10px' },
 		transportPanel: { display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 18px' },
 		transportRow: { display: 'flex', alignItems: 'center', gap: '10px' },
 		offsetCompactRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' },
@@ -9605,6 +9878,18 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		),
 	};
 	const renderCharacterSpan = (char, i, options = {}) => {
+		const absoluteIndex = currentLineCharRefs[i]?.absoluteIndex ?? (currentLineStart + i);
+		const inlineStyleRange = options.wordSpacer
+			? null
+			: currentLineStyleRanges.find(range => range.start <= absoluteIndex && range.end >= absoluteIndex);
+		const inlineStyleColor = inlineStyleRange?.speaker
+			? getSyncCreatorSpeakerTextColor(
+				inlineStyleRange.speaker,
+				inlineStyleRange['speaker-color'],
+				inlineStyleRange['speaker-fallback']
+			)
+			: '';
+		const inlineStyleKind = normalizeSyncCreatorKind(inlineStyleRange?.kind) || 'vocal';
 		const isSynced = isCharSynced(currentLineIndex, i);
 		const isRec = mode === 'record' && currentRecordingCharIndex >= 0 && i <= currentRecordingCharIndex;
 		const isLocked = isRecordingLockArmed && i <= recordingLockIndex;
@@ -9643,6 +9928,15 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			if (isRec || isLockedPlaybackProgress) style = { ...style, ...s.charRecording };
 			else if (isSynced) style = isPlayed ? { ...style, ...s.charPlayed } : { ...style, ...s.charSynced };
 			if (isLocked) style = { ...style, ...s.charLocked };
+			if (inlineStyleColor) {
+				style = {
+					...style,
+					color: inlineStyleColor,
+					'--lyrics-color-active': inlineStyleColor,
+					'--lyrics-color-inactive': inlineStyleColor
+				};
+			}
+			if (inlineStyleRange) style['--ivlyrics-range-index'] = i;
 		}
 
 		const pronunciationStyle = usePrimaryLayout
@@ -9657,9 +9951,14 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				color: currentSpeakerTextColor
 			};
 
-		return react.createElement('span', {
+		const charNode = react.createElement('span', {
 			key: options.key || i,
-			className: 'lyrics-karaoke-char',
+			className: [
+				'lyrics-karaoke-char',
+				inlineStyleRange ? 'ivlyrics-karaoke-range-style lyrics-karaoke-part' : '',
+				inlineStyleRange ? inlineStyleKind : '',
+				inlineStyleRange && textEffectsDisabled ? 'text-effects-disabled' : ''
+			].filter(Boolean).join(' '),
 			style,
 			ref: (el) => { charElementsRef.current[i] = el; },
 			'data-char-index': i,
@@ -9679,6 +9978,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				: (characterPronunciation && react.createElement('span', { style: pronunciationStyle }, characterPronunciation)),
 			shouldShowCharTime && isSynced && charTime !== null && react.createElement('span', { style: s.charTime }, formatSeconds(charTime))
 		);
+		return charNode;
 	};
 	const renderPronunciationUnit = (unit) => {
 		const wordChars = [];
@@ -10529,6 +10829,269 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		)
 	);
 
+	const renderStyleRangeEditor = () => {
+		if (!currentFullLineChars.length) return null;
+		const selectionStart = styleRangeSelection
+			? Math.min(styleRangeSelection.anchor, styleRangeSelection.focus)
+			: -1;
+		const selectionEnd = styleRangeSelection
+			? Math.max(styleRangeSelection.anchor, styleRangeSelection.focus)
+			: -1;
+		const selectedText = selectionStart >= 0
+			? currentFullLineChars.slice(selectionStart, selectionEnd + 1).join('')
+			: '';
+		const applyEffect = () => {
+			if (!updateCurrentLineStyleRanges({ kind: styleRangeEffect })) return;
+			Toast.success(I18n.t('syncCreator.rangeStyleApplied') || '선택한 글자에 효과를 적용했습니다.');
+		};
+		const selectRangeSpeaker = (value) => {
+			const transition = resolveSyncCreatorSpeakerTransition({
+				currentSpeaker: styleRangeSpeaker,
+				currentColor: styleRangeSpeakerColor,
+				currentFallback: styleRangeSpeakerFallback,
+				nextSpeaker: value,
+				remembered: {
+					color: styleRangeSpeakerColor || bulkCustomSpeakerColor,
+					fallback: styleRangeSpeakerFallback || bulkCustomSpeakerFallback
+				}
+			});
+			if (!transition) return;
+			setStyleRangeSpeaker(transition.speaker);
+			setStyleRangeSpeakerColor(transition.color);
+			setStyleRangeSpeakerFallback(transition.fallback || SYNC_CREATOR_DEFAULT_CUSTOM_FALLBACK);
+		};
+		const applySpeakerColor = () => {
+			const speakerMeta = resolveSyncCreatorBulkSpeakerMeta(
+				styleRangeSpeaker,
+				styleRangeSpeakerColor,
+				styleRangeSpeakerFallback
+			);
+			if (!speakerMeta) return;
+			if (!updateCurrentLineStyleRanges({
+				speaker: speakerMeta.speaker,
+				'speaker-color': speakerMeta.color,
+				'speaker-fallback': speakerMeta.fallback
+			})) return;
+			Toast.success(I18n.t('syncCreator.rangeColorApplied') || '선택한 글자에 색상을 적용했습니다.');
+		};
+		const clearStyle = () => {
+			if (!updateCurrentLineStyleRanges({ kind: null, speaker: null })) return;
+			Toast.success(I18n.t('syncCreator.rangeStyleCleared') || '선택 범위의 스타일을 지웠습니다.');
+		};
+		const rangeSpeakerTone = getSpeakerTone(
+			styleRangeSpeaker,
+			styleRangeSpeakerColor,
+			styleRangeSpeakerFallback
+		);
+
+		return react.createElement('section', {
+			className: 'sync-creator-range-style-editor',
+			style: {
+				flexShrink: 0,
+				marginTop: 8,
+				border: `1px solid ${TOSS_BORDER}`,
+				borderRadius: 10,
+				background: 'rgba(255,255,255,0.025)',
+				overflow: 'hidden'
+			}
+		},
+			react.createElement('button', {
+				type: 'button',
+				style: {
+					width: '100%',
+					minHeight: 38,
+					display: 'grid',
+					gridTemplateColumns: 'minmax(0, 1fr) auto auto',
+					alignItems: 'center',
+					gap: 9,
+					padding: '8px 11px',
+					border: 'none',
+					borderRadius: 0,
+					background: 'transparent',
+					color: 'var(--spice-text)',
+					textAlign: 'left',
+					cursor: 'pointer'
+				},
+				onClick: () => {
+					setIsStyleRangeEditorExpanded(value => !value);
+					setIsStyleRangePaletteOpen(false);
+				},
+				'aria-expanded': isStyleRangeEditorExpanded
+			},
+				react.createElement('strong', {
+					style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700 }
+				}, I18n.t('syncCreator.rangeStyleTitle') || '부분 효과 · 색상'),
+				react.createElement('span', { style: { fontSize: 10.5, color: 'var(--spice-subtext)', whiteSpace: 'nowrap' } },
+					currentLineStyleRanges.length
+						? `${currentLineStyleRanges.length} ${I18n.t('syncCreator.rangeStyleCount') || '개 범위'}`
+						: (I18n.t('syncCreator.rangeStyleEmpty') || '설정된 범위 없음')
+				),
+				react.createElement('span', { style: { color: 'var(--spice-subtext)', fontSize: 16, lineHeight: 1 } }, isStyleRangeEditorExpanded ? '⌃' : '⌄')
+			),
+			isStyleRangeEditorExpanded && react.createElement('div', {
+				style: { padding: '0 11px 10px', borderTop: `1px solid ${TOSS_BORDER}` }
+			},
+				react.createElement('div', { style: { marginTop: 8, fontSize: 10.5, color: 'var(--spice-subtext)', lineHeight: 1.4 } },
+					I18n.t('syncCreator.rangeStyleHint') || '싱크 단위와 관계없이 원하는 글자를 드래그해 선택하세요.'
+				),
+				react.createElement('div', {
+					style: {
+						display: 'flex',
+						flexWrap: 'wrap',
+						alignItems: 'baseline',
+						gap: 0,
+						maxHeight: 80,
+						overflowY: 'auto',
+						marginTop: 7,
+						padding: '7px 8px',
+						borderRadius: 7,
+						background: 'rgba(0,0,0,0.22)',
+						fontSize: 16,
+						lineHeight: 1.55,
+						userSelect: 'none',
+						cursor: 'text',
+						overscrollBehavior: 'contain'
+					},
+					role: 'listbox',
+					'aria-label': I18n.t('syncCreator.rangeStyleSelectLabel') || '스타일을 적용할 글자 범위'
+				}, currentFullLineChars.map((char, index) => {
+					const absoluteIndex = currentLineStart + index;
+					const existingStyle = currentLineStyleRanges.find(range => range.start <= absoluteIndex && range.end >= absoluteIndex);
+					const selected = index >= selectionStart && index <= selectionEnd;
+					const color = existingStyle?.speaker
+						? getSyncCreatorSpeakerTextColor(
+							existingStyle.speaker,
+							existingStyle['speaker-color'],
+							existingStyle['speaker-fallback']
+						)
+						: '';
+					return react.createElement('span', {
+						key: `range-style-${currentLineStart}-${index}`,
+						role: 'option',
+						'aria-selected': selected,
+						onPointerDown: (event) => beginStyleRangeSelection(index, event),
+						onPointerEnter: () => extendStyleRangeSelection(index),
+						style: {
+							display: 'inline-block',
+							minWidth: char === ' ' ? '0.42em' : undefined,
+							padding: 0,
+							margin: 0,
+							borderRadius: 3,
+							color: color || 'var(--spice-text)',
+							background: selected
+								? 'rgba(var(--spice-rgb-accent, 30, 215, 96), 0.32)'
+								: (existingStyle ? 'rgba(var(--spice-rgb-accent, 30, 215, 96), 0.10)' : 'transparent'),
+							boxShadow: existingStyle?.kind && existingStyle.kind !== 'vocal'
+								? 'inset 0 -2px 0 rgba(var(--spice-rgb-accent, 30, 215, 96), 0.75)'
+								: 'none'
+						},
+						title: existingStyle
+							? [getSyncCreatorKindLabel(existingStyle.kind), existingStyle.speaker].filter(Boolean).join(' · ')
+							: undefined
+					}, char === ' ' ? '\u00A0' : char);
+				})),
+				react.createElement('div', {
+					style: { minHeight: 16, marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10.5, color: selectedText ? 'var(--spice-text)' : 'var(--spice-subtext)' }
+				}, selectedText
+					? `${I18n.t('syncCreator.rangeStyleSelected') || '선택'}: “${selectedText}” (${selectionStart + 1}–${selectionEnd + 1})`
+					: (I18n.t('syncCreator.rangeStyleSelectPrompt') || '먼저 적용할 글자를 드래그하세요.')
+				),
+				react.createElement('div', { style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 6 } },
+					react.createElement('select', {
+						style: { ...s.select, flex: '1 1 140px', minWidth: 0 },
+						value: styleRangeEffect,
+						onChange: event => setStyleRangeEffect(event.target.value)
+					}, SYNC_CREATOR_KIND_OPTIONS.map(([value, labelKey]) => react.createElement('option', { key: value, value }, I18n.t(labelKey) || value))),
+					react.createElement('button', {
+						type: 'button',
+						style: { ...s.secondaryBtn, opacity: selectedText ? 1 : 0.45 },
+						disabled: !selectedText,
+						onClick: applyEffect
+					}, I18n.t('syncCreator.rangeEffectApply') || '효과 적용'),
+					react.createElement('button', {
+						type: 'button',
+						style: { ...s.deleteBtn, opacity: selectedText ? 1 : 0.45 },
+						disabled: !selectedText,
+						onClick: clearStyle
+					}, I18n.t('syncCreator.rangeStyleClear') || '스타일 지우기')
+				),
+				react.createElement('div', { style: { marginTop: 7, paddingTop: 7, borderTop: `1px solid ${TOSS_BORDER}` } },
+					react.createElement('div', { style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 } },
+						react.createElement('button', {
+							type: 'button',
+							style: {
+								...s.secondaryBtn,
+								flex: '1 1 150px',
+								minWidth: 0,
+								justifyContent: 'flex-start',
+								color: rangeSpeakerTone.text,
+								background: rangeSpeakerTone.background,
+								borderColor: rangeSpeakerTone.border
+							},
+							onClick: () => setIsStyleRangePaletteOpen(value => !value),
+							'aria-expanded': isStyleRangePaletteOpen
+						},
+							react.createElement('span', { style: { ...s.speakerDot, background: rangeSpeakerTone.dot } }),
+							react.createElement('span', { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+								`${I18n.t('syncCreator.rangeColorLabel') || '부분 색상'} · ${styleRangeSpeaker}`
+							),
+							react.createElement('span', { style: { marginLeft: 'auto', color: 'var(--spice-subtext)' } }, isStyleRangePaletteOpen ? '⌃' : '⌄')
+						),
+						react.createElement('button', {
+							type: 'button',
+							style: { ...s.secondaryBtn, opacity: selectedText ? 1 : 0.45 },
+							disabled: !selectedText,
+							onClick: applySpeakerColor
+						}, I18n.t('syncCreator.rangeColorApply') || '색상 적용')
+					),
+					isStyleRangePaletteOpen && react.createElement('div', {
+						className: 'sync-creator-range-speaker-palette',
+						style: {
+							maxHeight: 190,
+							overflowY: 'auto',
+							overflowX: 'hidden',
+							marginTop: 6,
+							padding: '8px 9px',
+							border: `1px solid ${TOSS_BORDER}`,
+							borderRadius: 8,
+							background: 'rgba(0,0,0,0.18)',
+							overscrollBehavior: 'contain'
+						}
+					},
+						renderSpeakerPicker(
+							styleRangeSpeaker,
+							styleRangeSpeakerColor,
+							styleRangeSpeakerFallback,
+							(value) => {
+								selectRangeSpeaker(value);
+								if (!isSyncCreatorCustomSpeaker(value)) setIsStyleRangePaletteOpen(false);
+							}
+						),
+						isSyncCreatorCustomSpeaker(styleRangeSpeaker) && react.createElement('div', {
+							style: { display: 'grid', gridTemplateColumns: '34px minmax(110px, 1fr)', gap: 7, marginTop: 7, alignItems: 'center' }
+						},
+							react.createElement('input', {
+								type: 'color',
+								value: sanitizeSyncCreatorSpeakerColor(styleRangeSpeaker, styleRangeSpeakerColor, true, styleRangeSpeakerFallback),
+								onChange: event => setStyleRangeSpeakerColor(normalizeSyncCreatorSpeakerColor(event.target.value)),
+								style: { width: 34, height: 30, padding: 2, border: `1px solid ${TOSS_BORDER}`, borderRadius: 7, background: 'transparent' },
+								'aria-label': I18n.t('syncCreator.speakerCustomColor') || 'Custom speaker color'
+							}),
+							react.createElement('select', {
+								style: { ...s.select, width: '100%' },
+								value: styleRangeSpeakerFallback,
+								onChange: event => setStyleRangeSpeakerFallback(normalizeSyncCreatorSpeakerFallback(event.target.value) || SYNC_CREATOR_DEFAULT_CUSTOM_FALLBACK)
+							}, SYNC_CREATOR_CUSTOM_FALLBACK_OPTIONS.map(value => react.createElement('option', {
+								key: value,
+								value
+							}, value.replace(' 1', ''))))
+						)
+					)
+				)
+			)
+		);
+	};
+
 	const renderStagePanel = () => react.createElement('div', { className: 'sync-creator-stage', style: { ...s.panel, ...s.stagePanel } },
 		isLoading && react.createElement('div', { style: s.loading }, I18n.t('syncCreator.loadingLyrics')),
 		error && react.createElement('div', { style: { ...s.error, display: 'flex', flexDirection: 'column', alignItems: 'center' } },
@@ -10582,7 +11145,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			react.createElement('div', { style: s.effectStripRow },
 				react.createElement('span', { style: s.effectStripTitle }, I18n.t('syncCreator.typeLabel') || 'Text effect'),
 				renderTextEffectPicker(currentTextEffectKind, updateCurrentTextEffect, { compact: true })
-			)
+			),
+			renderStyleRangeEditor()
 		)
 	);
 

@@ -4768,6 +4768,10 @@
                         end: Math.max(0, Number(line.end) - charOffset)
                     };
 
+                    if (Array.isArray(line.styleRanges)) {
+                        shifted.styleRanges = shiftSyncDataRanges(line.styleRanges, charOffset);
+                    }
+
                     if (line?.parallel) {
                         shifted.parallel = {
                             ...line.parallel,
@@ -5015,34 +5019,46 @@
                 if (repair.changed) timingRepairStats.repairedSequences++;
                 if (repair.usedLineFallback) timingRepairStats.lineFallbacks++;
             };
+            const getSyncDataSyllableStyleKey = (syllable) => [
+                syllable?.inlineStyle === true ? '1' : '0',
+                String(syllable?.styleKind || ''),
+                String(syllable?.styleSpeaker || ''),
+                String(syllable?.styleSpeakerColor || ''),
+                String(syllable?.styleSpeakerFallback || '')
+            ].join('|');
             const collapseSyncDataSyllables = (sourceSyllables, granularity, endTime) => {
                 const syllables = Array.isArray(sourceSyllables) ? sourceSyllables : [];
                 const normalizedGranularity = normalizeSyncDataGranularity(granularity);
                 if (normalizedGranularity === 'character' || syllables.length === 0) return syllables;
-                if (normalizedGranularity === 'line') {
-                    return [{
-                        text: syllables.map(syllable => syllable.text || '').join(''),
-                        startTime: syllables[0].startTime,
-                        endTime: Math.max(syllables[0].startTime, Number(endTime) || syllables[0].startTime)
-                    }];
-                }
 
                 const grouped = [];
                 for (const syllable of syllables) {
                     const previous = grouped[grouped.length - 1];
-                    if (previous && previous.startTime === syllable.startTime) {
+                    const sameTimingUnit = normalizedGranularity === 'line'
+                        || previous?.startTime === syllable.startTime;
+                    if (previous
+                        && sameTimingUnit
+                        && getSyncDataSyllableStyleKey(previous) === getSyncDataSyllableStyleKey(syllable)) {
                         previous.text += syllable.text || '';
                         continue;
                     }
+					const segmentStartTime = normalizedGranularity === 'line'
+						? syllables[0].startTime
+						: syllable.startTime;
                     grouped.push({
                         text: syllable.text || '',
-                        startTime: syllable.startTime,
+						startTime: segmentStartTime,
                         endTime: syllable.endTime
                     });
+                    if (syllable.inlineStyle === true) grouped[grouped.length - 1].inlineStyle = true;
+                    if (syllable.styleKind) grouped[grouped.length - 1].styleKind = syllable.styleKind;
+                    if (syllable.styleSpeaker) grouped[grouped.length - 1].styleSpeaker = syllable.styleSpeaker;
+                    if (syllable.styleSpeakerColor) grouped[grouped.length - 1].styleSpeakerColor = syllable.styleSpeakerColor;
+                    if (syllable.styleSpeakerFallback) grouped[grouped.length - 1].styleSpeakerFallback = syllable.styleSpeakerFallback;
                 }
                 for (let index = 0; index < grouped.length; index++) {
                     const nextStart = grouped[index + 1]?.startTime;
-                    grouped[index].endTime = Number.isFinite(nextStart)
+                    grouped[index].endTime = normalizedGranularity !== 'line' && Number.isFinite(nextStart)
                         ? Math.max(grouped[index].startTime, nextStart)
                         : Math.max(grouped[index].startTime, Number(endTime) || grouped[index].endTime);
                 }
@@ -5175,6 +5191,35 @@
 
             for (let i = 0; i < normalizedSyncLines.length; i++) {
                 const lineData = normalizedSyncLines[i];
+				const inlineStyleRanges = (Array.isArray(lineData?.styleRanges) ? lineData.styleRanges : [])
+					.map((range) => {
+						const start = Number(range?.start);
+						const end = Number(range?.end);
+						const kind = String(range?.kind || '').trim().toLowerCase();
+						const speaker = String(range?.speaker || '').trim().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').toUpperCase();
+						const speakerColor = /^#[0-9a-f]{6}$/i.test(String(range?.['speaker-color'] || '').trim())
+							? String(range['speaker-color']).trim().toLowerCase()
+							: '';
+						const speakerFallback = String(range?.['speaker-fallback'] || '').trim().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').toUpperCase();
+						return Number.isInteger(start) && Number.isInteger(end) && end >= start && (kind || speaker)
+							? { start, end, kind, speaker, speakerColor, speakerFallback }
+							: null;
+					})
+					.filter(Boolean)
+					.sort((left, right) => left.start - right.start || left.end - right.end);
+				const hasInlineStyles = inlineStyleRanges.length > 0;
+				const applyInlineStyle = (syllable, absoluteIndex, fallbackKind) => {
+					if (!hasInlineStyles) return syllable;
+					const styleRange = inlineStyleRanges.find(range => range.start <= absoluteIndex && range.end >= absoluteIndex);
+					return {
+						...syllable,
+						inlineStyle: true,
+						styleKind: styleRange?.kind || fallbackKind || 'vocal',
+						...(styleRange?.speaker ? { styleSpeaker: styleRange.speaker } : {}),
+						...(styleRange?.speakerColor ? { styleSpeakerColor: styleRange.speakerColor } : {}),
+						...(styleRange?.speakerFallback ? { styleSpeakerFallback: styleRange.speakerFallback } : {})
+					};
+				};
 
                 // 해당 범위의 텍스트 추출 (유니코드 문자 배열에서 slice 사용)
                 const lineText = fullTextChars.slice(lineData.start, lineData.end + 1).join('');
@@ -5225,11 +5270,11 @@
                         lineEndTime = charEndTime;
                     }
 
-                    syllables.push({
+					syllables.push(applyInlineStyle({
                         text: chars[j],
                         startTime: charStartTime,
                         endTime: charEndTime
-                    });
+					}, lineData.start + j, lineData.kind || 'vocal'));
                 }
 
                 syllables = collapseSyncDataSyllables(syllables, lineGranularity, lineEndTime);
@@ -5258,10 +5303,11 @@
                                 const gapEndTime = Number.isFinite(nextRangeTime)
                                     ? Math.max(gapStartTime, nextRangeTime)
                                     : gapStartTime;
-                                partSyllables.push({
+								partSyllables.push({
                                     text: ' ',
                                     startTime: gapStartTime,
-                                    endTime: gapEndTime
+									endTime: gapEndTime,
+									...(hasInlineStyles ? { inlineStyle: true, styleKind: part.kind || lineData.kind || 'vocal' } : {})
                                 });
                             }
                         }
@@ -5322,11 +5368,11 @@
                             charEnd = Math.max(charStart, charEnd);
 
                             text += char;
-                            partSyllables.push({
+							partSyllables.push(applyInlineStyle({
                                 text: char,
                                 startTime: charStart,
                                 endTime: charEnd
-                            });
+							}, sourceIndex, part.kind || lineData.kind || 'vocal'));
                             partCharIndex++;
                         }
                     });

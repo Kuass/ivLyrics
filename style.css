@@ -2618,6 +2618,52 @@ div.lyrics-tabBar-headerItemLink {
   will-change: opacity, filter;
 }
 
+.ivlyrics-karaoke-range-style {
+  display: inline-block;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  word-spacing: inherit;
+  vertical-align: baseline;
+  transform-origin: center bottom;
+}
+
+.ivlyrics-karaoke-range-style.effect { animation: ivlyrics-kind-effect-tremble 180ms steps(2, end) infinite; }
+.ivlyrics-karaoke-range-style.adlib { animation: ivlyrics-kind-adlib-float 1.05s ease-in-out infinite; }
+.ivlyrics-karaoke-range-style.pulse { animation: ivlyrics-kind-pulse 940ms ease-in-out infinite; }
+.ivlyrics-karaoke-range-style.wave { animation: ivlyrics-kind-wave 920ms ease-in-out infinite; }
+.ivlyrics-karaoke-range-style.sparkle { animation: ivlyrics-kind-sparkle 1.18s ease-in-out infinite; }
+.ivlyrics-karaoke-range-style.echo { animation: ivlyrics-kind-echo 1.28s ease-in-out infinite; }
+.ivlyrics-karaoke-range-style.whisper { animation: ivlyrics-kind-whisper 1.45s ease-in-out infinite; }
+.ivlyrics-karaoke-range-style.bounce { animation: ivlyrics-kind-bounce 780ms cubic-bezier(0.2, 0.85, 0.24, 1) infinite; }
+.ivlyrics-karaoke-range-style.sway { animation: ivlyrics-kind-sway 1.35s ease-in-out infinite; }
+.ivlyrics-karaoke-range-style.glow { animation: ivlyrics-kind-glow 2.8s ease-in-out infinite; }
+.ivlyrics-karaoke-range-style.glitch { animation: ivlyrics-kind-glitch 1.12s steps(1, end) infinite; }
+.ivlyrics-karaoke-range-style.flicker { animation: ivlyrics-kind-flicker 1.22s steps(1, end) infinite; }
+.ivlyrics-karaoke-range-style.float { animation: ivlyrics-kind-float 1.65s ease-in-out infinite; }
+.ivlyrics-karaoke-range-style.blur { animation: ivlyrics-kind-blur 1.5s ease-in-out infinite; }
+.ivlyrics-karaoke-range-style.pop { animation: ivlyrics-kind-pop 1.08s cubic-bezier(0.18, 0.9, 0.36, 1) infinite; }
+
+.ivlyrics-karaoke-range-style.wave,
+.ivlyrics-karaoke-range-style.sparkle,
+.ivlyrics-karaoke-range-style.echo,
+.ivlyrics-karaoke-range-style.pop {
+  animation-delay: calc(var(--ivlyrics-range-index, 0) * -70ms);
+}
+
+.ivlyrics-karaoke-range-style {
+  animation-play-state: paused;
+}
+
+.lyrics-karaoke-line.is-active .ivlyrics-karaoke-range-style {
+  animation-play-state: running;
+}
+
 .lyrics-karaoke-part.text-effects-disabled,
 .lyrics-karaoke-part.text-effects-disabled *,
 .lyrics-lyricsContainer-LyricsLine.text-effects-disabled,

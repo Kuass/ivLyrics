@@ -3158,7 +3158,9 @@ const getKaraokeLineMetaClass = (line) => {
 	const classes = [];
 	const speakerClass = normalizeKaraokeSpeakerClass(line?.speaker, line?.['speaker-color'], line?.['speaker-fallback']);
 	if (speakerClass) classes.push(`speaker-${speakerClass}`);
-	if (line?.kind) classes.push(...getKaraokeKindClassParts(line.kind));
+	const hasInlineStyles = Array.isArray(line?.syllables)
+		&& line.syllables.some(syllable => syllable?.inlineStyle === true);
+	if (line?.kind && !hasInlineStyles) classes.push(...getKaraokeKindClassParts(line.kind));
 	return classes.join(" ");
 };
 
@@ -4296,7 +4298,8 @@ const buildKaraokeTextRunSegments = (timedChars, wordTimed = false) => {
 	if (!Array.isArray(timedChars) || timedChars.length === 0) {
 		return [];
 	}
-	const sharedSegments = !wordTimed && window.LyricsService?.buildKaraokeWordSegments?.(timedChars, {
+	const hasInlineStyles = timedChars.some(charInfo => charInfo?.inlineStyle === true);
+	const sharedSegments = !wordTimed && !hasInlineStyles && window.LyricsService?.buildKaraokeWordSegments?.(timedChars, {
 		getText: (charInfo) => charInfo?.char || "",
 		getStartTime: (charInfo) => charInfo?.startTime,
 		getEndTime: (charInfo) => charInfo?.endTime,
@@ -4326,7 +4329,18 @@ const buildKaraokeTextRunSegments = (timedChars, wordTimed = false) => {
 			&& unitIndex !== null
 			&& currentSegment.unitIndex !== null
 			&& currentSegment.unitIndex !== unitIndex;
-		if (!currentSegment || currentSegment.type !== type || unitChanged) {
+		const styleKind = charInfo?.inlineStyle === true ? String(charInfo?.styleKind || 'vocal') : '';
+		const styleSpeaker = charInfo?.inlineStyle === true ? String(charInfo?.styleSpeaker || '') : '';
+		const styleSpeakerColor = charInfo?.inlineStyle === true ? String(charInfo?.styleSpeakerColor || '') : '';
+		const styleSpeakerFallback = charInfo?.inlineStyle === true ? String(charInfo?.styleSpeakerFallback || '') : '';
+		const styleChanged = currentSegment
+			&& (
+				currentSegment.styleKind !== styleKind
+				|| currentSegment.styleSpeaker !== styleSpeaker
+				|| currentSegment.styleSpeakerColor !== styleSpeakerColor
+				|| currentSegment.styleSpeakerFallback !== styleSpeakerFallback
+			);
+		if (!currentSegment || currentSegment.type !== type || unitChanged || styleChanged) {
 			if (currentSegment?.text.length > 0) {
 				segments.push(currentSegment);
 			}
@@ -4337,6 +4351,10 @@ const buildKaraokeTextRunSegments = (timedChars, wordTimed = false) => {
 				text: "",
 				startTime: Number.isFinite(charInfo?.startTime) ? charInfo.startTime : 0,
 				endTime: Number.isFinite(charInfo?.endTime) ? charInfo.endTime : 0,
+				styleKind,
+				styleSpeaker,
+				styleSpeakerColor,
+				styleSpeakerFallback,
 			};
 		}
 
@@ -4401,12 +4419,28 @@ const buildKaraokeTextRunElements = (
 			segmentStyle["--karaoke-bounce-scale"] = bounce.scale;
 		}
 
-		const segmentClassName = getCachedKaraokeStateClassName(
+		let segmentClassName = getCachedKaraokeStateClassName(
 			KARAOKE_TEXT_RUN_STATE_CLASS_NAMES,
 			segmentState,
 			bounce.active,
 			isComplete
 		);
+		if (segment.styleKind || segment.styleSpeaker) {
+			segmentClassName += ` ivlyrics-karaoke-range-style lyrics-karaoke-part ${segment.styleKind || 'vocal'}`;
+			const speakerClass = normalizeKaraokeSpeakerClass(
+				segment.styleSpeaker,
+				segment.styleSpeakerColor,
+				segment.styleSpeakerFallback
+			);
+			if (speakerClass) segmentClassName += ` speaker-${speakerClass}`;
+			Object.assign(segmentStyle, getKaraokeSpeakerStyle(
+				segment.styleSpeaker,
+				segment.styleSpeakerColor,
+				segment.styleSpeakerFallback
+			));
+			if (segment.styleKind && !areKaraokeTextEffectsEnabled()) segmentClassName += ' text-effects-disabled';
+		}
+		segmentStyle['--ivlyrics-range-index'] = segment.startIndex;
 
 		return react.createElement(
 			"span",
@@ -5683,6 +5717,13 @@ const buildKaraokeTimedChars = (line) => {
 					startTime: charStart,
 					endTime: charStart + charDuration,
 					karaokeUnitIndex,
+					...(syllable.inlineStyle === true ? {
+						inlineStyle: true,
+						styleKind: syllable.styleKind || 'vocal',
+						styleSpeaker: syllable.styleSpeaker || '',
+						styleSpeakerColor: syllable.styleSpeakerColor || '',
+						styleSpeakerFallback: syllable.styleSpeakerFallback || ''
+					} : null),
 				});
 			});
 		});
@@ -6061,13 +6102,15 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 			culturalAnnotationsByRow[rowIndex].push(annotation);
 		}
           let rowGlobalCharOffset = globalCharOffset;
-          const stackChildren = vocalRows.map((row, rowIndex) => {
+		  const stackChildren = vocalRows.map((row, rowIndex) => {
                   const rowRenderData = vocalRowRenderData[rowIndex];
 			const rowLine = rowRenderData.line;
+			const rowHasInlineStyles = Array.isArray(row.syllables)
+				&& row.syllables.some(syllable => syllable?.inlineStyle === true);
                   const classParts = [
                           "lyrics-karaoke-part",
                           row.role === "background" ? "background" : "lead",
-                          ...getKaraokeKindClassParts(row.kind || "vocal"),
+						  ...(rowHasInlineStyles ? [] : getKaraokeKindClassParts(row.kind || "vocal")),
                           shouldUseVocalRowAnchor && rowIndex === activeVocalRowIndex ? "active-vocal-row" : "",
                           row.speakerClass ? `speaker-${row.speakerClass}` : "",
                   ].filter(Boolean);
@@ -6292,7 +6335,7 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 		);
 		const reading = furiganaMap.get(index);
 
-		const renderedCharNode = reading
+		let renderedCharNode = reading
 			? react.createElement(
 				"ruby",
 				{
@@ -6304,6 +6347,31 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 				react.createElement("rt", null, reading)
 			)
 			: charNode;
+		if (charInfo?.inlineStyle === true) {
+			const inlineKind = String(charInfo.styleKind || 'vocal').trim().toLowerCase() || 'vocal';
+			const inlineSpeakerClass = normalizeKaraokeSpeakerClass(
+				charInfo.styleSpeaker,
+				charInfo.styleSpeakerColor,
+				charInfo.styleSpeakerFallback
+			);
+			const inlineStyle = {
+				'--ivlyrics-range-index': index,
+				...getKaraokeSpeakerStyle(
+					charInfo.styleSpeaker,
+					charInfo.styleSpeakerColor,
+					charInfo.styleSpeakerFallback
+				)
+			};
+			renderedCharNode = react.createElement(
+				'span',
+				{
+					className: `ivlyrics-karaoke-range-style lyrics-karaoke-part ${getKaraokeKindClassParts(inlineKind).join(' ')}${inlineSpeakerClass ? ` speaker-${inlineSpeakerClass}` : ''}`,
+					style: inlineStyle,
+					key: `karaoke-inline-style-${index}`
+				},
+				renderedCharNode
+			);
+		}
 
 		const culturalMarkers = culturalMarkersByCharIndex.get(index) || [];
 		if (culturalMarkers.length === 0) {
