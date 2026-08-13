@@ -2319,6 +2319,10 @@ window.LANG_MS = {
     "fontSizeInfo": "Laraskan saiz teks keseluruhan dokumen Penyelidikan",
     "gestureHint": "Klik kanan atau tahan karya seni album untuk membuka Penyelidikan",
     "gesture": "Klik kanan · Tahan",
+    "tokenConsentTitle": "Sebelum menggunakan Penyelidikan",
+    "tokenConsentBody": "Apabila Penyelidikan dijana buat kali pertama, sejumlah besar token mungkin digunakan untuk menganalisis lagu dan mengumpul maklumat sokongan.",
+    "tokenConsentNote": "Penggunaan token dan kemungkinan caj bergantung pada penyedia AI dan model yang dipilih.",
+    "tokenConsentAgree": "Setuju dan mulakan Penyelidikan",
     "providerDescription": "Pilih pembekal AI untuk mod terjemahan, sebutan, Penyelidikan dan Pembelajaran",
     "sections": {
       "overview": "Gambaran keseluruhan",

@@ -2309,6 +2309,10 @@ window.LANG_ID = {
     "fontSizeInfo": "Sesuaikan ukuran teks keseluruhan dokumen Penelitian",
     "gestureHint": "Klik kanan atau tahan sampul album untuk membuka Riset",
     "gesture": "Klik kanan · Tahan",
+    "tokenConsentTitle": "Sebelum menggunakan Riset",
+    "tokenConsentBody": "Saat Riset dibuat untuk pertama kalinya, banyak token mungkin digunakan untuk menganalisis lagu dan mengumpulkan informasi pendukung.",
+    "tokenConsentNote": "Penggunaan token dan kemungkinan biaya bergantung pada penyedia AI dan model yang dipilih.",
+    "tokenConsentAgree": "Setuju dan mulai Riset",
     "providerDescription": "Pilih penyedia AI untuk mode penerjemahan, pengucapan, Penelitian, dan Pembelajaran",
     "sections": {
       "overview": "Ikhtisar",

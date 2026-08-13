@@ -46,6 +46,30 @@ const FullscreenOverlay = (() => {
     const QUEUE_EMPTY_GRACE_MS = 1500;
     const PLAYER_SEEK_END_GUARD_MIN_MS = 250;
     const PLAYER_SEEK_END_GUARD_MAX_MS = 500;
+    const RESEARCH_TOKEN_CONSENT_STORAGE_KEY = "ivLyrics:research-token-consent:v1";
+    const hasResearchTokenConsent = () => {
+        try {
+            const value = window.ivLyricsStoragePersistence?.getItem?.(RESEARCH_TOKEN_CONSENT_STORAGE_KEY)
+                ?? Spicetify.LocalStorage?.get?.(RESEARCH_TOKEN_CONSENT_STORAGE_KEY)
+                ?? window.localStorage?.getItem?.(RESEARCH_TOKEN_CONSENT_STORAGE_KEY);
+            return value === "true" || value === "1";
+        } catch (_) {
+            return false;
+        }
+    };
+    const saveResearchTokenConsent = () => {
+        try {
+            if (window.ivLyricsStoragePersistence?.setItem) {
+                window.ivLyricsStoragePersistence.setItem(RESEARCH_TOKEN_CONSENT_STORAGE_KEY, "true");
+            } else if (Spicetify.LocalStorage?.set) {
+                Spicetify.LocalStorage.set(RESEARCH_TOKEN_CONSENT_STORAGE_KEY, "true");
+            } else {
+                window.localStorage?.setItem?.(RESEARCH_TOKEN_CONSENT_STORAGE_KEY, "true");
+            }
+        } catch (error) {
+            console.warn("[Research] Failed to remember token consent:", error);
+        }
+    };
     const FOCUSED_PRESENTATION_IDS = new Set([
         "vinyl",
         "compact-vinyl",
@@ -1870,6 +1894,104 @@ const FullscreenOverlay = (() => {
         );
     };
 
+    const ResearchTokenConsentDialog = react.memo(({ onAgree, onCancel }) => {
+        const dialogRef = useRef(null);
+        const agreeButtonRef = useRef(null);
+
+        useEffect(() => {
+            const previouslyFocused = document.activeElement;
+            const focusFrame = window.requestAnimationFrame(() => agreeButtonRef.current?.focus?.());
+            const handleKeyDown = (event) => {
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onCancel();
+                    return;
+                }
+
+                if (event.key !== "Tab") return;
+                const focusable = Array.from(dialogRef.current?.querySelectorAll?.("button:not(:disabled)") || []);
+                if (focusable.length === 0) return;
+
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            };
+
+            window.addEventListener("keydown", handleKeyDown, true);
+            return () => {
+                window.cancelAnimationFrame(focusFrame);
+                window.removeEventListener("keydown", handleKeyDown, true);
+                previouslyFocused?.focus?.();
+            };
+        }, [onCancel]);
+
+        return react.createElement("div", {
+            className: "research-consent-overlay",
+            onMouseDown: (event) => {
+                if (event.target === event.currentTarget) onCancel();
+            }
+        },
+            react.createElement("section", {
+                ref: dialogRef,
+                className: "research-consent-dialog",
+                role: "dialog",
+                "aria-modal": "true",
+                "aria-labelledby": "research-consent-title",
+                "aria-describedby": "research-consent-description research-consent-note"
+            },
+                react.createElement("div", {
+                    className: "research-consent-icon",
+                    "aria-hidden": "true"
+                },
+                    react.createElement("svg", {
+                        viewBox: "0 0 24 24",
+                        width: 24,
+                        height: 24,
+                        fill: "none",
+                        stroke: "currentColor",
+                        strokeWidth: 1.8,
+                        strokeLinecap: "round",
+                        strokeLinejoin: "round"
+                    },
+                        react.createElement("path", { d: "M10.3 3.7 2.5 17.2A2 2 0 0 0 4.2 20h15.6a2 2 0 0 0 1.7-2.8L13.7 3.7a2 2 0 0 0-3.4 0Z" }),
+                        react.createElement("path", { d: "M12 9v4" }),
+                        react.createElement("path", { d: "M12 17h.01" })
+                    )
+                ),
+                react.createElement("span", { className: "research-consent-eyebrow" }, I18n.t("research.title")),
+                react.createElement("h2", { id: "research-consent-title" }, I18n.t("research.tokenConsentTitle")),
+                react.createElement("p", {
+                    id: "research-consent-description",
+                    className: "research-consent-description"
+                }, I18n.t("research.tokenConsentBody")),
+                react.createElement("div", { className: "research-consent-note" },
+                    react.createElement("span", { className: "research-consent-note-dot", "aria-hidden": "true" }),
+                    react.createElement("p", { id: "research-consent-note" }, I18n.t("research.tokenConsentNote"))
+                ),
+                react.createElement("div", { className: "research-consent-actions" },
+                    react.createElement("button", {
+                        type: "button",
+                        className: "research-consent-button research-consent-button-secondary",
+                        onClick: onCancel
+                    }, I18n.t("research.cancel")),
+                    react.createElement("button", {
+                        ref: agreeButtonRef,
+                        type: "button",
+                        className: "research-consent-button research-consent-button-primary",
+                        onClick: onAgree
+                    }, I18n.t("research.tokenConsentAgree"))
+                )
+            )
+        );
+    });
+
     // Main Overlay Component
     const Overlay = ({
         coverUrl,
@@ -1896,6 +2018,8 @@ const FullscreenOverlay = (() => {
         const [tmiData, setTmiData] = useState(null);
         const [tmiLoading, setTmiLoading] = useState(false);
         const [tmiWebSearchFallback, setTmiWebSearchFallback] = useState(false);
+        const [researchConsentAccepted, setResearchConsentAccepted] = useState(hasResearchTokenConsent);
+        const [showResearchConsent, setShowResearchConsent] = useState(false);
         const [lpModeClosing, setLpModeClosing] = useState(false);
         const [isPlaying, setIsPlaying] = useState(false);
         const [position, setPosition] = useState(0);
@@ -2111,7 +2235,7 @@ const FullscreenOverlay = (() => {
 
         // Auto-hide UI on mouse inactivity
         useEffect(() => {
-            if (!isFullscreen || !autoHideUI) {
+            if (!isFullscreen || !autoHideUI || showResearchConsent) {
                 uiVisibleRef.current = true;
                 setUiVisible(true);
                 return;
@@ -2144,7 +2268,7 @@ const FullscreenOverlay = (() => {
                     clearTimeout(hideTimerRef.current);
                 }
             };
-        }, [isFullscreen, autoHideUI, autoHideDelay]);
+        }, [isFullscreen, autoHideUI, autoHideDelay, showResearchConsent]);
 
         const clearAlbumPressTimer = useCallback(() => {
             if (albumPressTimerRef.current) {
@@ -2247,16 +2371,8 @@ const FullscreenOverlay = (() => {
             }
         }, []);
 
-        // Research is intentionally opened only through context click or a long press.
-        const openTmiMode = useCallback(async () => {
+        const beginResearch = useCallback(async () => {
             if (tmiMode || tmiOpeningRef.current) return;
-
-            const hasAIProvider = window.AIAddonManager?.getEnabledProvidersFor('research')?.length > 0;
-
-            if (!hasAIProvider) {
-                Toast.error(I18n.t("tmi.requireKey"));
-                return;
-            }
 
             const trackId = trackUri?.split(":")[2];
             if (!trackId) return;
@@ -2271,6 +2387,35 @@ const FullscreenOverlay = (() => {
                 tmiOpeningRef.current = false;
             }
         }, [enableResearchPlaybackGuard, loadResearch, tmiMode, trackUri]);
+
+        // Research is intentionally opened only through context click or a long press.
+        const openTmiMode = useCallback(() => {
+            if (tmiMode || tmiOpeningRef.current || showResearchConsent) return;
+
+            const hasAIProvider = window.AIAddonManager?.getEnabledProvidersFor('research')?.length > 0;
+            if (!hasAIProvider) {
+                Toast.error(I18n.t("tmi.requireKey"));
+                return;
+            }
+
+            if (!researchConsentAccepted) {
+                setShowResearchConsent(true);
+                return;
+            }
+
+            beginResearch();
+        }, [beginResearch, researchConsentAccepted, showResearchConsent, tmiMode]);
+
+        const closeResearchConsent = useCallback(() => {
+            setShowResearchConsent(false);
+        }, []);
+
+        const acceptResearchConsent = useCallback(() => {
+            saveResearchTokenConsent();
+            setResearchConsentAccepted(true);
+            setShowResearchConsent(false);
+            beginResearch();
+        }, [beginResearch]);
 
         const handleAlbumModeClick = useCallback((event) => {
             event?.preventDefault?.();
@@ -2538,11 +2683,17 @@ const FullscreenOverlay = (() => {
             )
         );
 
+        const renderResearchConsentDialog = () => showResearchConsent && react.createElement(ResearchTokenConsentDialog, {
+            onAgree: acceptResearchConsent,
+            onCancel: closeResearchConsent
+        });
+
         if (!isFullscreen) return null;
 
         const VinylMode = window.ivLyricsVinylPlayerMode;
         if (!tvModeEnabled && focusModeActive && !tmiMode && VinylMode) {
-            return react.createElement(VinylMode, {
+            return react.createElement(react.Fragment, null,
+                react.createElement(VinylMode, {
                 track: liveVinylTrack,
                 albumRadius,
                 isClosing: lpModeClosing,
@@ -2622,8 +2773,10 @@ const FullscreenOverlay = (() => {
                     else Spicetify.Player?.togglePlay?.();
                 },
                 onTogglePlayback: () => Spicetify.Player.togglePlay(),
-                onNext: () => Spicetify.Player.next()
-            });
+                    onNext: () => Spicetify.Player.next()
+                }),
+                renderResearchConsentDialog()
+            );
         }
 
         const CompactAlbumVinyl = VinylMode?.CompactAlbumVinyl;
@@ -2679,6 +2832,7 @@ const FullscreenOverlay = (() => {
         const PresentationSwitcher = VinylMode?.PresentationSwitcher;
 
         return react.createElement(react.Fragment, null,
+            renderResearchConsentDialog(),
             !tvModeEnabled && !tmiMode && PresentationSwitcher && react.createElement(PresentationSwitcher, {
                 activeMode: normalizedPresentationMode,
                 visible: true,

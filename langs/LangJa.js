@@ -2310,6 +2310,10 @@ window.LANG_JA = {
     "fontSizeInfo": "研究文書全体のテキストサイズを調整する",
     "gestureHint": "アルバムアートワークを右クリックするか長押ししてリサーチを開きます",
     "gesture": "右クリック・長押し",
+    "tokenConsentTitle": "リサーチを使用する前に",
+    "tokenConsentBody": "リサーチを初めて生成する際、楽曲の分析と関連情報の収集に大量のトークンを使用する場合があります。",
+    "tokenConsentNote": "トークン使用量と料金の発生有無は、選択したAIプロバイダーとモデルによって異なります。",
+    "tokenConsentAgree": "同意してリサーチを開始",
     "providerDescription": "翻訳、発音、調査、学習モードの AI プロバイダーを選択",
     "sections": {
       "overview": "概要",

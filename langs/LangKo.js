@@ -2310,6 +2310,10 @@ window.LANG_KO = {
     "fontSizeInfo": "리서치 문서에 표시되는 전체 글자 크기를 조절합니다",
     "gestureHint": "앨범을 우클릭하거나 길게 눌러 리서치 열기",
     "gesture": "우클릭 · 길게 누르기",
+    "tokenConsentTitle": "리서치 사용 전 안내",
+    "tokenConsentBody": "리서치를 처음 생성할 때 곡 분석과 관련 자료 수집에 많은 양의 토큰을 사용할 수 있습니다.",
+    "tokenConsentNote": "토큰 사용량과 비용 발생 여부는 선택한 AI 제공자와 모델에 따라 달라집니다.",
+    "tokenConsentAgree": "동의하고 리서치 시작",
     "providerDescription": "번역, 발음 표기, 리서치와 학습 모드에 사용할 AI 제공자를 선택하세요",
     "sections": {
       "overview": "개요",

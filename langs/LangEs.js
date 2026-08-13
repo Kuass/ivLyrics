@@ -2310,6 +2310,10 @@ window.LANG_ES = {
     "fontSizeInfo": "Ajustar el tamaño general del texto del documento de investigación.",
     "gestureHint": "Haga clic derecho o mantenga presionada la carátula del álbum para abrir Investigación",
     "gesture": "Hacer clic derecho · Mantener presionado",
+    "tokenConsentTitle": "Antes de usar Investigación",
+    "tokenConsentBody": "Al generar la Investigación por primera vez, es posible que se utilice una gran cantidad de tokens para analizar la canción y recopilar información de apoyo.",
+    "tokenConsentNote": "El uso de tokens y los posibles cargos dependen del proveedor y del modelo de IA seleccionados.",
+    "tokenConsentAgree": "Aceptar e iniciar la Investigación",
     "providerDescription": "Elija proveedores de IA para los modos de traducción, pronunciación, investigación y aprendizaje",
     "sections": {
       "overview": "Descripción general",

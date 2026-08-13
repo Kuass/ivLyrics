@@ -2310,6 +2310,10 @@ window.LANG_TR = {
     "fontSizeInfo": "Araştırma belgesinin genel metin boyutunu ayarlayın",
     "gestureHint": "Araştırmayı açmak için albüm resmine sağ tıklayın veya basılı tutun",
     "gesture": "Sağ tıklayın · Basılı tutun",
+    "tokenConsentTitle": "Araştırmayı kullanmadan önce",
+    "tokenConsentBody": "Araştırma ilk kez oluşturulurken şarkıyı analiz etmek ve destekleyici bilgiler toplamak için çok sayıda token kullanılabilir.",
+    "tokenConsentNote": "Token kullanımı ve olası ücretler seçilen yapay zekâ sağlayıcısına ve modele bağlıdır.",
+    "tokenConsentAgree": "Kabul et ve Araştırmayı başlat",
     "providerDescription": "Çeviri, telaffuz, Araştırma ve Öğrenme modu için yapay zeka sağlayıcılarını seçin",
     "sections": {
       "overview": "Genel Bakış",

@@ -2310,6 +2310,10 @@ window.LANG_IT = {
     "fontSizeInfo": "Regola la dimensione complessiva del testo del documento di ricerca",
     "gestureHint": "Fai clic con il pulsante destro del mouse o tieni premuta la copertina dell'album per aprire la ricerca",
     "gesture": "Fare clic con il pulsante destro del mouse su · Mantieni",
+    "tokenConsentTitle": "Prima di usare Ricerca",
+    "tokenConsentBody": "La prima volta che viene generata la Ricerca, l’analisi del brano e la raccolta di informazioni di supporto possono utilizzare molti token.",
+    "tokenConsentNote": "L’uso dei token e gli eventuali costi dipendono dal provider e dal modello IA selezionati.",
+    "tokenConsentAgree": "Accetta e avvia la Ricerca",
     "providerDescription": "Scegli i fornitori di intelligenza artificiale per la traduzione, la pronuncia, la ricerca e la modalità di apprendimento",
     "sections": {
       "overview": "Panoramica",

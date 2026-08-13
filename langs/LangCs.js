@@ -2309,6 +2309,10 @@ window.LANG_CS = {
     "fontSizeInfo": "Upravte celkovou velikost textu výzkumného dokumentu",
     "gestureHint": "Kliknutím pravým tlačítkem nebo podržením obalu alba otevřete Výzkum",
     "gesture": "Klepněte pravým tlačítkem · Podržet",
+    "tokenConsentTitle": "Před použitím Výzkumu",
+    "tokenConsentBody": "Při prvním vytvoření Výzkumu může analýza skladby a shromažďování podkladů spotřebovat velké množství tokenů.",
+    "tokenConsentNote": "Spotřeba tokenů a případné poplatky závisí na vybraném poskytovateli AI a modelu.",
+    "tokenConsentAgree": "Souhlasit a spustit Výzkum",
     "providerDescription": "Vyberte si poskytovatele umělé inteligence pro režim překladu, výslovnosti, výzkumu a učení",
     "sections": {
       "overview": "Přehled",

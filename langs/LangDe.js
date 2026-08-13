@@ -2309,6 +2309,10 @@ window.LANG_DE = {
     "fontSizeInfo": "Passen Sie die Gesamttextgröße des Forschungsdokuments an",
     "gestureHint": "Klicken Sie mit der rechten Maustaste oder halten Sie das Albumcover gedrückt, um „Recherche“ zu öffnen",
     "gesture": "Rechtsklick · Halten",
+    "tokenConsentTitle": "Vor der Nutzung von Research",
+    "tokenConsentBody": "Bei der erstmaligen Erstellung einer Research können für die Analyse des Songs und das Sammeln ergänzender Informationen viele Tokens verbraucht werden.",
+    "tokenConsentNote": "Tokenverbrauch und mögliche Kosten hängen vom ausgewählten KI-Anbieter und Modell ab.",
+    "tokenConsentAgree": "Zustimmen und Research starten",
     "providerDescription": "Wählen Sie KI-Anbieter für Übersetzung, Aussprache, Recherche und Lernmodus",
     "sections": {
       "overview": "Übersicht",

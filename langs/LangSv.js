@@ -2309,6 +2309,10 @@ window.LANG_SV = {
     "fontSizeInfo": "Justera den övergripande textstorleken för forskningsdokumentet",
     "gestureHint": "Högerklicka eller håll ned albumomslaget för att öppna researchen",
     "gesture": "Högerklicka · Håll",
+    "tokenConsentTitle": "Innan du använder Research",
+    "tokenConsentBody": "När Research genereras för första gången kan många token användas för att analysera låten och samla in stödjande information.",
+    "tokenConsentNote": "Tokenanvändning och eventuella kostnader beror på vald AI-leverantör och modell.",
+    "tokenConsentAgree": "Godkänn och starta Research",
     "providerDescription": "Välj AI-leverantörer för översättning, uttal, forskning och inlärningsläge",
     "sections": {
       "overview": "Översikt",

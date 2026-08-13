@@ -2310,6 +2310,10 @@ window.LANG_ZH_CN = {
     "fontSizeInfo": "调整研究文档的整体文本大小",
     "gestureHint": "右键单击或按住专辑封面以打开研究",
     "gesture": "右键单击·按住",
+    "tokenConsentTitle": "使用研究功能前",
+    "tokenConsentBody": "首次生成研究内容时，分析歌曲和收集相关资料可能会消耗大量令牌。",
+    "tokenConsentNote": "令牌用量和可能产生的费用取决于所选的 AI 提供商和模型。",
+    "tokenConsentAgree": "同意并开始研究",
     "providerDescription": "选择翻译、发音、研究和学习模式的人工智能提供商",
     "sections": {
       "overview": "概述",

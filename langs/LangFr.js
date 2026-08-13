@@ -2310,6 +2310,10 @@ window.LANG_FR = {
     "fontSizeInfo": "Ajuster la taille globale du texte du document de recherche",
     "gestureHint": "Cliquez avec le bouton droit ou maintenez la pression sur la pochette de l'album pour ouvrir la recherche.",
     "gesture": "Clic droit · Maintenir",
+    "tokenConsentTitle": "Avant d’utiliser Research",
+    "tokenConsentBody": "Lors de la première génération de Research, l’analyse du morceau et la collecte d’informations complémentaires peuvent utiliser un grand nombre de jetons.",
+    "tokenConsentNote": "L’utilisation des jetons et les frais éventuels dépendent du fournisseur d’IA et du modèle sélectionnés.",
+    "tokenConsentAgree": "Accepter et lancer Research",
     "providerDescription": "Choisissez des fournisseurs d’IA pour les modes traduction, prononciation, recherche et apprentissage",
     "sections": {
       "overview": "Aperçu",

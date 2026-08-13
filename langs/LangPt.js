@@ -2310,6 +2310,10 @@ window.LANG_PT = {
     "fontSizeInfo": "Ajuste o tamanho geral do texto do documento de pesquisa",
     "gestureHint": "Clique com o botão direito ou segure a capa do álbum para abrir a Pesquisa",
     "gesture": "Clique com o botão direito · Segure",
+    "tokenConsentTitle": "Antes de usar a Pesquisa",
+    "tokenConsentBody": "Na primeira geração da Pesquisa, uma grande quantidade de tokens pode ser usada para analisar a música e coletar informações complementares.",
+    "tokenConsentNote": "O uso de tokens e possíveis cobranças dependem do provedor e do modelo de IA selecionados.",
+    "tokenConsentAgree": "Concordar e iniciar a Pesquisa",
     "providerDescription": "Escolha provedores de IA para tradução, pronúncia, pesquisa e modo de aprendizagem",
     "sections": {
       "overview": "Visão geral",

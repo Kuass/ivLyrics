@@ -2310,6 +2310,10 @@ window.LANG_EN = {
     "fontSizeInfo": "Adjust the overall text size of the Research document",
     "gestureHint": "Right-click or hold the album artwork to open Research",
     "gesture": "Right-click · Hold",
+    "tokenConsentTitle": "Before using Research",
+    "tokenConsentBody": "The first time Research is generated, it may use a large number of tokens to analyze the song and gather supporting information.",
+    "tokenConsentNote": "Token usage and possible charges depend on the selected AI provider and model.",
+    "tokenConsentAgree": "Agree and start Research",
     "providerDescription": "Choose AI providers for translation, pronunciation, Research, and Learning mode",
     "sections": {
       "overview": "Overview",

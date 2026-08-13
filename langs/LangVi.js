@@ -2310,6 +2310,10 @@ window.LANG_VI = {
     "fontSizeInfo": "Điều chỉnh kích thước văn bản tổng thể của tài liệu Nghiên cứu",
     "gestureHint": "Nhấp chuột phải hoặc giữ ảnh bìa album để mở Nghiên cứu",
     "gesture": "Nhấp chuột phải · Giữ",
+    "tokenConsentTitle": "Trước khi sử dụng Nghiên cứu",
+    "tokenConsentBody": "Khi tạo Nghiên cứu lần đầu, hệ thống có thể sử dụng nhiều token để phân tích bài hát và thu thập thông tin hỗ trợ.",
+    "tokenConsentNote": "Lượng token sử dụng và chi phí có thể phát sinh phụ thuộc vào nhà cung cấp AI và mô hình đã chọn.",
+    "tokenConsentAgree": "Đồng ý và bắt đầu Nghiên cứu",
     "providerDescription": "Chọn nhà cung cấp AI cho chế độ dịch thuật, phát âm, nghiên cứu và học tập",
     "sections": {
       "overview": "Tổng quan",
