@@ -70,6 +70,7 @@
         },
         supports: {
             karaoke: true,
+            karaokeWord: true,
             synced: true,
             unsynced: true
         },
@@ -1471,6 +1472,7 @@
 
         return {
             karaoke: karaoke?.length ? karaoke : null,
+            karaokeGranularity: karaoke?.length ? 'word' : null,
             synced: synced.length ? synced : null,
             unsynced: unsynced.length ? unsynced : null
         };
@@ -1524,6 +1526,7 @@
 
                 const parsed = parseLyricsPayload(fetched.data, normalizeDurationMs(info));
                 result.karaoke = parsed.karaoke;
+                result.karaokeGranularity = parsed.karaokeGranularity;
                 result.synced = parsed.synced;
                 result.unsynced = parsed.unsynced;
                 result.karaokeSource = result.karaoke ? ADDON_INFO.id : null;

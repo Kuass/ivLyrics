@@ -476,19 +476,23 @@ window.LANG_JA = {
         "desc": "現在の曲に同期データがある場合、通常の優先順位より先に対応する歌詞プロバイダーを試します。"
       },
       "preferLyricsTypeOverProviderOrder": {
-        "label": "歌詞タイプをプロバイダー順より優先",
-        "desc": "全プロバイダーのカラオケ歌詞を先に試し、次に同期歌詞、最後にプレーン歌詞を試します。同じタイプ内では設定したプロバイダー順を維持します。"
+        "label": "文字 → 単語 → 行 → 通常歌詞を優先",
+        "desc": "すべてのプロバイダーで文字同期歌詞を先に探し、続いて単語同期、行同期、通常歌詞の順に取得します。同じ種類では設定したプロバイダー順を維持します。"
       },
       "noProviders": "登録されている歌詞プロバイダーがありません。",
       "allowedTypes": "許可する歌詞タイプ",
       "moveUp": "上に移動",
       "moveDown": "下に移動",
       "types": {
+        "character": "文字同期歌詞",
+        "word": "単語同期歌詞",
         "karaoke": "カラオケ歌詞",
         "synced": "同期歌詞",
         "unsynced": "非同期歌詞"
       },
       "supports": {
+        "character": "文字同期",
+        "word": "単語同期",
         "karaoke": "カラオケ",
         "synced": "同期",
         "unsynced": "非同期",
@@ -1942,6 +1946,10 @@ window.LANG_JA = {
     "terminalMac": "Terminal (ターミナル)"
   },
   "modes": {
+    "character": "文字単位",
+    "word": "単語単位",
+    "rightClickToLock": "右クリックで固定",
+    "rightClickToUnlock": "右クリックで固定解除",
     "karaoke": "カラオケ",
     "synced": "同期",
     "unsynced": "通常歌詞"

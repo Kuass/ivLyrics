@@ -2188,6 +2188,8 @@ const IVLYRICS_TOOLBAR_ICON_PATHS = Object.freeze({
   fullscreenEnter: '<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>',
   fullscreenExit: '<path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>',
   karaoke: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11v1a7 7 0 0 0 14 0v-1M12 19v3M8 22h8"/>',
+  character: '<path d="m5 18 4.5-12h2L16 18M7 13h7"/><path d="M18 7h3M19.5 5.5v3"/>',
+  word: '<path d="m3 18 4-12h2l4 12M5 13h6"/><path d="M16 8h5M16 12h5M16 16h5"/>',
   synced: '<path d="M4 6h10M4 11h9M4 16h7"/><path d="M18 6v7"/><circle cx="18" cy="15" r="2"/>',
   unsynced: '<path d="M4 6h14M4 11h16M4 16h12"/>',
   syncCreator: '<path d="M3 12h2l2-5 3 10 3-8 2 6"/><path d="m16 19 4-4 2 2-4 4-3 1 1-3Z"/>',

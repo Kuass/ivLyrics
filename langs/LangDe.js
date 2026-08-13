@@ -476,19 +476,23 @@ window.LANG_DE = {
         "desc": "Wenn für den aktuellen Titel Sync-Daten vorhanden sind, wird der passende Songtext-Anbieter vor der normalen Anbieterreihenfolge ausprobiert."
       },
       "preferLyricsTypeOverProviderOrder": {
-        "label": "Songtexttyp vor Anbieterreihenfolge priorisieren",
-        "desc": "Zuerst bei allen Anbietern nach Karaoke-Texten suchen, danach nach synchronisierten und zuletzt nach unformatierten Texten. Innerhalb jedes Typs bleibt die festgelegte Anbieterreihenfolge erhalten."
+        "label": "Zeichen, Wörter, Zeilen und dann Klartext priorisieren",
+        "desc": "Zuerst bei allen Anbietern nach zeichenweise synchronisierten Songtexten suchen, danach nach wortweise und zeilenweise synchronisierten und zuletzt nach unformatierten Texten. Innerhalb jedes Typs bleibt die festgelegte Anbieterreihenfolge erhalten."
       },
       "noProviders": "Keine Songtext-Anbieter registriert.",
       "allowedTypes": "Erlaubte Songtext-Typen",
       "moveUp": "Nach oben verschieben",
       "moveDown": "Nach unten verschieben",
       "types": {
+        "character": "Zeichenweise synchronisierte Songtexte",
+        "word": "Wortweise synchronisierte Songtexte",
         "karaoke": "Karaoke-Songtexte",
         "synced": "Synchronisierte Songtexte",
         "unsynced": "Nicht-synchronisierte Songtexte"
       },
       "supports": {
+        "character": "Zeichenweise",
+        "word": "Wortweise",
         "karaoke": "Karaoke",
         "synced": "Sync",
         "unsynced": "Unsync",
@@ -1942,6 +1946,10 @@ window.LANG_DE = {
     "terminalMac": "Terminal"
   },
   "modes": {
+    "character": "Zeichenweise",
+    "word": "Wortweise",
+    "rightClickToLock": "Rechtsklick zum Fixieren",
+    "rightClickToUnlock": "Rechtsklick zum Lösen",
     "karaoke": "Karaoke",
     "synced": "Sync",
     "unsynced": "Text"

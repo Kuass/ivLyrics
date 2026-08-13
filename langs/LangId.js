@@ -476,19 +476,23 @@ window.LANG_ID = {
         "desc": "Jika data sinkronisasi tersedia untuk lagu saat ini, coba penyedia lirik yang cocok sebelum urutan penyedia biasa."
       },
       "preferLyricsTypeOverProviderOrder": {
-        "label": "Prioritaskan jenis lirik sebelum urutan penyedia",
-        "desc": "Coba lirik karaoke dari semua penyedia terlebih dahulu, lalu lirik sinkron, kemudian lirik biasa. Urutan penyedia yang diatur tetap dipertahankan dalam setiap jenis."
+        "label": "Prioritaskan karakter, kata, baris, lalu lirik biasa",
+        "desc": "Coba lirik tersinkron per karakter dari semua penyedia terlebih dahulu, lalu per kata, per baris, dan akhirnya lirik biasa. Urutan penyedia yang diatur tetap dipertahankan dalam setiap jenis."
       },
       "noProviders": "Tidak ada penyedia lirik yang terdaftar.",
       "allowedTypes": "Tipe Lirik yang Diizinkan",
       "moveUp": "Pindahkan ke Atas",
       "moveDown": "Pindahkan ke Bawah",
       "types": {
+        "character": "Lirik tersinkron per karakter",
+        "word": "Lirik tersinkron per kata",
         "karaoke": "Lirik Karaoke",
         "synced": "Lirik Sinkron",
         "unsynced": "Lirik Tidak Sinkron"
       },
       "supports": {
+        "character": "Per karakter",
+        "word": "Per kata",
         "karaoke": "Karaoke",
         "synced": "Sinkron",
         "unsynced": "Tidak Sinkron",
@@ -1942,6 +1946,10 @@ window.LANG_ID = {
     "terminalMac": "Terminal"
   },
   "modes": {
+    "character": "Per karakter",
+    "word": "Per kata",
+    "rightClickToLock": "Klik kanan untuk mengunci",
+    "rightClickToUnlock": "Klik kanan untuk melepas kunci",
     "karaoke": "Karaoke",
     "synced": "Sinkron",
     "unsynced": "Lirik Umum"

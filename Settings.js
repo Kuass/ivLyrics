@@ -122,6 +122,8 @@ const SETTINGS_OUTLINE_ICONS = Object.freeze({
   debug: "M9 9h6v8a3 3 0 0 1-6 0V9Zm3-5v5M8 4l2 2M16 4l-2 2M5 11h4M15 11h4M5 16h4M15 16h4",
   about: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-11v6M12 7h.01",
   karaoke: "M12 14a4 4 0 0 0 4-4V5a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4Zm-7-4a7 7 0 0 0 14 0M12 17v4M9 21h6",
+  character: "M5 9v6M9 6v12M13 9v6M17 4v16M21 8v8",
+  word: "M3 6h4l2 12h2l3-12h4l3 12M4.5 13h3M14.5 13h5",
   synced: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-15v5l3 2",
   unsynced: "M5 6h14M5 12h14M5 18h9",
   ivsync: "M20 7h-5V2M4 17h5v5M5.5 8a8 8 0 0 1 13-2L20 7M4 17l1.5 1A8 8 0 0 0 18.5 16",
@@ -1395,6 +1397,31 @@ const AddonSettingsCard = ({ addon, isEnabled, onToggle, isExpanded, onExpandTog
   );
 };
 
+const getLyricsProviderGranularitySupport = (provider) => {
+  const declared = new Set(
+    (Array.isArray(provider?.supports?.karaokeGranularities)
+      ? provider.supports.karaokeGranularities
+      : [])
+      .map(value => {
+        const normalized = String(value || '').trim().toLowerCase();
+        if (normalized === 'char' || normalized === 'letter') return 'character';
+        if (normalized === 'token') return 'word';
+        return normalized;
+      })
+  );
+  if (provider?.supports?.character === true || provider?.supports?.karaokeCharacter === true) {
+    declared.add('character');
+  }
+  if (provider?.supports?.word === true || provider?.supports?.karaokeWord === true) {
+    declared.add('word');
+  }
+  const legacyGeneric = declared.size === 0 && provider?.supports?.karaoke === true;
+  return {
+    character: provider?.useIvLyricsSync === true || declared.has('character') || legacyGeneric,
+    word: declared.has('word') || legacyGeneric
+  };
+};
+
 // 가사 제공자 카드 컴포넌트
 const LyricsProviderCard = ({ provider, isEnabled, onToggle, isExpanded, onExpandToggle }) => {
   const SettingsUI = provider.getSettingsUI ? provider.getSettingsUI() : null;
@@ -1418,8 +1445,12 @@ const LyricsProviderCard = ({ provider, isEnabled, onToggle, isExpanded, onExpan
   // 지원 유형 뱃지 렌더링
   const renderSupportBadges = () => {
     const badges = [];
-    if (provider.supports?.karaoke) {
-      badges.push(react.createElement(ProviderSupportIconChip, { key: "karaoke", type: "karaoke", label: I18n.t("settings.lyricsProviders.supports.karaoke") || "Karaoke" }));
+    const { character: supportsCharacter, word: supportsWord } = getLyricsProviderGranularitySupport(provider);
+    if (supportsCharacter) {
+      badges.push(react.createElement(ProviderSupportIconChip, { key: "character", type: "character", label: I18n.t("settings.lyricsProviders.supports.character") || "Character-synced" }));
+    }
+    if (supportsWord) {
+      badges.push(react.createElement(ProviderSupportIconChip, { key: "word", type: "word", label: I18n.t("settings.lyricsProviders.supports.word") || "Word-synced" }));
     }
     if (provider.supports?.synced) {
       badges.push(react.createElement(ProviderSupportIconChip, { key: "synced", type: "synced", label: I18n.t("settings.lyricsProviders.supports.synced") || "Synced" }));
@@ -1434,8 +1465,15 @@ const LyricsProviderCard = ({ provider, isEnabled, onToggle, isExpanded, onExpan
   };
 
   // 상세 설정 상태 (가사 유형별 활성화 여부)
-  const [enableKaraoke, setEnableKaraoke] = useState(() =>
-    window.LyricsAddonManager?.getAddonSetting(provider.id, 'enable_karaoke', true) ?? true
+  const getLegacyKaraokeFallback = () => {
+    const legacy = window.LyricsAddonManager?.getAddonSetting(provider.id, 'enable_karaoke', null);
+    return legacy === null || legacy === undefined ? true : legacy !== false;
+  };
+  const [enableCharacter, setEnableCharacter] = useState(() =>
+    window.LyricsAddonManager?.getAddonSetting(provider.id, 'enable_character', getLegacyKaraokeFallback()) ?? true
+  );
+  const [enableWord, setEnableWord] = useState(() =>
+    window.LyricsAddonManager?.getAddonSetting(provider.id, 'enable_word', getLegacyKaraokeFallback()) ?? true
   );
   const [enableSynced, setEnableSynced] = useState(() =>
     window.LyricsAddonManager?.getAddonSetting(provider.id, 'enable_synced', true) ?? true
@@ -1447,9 +1485,12 @@ const LyricsProviderCard = ({ provider, isEnabled, onToggle, isExpanded, onExpan
   const handleTypeToggle = (type, value) => {
     if (!window.LyricsAddonManager) return;
 
-    if (type === 'karaoke') {
-      setEnableKaraoke(value);
-      window.LyricsAddonManager.setAddonSetting(provider.id, 'enable_karaoke', value);
+    if (type === 'character') {
+      setEnableCharacter(value);
+      window.LyricsAddonManager.setAddonSetting(provider.id, 'enable_character', value);
+    } else if (type === 'word') {
+      setEnableWord(value);
+      window.LyricsAddonManager.setAddonSetting(provider.id, 'enable_word', value);
     } else if (type === 'synced') {
       setEnableSynced(value);
       window.LyricsAddonManager.setAddonSetting(provider.id, 'enable_synced', value);
@@ -1459,7 +1500,10 @@ const LyricsProviderCard = ({ provider, isEnabled, onToggle, isExpanded, onExpan
     }
   };
 
-  const showKaraokeToggle = provider.supports?.karaoke || provider.useIvLyricsSync;
+  const {
+    character: showCharacterToggle,
+    word: showWordToggle
+  } = getLyricsProviderGranularitySupport(provider);
   const showSyncedToggle = provider.supports?.synced;
   const showUnsyncedToggle = provider.supports?.unsynced;
 
@@ -1525,13 +1569,21 @@ const LyricsProviderCard = ({ provider, isEnabled, onToggle, isExpanded, onExpan
       react.createElement("div", { className: "lyrics-type-toggles-container" },
         react.createElement("div", { className: "lyrics-type-toggles-title" }, I18n.t("settings.lyricsProviders.allowedTypes") || "Allowed Lyrics Types"),
         react.createElement("div", { className: "lyrics-type-toggles" },
-          showKaraokeToggle && react.createElement("button", {
+          showCharacterToggle && react.createElement("button", {
             type: "button",
-            onClick: () => handleTypeToggle('karaoke', !enableKaraoke),
-            className: `lyrics-type-toggle-chip type-karaoke ${enableKaraoke ? "active" : ""}`
+            onClick: () => handleTypeToggle('character', !enableCharacter),
+            className: `lyrics-type-toggle-chip type-character ${enableCharacter ? "active" : ""}`
           },
-            enableKaraoke && react.createElement("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 3, strokeLinecap: "round", strokeLinejoin: "round" }, react.createElement("polyline", { points: "20 6 9 17 4 12" })),
-            I18n.t("settings.lyricsProviders.types.karaoke") || "Karaoke Lyrics"
+            enableCharacter && react.createElement("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 3, strokeLinecap: "round", strokeLinejoin: "round" }, react.createElement("polyline", { points: "20 6 9 17 4 12" })),
+            I18n.t("settings.lyricsProviders.types.character") || "Character-synced Lyrics"
+          ),
+          showWordToggle && react.createElement("button", {
+            type: "button",
+            onClick: () => handleTypeToggle('word', !enableWord),
+            className: `lyrics-type-toggle-chip type-word ${enableWord ? "active" : ""}`
+          },
+            enableWord && react.createElement("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 3, strokeLinecap: "round", strokeLinejoin: "round" }, react.createElement("polyline", { points: "20 6 9 17 4 12" })),
+            I18n.t("settings.lyricsProviders.types.word") || "Word-synced Lyrics"
           ),
           showSyncedToggle && react.createElement("button", {
             type: "button",
@@ -12526,7 +12578,7 @@ const ConfigModal = ({
     color: var(--text-primary);
 }
 
-#${APP_NAME}-config-container .lyrics-type-toggle-chip.type-karaoke.active,
+#${APP_NAME}-config-container .lyrics-type-toggle-chip.type-word.active,
 #${APP_NAME}-config-container .ai-addon-cap-chip.cap-metadata.active {
     color: #b45309;
     border-color: rgba(180, 83, 9, 0.45);
@@ -12534,6 +12586,7 @@ const ConfigModal = ({
 }
 
 #${APP_NAME}-config-container .lyrics-type-toggle-chip.type-synced.active,
+#${APP_NAME}-config-container .lyrics-type-toggle-chip.type-character.active,
 #${APP_NAME}-config-container .ai-addon-cap-chip.cap-translate.active,
 #${APP_NAME}-config-container .ai-addon-cap-chip.cap-lyricsStudy.active {
     color: var(--accent-primary);
@@ -16475,7 +16528,7 @@ const ConfigModal = ({
     color: #5fd88f;
 }
 
-#${APP_NAME}-config-container .support-icon-chip.support-icon-karaoke {
+#${APP_NAME}-config-container .support-icon-chip.support-icon-word {
     border-color: #4b3a16;
     background: #2c2412;
     color: #d8a92f;
@@ -16493,7 +16546,7 @@ const ConfigModal = ({
     color: #237447;
 }
 
-#${APP_NAME}-config-container[data-ui-theme="light"] .support-icon-chip.support-icon-karaoke {
+#${APP_NAME}-config-container[data-ui-theme="light"] .support-icon-chip.support-icon-word {
     border-color: #eadcba;
     background: #fbf4df;
     color: #956f10;

@@ -476,19 +476,23 @@ window.LANG_SV = {
         "desc": "När synkdata finns för det aktuella spåret provas motsvarande textleverantör före den vanliga ordningen."
       },
       "preferLyricsTypeOverProviderOrder": {
-        "label": "Prioritera texttyp före leverantörsordning",
-        "desc": "Prova först karaoketexter hos alla leverantörer, sedan synkroniserade texter och sist vanliga texter. Den inställda leverantörsordningen behålls inom varje typ."
+        "label": "Prioritera tecken, ord, rader och sedan vanlig text",
+        "desc": "Prova först teckensynkroniserade texter hos alla leverantörer, sedan ordsynkroniserade, radsynkroniserade och sist vanliga texter. Den inställda leverantörsordningen behålls inom varje typ."
       },
       "noProviders": "Inga textleverantörer registrerade.",
       "allowedTypes": "Tillåtna texttyper",
       "moveUp": "Flytta upp",
       "moveDown": "Flytta ner",
       "types": {
+        "character": "Teckensynkroniserad text",
+        "word": "Ordsynkroniserad text",
         "karaoke": "Karaoke texter",
         "synced": "Synkroniserad text",
         "unsynced": "Vanlig text sångtexter"
       },
       "supports": {
+        "character": "Teckensynk",
+        "word": "Ordsynk",
         "karaoke": "Karaoke",
         "synced": "Synkroniserad",
         "unsynced": "Vanligt",
@@ -1942,6 +1946,10 @@ window.LANG_SV = {
     "terminalMac": "Terminal"
   },
   "modes": {
+    "character": "Teckenvis",
+    "word": "Ordvis",
+    "rightClickToLock": "Högerklicka för att låsa",
+    "rightClickToUnlock": "Högerklicka för att låsa upp",
     "karaoke": "Karaoke",
     "synced": "Synkroniserad",
     "unsynced": "Vanlig text"

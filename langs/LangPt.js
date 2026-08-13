@@ -476,19 +476,23 @@ window.LANG_PT = {
         "desc": "Quando houver dados de sincronização para a faixa atual, tente o provedor de letras correspondente antes da ordem normal."
       },
       "preferLyricsTypeOverProviderOrder": {
-        "label": "Priorizar o tipo de letra antes da ordem dos provedores",
-        "desc": "Tentar primeiro letras de karaokê em todos os provedores, depois letras sincronizadas e por fim letras simples. A ordem configurada dos provedores é mantida em cada tipo."
+        "label": "Priorizar caractere, palavra, linha e depois texto simples",
+        "desc": "Tentar primeiro, em todos os provedores, letras sincronizadas por caractere, depois por palavra, por linha e por fim letras simples. A ordem configurada dos provedores é mantida em cada tipo."
       },
       "noProviders": "Nenhum provedor de letras registrado.",
       "allowedTypes": "Tipos de letras permitidos",
       "moveUp": "Mover para cima",
       "moveDown": "Mover para baixo",
       "types": {
+        "character": "Letras sincronizadas por caractere",
+        "word": "Letras sincronizadas por palavra",
         "karaoke": "Letras de karaokê",
         "synced": "Letras sincronizadas",
         "unsynced": "Letras não sincronizadas"
       },
       "supports": {
+        "character": "Por caractere",
+        "word": "Por palavra",
         "karaoke": "Karaokê",
         "synced": "Sinc.",
         "unsynced": "Não Sinc.",
@@ -1942,6 +1946,10 @@ window.LANG_PT = {
     "terminalMac": "Terminal"
   },
   "modes": {
+    "character": "Por caractere",
+    "word": "Por palavra",
+    "rightClickToLock": "Clique direito para fixar",
+    "rightClickToUnlock": "Clique direito para desafixar",
     "karaoke": "Karaokê",
     "synced": "Sincronizado",
     "unsynced": "Letra Normal"

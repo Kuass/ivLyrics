@@ -64,6 +64,8 @@
         },
         supports: {
             karaoke: true,
+            karaokeCharacter: true,
+            karaokeWord: true,
             synced: true,
             unsynced: true
         },

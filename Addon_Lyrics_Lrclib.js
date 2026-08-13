@@ -258,6 +258,7 @@
         // 【지원 가사 유형】 이 애드온이 제공할 수 있는 가사 형식
         supports: {
             karaoke: true,    // 노래방 모드 (Lyricsfile 단어별 하이라이트) - 지원
+            karaokeWord: true,
             synced: true,     // 싱크 가사 (타임스탬프 포함 LRC 형식) - 지원
             unsynced: true    // 일반 가사 (텍스트만) - 지원
         },
@@ -1284,6 +1285,7 @@
         // syncedLyrics/plainLyrics 결과를 이 데이터로 교체하면 안 됩니다.
         result.karaoke = karaoke;
         result.karaokeSource = 'lrclib-lyricsfile';
+        result.karaokeGranularity = 'word';
         return true;
     }
 

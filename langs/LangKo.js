@@ -476,19 +476,23 @@ window.LANG_KO = {
         "desc": "OpenDB에 현재 곡의 ivLyrics Sync 데이터가 있으면 해당 가사 제공자를 일반 우선순위보다 먼저 시도합니다."
       },
       "preferLyricsTypeOverProviderOrder": {
-        "label": "노래방 → 싱크 → 일반 우선 조회",
-        "desc": "모든 제공자의 노래방 가사를 먼저 찾은 뒤 싱크 가사, 일반 가사 순서로 조회합니다. 같은 유형 안에서는 설정한 제공자 순서를 따릅니다."
+        "label": "글자 → 단어 → 줄 → 일반 우선 조회",
+        "desc": "모든 제공자의 글자 단위 가사를 먼저 찾은 뒤 단어 단위, 줄 단위, 일반 가사 순서로 조회합니다. 같은 유형 안에서는 설정한 제공자 순서를 따릅니다."
       },
       "noProviders": "등록된 가사 제공자가 없습니다.",
       "allowedTypes": "허용할 가사 유형",
       "moveUp": "위로 이동",
       "moveDown": "아래로 이동",
       "types": {
+        "character": "글자 단위 가사",
+        "word": "단어 단위 가사",
         "karaoke": "노래방 가사 (Karaoke)",
         "synced": "싱크 가사 (Synced)",
         "unsynced": "일반 가사 (Unsynced)"
       },
       "supports": {
+        "character": "글자 단위",
+        "word": "단어 단위",
         "karaoke": "노래방",
         "synced": "싱크",
         "unsynced": "일반",
@@ -1942,6 +1946,10 @@ window.LANG_KO = {
     "terminalMac": "Terminal (터미널)"
   },
   "modes": {
+    "character": "글자 단위",
+    "word": "단어 단위",
+    "rightClickToLock": "우클릭하여 고정",
+    "rightClickToUnlock": "우클릭하여 고정 해제",
     "karaoke": "노래방",
     "synced": "동기화",
     "unsynced": "일반가사"

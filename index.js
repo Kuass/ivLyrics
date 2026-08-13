@@ -2328,8 +2328,38 @@ const DBExportManager = {
 const KARAOKE = 0;
 const SYNCED = 1;
 const UNSYNCED = 2;
+const WORD_KARAOKE = 3;
 const LYRICS_MODE_TYPE_KEYS = ['karaoke', 'synced', 'unsynced'];
-const getLyricsModeTypeKey = (mode) => LYRICS_MODE_TYPE_KEYS[mode] || null;
+const IVLYRICS_RENDER_MODE_LOCK_STORAGE_KEY = "ivLyrics:visual:render-mode-lock";
+const getLyricsDataMode = (mode) => mode === WORD_KARAOKE ? KARAOKE : mode;
+const isKaraokeRenderMode = (mode) => mode === KARAOKE || mode === WORD_KARAOKE;
+const getLyricsModeTypeKey = (mode) => LYRICS_MODE_TYPE_KEYS[getLyricsDataMode(mode)] || null;
+const normalizeLyricsRenderModeLock = (value) => {
+  if (value === null || value === undefined || value === "") return -1;
+  const mode = Number(value);
+  return [KARAOKE, WORD_KARAOKE, SYNCED, UNSYNCED].includes(mode) ? mode : -1;
+};
+const getRememberedLyricsRenderModeLock = () => {
+  try {
+    return normalizeLyricsRenderModeLock(
+      StorageManager.getItem(IVLYRICS_RENDER_MODE_LOCK_STORAGE_KEY)
+    );
+  } catch (error) {
+    return -1;
+  }
+};
+const rememberLyricsRenderModeLock = (mode) => {
+  const normalizedMode = normalizeLyricsRenderModeLock(mode);
+  try {
+    StorageManager.setItem(
+      IVLYRICS_RENDER_MODE_LOCK_STORAGE_KEY,
+      String(normalizedMode)
+    );
+  } catch (error) {
+    ivLyricsDebug("[ivLyrics] Failed to remember lyrics render mode lock:", error);
+  }
+  return normalizedMode;
+};
 
 const VINYL_TYPOGRAPHY_DEFAULT_SCALE = 0.7;
 const getOrSeedVinylTypographySetting = (
@@ -3357,6 +3387,7 @@ let CACHE = {};
 
 const emptyState = {
   karaoke: null,
+  karaokeGranularity: null,
   synced: null,
   unsynced: null,
   currentLyrics: null,
@@ -4688,6 +4719,7 @@ class LyricsContainer extends react.Component {
     super();
     this.state = {
       karaoke: null,
+      karaokeGranularity: null,
       synced: null,
       unsynced: null,
       currentLyrics: null,
@@ -4713,6 +4745,7 @@ class LyricsContainer extends react.Component {
       dynamicColors: null,
       tempo: "0.25s",
       explicitMode: -1,
+      lockedMode: getRememberedLyricsRenderModeLock(),
       mode: -1,
       isLoading: false,
       showMarketplace: false,
@@ -5220,7 +5253,7 @@ class LyricsContainer extends react.Component {
 
   getCurrentCulturalAnnotationLyrics() {
     const currentMode = this.getCurrentMode();
-    if (currentMode === KARAOKE && Array.isArray(this.state.karaoke)) {
+    if (isKaraokeRenderMode(currentMode) && Array.isArray(this.state.karaoke)) {
       return this.state.karaoke;
     }
     if (currentMode === SYNCED && Array.isArray(this.state.synced)) {
@@ -5395,7 +5428,7 @@ class LyricsContainer extends react.Component {
   getEditingBaseLyrics() {
     const currentMode = this.getCurrentMode();
 
-    if (currentMode === KARAOKE && Array.isArray(this.state.karaoke)) {
+    if (isKaraokeRenderMode(currentMode) && Array.isArray(this.state.karaoke)) {
       return this.state.karaoke;
     }
     if (currentMode === SYNCED && Array.isArray(this.state.synced)) {
@@ -6258,7 +6291,7 @@ class LyricsContainer extends react.Component {
 
       // 원본 가사를 가져오기 위해 synced, karaoke, unsynced 중 현재 모드에 해당하는 것 사용
       let originalLyrics = [];
-      if (currentMode === KARAOKE && this.state.karaoke) {
+      if (isKaraokeRenderMode(currentMode) && this.state.karaoke) {
         originalLyrics = this.state.karaoke;
       } else if (currentMode === SYNCED && this.state.synced) {
         originalLyrics = this.state.synced;
@@ -6816,7 +6849,7 @@ class LyricsContainer extends react.Component {
       const result = await window.LyricsService.getLyricsFromProviders(
         trackInfo,
         [],
-        mode,
+        getLyricsDataMode(mode),
         this.trackLyricsProviderOverride || null
       );
       if (!result.uri) result.uri = trackInfo.uri;
@@ -6986,7 +7019,7 @@ class LyricsContainer extends react.Component {
       // if lyrics are cached
       if (
         (mode === -1 && CACHE[info.uri]) ||
-        CACHE[info.uri]?.[CONFIG.modes?.[mode]]
+        CACHE[info.uri]?.[CONFIG.modes?.[getLyricsDataMode(mode)]]
       ) {
         tempState = {
           provider: "",
@@ -7037,7 +7070,7 @@ class LyricsContainer extends react.Component {
         const resp = await window.LyricsService.getLyricsFromProviders(
           info,
           [],
-          mode,
+          getLyricsDataMode(mode),
           trackLyricsProviderOverride
         );
         if (!resp.uri) resp.uri = info.uri;
@@ -7097,17 +7130,12 @@ class LyricsContainer extends react.Component {
       }
       let finalMode = mode;
       if (mode === -1) {
-        if (this.state.explicitMode !== -1) {
+        if (this.isModeAvailable(this.state.lockedMode, tempState)) {
+          finalMode = this.state.lockedMode;
+        } else if (this.isModeAvailable(this.state.explicitMode, tempState)) {
           finalMode = this.state.explicitMode;
         } else {
-          // Auto switch: prefer karaoke, then synced, then unsynced
-          if (tempState.karaoke) {
-            finalMode = KARAOKE;
-          } else if (tempState.synced) {
-            finalMode = SYNCED;
-          } else if (tempState.unsynced) {
-            finalMode = UNSYNCED;
-          }
+          finalMode = this.getAutomaticMode(tempState);
         }
       }
 
@@ -7221,8 +7249,9 @@ class LyricsContainer extends react.Component {
   resolveLyricsForMode(lyricsState, mode) {
     if (!lyricsState) return null;
 
+    const dataMode = getLyricsDataMode(mode);
     const preferredModeKey =
-      typeof mode === "number" && mode >= 0 ? CONFIG.modes?.[mode] : null;
+      typeof dataMode === "number" && dataMode >= 0 ? CONFIG.modes?.[dataMode] : null;
     const preferredLyrics =
       preferredModeKey && lyricsState[preferredModeKey]
         ? lyricsState[preferredModeKey]
@@ -8498,7 +8527,7 @@ class LyricsContainer extends react.Component {
       return false;
     }
 
-    const nextLyrics = {
+    const parsedLyrics = {
       karaoke: Array.isArray(localLyrics.karaoke) && localLyrics.karaoke.length ? localLyrics.karaoke : null,
       synced: Array.isArray(localLyrics.synced) && localLyrics.synced.length ? localLyrics.synced : null,
       unsynced: Array.isArray(localLyrics.unsynced) && localLyrics.unsynced.length ? localLyrics.unsynced : null,
@@ -8506,12 +8535,17 @@ class LyricsContainer extends react.Component {
       uri: currentUri,
       localLyricsSource: sourceLabel,
     };
+    let nextLyrics = parsedLyrics;
     if (window.PseudoKaraokeService?.applyToResult) {
       await window.PseudoKaraokeService.applyToResult(nextLyrics, {
         uri: currentUri,
         duration: Spicetify.Player?.data?.item?.duration?.milliseconds,
       });
     }
+    nextLyrics = window.LyricsAddonManager?.normalizeResult?.(nextLyrics, {
+      uri: currentUri,
+      duration: Spicetify.Player?.data?.item?.duration?.milliseconds,
+    }) || nextLyrics;
     const resetTranslations = {
       romaji: null,
       furigana: null,
@@ -8675,6 +8709,7 @@ class LyricsContainer extends react.Component {
     this.clearPendingLyricsUpdates();
     this.setState({
       karaoke: null,
+      karaokeGranularity: null,
       synced: null,
       unsynced: null,
       currentLyrics: null,
@@ -9395,22 +9430,33 @@ class LyricsContainer extends react.Component {
     // 전체화면 단축키는 GlobalShortcuts.js에서 전역으로 처리
   }
 
-  getCurrentMode() {
-    let mode = -1;
-    if (this.state.explicitMode !== -1) {
-      mode = this.state.explicitMode;
-    } else {
-      // Auto switch: prefer karaoke, then synced, then unsynced
-      // 노래방 모드가 비활성화되어 있으면 karaoke를 건너뛰고 synced부터 시작
-      if (this.state.karaoke && CONFIG.visual["karaoke-mode-enabled"]) {
-        mode = KARAOKE;
-      } else if (this.state.synced) {
-        mode = SYNCED;
-      } else if (this.state.unsynced) {
-        mode = UNSYNCED;
-      }
+  isModeAvailable(mode, lyricsState = this.state) {
+    if (!lyricsState || mode === -1) return false;
+    if (isKaraokeRenderMode(mode)) {
+      return !!lyricsState.karaoke && CONFIG.visual["karaoke-mode-enabled"];
     }
-    return mode;
+    if (mode === SYNCED) return !!lyricsState.synced;
+    if (mode === UNSYNCED) return !!lyricsState.unsynced;
+    return false;
+  }
+
+  getAutomaticMode(lyricsState = this.state) {
+    if (lyricsState?.karaoke && CONFIG.visual["karaoke-mode-enabled"]) {
+      return lyricsState.karaokeGranularity === "word" ? WORD_KARAOKE : KARAOKE;
+    }
+    if (lyricsState?.synced) return SYNCED;
+    if (lyricsState?.unsynced) return UNSYNCED;
+    return -1;
+  }
+
+  getCurrentMode() {
+    if (this.isModeAvailable(this.state.lockedMode)) {
+      return this.state.lockedMode;
+    }
+    if (this.isModeAvailable(this.state.explicitMode)) {
+      return this.state.explicitMode;
+    }
+    return this.getAutomaticMode();
   }
 
   render() {
@@ -9634,7 +9680,7 @@ class LyricsContainer extends react.Component {
     }
     const firstTimedLyricStartTimeMs = Number(this.state.currentLyrics?.[0]?.startTime);
     const defaultCommunityVideoStartTime =
-      (mode === KARAOKE || mode === SYNCED) &&
+      (isKaraokeRenderMode(mode) || mode === SYNCED) &&
         Number.isFinite(firstTimedLyricStartTimeMs) &&
         firstTimedLyricStartTimeMs >= 0
         ? firstTimedLyricStartTimeMs / 1000
@@ -9687,7 +9733,7 @@ class LyricsContainer extends react.Component {
           : mode;
 
     showTranslationButton =
-      potentialMode === KARAOKE ||
+      isKaraokeRenderMode(potentialMode) ||
       potentialMode === SYNCED ||
       potentialMode === UNSYNCED ||
       mode === -1;
@@ -9786,6 +9832,7 @@ class LyricsContainer extends react.Component {
       ? react.createElement(window.LyricsPageRenderer, {
         mode,
         karaokeMode: KARAOKE,
+        wordMode: WORD_KARAOKE,
         syncedMode: SYNCED,
         unsyncedMode: UNSYNCED,
         trackUri: this.state.uri,
@@ -9909,36 +9956,66 @@ class LyricsContainer extends react.Component {
           className: "ivlyrics-toolbar-icon-fallback",
           "aria-hidden": "true",
         });
+    const getModeButtonLabel = (modeId, labelKey) => {
+      const modeLabel = I18n.t(labelKey);
+      const lockHint = this.state.lockedMode === modeId
+        ? I18n.t("modes.rightClickToUnlock")
+        : I18n.t("modes.rightClickToLock");
+      return `${modeLabel} · ${lockHint}`;
+    };
     const modeButtons = [
       this.state.karaoke &&
       CONFIG.visual["karaoke-mode-enabled"] &&
       react.createElement(
         Spicetify.ReactComponent.TooltipWrapper,
-        { key: "karaoke", label: I18n.t("modes.karaoke") },
+        { key: "character", label: getModeButtonLabel(KARAOKE, "modes.character") },
         react.createElement(
           "button",
           {
             type: "button",
-            className: `lyrics-config-button lyrics-mode-button ${mode === KARAOKE ? "active" : ""}`,
+            className: `lyrics-config-button lyrics-mode-button ${mode === KARAOKE ? "active" : ""}${this.state.lockedMode === KARAOKE ? " mode-locked" : ""}`,
             onClick: () => this.switchTo(KARAOKE),
+            onContextMenu: (event) => this.toggleModeLock(KARAOKE, event),
             "aria-pressed": mode === KARAOKE,
-            "aria-label": I18n.t("modes.karaoke"),
+            "aria-label": getModeButtonLabel(KARAOKE, "modes.character"),
+            "data-mode-locked": this.state.lockedMode === KARAOKE,
           },
-          renderFloatingToolbarIcon("karaoke")
+          renderFloatingToolbarIcon("character")
+        )
+      ),
+      this.state.karaoke &&
+      CONFIG.visual["karaoke-mode-enabled"] &&
+      react.createElement(
+        Spicetify.ReactComponent.TooltipWrapper,
+        { key: "word", label: getModeButtonLabel(WORD_KARAOKE, "modes.word") },
+        react.createElement(
+          "button",
+          {
+            type: "button",
+            className: `lyrics-config-button lyrics-mode-button ${mode === WORD_KARAOKE ? "active" : ""}${this.state.lockedMode === WORD_KARAOKE ? " mode-locked" : ""}`,
+            onClick: () => this.switchTo(WORD_KARAOKE),
+            onContextMenu: (event) => this.toggleModeLock(WORD_KARAOKE, event),
+            "aria-pressed": mode === WORD_KARAOKE,
+            "aria-label": getModeButtonLabel(WORD_KARAOKE, "modes.word"),
+            "data-mode-locked": this.state.lockedMode === WORD_KARAOKE,
+          },
+          renderFloatingToolbarIcon("word")
         )
       ),
       this.state.synced &&
       react.createElement(
         Spicetify.ReactComponent.TooltipWrapper,
-        { key: "synced", label: I18n.t("modes.synced") },
+        { key: "synced", label: getModeButtonLabel(SYNCED, "modes.synced") },
         react.createElement(
           "button",
           {
             type: "button",
-            className: `lyrics-config-button lyrics-mode-button ${mode === SYNCED ? "active" : ""}`,
+            className: `lyrics-config-button lyrics-mode-button ${mode === SYNCED ? "active" : ""}${this.state.lockedMode === SYNCED ? " mode-locked" : ""}`,
             onClick: () => this.switchTo(SYNCED),
+            onContextMenu: (event) => this.toggleModeLock(SYNCED, event),
             "aria-pressed": mode === SYNCED,
-            "aria-label": I18n.t("modes.synced"),
+            "aria-label": getModeButtonLabel(SYNCED, "modes.synced"),
+            "data-mode-locked": this.state.lockedMode === SYNCED,
           },
           renderFloatingToolbarIcon("synced")
         )
@@ -9946,15 +10023,17 @@ class LyricsContainer extends react.Component {
       this.state.unsynced &&
       react.createElement(
         Spicetify.ReactComponent.TooltipWrapper,
-        { key: "unsynced", label: I18n.t("modes.unsynced") },
+        { key: "unsynced", label: getModeButtonLabel(UNSYNCED, "modes.unsynced") },
         react.createElement(
           "button",
           {
             type: "button",
-            className: `lyrics-config-button lyrics-mode-button ${mode === UNSYNCED ? "active" : ""}`,
+            className: `lyrics-config-button lyrics-mode-button ${mode === UNSYNCED ? "active" : ""}${this.state.lockedMode === UNSYNCED ? " mode-locked" : ""}`,
             onClick: () => this.switchTo(UNSYNCED),
+            onContextMenu: (event) => this.toggleModeLock(UNSYNCED, event),
             "aria-pressed": mode === UNSYNCED,
-            "aria-label": I18n.t("modes.unsynced"),
+            "aria-label": getModeButtonLabel(UNSYNCED, "modes.unsynced"),
+            "data-mode-locked": this.state.lockedMode === UNSYNCED,
           },
           renderFloatingToolbarIcon("unsynced")
         )
@@ -10115,7 +10194,7 @@ class LyricsContainer extends react.Component {
       )
       : null;
     const hasTrackSyncLyrics =
-      (mode === KARAOKE && Array.isArray(this.state.karaoke) && this.state.karaoke.length > 0) ||
+      (isKaraokeRenderMode(mode) && Array.isArray(this.state.karaoke) && this.state.karaoke.length > 0) ||
       (mode === SYNCED && Array.isArray(this.state.synced) && this.state.synced.length > 0);
     const canAdjustTrackSync = hasTrackSyncLyrics &&
       !this.state.showMarketplace &&
@@ -10176,7 +10255,7 @@ class LyricsContainer extends react.Component {
         activeLyrics: shouldHideFullscreenLyrics || !Array.isArray(this.state.currentLyrics)
           ? []
           : this.state.currentLyrics,
-        activeLyricsKaraoke: !shouldHideFullscreenLyrics && mode === KARAOKE && !!this.state.karaoke,
+        activeLyricsKaraoke: !shouldHideFullscreenLyrics && isKaraokeRenderMode(mode) && !!this.state.karaoke,
         karaokeSource: this.state.karaokeSource,
         lyricsSettingsRevision: this.reRenderLyricsPage,
         translatedMetadata: this.state.translatedMetadata,
@@ -10534,6 +10613,23 @@ class LyricsContainer extends react.Component {
         prevState.currentLyrics ||
         [],
     }));
+  }
+
+  toggleModeLock(mode, event = null) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    const nextLockedMode = this.state.lockedMode === mode ? -1 : mode;
+    rememberLyricsRenderModeLock(nextLockedMode);
+    this.lastProcessedMode = null;
+    this.setState((prevState) => ({
+      lockedMode: nextLockedMode,
+      explicitMode: nextLockedMode === -1 ? -1 : mode,
+      currentLyrics: nextLockedMode === -1
+        ? prevState.currentLyrics
+        : this.resolveLyricsForMode(prevState, mode) || prevState.currentLyrics || [],
+    }), () => {
+      this.lyricsSource(this.state, this.getCurrentMode());
+    });
   }
 
 }

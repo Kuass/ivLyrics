@@ -2535,6 +2535,7 @@ const renderLyricSubLine = (
 
 const renderLyricMainContent = ({
   isKara = false,
+  karaokeRenderGranularity = null,
   mainText,
   line,
   position,
@@ -2561,6 +2562,7 @@ const renderLyricMainContent = ({
                   phonetic: subText,
                   translation: subText2,
                   culturalAnnotations,
+                  renderGranularity: karaokeRenderGranularity,
           });
   }
 
@@ -4072,7 +4074,67 @@ const getCachedKaraokeStateClassName = (classNames, state, isBouncing, isComplet
 	classNames[state][(isBouncing ? 2 : 0) + (isComplete ? 1 : 0)]
 );
 
-const buildKaraokeWordElements = (timedChars, charElements) => {
+const assignKaraokeWordIndexes = (timedChars, preferSourceUnits = false) => {
+	if (!Array.isArray(timedChars) || timedChars.length === 0) {
+		return timedChars;
+	}
+
+	const wordIndexes = new Array(timedChars.length).fill(null);
+	const assignFromSourceUnits = () => {
+		const unitWordIndexes = new Map();
+		let nextWordIndex = 0;
+		timedChars.forEach((charInfo, index) => {
+			const char = String(charInfo?.char || "");
+			if (!char || KARAOKE_WHITESPACE_CHAR_REGEX.test(char)) return;
+			const unitIndex = Number.isInteger(charInfo?.karaokeUnitIndex)
+				? charInfo.karaokeUnitIndex
+				: index;
+			if (!unitWordIndexes.has(unitIndex)) {
+				unitWordIndexes.set(unitIndex, nextWordIndex++);
+			}
+			wordIndexes[index] = unitWordIndexes.get(unitIndex);
+		});
+	};
+
+	if (preferSourceUnits) {
+		assignFromSourceUnits();
+	} else if (typeof Intl !== "undefined" && typeof Intl.Segmenter === "function") {
+		const text = timedChars.map((charInfo) => String(charInfo?.char || "")).join("");
+		const charUtf16Offsets = [];
+		let utf16Offset = 0;
+		timedChars.forEach((charInfo) => {
+			charUtf16Offsets.push(utf16Offset);
+			utf16Offset += String(charInfo?.char || "").length;
+		});
+
+		let nextWordIndex = 0;
+		for (const segment of new Intl.Segmenter(undefined, { granularity: "word" }).segment(text)) {
+			if (!segment.segment || /^\s+$/u.test(segment.segment)) continue;
+			const segmentStart = segment.index;
+			const segmentEnd = segmentStart + segment.segment.length;
+			for (let index = 0; index < charUtf16Offsets.length; index += 1) {
+				const charStart = charUtf16Offsets[index];
+				if (charStart >= segmentStart && charStart < segmentEnd) {
+					wordIndexes[index] = nextWordIndex;
+				}
+			}
+			nextWordIndex += 1;
+		}
+	} else {
+		assignFromSourceUnits();
+	}
+
+	return timedChars.map((charInfo, index) => ({
+		...charInfo,
+		karaokeWordIndex: wordIndexes[index],
+	}));
+};
+
+const buildKaraokeWordElements = (
+	timedChars,
+	charElements,
+	{ position = 0, isActive = false, isComplete = false, globalCharOffset = 0, activeGlobalCharIndex = -1, wordTimed = false } = {}
+) => {
 	if (!Array.isArray(timedChars) || !Array.isArray(charElements) || timedChars.length !== charElements.length) {
 		return charElements;
 	}
@@ -4080,7 +4142,44 @@ const buildKaraokeWordElements = (timedChars, charElements) => {
 	const wordElements = [];
 	let currentWord = [];
 	let currentWordStart = 0;
+	let currentWordUnit = null;
 	const timedCharCount = timedChars.length;
+	const flushWord = () => {
+		if (currentWord.length === 0) return;
+		const wordChars = timedChars.slice(currentWordStart, currentWordStart + currentWord.length);
+		const startTime = wordChars.reduce((minimum, charInfo) => {
+			const value = Number.isFinite(charInfo?.karaokeFillStartTime)
+				? charInfo.karaokeFillStartTime
+				: charInfo?.startTime;
+			return Number.isFinite(value) ? Math.min(minimum, value) : minimum;
+		}, Infinity);
+		const endTime = wordChars.reduce((maximum, charInfo) => {
+			const value = Number.isFinite(charInfo?.karaokeFillEndTime)
+				? charInfo.karaokeFillEndTime
+				: charInfo?.endTime;
+			return Number.isFinite(value) ? Math.max(maximum, value) : maximum;
+		}, -Infinity);
+		const centerIndex = globalCharOffset + currentWordStart + Math.max(0, currentWord.length - 1) / 2;
+		const attenuation = getKaraokeBounceAttenuation(centerIndex, activeGlobalCharIndex);
+		const bounce = wordTimed && Number.isFinite(startTime) && Number.isFinite(endTime)
+			? getKaraokeWordBounceValues(position, isActive, startTime, endTime, attenuation)
+			: { active: false };
+		const style = bounce.active ? {
+			"--karaoke-bounce-y": `${bounce.offsetY}px`,
+			"--karaoke-bounce-scale": bounce.scale,
+		} : undefined;
+		wordElements.push(react.createElement(
+			"span",
+			{
+				className: `lyrics-karaoke-word${wordTimed ? " is-word-timed" : ""}${bounce.active ? " is-bouncing" : ""}${isComplete ? " is-complete" : ""}`,
+				style,
+				key: `karaoke-word-${currentWordStart}`,
+			},
+			currentWord
+		));
+		currentWord = [];
+		currentWordUnit = null;
+	};
 
 	for (let index = 0; index < timedCharCount; index++) {
 		if (!(index in timedChars)) {
@@ -4091,42 +4190,34 @@ const buildKaraokeWordElements = (timedChars, charElements) => {
 		const char = charInfo?.char || "";
 		const element = charElements[index];
 		const isWhitespace = KARAOKE_WHITESPACE_CHAR_REGEX.test(char);
+		const unitIndex = Number.isInteger(charInfo?.karaokeWordIndex)
+			? charInfo.karaokeWordIndex
+			: null;
+		const unitChanged = wordTimed
+			&& currentWord.length > 0
+			&& unitIndex !== null
+			&& currentWordUnit !== null
+			&& unitIndex !== currentWordUnit;
+
+		if (unitChanged) {
+			flushWord();
+		}
 
 		if (!isWhitespace && currentWord.length === 0) {
 			currentWordStart = index;
+			currentWordUnit = unitIndex;
 		}
 
 		if (isWhitespace) {
-			if (currentWord.length > 0) {
-				currentWord.push(element);
-				wordElements.push(react.createElement(
-					"span",
-					{
-						className: "lyrics-karaoke-word",
-						key: `karaoke-word-${currentWordStart}`,
-					},
-					currentWord
-				));
-				currentWord = [];
-			} else {
-				wordElements.push(element);
-			}
+			flushWord();
+			wordElements.push(element);
 			continue;
 		}
 
 		currentWord.push(element);
 	}
 
-	if (currentWord.length > 0) {
-		wordElements.push(react.createElement(
-			"span",
-			{
-				className: "lyrics-karaoke-word",
-				key: `karaoke-word-${currentWordStart}`,
-			},
-			currentWord
-		));
-	}
+	flushWord();
 	return wordElements;
 };
 
@@ -4152,11 +4243,18 @@ const getKaraokeSegmentFill = (segment, position, isActive, isComplete) => {
 	return Math.round(corrected / 4) * 4;
 };
 
-const buildKaraokeTextRunSegments = (timedChars) => {
+const getKaraokeInstantWordFill = (segment, position, isActive, isComplete) => {
+	if (isComplete) return 100;
+	if (!isActive || !segment) return 0;
+	const startTime = Number.isFinite(segment.startTime) ? segment.startTime : 0;
+	return position >= startTime ? 100 : 0;
+};
+
+const buildKaraokeTextRunSegments = (timedChars, wordTimed = false) => {
 	if (!Array.isArray(timedChars) || timedChars.length === 0) {
 		return [];
 	}
-	const sharedSegments = window.LyricsService?.buildKaraokeWordSegments?.(timedChars, {
+	const sharedSegments = !wordTimed && window.LyricsService?.buildKaraokeWordSegments?.(timedChars, {
 		getText: (charInfo) => charInfo?.char || "",
 		getStartTime: (charInfo) => charInfo?.startTime,
 		getEndTime: (charInfo) => charInfo?.endTime,
@@ -4177,12 +4275,22 @@ const buildKaraokeTextRunSegments = (timedChars) => {
 		const charInfo = timedChars[index];
 		const char = charInfo?.char || "";
 		const type = KARAOKE_WHITESPACE_CHAR_REGEX.test(char) ? "space" : "text";
-		if (!currentSegment || currentSegment.type !== type) {
+		const unitIndex = Number.isInteger(charInfo?.karaokeWordIndex)
+			? charInfo.karaokeWordIndex
+			: null;
+		const unitChanged = wordTimed
+			&& type === "text"
+			&& currentSegment?.type === "text"
+			&& unitIndex !== null
+			&& currentSegment.unitIndex !== null
+			&& currentSegment.unitIndex !== unitIndex;
+		if (!currentSegment || currentSegment.type !== type || unitChanged) {
 			if (currentSegment?.text.length > 0) {
 				segments.push(currentSegment);
 			}
 			currentSegment = {
 				type,
+				unitIndex,
 				startIndex: index,
 				text: "",
 				startTime: Number.isFinite(charInfo?.startTime) ? charInfo.startTime : 0,
@@ -4209,9 +4317,10 @@ const buildKaraokeTextRunElements = (
 	isComplete,
 	textDirection,
 	globalCharOffset = 0,
-	activeGlobalCharIndex = -1
+	activeGlobalCharIndex = -1,
+	wordTimed = false
 ) => {
-	const segments = buildKaraokeTextRunSegments(timedChars);
+	const segments = buildKaraokeTextRunSegments(timedChars, wordTimed);
 	const renderSegments = textDirection === "rtl" ? [...segments].reverse() : segments;
 
 	return renderSegments.map((segment) => {
@@ -4226,13 +4335,17 @@ const buildKaraokeTextRunElements = (
 			);
 		}
 
-		const fillValue = getKaraokeSegmentFill(segment, position, isActive, isComplete);
+		const fillValue = wordTimed
+			? getKaraokeInstantWordFill(segment, position, isActive, isComplete)
+			: getKaraokeSegmentFill(segment, position, isActive, isComplete);
 		const segmentDirection = getKaraokeTextDirection(segment.text) || textDirection;
 		const gradientDirection = segmentDirection === "rtl" ? "to left" : "to right";
 		const segmentState = fillValue <= 0 ? "pending" : fillValue >= 100 ? "done" : "active";
 		const segmentCenterIndex = globalCharOffset + segment.startIndex + Math.max(0, segment.text.length - 1) / 2;
 		const bounceAttenuation = getKaraokeBounceAttenuation(segmentCenterIndex, activeGlobalCharIndex);
-		const bounce = getKaraokeBounceValues(position, isActive, segment.startTime, segment.endTime, bounceAttenuation);
+		const bounce = wordTimed
+			? getKaraokeWordBounceValues(position, isActive, segment.startTime, segment.endTime, bounceAttenuation)
+			: getKaraokeBounceValues(position, isActive, segment.startTime, segment.endTime, bounceAttenuation);
 		const segmentStyle = {};
 		if (segmentState === "active") {
 			const softEdge = 10;
@@ -4354,6 +4467,7 @@ const LyricsLineBlock = react.memo(({
 	subText2 = null,
 	originalText = null,
 	isKara = false,
+	karaokeRenderGranularity = null,
 	line = null,
 	position = 0,
 	isActive = false,
@@ -4453,6 +4567,7 @@ const LyricsLineBlock = react.memo(({
 		}) : "\u00A0")
 		: renderLyricMainContent({
 			isKara,
+			karaokeRenderGranularity,
 			mainText,
 			line: mainLine,
 			position: isKara ? position : 0,
@@ -4532,7 +4647,7 @@ const LyricsLineBlock = react.memo(({
 	);
 });
 
-const renderLyricsItems = ({ items, isKara, position = 0, activeLineRef = null, settingsRevision = 0 }) => {
+const renderLyricsItems = ({ items, isKara, karaokeRenderGranularity = null, position = 0, activeLineRef = null, settingsRevision = 0 }) => {
 	const karaokePosition = isKara ? position : 0;
 
 	return items.map((item) => {
@@ -4559,6 +4674,7 @@ const renderLyricsItems = ({ items, isKara, position = 0, activeLineRef = null, 
 			culturalNote: item.culturalNote,
 			originalText: item.originalText,
 			isKara,
+			karaokeRenderGranularity,
 			line: item.line,
 			// Only the karaoke-active line needs the live position; pinning others to 0
 			// keeps their LyricsLineBlock props stable so react.memo can skip the
@@ -5510,7 +5626,7 @@ const buildKaraokeTimedChars = (line) => {
 	const sourceSyllables = getTimedSyllablesFromLine(line);
 
 	if (sourceSyllables.length > 0) {
-		sourceSyllables.forEach((syllable) => {
+		sourceSyllables.forEach((syllable, karaokeUnitIndex) => {
 			if (!syllable || !syllable.text) return;
 
 			const charArray = Array.from(syllable.text || "");
@@ -5524,6 +5640,7 @@ const buildKaraokeTimedChars = (line) => {
 					char,
 					startTime: charStart,
 					endTime: charStart + charDuration,
+					karaokeUnitIndex,
 				});
 			});
 		});
@@ -5542,6 +5659,7 @@ const buildKaraokeTimedChars = (line) => {
 		char,
 		startTime: startTime + (index * charDuration),
 		endTime: startTime + ((index + 1) * charDuration),
+		karaokeUnitIndex: index,
 	}));
 };
 
@@ -5800,10 +5918,40 @@ const getKaraokeBounceValues = (position, isActive, startTime, endTime, attenuat
 	};
 };
 
-const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0, globalCharOffset = 0, activeGlobalCharIndex = -1, phonetic = null, translation = null, furiganaMapOverride = null, culturalAnnotations = [] }) => {
+const getKaraokeWordBounceValues = (position, isActive, startTime, endTime, attenuation = 1) => {
+	if (!CONFIG.visual["karaoke-bounce"] || !isActive || attenuation <= 0) {
+		return KARAOKE_BOUNCE_IDLE;
+	}
+
+	const duration = Math.max(1, endTime - startTime);
+	const progress = (position - startTime) / duration;
+	if (progress <= 0 || progress >= 1) {
+		return KARAOKE_BOUNCE_IDLE;
+	}
+
+	const waveStrength = Math.pow(Math.sin(Math.PI * progress), 0.82)
+		* Math.max(0, Math.min(1, attenuation));
+	if (waveStrength < 0.025) {
+		return KARAOKE_BOUNCE_IDLE;
+	}
+
+	const offsetY = Math.round((-6 * waveStrength) * 2) / 2;
+	const scale = Math.round((1 + 0.055 * waveStrength) * 100) / 100;
+	return {
+		offsetY,
+		scale,
+		active: offsetY !== 0 || scale !== 1,
+	};
+};
+
+const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0, globalCharOffset = 0, activeGlobalCharIndex = -1, phonetic = null, translation = null, furiganaMapOverride = null, culturalAnnotations = [], renderGranularity = null }) => {
   if (!line) {
           return "";
   }
+
+  const wordTimed = renderGranularity
+	? renderGranularity === "word"
+	: line.karaokeGranularity === "word";
 
   const vocalRows = getKaraokeVocalRows(line);
   const shouldUseVocalRowAnchor = isActive
@@ -5874,6 +6022,7 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 					globalCharOffset: currentOffset,
 					activeGlobalCharIndex: rowActiveGlobalCharIndex,
 					culturalAnnotations: culturalAnnotationsByRow[rowIndex],
+					renderGranularity,
 				}),
 				rowPhonetic && react.createElement(
 					"span",
@@ -5939,11 +6088,15 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 		}) || compensatedTimedChars;
 		const detectedTextDirection = getKaraokeTextDirection(rawLineText);
 
+		const renderTimedChars = wordTimed
+			? assignKaraokeWordIndexes(fillTimedChars, line.karaokeGranularity === "word")
+			: fillTimedChars;
+
 		return {
 			furiganaMap: furiganaMapOverride instanceof Map
 				? furiganaMapOverride
 				: buildKaraokeFuriganaMap(processedText),
-			timedChars: fillTimedChars,
+			timedChars: renderTimedChars,
 			endTime: compensatedTimedChars.reduce(
 				(maxEndTime, charInfo) => Math.max(maxEndTime, Number.isFinite(charInfo?.endTime) ? charInfo.endTime : 0),
 				getKaraokeLineBounds(line).endTime
@@ -5952,9 +6105,26 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 			textDirection: detectedTextDirection,
 			useTextRun: shouldUseKaraokeTextRun(rawLineText),
 		};
-	}, [line, furiganaEnabled, furiganaReady, furiganaMapOverride]);
+	}, [line, furiganaEnabled, furiganaReady, furiganaMapOverride, wordTimed]);
 	const isComplete = isActive && position >= endTime;
 	const timedText = timedChars.map(charInfo => String(charInfo?.char || "")).join("");
+	const wordStartTimes = new Map();
+	if (wordTimed) {
+		timedChars.forEach((charInfo) => {
+			const wordIndex = Number.isInteger(charInfo?.karaokeWordIndex)
+				? charInfo.karaokeWordIndex
+				: null;
+			if (wordIndex === null) return;
+			const startTime = Number.isFinite(charInfo?.karaokeFillStartTime)
+				? charInfo.karaokeFillStartTime
+				: charInfo?.startTime;
+			if (!Number.isFinite(startTime)) return;
+			wordStartTimes.set(
+				wordIndex,
+				Math.min(wordStartTimes.get(wordIndex) ?? Infinity, startTime)
+			);
+		});
+	}
 	const culturalMarkersByCharIndex = new Map();
 	const fallbackCulturalAnnotations = [];
 	for (const annotation of culturalAnnotations) {
@@ -5987,16 +6157,27 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 	}
 
 	const charElements = useTextRun ? [] : timedChars.map((charInfo, index) => {
-		const fillRatio = getKaraokeCharFill(
-			position,
-			isActive,
-			Number.isFinite(charInfo?.karaokeFillStartTime) ? charInfo.karaokeFillStartTime : charInfo.startTime,
-			Number.isFinite(charInfo?.karaokeFillEndTime) ? charInfo.karaokeFillEndTime : charInfo.endTime
-		);
+		const wordIndex = Number.isInteger(charInfo?.karaokeWordIndex)
+			? charInfo.karaokeWordIndex
+			: null;
+		const wordStartTime = wordIndex === null ? null : wordStartTimes.get(wordIndex);
+		const fillRatio = wordTimed
+			? getKaraokeInstantWordFill(
+				{ startTime: Number.isFinite(wordStartTime) ? wordStartTime : charInfo?.startTime },
+				position,
+				isActive,
+				isComplete
+			) / 100
+			: getKaraokeCharFill(
+				position,
+				isActive,
+				Number.isFinite(charInfo?.karaokeFillStartTime) ? charInfo.karaokeFillStartTime : charInfo.startTime,
+				Number.isFinite(charInfo?.karaokeFillEndTime) ? charInfo.karaokeFillEndTime : charInfo.endTime
+			);
 		const charState = fillRatio <= 0 ? "pending" : fillRatio >= 1 ? "done" : "active";
 		const globalCharIndex = globalCharOffset + index;
 		const bounceAttenuation = getKaraokeBounceAttenuation(globalCharIndex, activeGlobalCharIndex);
-		const bounce = getKaraokeBounceValues(
+		const bounce = wordTimed ? KARAOKE_BOUNCE_IDLE : getKaraokeBounceValues(
 			position,
 			isActive,
 			Number.isFinite(charInfo?.karaokeFillStartTime) ? charInfo.karaokeFillStartTime : charInfo.startTime,
@@ -6077,16 +6258,24 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 			isComplete,
 			textDirection,
 			globalCharOffset,
-			activeGlobalCharIndex
+			activeGlobalCharIndex,
+			wordTimed
 		)
-		: wrapByWord
-		? buildKaraokeWordElements(timedChars, charElements)
+		: (wrapByWord || wordTimed)
+		? buildKaraokeWordElements(timedChars, charElements, {
+			position,
+			isActive,
+			isComplete,
+			globalCharOffset,
+			activeGlobalCharIndex,
+			wordTimed,
+		})
 		: charElements;
 
 	return react.createElement(
 		"span",
 		{
-			className: `lyrics-karaoke-line${wrapByWord || useTextRun ? " has-word-wrap" : ""}${useTextRun ? " is-text-run" : ""}${textDirection === "rtl" ? " is-rtl" : ""}${isActive ? " is-active" : ""}${isComplete ? " is-complete" : ""}`,
+			className: `lyrics-karaoke-line${wrapByWord || wordTimed || useTextRun ? " has-word-wrap" : ""}${wordTimed ? " is-word-timed" : ""}${useTextRun ? " is-text-run" : ""}${textDirection === "rtl" ? " is-rtl" : ""}${isActive ? " is-active" : ""}${isComplete ? " is-complete" : ""}`,
 			dir: useTextRun ? (textDirection === "rtl" ? "ltr" : textDirection) : undefined,
 		},
 		lineChildren,
@@ -6101,7 +6290,7 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 	);
 });
 
-const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara, karaokeSource = null, reRenderLyricsPage = null }) => {
+const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara, karaokeSource = null, karaokeRenderGranularity = null, reRenderLyricsPage = null }) => {
 	const position = useLyricsPlaybackPosition();
 	const karaokePosition = isKara ? position + getPseudoKaraokeRenderAdvance(karaokeSource) : position;
 	const karaokeLineTransitionClass = isKara && CONFIG.visual["karaoke-line-transition"]
@@ -6216,6 +6405,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copy
 			...renderLyricsItems({
                           items: renderItems,
                           isKara,
+                          karaokeRenderGranularity,
                           position: karaokePosition,
                           activeLineRef: setCompactActiveLineAnchor,
                           settingsRevision: reRenderLyricsPage,
@@ -6780,6 +6970,7 @@ const LyricsUnavailableView = react.memo(({ isLoading }) =>
 const LyricsPageRenderer = react.memo(({
 	mode = -1,
 	karaokeMode = 0,
+	wordMode = 3,
 	syncedMode = 1,
 	unsyncedMode = 2,
 	trackUri = "",
@@ -6811,7 +7002,7 @@ const LyricsPageRenderer = react.memo(({
 			};
 		}
 
-		if (mode === karaokeMode && karaoke) {
+		if ((mode === karaokeMode || mode === wordMode) && karaoke) {
 			return {
 				component: SyncedLyricsPage,
 				props: {
@@ -6822,6 +7013,7 @@ const LyricsPageRenderer = react.memo(({
 					copyright,
 					isKara: true,
 					karaokeSource,
+					karaokeRenderGranularity: mode === wordMode ? "word" : "character",
 					reRenderLyricsPage,
 				},
 			};
@@ -6863,6 +7055,7 @@ const LyricsPageRenderer = react.memo(({
 		onCloseMarketplace,
 		mode,
 		karaokeMode,
+		wordMode,
 		syncedMode,
 		unsyncedMode,
 		karaoke,

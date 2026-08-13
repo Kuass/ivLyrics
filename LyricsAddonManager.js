@@ -63,17 +63,26 @@
     };
     const SYNC_DATA_RENDERER_VERSION = '2026-05-23-source-line-shape-1';
 
-    // 가사 유형
+    // 가사 유형. Karaoke 데이터는 타이밍의 최소 단위를 기준으로 다시
+    // 나눈다. 렌더러는 같은 `result.karaoke` 배열을 사용하지만 선택 정책과
+    // 제공자별 허용 설정은 두 종류를 독립적으로 다룬다.
     const LYRICS_TYPES = {
-        KARAOKE: 'karaoke',     // 노래방 가사 (단어별 타이밍)
+        CHARACTER: 'character', // 글자 단위 노래방 가사
+        WORD: 'word',           // 단어 단위 노래방 가사
+        KARAOKE: 'karaoke',     // 이전 Addon/설정 호환용 그룹 이름
         SYNCED: 'synced',       // 싱크 가사 (줄별 타이밍)
         UNSYNCED: 'unsynced'    // 일반 가사 (타이밍 없음)
     };
     const LYRICS_TYPE_PRIORITY_ORDER = [
-        LYRICS_TYPES.KARAOKE,
+        LYRICS_TYPES.CHARACTER,
+        LYRICS_TYPES.WORD,
         LYRICS_TYPES.SYNCED,
         LYRICS_TYPES.UNSYNCED
     ];
+    const KARAOKE_GRANULARITIES = new Set([
+        LYRICS_TYPES.CHARACTER,
+        LYRICS_TYPES.WORD
+    ]);
     const PROVIDER_SELECTION_POLICIES = {
         PROVIDER_FIRST: 'provider-first-v1',
         TYPE_FIRST: 'type-first-v1'
@@ -95,6 +104,103 @@
 
     function hasLyricsContent(lines) {
         return Array.isArray(lines) && lines.length > 0;
+    }
+
+    function normalizeKaraokeGranularity(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        if (normalized === 'char' || normalized === 'character' || normalized === 'letter') {
+            return LYRICS_TYPES.CHARACTER;
+        }
+        if (normalized === 'word' || normalized === 'token') {
+            return LYRICS_TYPES.WORD;
+        }
+        return '';
+    }
+
+    function getDeclaredKaraokeGranularities(provider) {
+        const declared = new Set(
+            (Array.isArray(provider?.supports?.karaokeGranularities)
+                ? provider.supports.karaokeGranularities
+                : [])
+                .map(normalizeKaraokeGranularity)
+                .filter(Boolean)
+        );
+        if (provider?.supports?.character === true || provider?.supports?.karaokeCharacter === true) {
+            declared.add(LYRICS_TYPES.CHARACTER);
+        }
+        if (provider?.supports?.word === true || provider?.supports?.karaokeWord === true) {
+            declared.add(LYRICS_TYPES.WORD);
+        }
+        return declared;
+    }
+
+    function getKaraokeLineSyllables(line) {
+        const syllables = [];
+        if (Array.isArray(line?.syllables)) syllables.push(...line.syllables);
+        if (Array.isArray(line?.vocals?.lead?.syllables)) syllables.push(...line.vocals.lead.syllables);
+        if (Array.isArray(line?.vocals?.background)) {
+            line.vocals.background.forEach(part => {
+                if (Array.isArray(part?.syllables)) syllables.push(...part.syllables);
+            });
+        }
+        return syllables;
+    }
+
+    function inferKaraokeGranularity(result) {
+        const explicit = normalizeKaraokeGranularity(
+            result?.karaokeGranularity
+            || result?.karaokeTimingType
+            || result?.karaokeType
+        );
+        if (explicit) return explicit;
+
+        const source = String(result?.karaokeSource || '').trim().toLowerCase();
+        if (source === 'sync-data' || source === 'ivlyrics-sync') {
+            return LYRICS_TYPES.CHARACTER;
+        }
+        if (source === 'lrclib-lyricsfile' || source === 'lyricsplus') {
+            return LYRICS_TYPES.WORD;
+        }
+
+        let singleCharacterUnits = 0;
+        let multiCharacterUnits = 0;
+        for (const line of (Array.isArray(result?.karaoke) ? result.karaoke : [])) {
+            for (const syllable of getKaraokeLineSyllables(line)) {
+                const text = String(syllable?.text || '').trim();
+                if (!text) continue;
+                const characterCount = Array.from(text).length;
+                if (characterCount <= 1) singleCharacterUnits++;
+                else multiCharacterUnits++;
+            }
+        }
+
+        // A word-timed source normally exposes several multi-character tokens.
+        // Keep borderline/CJK data in character mode unless multi-character units
+        // clearly dominate; this avoids turning real per-character sync into a
+        // coarse renderer because of one punctuation or whitespace token.
+        if (multiCharacterUnits > 0
+            && multiCharacterUnits >= Math.max(2, Math.ceil(singleCharacterUnits * 0.35))) {
+            return LYRICS_TYPES.WORD;
+        }
+        return LYRICS_TYPES.CHARACTER;
+    }
+
+    function applyKaraokeGranularity(result, forcedGranularity = '') {
+        if (!result || typeof result !== 'object' || !hasLyricsContent(result.karaoke)) {
+            return result;
+        }
+        const granularity = normalizeKaraokeGranularity(forcedGranularity)
+            || inferKaraokeGranularity(result);
+        const karaoke = result.karaoke.map(line => (
+            line && typeof line === 'object' && line.karaokeGranularity !== granularity
+                ? { ...line, karaokeGranularity: granularity }
+                : line
+        ));
+        return {
+            ...result,
+            karaoke,
+            karaokeGranularity: granularity
+        };
     }
 
     function decodeInstrumentalBreakEntities(value) {
@@ -813,7 +919,7 @@
         }
 
         /**
-         * 모든 제공자의 노래방 가사를 먼저 찾고, 이후 싱크/일반 가사를
+         * 모든 제공자의 글자 단위 가사를 먼저 찾고, 이후 단어/줄/일반 가사를
          * 같은 제공자 우선순위로 탐색할지 여부. 새 설치의 기본값은 true다.
          */
         isPreferLyricsTypeOverProviderOrderEnabled() {
@@ -883,8 +989,9 @@
                 const remaining = [];
                 for (const provider of providers) {
                     const addonId = getLyricsAddonIdForSyncProvider(provider?.id);
+                    const typeSettings = this._getProviderTypeSettings(provider);
                     const canUseSyncData = provider?.useIvLyricsSync !== false
-                        && this.getAddonSetting(provider.id, 'enable_karaoke', true) !== false;
+                        && typeSettings[LYRICS_TYPES.CHARACTER] !== false;
                     if (canUseSyncData && preferredAddonIds.has(addonId)) {
                         preferred.push(provider);
                     } else {
@@ -974,8 +1081,21 @@
         // ============================================
 
         _getProviderTypeSettings(provider) {
+            const legacyKaraoke = this.getAddonSetting(provider.id, 'enable_karaoke', null);
+            const karaokeFallback = legacyKaraoke === null || legacyKaraoke === undefined
+                ? true
+                : legacyKaraoke !== false;
             return {
-                [LYRICS_TYPES.KARAOKE]: this.getAddonSetting(provider.id, 'enable_karaoke', true) !== false,
+                [LYRICS_TYPES.CHARACTER]: this.getAddonSetting(
+                    provider.id,
+                    'enable_character',
+                    karaokeFallback
+                ) !== false,
+                [LYRICS_TYPES.WORD]: this.getAddonSetting(
+                    provider.id,
+                    'enable_word',
+                    karaokeFallback
+                ) !== false,
                 [LYRICS_TYPES.SYNCED]: this.getAddonSetting(provider.id, 'enable_synced', true) !== false,
                 [LYRICS_TYPES.UNSYNCED]: this.getAddonSetting(provider.id, 'enable_unsynced', true) !== false
             };
@@ -984,12 +1104,18 @@
         _canProviderParticipateInType(provider, lyricsType, typeSettings, syncDataProviderIds) {
             if (!typeSettings?.[lyricsType]) return false;
 
-            if (lyricsType === LYRICS_TYPES.KARAOKE) {
+            if (KARAOKE_GRANULARITIES.has(lyricsType)) {
                 const addonId = getLyricsAddonIdForSyncProvider(provider?.id);
                 const hasKnownSyncData = provider?.useIvLyricsSync !== false
                     && syncDataProviderIds instanceof Set
                     && syncDataProviderIds.has(addonId);
-                return provider?.supports?.karaoke === true || hasKnownSyncData;
+                if (lyricsType === LYRICS_TYPES.CHARACTER && hasKnownSyncData) {
+                    return true;
+                }
+                const declaredGranularities = getDeclaredKaraokeGranularities(provider);
+                return declaredGranularities.size > 0
+                    ? declaredGranularities.has(lyricsType)
+                    : provider?.supports?.karaoke === true;
             }
 
             return provider?.supports?.[lyricsType] === true;
@@ -1005,8 +1131,14 @@
         _selectProviderCandidateForType(candidate, lyricsType) {
             if (!candidate) return null;
 
-            if (lyricsType === LYRICS_TYPES.KARAOKE) {
-                return candidate.hasKaraoke && !candidate.isPseudoKaraoke
+            if (lyricsType === LYRICS_TYPES.CHARACTER) {
+                return candidate.hasCharacterKaraoke && !candidate.isPseudoKaraoke
+                    ? { ...candidate.result }
+                    : null;
+            }
+
+            if (lyricsType === LYRICS_TYPES.WORD) {
+                return candidate.hasWordKaraoke && !candidate.isPseudoKaraoke
                     ? { ...candidate.result }
                     : null;
             }
@@ -1075,7 +1207,9 @@
 
         async _loadProviderCandidate(provider, info, context, typeSettings) {
             const { lyricsCacheId, trackId, trackIsrc } = context;
-            const allowKaraoke = typeSettings[LYRICS_TYPES.KARAOKE];
+            const allowCharacter = typeSettings[LYRICS_TYPES.CHARACTER];
+            const allowWord = typeSettings[LYRICS_TYPES.WORD];
+            const allowKaraoke = allowCharacter || allowWord;
             const allowSynced = typeSettings[LYRICS_TYPES.SYNCED];
             const allowUnsynced = typeSettings[LYRICS_TYPES.UNSYNCED];
 
@@ -1085,7 +1219,7 @@
             }
 
             window.__ivLyricsDebugLog?.(`[LyricsAddonManager] Trying provider: ${provider.id}`);
-            window.__ivLyricsDebugLog?.(`[LyricsAddonManager] User settings for ${provider.id}: karaoke=${allowKaraoke}, synced=${allowSynced}, unsynced=${allowUnsynced}`);
+            window.__ivLyricsDebugLog?.(`[LyricsAddonManager] User settings for ${provider.id}: character=${allowCharacter}, word=${allowWord}, synced=${allowSynced}, unsynced=${allowUnsynced}`);
 
             let result = null;
             let cacheHit = false;
@@ -1168,11 +1302,17 @@
                 }
             }
 
+            result = applyKaraokeGranularity(result);
             const resultHasKaraoke = hasLyricsContent(result.karaoke);
+            const resultKaraokeGranularity = resultHasKaraoke
+                ? inferKaraokeGranularity(result)
+                : '';
+            const resultHasCharacterKaraoke = resultHasKaraoke
+                && resultKaraokeGranularity === LYRICS_TYPES.CHARACTER;
             const resultHasSynced = hasLyricsContent(result.synced);
             const resultHasUnsynced = hasLyricsContent(result.unsynced);
-            const needsKaraoke = allowKaraoke && (
-                !resultHasKaraoke
+            const needsCharacterKaraoke = allowCharacter && (
+                !resultHasCharacterKaraoke
                 || this._isPseudoKaraoke(result)
             );
             const hasBaseLyrics = resultHasSynced || resultHasUnsynced;
@@ -1188,17 +1328,19 @@
                 providerId: provider.id,
                 resultProvider: result.provider || null,
                 useIvLyricsSync,
-                allowKaraoke,
+                allowCharacter,
+                allowWord,
                 hasKaraoke: resultHasKaraoke,
+                karaokeGranularity: resultKaraokeGranularity || null,
                 hasSynced: resultHasSynced,
                 hasUnsynced: resultHasUnsynced,
-                needsKaraoke,
+                needsCharacterKaraoke,
                 hasBaseLyrics,
                 isrc: trackIsrc || null,
                 hasSyncDataService: !!window.SyncDataService?.getSyncData
             });
 
-            if (useIvLyricsSync && needsKaraoke && hasBaseLyrics) {
+            if (useIvLyricsSync && needsCharacterKaraoke && hasBaseLyrics) {
                 if ((trackId || trackIsrc) && window.SyncDataService?.getSyncData) {
                     try {
                         const syncProvider = result.provider || provider.id;
@@ -1218,6 +1360,7 @@
                             if (hasLyricsContent(karaoke)) {
                                 result.karaoke = karaoke;
                                 result.karaokeSource = 'sync-data';
+                                result.karaokeGranularity = LYRICS_TYPES.CHARACTER;
                                 delete result.pseudoKaraokeCacheVersion;
                                 result.syncDataApplied = true;
                                 result.syncDataProvider = syncProvider;
@@ -1258,7 +1401,7 @@
                 }
             }
 
-            if (window.PseudoKaraokeService?.applyToResult) {
+            if (allowKaraoke && window.PseudoKaraokeService?.applyToResult) {
                 try {
                     const karaokeBeforePseudo = result.karaoke;
                     const karaokeSourceBeforePseudo = result.karaokeSource;
@@ -1279,7 +1422,7 @@
             // provider result was normalized. Normalize once more at the final
             // boundary so every provider and lyric type keeps the same marker.
             const finalInstrumentalBreaks = normalizeProviderInstrumentalBreaks(result, info);
-            result = finalInstrumentalBreaks.result;
+            result = applyKaraokeGranularity(finalInstrumentalBreaks.result);
             instrumentalBreaksNormalized = instrumentalBreaksNormalized
                 || finalInstrumentalBreaks.changed;
 
@@ -1287,17 +1430,33 @@
             if (finalResult.syncDataApplied) {
                 finalResult.syncDataRendererVersion = SYNC_DATA_RENDERER_VERSION;
             }
-            if (!allowKaraoke) finalResult.karaoke = null;
+            const finalKaraokeGranularity = hasLyricsContent(finalResult.karaoke)
+                ? inferKaraokeGranularity(finalResult)
+                : '';
+            const karaokeGranularityAllowed = finalKaraokeGranularity === LYRICS_TYPES.CHARACTER
+                ? allowCharacter
+                : finalKaraokeGranularity === LYRICS_TYPES.WORD
+                    ? allowWord
+                    : false;
+            if (!allowKaraoke || !karaokeGranularityAllowed) {
+                finalResult.karaoke = null;
+                finalResult.karaokeGranularity = null;
+            }
             if (!allowSynced) finalResult.synced = null;
             if (!allowUnsynced) finalResult.unsynced = null;
 
             const hasKaraoke = hasLyricsContent(finalResult.karaoke);
+            const hasCharacterKaraoke = hasKaraoke
+                && finalKaraokeGranularity === LYRICS_TYPES.CHARACTER;
+            const hasWordKaraoke = hasKaraoke
+                && finalKaraokeGranularity === LYRICS_TYPES.WORD;
             const hasSynced = hasLyricsContent(finalResult.synced);
             const hasUnsynced = hasLyricsContent(finalResult.unsynced);
             const isPseudoKaraoke = hasKaraoke && this._isPseudoKaraoke(finalResult);
 
             window.__ivLyricsDebugLog?.(`[LyricsAddonManager] After filtering for ${provider.id}:`, {
                 hasKaraoke,
+                karaokeGranularity: hasKaraoke ? finalKaraokeGranularity : null,
                 hasSynced,
                 hasUnsynced,
                 isPseudoKaraoke
@@ -1326,6 +1485,8 @@
                 provider,
                 result: finalResult,
                 hasKaraoke,
+                hasCharacterKaraoke,
+                hasWordKaraoke,
                 hasSynced,
                 hasUnsynced,
                 isPseudoKaraoke
@@ -1334,7 +1495,7 @@
 
         /**
          * 가사를 가져온다. 품질 우선 옵션에서는 각 제공자를 한 번만 요청하며,
-         * 노래방 → 싱크 → 일반 단계 안에서 사용자 지정 제공자 순서를 유지한다.
+         * 글자 → 단어 → 줄 → 일반 단계 안에서 사용자 지정 제공자 순서를 유지한다.
          */
         async getLyrics(info, forcedProviderId = null) {
             this.clearActiveLyricsSearchProgress(info?.uri, forcedProviderId);
@@ -1355,7 +1516,7 @@
                 const forcedProvider = forcedProviderId ? enabledProviders[0] : null;
                 this._publishLyricsSearchProgress(info, forcedProviderId, {
                     stage: forcedProvider ? 'provider' : 'sync-data',
-                    lyricsType: forcedProvider ? null : LYRICS_TYPES.KARAOKE,
+                    lyricsType: forcedProvider ? null : LYRICS_TYPES.CHARACTER,
                     providerId: forcedProvider?.id || 'ivlyrics-sync',
                     providerName: forcedProvider?.name || 'ivLyrics Sync',
                     attempt: forcedProvider ? 1 : 0
@@ -1480,7 +1641,10 @@
                         const typeSettings = typeSettingsByProvider.get(provider.id);
                         const existingCandidate = providerAttempts.get(provider.id);
                         const hasAllowedPseudoSyncedFallback = lyricsType === LYRICS_TYPES.SYNCED
-                            && typeSettings?.[LYRICS_TYPES.KARAOKE]
+                            && (
+                                typeSettings?.[LYRICS_TYPES.CHARACTER]
+                                || typeSettings?.[LYRICS_TYPES.WORD]
+                            )
                             && existingCandidate?.hasKaraoke
                             && existingCandidate?.isPseudoKaraoke;
                         if (!hasAllowedPseudoSyncedFallback && !this._canProviderParticipateInType(
@@ -1512,13 +1676,15 @@
                     const candidate = await loadProviderOnce(provider, null);
                     if (!candidate) continue;
 
-                    const selectionType = candidate.hasKaraoke
-                        ? LYRICS_TYPES.KARAOKE
-                        : candidate.hasSynced
-                            ? LYRICS_TYPES.SYNCED
-                            : candidate.hasUnsynced
-                                ? LYRICS_TYPES.UNSYNCED
-                                : null;
+                    const selectionType = candidate.hasCharacterKaraoke
+                        ? LYRICS_TYPES.CHARACTER
+                        : candidate.hasWordKaraoke
+                            ? LYRICS_TYPES.WORD
+                            : candidate.hasSynced
+                                ? LYRICS_TYPES.SYNCED
+                                : candidate.hasUnsynced
+                                    ? LYRICS_TYPES.UNSYNCED
+                                    : null;
                     if (selectionType) {
                         const finalResult = this._finalizeLyricsFetch(
                             candidate.result,
@@ -1559,7 +1725,9 @@
 
             try {
                 const result = await provider.getLyrics(info);
-                return normalizeProviderInstrumentalBreaks(result, info).result;
+                return applyKaraokeGranularity(
+                    normalizeProviderInstrumentalBreaks(result, info).result
+                );
             } catch (e) {
                 console.error(`[LyricsAddonManager] Provider ${providerId} failed:`, e);
                 return { error: e.message, uri: info.uri };
@@ -1570,15 +1738,33 @@
         // Utility Methods
         // ============================================
 
+        normalizeResult(result, info = {}) {
+            return applyKaraokeGranularity(
+                normalizeProviderInstrumentalBreaks(result, info).result
+            );
+        }
+
         /**
          * 특정 가사 유형을 지원하는 Provider 목록
-         * @param {'karaoke'|'synced'|'unsynced'} type - 가사 유형
+         * @param {'character'|'word'|'synced'|'unsynced'} type - 가사 유형
          * @returns {Object[]}
          */
         getProvidersSupporting(type) {
-            return this.getAddons().filter(addon =>
-                addon.supports && addon.supports[type] === true
-            );
+            const normalizedType = normalizeKaraokeGranularity(type) || type;
+            return this.getAddons().filter(addon => {
+                if (!addon.supports) return false;
+                const declaredGranularities = getDeclaredKaraokeGranularities(addon);
+                if (normalizedType === LYRICS_TYPES.CHARACTER) {
+                    return addon.useIvLyricsSync === true
+                        || declaredGranularities.has(LYRICS_TYPES.CHARACTER)
+                        || (declaredGranularities.size === 0 && addon.supports.karaoke === true);
+                }
+                if (normalizedType === LYRICS_TYPES.WORD) {
+                    return declaredGranularities.has(LYRICS_TYPES.WORD)
+                        || (declaredGranularities.size === 0 && addon.supports.karaoke === true);
+                }
+                return addon.supports[normalizedType] === true;
+            });
         }
 
         /**

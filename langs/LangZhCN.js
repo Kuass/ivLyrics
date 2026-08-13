@@ -476,19 +476,23 @@ window.LANG_ZH_CN = {
         "desc": "如果当前歌曲有同步数据，将在常规提供商顺序之前尝试对应的歌词提供商。"
       },
       "preferLyricsTypeOverProviderOrder": {
-        "label": "歌词类型优先于提供商顺序",
-        "desc": "先在所有提供商中查找卡拉 OK 歌词，再查找同步歌词，最后查找普通歌词。每种类型内仍按设定的提供商顺序尝试。"
+        "label": "优先逐字、逐词、逐行、纯文本歌词",
+        "desc": "先在所有提供商中查找逐字同步歌词，然后依次查找逐词同步、逐行同步和纯文本歌词。同一类型内保持已设置的提供商顺序。"
       },
       "noProviders": "未注册歌词提供者。",
       "allowedTypes": "允许的歌词类型",
       "moveUp": "上移",
       "moveDown": "下移",
       "types": {
+        "character": "逐字同步歌词",
+        "word": "逐词同步歌词",
         "karaoke": "卡拉OK歌词",
         "synced": "同步歌词",
         "unsynced": "普通文本歌词"
       },
       "supports": {
+        "character": "逐字",
+        "word": "逐词",
         "karaoke": "卡拉OK",
         "synced": "同步",
         "unsynced": "普通",
@@ -1942,6 +1946,10 @@ window.LANG_ZH_CN = {
     "terminalMac": "终端 (Terminal)"
   },
   "modes": {
+    "character": "逐字",
+    "word": "逐词",
+    "rightClickToLock": "右键固定",
+    "rightClickToUnlock": "右键取消固定",
     "karaoke": "卡拉OK",
     "synced": "同步",
     "unsynced": "纯文本"

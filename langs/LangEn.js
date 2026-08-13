@@ -476,19 +476,23 @@ window.LANG_EN = {
         "desc": "When OpenDB has ivLyrics Sync data for the current track, try its matching lyrics provider before the normal provider order."
       },
       "preferLyricsTypeOverProviderOrder": {
-        "label": "Prioritize lyrics type over provider order",
-        "desc": "Try karaoke lyrics across all providers first, then synced lyrics, then plain lyrics. The configured provider order is preserved within each type."
+        "label": "Prioritize character, word, line, then plain lyrics",
+        "desc": "Try character-synced lyrics across all providers first, then word-synced, line-synced, and plain lyrics. The configured provider order is preserved within each type."
       },
       "noProviders": "No lyrics providers registered.",
       "allowedTypes": "Allowed Lyrics Types",
       "moveUp": "Move Up",
       "moveDown": "Move Down",
       "types": {
+        "character": "Character-synced Lyrics",
+        "word": "Word-synced Lyrics",
         "karaoke": "Karaoke Lyrics",
         "synced": "Synced Lyrics",
         "unsynced": "Plain Text Lyrics"
       },
       "supports": {
+        "character": "Character-synced",
+        "word": "Word-synced",
         "karaoke": "Karaoke",
         "synced": "Synced",
         "unsynced": "Plain",
@@ -1942,6 +1946,10 @@ window.LANG_EN = {
     "terminalMac": "Terminal"
   },
   "modes": {
+    "character": "Character",
+    "word": "Word",
+    "rightClickToLock": "Right-click to lock",
+    "rightClickToUnlock": "Right-click to unlock",
     "karaoke": "Karaoke",
     "synced": "Synced",
     "unsynced": "Plain Text"

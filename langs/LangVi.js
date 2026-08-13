@@ -476,19 +476,23 @@ window.LANG_VI = {
         "desc": "Khi bài hát hiện tại có dữ liệu đồng bộ, hãy thử nhà cung cấp lời tương ứng trước thứ tự thông thường."
       },
       "preferLyricsTypeOverProviderOrder": {
-        "label": "Ưu tiên loại lời bài hát hơn thứ tự nhà cung cấp",
-        "desc": "Thử lời karaoke từ tất cả nhà cung cấp trước, sau đó lời đồng bộ và cuối cùng lời thường. Thứ tự nhà cung cấp đã đặt được giữ nguyên trong từng loại."
+        "label": "Ưu tiên ký tự, từ, dòng, rồi lời thường",
+        "desc": "Thử lời đồng bộ theo ký tự từ tất cả nhà cung cấp trước, sau đó theo từ, theo dòng và cuối cùng là lời thường. Thứ tự nhà cung cấp đã đặt được giữ nguyên trong từng loại."
       },
       "noProviders": "Chưa có nhà cung cấp lời bài hát nào được đăng ký.",
       "allowedTypes": "Các loại lời được phép",
       "moveUp": "Di chuyển lên",
       "moveDown": "Di chuyển xuống",
       "types": {
+        "character": "Lời đồng bộ theo ký tự",
+        "word": "Lời đồng bộ theo từ",
         "karaoke": "Lời Karaoke",
         "synced": "Lời đồng bộ",
         "unsynced": "Lời chưa đồng bộ"
       },
       "supports": {
+        "character": "Theo ký tự",
+        "word": "Theo từ",
         "karaoke": "Karaoke",
         "synced": "Đồng bộ",
         "unsynced": "Chưa đồng bộ",
@@ -1942,6 +1946,10 @@ window.LANG_VI = {
     "terminalMac": "Terminal"
   },
   "modes": {
+    "character": "Theo ký tự",
+    "word": "Theo từ",
+    "rightClickToLock": "Nhấp chuột phải để khóa",
+    "rightClickToUnlock": "Nhấp chuột phải để mở khóa",
     "karaoke": "Karaoke",
     "synced": "Đồng bộ",
     "unsynced": "Lời thường"

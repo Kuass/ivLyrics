@@ -476,19 +476,23 @@ window.LANG_CS = {
         "desc": "Pokud jsou pro aktuální skladbu dostupná synchronizační data, odpovídající poskytovatel textu se vyzkouší před běžným pořadím poskytovatelů."
       },
       "preferLyricsTypeOverProviderOrder": {
-        "label": "Upřednostnit typ textu před pořadím poskytovatelů",
-        "desc": "Nejprve vyzkoušet karaoke texty u všech poskytovatelů, potom synchronizované a nakonec prosté texty. V rámci každého typu se zachová nastavené pořadí poskytovatelů."
+        "label": "Upřednostnit znaky, slova, řádky a potom prostý text",
+        "desc": "Nejprve vyzkoušet u všech poskytovatelů texty synchronizované po znacích, potom po slovech, po řádcích a nakonec prosté texty. V rámci každého typu se zachová nastavené pořadí poskytovatelů."
       },
       "noProviders": "Nejsou registrováni žádní poskytovatelé textů.",
       "allowedTypes": "Povolené typy textů",
       "moveUp": "Posunout nahoru",
       "moveDown": "Přesunout dolů",
       "types": {
+        "character": "Texty synchronizované po znacích",
+        "word": "Texty synchronizované po slovech",
         "karaoke": "Texty karaoke",
         "synced": "Synchronizované texty",
         "unsynced": "Texty prostého textu"
       },
       "supports": {
+        "character": "Po znacích",
+        "word": "Po slovech",
         "karaoke": "Karaoke",
         "synced": "Synchronizováno",
         "unsynced": "Obyčejný",
@@ -1942,6 +1946,10 @@ window.LANG_CS = {
     "terminalMac": "Terminál"
   },
   "modes": {
+    "character": "Po znacích",
+    "word": "Po slovech",
+    "rightClickToLock": "Pravým kliknutím připnout",
+    "rightClickToUnlock": "Pravým kliknutím odepnout",
     "karaoke": "Karaoke",
     "synced": "Synchronizováno",
     "unsynced": "Prostý text"

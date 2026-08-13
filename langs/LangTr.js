@@ -476,19 +476,23 @@ window.LANG_TR = {
         "desc": "Geçerli parça için senkronizasyon verisi varsa eşleşen söz sağlayıcısı normal sağlayıcı sırasından önce denenir."
       },
       "preferLyricsTypeOverProviderOrder": {
-        "label": "Şarkı sözü türünü sağlayıcı sırasından önce tut",
-        "desc": "Önce tüm sağlayıcılarda karaoke sözlerini, ardından senkronize sözleri ve son olarak düz sözleri dene. Her tür içinde ayarlanan sağlayıcı sırası korunur."
+        "label": "Önce karakter, kelime, satır ve ardından düz sözler",
+        "desc": "Önce tüm sağlayıcılarda karakter zamanlı sözleri, ardından kelime zamanlı, satır zamanlı ve son olarak düz sözleri dene. Her tür içinde ayarlanan sağlayıcı sırası korunur."
       },
       "noProviders": "Kayıtlı söz sağlayıcısı yok.",
       "allowedTypes": "İzin Verilen Söz Türleri",
       "moveUp": "Yukarı Taşı",
       "moveDown": "Aşağı Taşı",
       "types": {
+        "character": "Karakter zamanlı sözler",
+        "word": "Kelime zamanlı sözler",
         "karaoke": "Karaoke Sözleri",
         "synced": "Senkronize Sözler",
         "unsynced": "Düz Metin Sözleri"
       },
       "supports": {
+        "character": "Karakter zamanlı",
+        "word": "Kelime zamanlı",
         "karaoke": "Karaoke",
         "synced": "Senkronize",
         "unsynced": "Düz Metin",
@@ -1942,6 +1946,10 @@ window.LANG_TR = {
     "terminalMac": "Terminal"
   },
   "modes": {
+    "character": "Karakter karakter",
+    "word": "Kelime kelime",
+    "rightClickToLock": "Sabitlemek için sağ tıklayın",
+    "rightClickToUnlock": "Sabitlemeyi kaldırmak için sağ tıklayın",
     "karaoke": "Karaoke",
     "synced": "Senkronize",
     "unsynced": "Düz Metin"

@@ -476,19 +476,23 @@ window.LANG_FR = {
         "desc": "Lorsque des données de synchronisation existent pour le titre actuel, le fournisseur de paroles correspondant est essayé avant l’ordre habituel."
       },
       "preferLyricsTypeOverProviderOrder": {
-        "label": "Prioriser le type de paroles sur l’ordre des fournisseurs",
-        "desc": "Essayer d’abord les paroles karaoké chez tous les fournisseurs, puis les paroles synchronisées et enfin les paroles simples. L’ordre configuré des fournisseurs est conservé dans chaque type."
+        "label": "Prioriser caractère, mot, ligne, puis texte simple",
+        "desc": "Essayer d’abord chez tous les fournisseurs les paroles synchronisées caractère par caractère, puis mot par mot, ligne par ligne et enfin les paroles simples. L’ordre configuré des fournisseurs est conservé dans chaque type."
       },
       "noProviders": "Aucun fournisseur de paroles enregistré.",
       "allowedTypes": "Types de paroles autorisés",
       "moveUp": "Déplacer vers le haut",
       "moveDown": "Déplacer vers le bas",
       "types": {
+        "character": "Paroles synchronisées caractère par caractère",
+        "word": "Paroles synchronisées mot par mot",
         "karaoke": "Paroles karaoké",
         "synced": "Paroles synchronisées",
         "unsynced": "Paroles non synchronisées"
       },
       "supports": {
+        "character": "Par caractère",
+        "word": "Par mot",
         "karaoke": "Karaoké",
         "synced": "Synchro",
         "unsynced": "Non-synchro",
@@ -1942,6 +1946,10 @@ window.LANG_FR = {
     "terminalMac": "Terminal"
   },
   "modes": {
+    "character": "Par caractère",
+    "word": "Par mot",
+    "rightClickToLock": "Clic droit pour verrouiller",
+    "rightClickToUnlock": "Clic droit pour déverrouiller",
     "karaoke": "Karaoké",
     "synced": "Synchro",
     "unsynced": "Paroles"

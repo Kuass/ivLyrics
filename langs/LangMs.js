@@ -476,19 +476,23 @@ window.LANG_MS = {
         "desc": "Jika data penyegerakan tersedia untuk lagu semasa, cuba penyedia lirik yang sepadan sebelum susunan penyedia biasa."
       },
       "preferLyricsTypeOverProviderOrder": {
-        "label": "Utamakan jenis lirik berbanding susunan penyedia",
-        "desc": "Cuba lirik karaoke daripada semua penyedia dahulu, kemudian lirik segerak, diikuti lirik biasa. Susunan penyedia yang ditetapkan dikekalkan dalam setiap jenis."
+        "label": "Utamakan aksara, perkataan, baris, kemudian lirik biasa",
+        "desc": "Cuba lirik disegerakkan mengikut aksara daripada semua penyedia dahulu, kemudian mengikut perkataan, baris dan akhirnya lirik biasa. Susunan penyedia yang ditetapkan dikekalkan dalam setiap jenis."
       },
       "noProviders": "Tiada penyedia lirik berdaftar.",
       "allowedTypes": "Jenis Lirik Dibenarkan",
       "moveUp": "Alih ke atas",
       "moveDown": "Alih ke bawah",
       "types": {
+        "character": "Lirik disegerakkan mengikut aksara",
+        "word": "Lirik disegerakkan mengikut perkataan",
         "karaoke": "Lirik Karaoke",
         "synced": "Lirik Senada (Synced)",
         "unsynced": "Lirik Biasa (Unsynced)"
       },
       "supports": {
+        "character": "Mengikut aksara",
+        "word": "Mengikut perkataan",
         "karaoke": "Karaoke",
         "synced": "Senada",
         "unsynced": "Biasa",
@@ -1952,6 +1956,10 @@ window.LANG_MS = {
     "terminalMac": "Terminal"
   },
   "modes": {
+    "character": "Mengikut aksara",
+    "word": "Mengikut perkataan",
+    "rightClickToLock": "Klik kanan untuk mengunci",
+    "rightClickToUnlock": "Klik kanan untuk membuka kunci",
     "karaoke": "Karaoke",
     "synced": "Senada",
     "unsynced": "Lirik Biasa"

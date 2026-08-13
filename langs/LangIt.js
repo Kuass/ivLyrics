@@ -476,19 +476,23 @@ window.LANG_IT = {
         "desc": "Quando sono disponibili dati di sincronizzazione per il brano corrente, prova il fornitore di testi corrispondente prima dell’ordine normale."
       },
       "preferLyricsTypeOverProviderOrder": {
-        "label": "Dai priorità al tipo di testo rispetto all’ordine dei fornitori",
-        "desc": "Prova prima i testi karaoke di tutti i fornitori, poi i testi sincronizzati e infine quelli normali. L’ordine configurato dei fornitori viene mantenuto in ogni tipo."
+        "label": "Dai priorità a carattere, parola, riga e poi testo normale",
+        "desc": "Prova prima i testi sincronizzati per carattere di tutti i fornitori, poi per parola, per riga e infine quelli normali. L’ordine configurato dei fornitori viene mantenuto in ogni tipo."
       },
       "noProviders": "Nessun fornitore di testi registrato.",
       "allowedTypes": "Tipi di testo consentiti",
       "moveUp": "Sposta su",
       "moveDown": "Sposta giù",
       "types": {
+        "character": "Testi sincronizzati per carattere",
+        "word": "Testi sincronizzati per parola",
         "karaoke": "Testi Karaoke",
         "synced": "Testi sincronizzati",
         "unsynced": "Testi non sincronizzati"
       },
       "supports": {
+        "character": "Per carattere",
+        "word": "Per parola",
         "karaoke": "Karaoke",
         "synced": "Sinc.",
         "unsynced": "Non sinc.",
@@ -1942,6 +1946,10 @@ window.LANG_IT = {
     "terminalMac": "Terminale"
   },
   "modes": {
+    "character": "Per carattere",
+    "word": "Per parola",
+    "rightClickToLock": "Clic destro per bloccare",
+    "rightClickToUnlock": "Clic destro per sbloccare",
     "karaoke": "Karaoke",
     "synced": "Sincronizzato",
     "unsynced": "Testo normale"
