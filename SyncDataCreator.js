@@ -2808,6 +2808,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const recordingVisualFrameTimeRef = useRef(0);
 	const lastPaintedPlaybackIndexRef = useRef(-1);
 	const preventNextTrackRef = useRef(false);
+	const hasAutoLoadedLyricsRef = useRef(false);
 	const providerRef = useRef(provider);
 	const selectedLrclibSourceRef = useRef(selectedLrclibSource);
 	const customSpeakerMetaMemoryRef = useRef(new Map());
@@ -4567,92 +4568,13 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 
 
-	// 컴포넌트 마운트 시 자동 가사 로드 + 기존 싱크 데이터 불러오기
+	// 제작기에 진입하면 '다시 로드' 버튼과 같은 LRCLIB 로드 흐름을 한 번 실행한다.
+	// ref 가드는 callback 의존성이 갱신되더라도 같은 화면에서 중복 요청하지 않도록 한다.
 	useEffect(() => {
-		const initWithExistingSyncData = async () => {
-			// 생성기 진입만으로는 가사를 자동 로드하지 않음. 사용자가 직접 provider를 선택하고 로드해야 함.
-			if (false && initialData && initialData.provider && initialData.lyrics) {
-				window.__ivLyricsDebugLog?.('[SyncDataCreator] Using initial data:', initialData.provider);
-				let finalProvider = initialData.provider;
-				const inputLyrics = initialData.lyrics;
-
-				// Spotify provider normalization
-				if ((finalProvider === 'Spotify' || finalProvider === 'spotify') && inputLyrics.spotifyLyricsProvider) {
-					finalProvider = `spotify-${inputLyrics.spotifyLyricsProvider}`;
-				}
-
-				let lyricsSource;
-
-				// inputLyrics가 배열이면(LyricsContainer에서 직접 넘긴 경우) 객체로 감쌈
-				if (Array.isArray(inputLyrics)) {
-					setLyrics({
-						provider: finalProvider,
-						synced: inputLyrics,
-						unsynced: inputLyrics
-					});
-					lyricsSource = inputLyrics;
-				} else {
-					setLyrics(inputLyrics);
-					lyricsSource = inputLyrics.synced || inputLyrics.unsynced;
-				}
-
-				setProviderValue(finalProvider);
-
-				let text = '';
-
-				if (Array.isArray(lyricsSource)) {
-					text = lyricsSource.map(line => {
-						if (typeof line === 'string') return line;
-						if (line.originalText && typeof line.originalText === 'string' && line.originalText.trim().length > 0) return line.originalText;
-						if (line.text) return typeof line.text === 'string' ? line.text : '';
-						return '';
-					}).filter(t => t.trim().length > 0).join('\n');
-				} else if (typeof lyricsSource === 'string') {
-					text = lyricsSource;
-				}
-
-				// NFC 정규화 적용
-				text = text ? normalizeSyncCreatorStandaloneParentheticalLines(text) : '';
-
-				if (text.trim().length > 0) {
-					setLyricsText(text);
-				} else {
-					setError(I18n.t('syncCreator.noLyrics'));
-				}
-
-				// 기존 싱크 데이터가 있는지 확인
-				if (window.SyncDataService && trackId) {
-					try {
-						const existingSyncData = await window.SyncDataService.getSyncData(trackId, finalProvider, {
-							isrc: trackIsrc || undefined,
-							title: trackName,
-							artist: artistName,
-							album: albumName
-						});
-						if (existingSyncData && existingSyncData.syncData && existingSyncData.syncData.lines) {
-							window.__ivLyricsDebugLog?.('[SyncDataCreator] Found matching existing sync data');
-							const normalizedSyncBody = normalizeLoadedSyncCreatorBodyForLyrics(existingSyncData.syncData, text);
-							const sanitizedSyncBody = sanitizeSyncCreatorSyncData(
-								normalizedSyncBody,
-								getSyncCreatorFlatLyricsCharsFromText(text)
-							);
-							if (sanitizedSyncBody) {
-								setSyncData(sanitizedSyncBody);
-								Toast.success(I18n.t('syncCreator.loadedExistingSyncData') || 'Loaded existing sync data');
-							}
-						}
-					} catch (e) {
-						console.warn('[SyncDataCreator] Failed to load existing sync data:', e);
-					}
-				}
-				return;
-			}
-
-			// initialData가 없으면 자동으로 로드하지 않음 (유저가 '로드' 버튼을 눌러야 함)
-		};
-
-		initWithExistingSyncData();
-	}, []);
+		if (hasAutoLoadedLyricsRef.current) return;
+		hasAutoLoadedLyricsRef.current = true;
+		void loadLyrics();
+	}, [loadLyrics]);
 
 	// 재생 위치 업데이트 + 미리보기 자동 줄 이동
 	useEffect(() => {
