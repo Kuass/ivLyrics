@@ -2545,6 +2545,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
 
     const INTERLUDE_MIN_DURATION_MS = 500;
     const KARAOKE_TRAILING_INTERLUDE_DELAY_MS = 2500;
+    const INTERLUDE_NOTE_CHARACTER_REGEX = /[\u2669-\u266F\u{1D100}-\u{1D1FF}\u{1F3B5}-\u{1F3BC}]/u;
     const INTERLUDE_MARKER_REGEX = /^[\s\u00A0\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFE0E\uFE0F\uFEFF\u2669-\u266F\u{1D100}-\u{1D1FF}\u{1F3B5}-\u{1F3BC}]+$/u;
     const INSTRUMENTAL_BREAK_ICON_DESIGNS = new Set([
         "equalizer",
@@ -2657,7 +2658,10 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
 
     const getInterludeCandidateText = (line) => {
         if (!line) return '';
-        if (line.originalText !== undefined) return getPlainLyricText(line.originalText);
+        if (line.originalText !== undefined) {
+            const originalText = getPlainLyricText(line.originalText);
+            if (originalText.trim()) return originalText;
+        }
         if (line.text !== undefined) return getPlainLyricText(line.text);
         return getPlainLyricText(line);
     };
@@ -2673,6 +2677,20 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             .trim();
 
         return !normalized || INTERLUDE_MARKER_REGEX.test(normalized);
+    };
+
+    const isMusicNoteInterludeMarkerText = (text) => {
+        if (window.ivLyricsInstrumentalBreaks?.isMarkerText?.(text)) {
+            return true;
+        }
+
+        const normalized = String(text ?? '')
+            .replace(/&nbsp;/gi, ' ')
+            .replace(/<[^>]+>/g, '')
+            .trim();
+
+        return INTERLUDE_NOTE_CHARACTER_REGEX.test(normalized)
+            && INTERLUDE_MARKER_REGEX.test(normalized);
     };
 
     const toFiniteTime = (value) => {
@@ -2711,7 +2729,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
 
     const getInterludeInfo = (line, nextLine = null, lineIndex = -1, lineCount = 0) => {
         const startTime = toFiniteTime(line?.startTime);
-        if (startTime === null || !isInterludeMarkerText(getInterludeCandidateText(line))) {
+        const markerText = getInterludeCandidateText(line);
+        if (startTime === null || !isInterludeMarkerText(markerText)) {
             return { isInterlude: false, durationMs: 0 };
         }
 
@@ -2720,13 +2739,16 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const trackEndTime = lineIndex === Math.max(0, lineCount - 1) ? getCurrentTrackDurationMs() : null;
         const endTime = nextStartTime !== null && nextStartTime > startTime
             ? nextStartTime
-            : (trackEndTime !== null && trackEndTime > startTime
-                ? trackEndTime
-                : (directEndTime !== null && directEndTime > startTime ? directEndTime : null));
+            : (directEndTime !== null && directEndTime > startTime
+                ? directEndTime
+                : (trackEndTime !== null && trackEndTime > startTime ? trackEndTime : null));
         const durationMs = endTime !== null && endTime > startTime ? endTime - startTime : 0;
+        const minimumDurationMs = isMusicNoteInterludeMarkerText(markerText)
+            ? 0
+            : INTERLUDE_MIN_DURATION_MS;
 
         return {
-            isInterlude: durationMs > INTERLUDE_MIN_DURATION_MS,
+            isInterlude: durationMs > minimumDurationMs,
             durationMs,
             kind: getInstrumentalBreakKind(lineIndex, lineCount)
         };

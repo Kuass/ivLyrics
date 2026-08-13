@@ -362,9 +362,9 @@
                 ? (
                     nextStartTime !== null && nextStartTime > startTime
                         ? nextStartTime
-                        : (durationMs !== null && durationMs > startTime
-                            ? durationMs
-                            : (directEndTime !== null && directEndTime > startTime ? directEndTime : null))
+                        : (directEndTime !== null && directEndTime > startTime
+                            ? directEndTime
+                            : (durationMs !== null && durationMs > startTime ? durationMs : null))
                 )
                 : null;
             const textChanged = line.text !== marker
