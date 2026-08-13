@@ -2529,6 +2529,13 @@ window.LANG_RU = {
   "syncCreator": {
     "loginRequired": "Чтобы создать караоке-синхронизацию, требуется вход через Discord.",
     "title": "Создание синхронизации",
+    "syncGranularityLabel": "Единица синхронизации",
+    "syncGranularityLine": "Строка",
+    "syncGranularityWord": "Слово",
+    "syncGranularityCharacter": "Символ",
+    "syncGranularityHint": "Выберите единицу записи времени",
+    "lineSyncHint": "Нажмите на текст в момент начала строки.",
+    "wordSyncHint": "Нажимайте или проводите в такт каждому слову.",
     "buttonTooltip": "Создать синхронизацию (Караоке)",
     "clickHereHint": "Нажмите здесь, чтобы синхронизировать текст!",
     "loading": "Загрузка...",

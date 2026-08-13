@@ -4494,6 +4494,58 @@
             return seconds === null ? null : Math.round(seconds * 1000);
         };
 
+        const normalizeSyncDataGranularity = (value) => {
+            const normalized = String(value || '').trim().toLowerCase();
+            return normalized === 'line' || normalized === 'word' ? normalized : 'character';
+        };
+
+        const expandSyncDataCompactTiming = (target, expectedLength) => {
+            if (!target || typeof target !== 'object') return target;
+            const granularity = normalizeSyncDataGranularity(target.granularity);
+            if (Array.isArray(target.chars)) return { ...target, granularity };
+            const length = Math.max(0, Number(expectedLength) || 0);
+            let chars = null;
+            if (granularity === 'line' && Number.isFinite(Number(target.timing))) {
+                chars = new Array(length).fill(Number(target.timing));
+            } else if (granularity === 'word' && Array.isArray(target.timing)) {
+                chars = new Array(length).fill(null);
+                let start = 0;
+                for (const mark of target.timing) {
+                    const end = Number(mark?.[0]);
+                    const time = Number(mark?.[1]);
+                    if (!Array.isArray(mark) || mark.length !== 2 || !Number.isInteger(end)
+                        || end < start || end >= length || !Number.isFinite(time)) {
+                        chars = null;
+                        break;
+                    }
+                    for (let index = start; index <= end; index++) chars[index] = time;
+                    start = end + 1;
+                }
+                if (chars && start !== length) chars = null;
+            }
+            return { ...target, granularity, chars: chars || [] };
+        };
+
+        const expandSyncDataCompactLines = (lines) => (
+            (Array.isArray(lines) ? lines : []).map((line) => {
+                const expectedLength = Number(line?.end) - Number(line?.start) + 1;
+                const expandedLine = expandSyncDataCompactTiming(line, expectedLength);
+                if (!Array.isArray(expandedLine?.parallel?.parts)) return expandedLine;
+                return {
+                    ...expandedLine,
+                    parallel: {
+                        ...expandedLine.parallel,
+                        parts: expandedLine.parallel.parts.map(part => expandSyncDataCompactTiming(
+                            part,
+                            (Array.isArray(part?.ranges) ? part.ranges : []).reduce((sum, range) => (
+                                sum + Math.max(0, Number(range?.end) - Number(range?.start) + 1)
+                            ), 0)
+                        ))
+                    }
+                };
+            })
+        );
+
         const getSyncDataBaseLyricsTimingRows = (lyrics) => (
             (Array.isArray(lyrics) ? lyrics : [])
                 .filter(line => String(line?.text || '').trim().length > 0)
@@ -4840,7 +4892,7 @@
             }
 
             const syncBody = syncData.syncData;
-            const syncLines = syncBody.lines;
+            const syncLines = expandSyncDataCompactLines(syncBody.lines);
             const syncSource = syncBody.source || syncData.source || null;
             const hasNormalizedSourceLineShape = Array.isArray(syncSource?.lineCharCounts)
                 && syncSource.lineCharCounts.length > 0;
@@ -4963,6 +5015,39 @@
                 if (repair.changed) timingRepairStats.repairedSequences++;
                 if (repair.usedLineFallback) timingRepairStats.lineFallbacks++;
             };
+            const collapseSyncDataSyllables = (sourceSyllables, granularity, endTime) => {
+                const syllables = Array.isArray(sourceSyllables) ? sourceSyllables : [];
+                const normalizedGranularity = normalizeSyncDataGranularity(granularity);
+                if (normalizedGranularity === 'character' || syllables.length === 0) return syllables;
+                if (normalizedGranularity === 'line') {
+                    return [{
+                        text: syllables.map(syllable => syllable.text || '').join(''),
+                        startTime: syllables[0].startTime,
+                        endTime: Math.max(syllables[0].startTime, Number(endTime) || syllables[0].startTime)
+                    }];
+                }
+
+                const grouped = [];
+                for (const syllable of syllables) {
+                    const previous = grouped[grouped.length - 1];
+                    if (previous && previous.startTime === syllable.startTime) {
+                        previous.text += syllable.text || '';
+                        continue;
+                    }
+                    grouped.push({
+                        text: syllable.text || '',
+                        startTime: syllable.startTime,
+                        endTime: syllable.endTime
+                    });
+                }
+                for (let index = 0; index < grouped.length; index++) {
+                    const nextStart = grouped[index + 1]?.startTime;
+                    grouped[index].endTime = Number.isFinite(nextStart)
+                        ? Math.max(grouped[index].startTime, nextStart)
+                        : Math.max(grouped[index].startTime, Number(endTime) || grouped[index].endTime);
+                }
+                return grouped;
+            };
             const rawLineCharTimes = normalizedSyncLines.map(line => (
                 line.chars.map(getSyncDataMilliseconds)
             ));
@@ -5001,6 +5086,7 @@
             });
             const fallbackCandidates = rawLineCharTimes.map((times, index) => {
                 const line = normalizedSyncLines[index];
+                if (normalizeSyncDataGranularity(line?.granularity) !== 'character') return null;
                 const { fallbackStartTime, fallbackEndTime } = providerLineBounds[index];
                 if (!times.length
                     || !Number.isFinite(fallbackStartTime)
@@ -5055,6 +5141,16 @@
                 }
             }
             const lineTimingRepairs = rawLineCharTimes.map((times, index) => {
+                if (normalizeSyncDataGranularity(normalizedSyncLines[index]?.granularity) !== 'character') {
+                    return {
+                        times,
+                        changed: false,
+                        usedLineFallback: false,
+                        duplicateCount: 0,
+                        unresolvedDuplicateCount: 0,
+                        longestCluster: 1
+                    };
+                }
                 const forceLineFallback = acceptedLineFallbacks[index];
                 const nextLineStart = effectiveLineStarts[index + 1];
                 const fallbackEndTime = Number.isFinite(nextLineStart)
@@ -5108,8 +5204,9 @@
                 const lastCharMaxDuration = Math.max(0.5, Math.min(1.5, avgCharDuration * 2.5));
 
                 // 각 글자별 syllable 생성
-                const syllables = [];
+                let syllables = [];
                 const chars = Array.from(lineText); // 유니코드 문자 지원
+                const lineGranularity = normalizeSyncDataGranularity(lineData.granularity);
 
                 for (let j = 0; j < lineData.chars.length && j < chars.length; j++) {
                     const charStartTime = lineCharTimes[j];
@@ -5117,6 +5214,8 @@
 
                     if (j < lineData.chars.length - 1) {
                         charEndTime = lineCharTimes[j + 1];
+                    } else if (lineGranularity === 'line') {
+                        charEndTime = lineEndTime;
                     } else {
                         // 마지막 글자: 다음 줄 시작 시간과 자연스러운 종료 시간 중 더 빠른 것 선택
                         const naturalEndTime = charStartTime + Math.round(lastCharMaxDuration * 1000);
@@ -5133,9 +5232,12 @@
                     });
                 }
 
+                syllables = collapseSyncDataSyllables(syllables, lineGranularity, lineEndTime);
+
                 const buildParallelPart = (part) => {
                     if (!part || !Array.isArray(part.ranges) || !Array.isArray(part.chars)) return null;
-                    const partSyllables = [];
+                    let partSyllables = [];
+                    const partGranularity = normalizeSyncDataGranularity(part.granularity || lineData.granularity);
                     let partCharIndex = 0;
                     let text = '';
 
@@ -5177,12 +5279,21 @@
                         const rangeStartTime = Number.isFinite(rangeRawTimes[0])
                             ? rangeRawTimes[0]
                             : (rangeRawTimes.find(Number.isFinite) ?? lineStartTime);
-                        const rangeTimingRepair = normalizeSyncDataTimestampSequence(rangeRawTimes, {
-                            fallbackStartMs: rangeStartTime,
-                            fallbackEndMs: rangeEndBound,
-                            endBoundMs: rangeEndBound,
-                            allowLineFallback: false
-                        });
+                        const rangeTimingRepair = partGranularity === 'character'
+                            ? normalizeSyncDataTimestampSequence(rangeRawTimes, {
+                                fallbackStartMs: rangeStartTime,
+                                fallbackEndMs: rangeEndBound,
+                                endBoundMs: rangeEndBound,
+                                allowLineFallback: false
+                            })
+                            : {
+                                times: rangeRawTimes,
+                                changed: false,
+                                usedLineFallback: false,
+                                duplicateCount: 0,
+                                unresolvedDuplicateCount: 0,
+                                longestCluster: 1
+                            };
                         const rangeCharTimes = rangeTimingRepair.times;
                         recordTimingRepair(rangeTimingRepair);
 
@@ -5203,6 +5314,8 @@
                                 charEnd = isRangeBoundary
                                     ? Math.min(nextCharStartTime, naturalEndTime)
                                     : nextCharStartTime;
+                            } else if (partGranularity === 'line') {
+                                charEnd = rangeEndBound;
                             } else {
                                 charEnd = Math.min(rangeEndBound, naturalEndTime);
                             }
@@ -5219,6 +5332,7 @@
                     });
 
                     if (!partSyllables.length) return null;
+                    partSyllables = collapseSyncDataSyllables(partSyllables, partGranularity, lineEndTime);
                     while (partSyllables.length && /^\s+$/u.test(partSyllables[0]?.text || '')) {
                         partSyllables.shift();
                     }

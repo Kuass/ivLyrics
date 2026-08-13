@@ -2528,6 +2528,13 @@ window.LANG_CS = {
   "syncCreator": {
     "loginRequired": "K vytvoření synchronizace karaoke je vyžadováno přihlášení Discord.",
     "title": "Vytvořte synchronizaci karaoke",
+    "syncGranularityLabel": "Jednotka synchronizace",
+    "syncGranularityLine": "Řádek",
+    "syncGranularityWord": "Slovo",
+    "syncGranularityCharacter": "Znak",
+    "syncGranularityHint": "Vyberte jednotku pro záznam časování",
+    "lineSyncHint": "Klepněte na text ve chvíli, kdy řádek začne.",
+    "wordSyncHint": "Klepejte nebo táhněte v rytmu jednotlivých slov.",
     "buttonTooltip": "Vytvořte synchronizaci karaoke",
     "clickHereHint": "Klikněte zde pro synchronizaci textů!",
     "loading": "Načítání...",

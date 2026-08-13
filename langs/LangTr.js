@@ -2529,6 +2529,13 @@ window.LANG_TR = {
   "syncCreator": {
     "loginRequired": "Karaoke senkronizasyonu oluşturmak için Discord girişi gereklidir.",
     "title": "Karaoke Senk. Oluştur",
+    "syncGranularityLabel": "Senkronizasyon birimi",
+    "syncGranularityLine": "Satır",
+    "syncGranularityWord": "Kelime",
+    "syncGranularityCharacter": "Karakter",
+    "syncGranularityHint": "Zamanlamanın kaydedileceği birimi seçin",
+    "lineSyncHint": "Satır başladığı anda sözlere dokunun.",
+    "wordSyncHint": "Her kelimeyle birlikte dokunun veya sürükleyin.",
     "buttonTooltip": "Karaoke Senk. Oluştur",
     "clickHereHint": "Sözleri senkronize etmek için buraya tıklayın!",
     "loading": "Yükleniyor...",

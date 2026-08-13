@@ -2528,6 +2528,13 @@ window.LANG_ID = {
   "syncCreator": {
     "loginRequired": "Login Discord diperlukan untuk membuat sinkronisasi karaoke.",
     "title": "Buat Sinkronisasi Karaoke",
+    "syncGranularityLabel": "Satuan sinkronisasi",
+    "syncGranularityLine": "Baris",
+    "syncGranularityWord": "Kata",
+    "syncGranularityCharacter": "Karakter",
+    "syncGranularityHint": "Pilih satuan untuk merekam waktu",
+    "lineSyncHint": "Ketuk lirik saat baris dimulai.",
+    "wordSyncHint": "Ketuk atau seret mengikuti setiap kata.",
     "buttonTooltip": "Buat Sinkronisasi Karaoke",
     "clickHereHint": "Klik di sini untuk menyinkronkan lirik!",
     "loading": "Memuat...",

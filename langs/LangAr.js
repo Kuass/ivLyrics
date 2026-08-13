@@ -2528,6 +2528,13 @@ window.LANG_AR = {
   "syncCreator": {
     "loginRequired": "يلزم تسجيل الدخول عبر Discord لإنشاء مزامنة الكاراوكي.",
     "title": "إنشاء مزامنة كاريوكي",
+    "syncGranularityLabel": "وحدة المزامنة",
+    "syncGranularityLine": "سطر",
+    "syncGranularityWord": "كلمة",
+    "syncGranularityCharacter": "حرف",
+    "syncGranularityHint": "اختر الوحدة المستخدمة لتسجيل التوقيت",
+    "lineSyncHint": "اضغط على الكلمات عند بدء السطر.",
+    "wordSyncHint": "اضغط أو اسحب بالتزامن مع كل كلمة.",
     "buttonTooltip": "إنشاء مزامنة كاريوكي",
     "clickHereHint": "انقر هنا لضبط مزامنة الكلمات!",
     "loading": "جارٍ التحميل...",

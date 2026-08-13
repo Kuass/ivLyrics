@@ -2529,6 +2529,13 @@ window.LANG_PT = {
   "syncCreator": {
     "loginRequired": "É necessário fazer login no Discord para criar a sincronia de karaokê.",
     "title": "Criar Sync Karaokê",
+    "syncGranularityLabel": "Unidade de sincronização",
+    "syncGranularityLine": "Linha",
+    "syncGranularityWord": "Palavra",
+    "syncGranularityCharacter": "Caractere",
+    "syncGranularityHint": "Escolha a unidade usada para registrar o tempo",
+    "lineSyncHint": "Toque na letra quando a linha começar.",
+    "wordSyncHint": "Toque ou arraste no ritmo de cada palavra.",
     "buttonTooltip": "Criar Sync Karaokê",
     "clickHereHint": "Clique aqui para ajustar a sincronização da letra!",
     "loading": "Carregando...",

@@ -2529,6 +2529,13 @@ window.LANG_ZH_TW = {
   "syncCreator": {
     "loginRequired": "建立卡拉 OK 同步需要登入 Discord。",
     "title": "建立卡拉OK同步",
+    "syncGranularityLabel": "同步單位",
+    "syncGranularityLine": "行",
+    "syncGranularityWord": "詞",
+    "syncGranularityCharacter": "字元",
+    "syncGranularityHint": "選擇記錄時間的單位",
+    "lineSyncHint": "在該行開始時點按歌詞。",
+    "wordSyncHint": "跟著每個詞點按或拖曳。",
     "buttonTooltip": "建立卡拉OK同步",
     "clickHereHint": "點此調整歌詞同步！",
     "loading": "載入中...",

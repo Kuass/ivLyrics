@@ -2538,6 +2538,13 @@ window.LANG_MS = {
   "syncCreator": {
     "loginRequired": "Log masuk Discord diperlukan untuk membuat lirik senada karaoke.",
     "title": "Buat Senada Karaoke",
+    "syncGranularityLabel": "Unit penyegerakan",
+    "syncGranularityLine": "Baris",
+    "syncGranularityWord": "Perkataan",
+    "syncGranularityCharacter": "Aksara",
+    "syncGranularityHint": "Pilih unit untuk merekod masa",
+    "lineSyncHint": "Ketik lirik apabila baris bermula.",
+    "wordSyncHint": "Ketik atau seret mengikut setiap perkataan.",
     "buttonTooltip": "Buat Senada Karaoke",
     "clickHereHint": "Klik di sini untuk menyelaraskan (sync) lirik!",
     "loading": "Memuatkan...",

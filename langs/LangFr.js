@@ -2529,6 +2529,13 @@ window.LANG_FR = {
   "syncCreator": {
     "loginRequired": "La connexion à Discord est requise pour créer une synchro karaoké.",
     "title": "Créateur Synchro Karaoké",
+    "syncGranularityLabel": "Unité de synchronisation",
+    "syncGranularityLine": "Ligne",
+    "syncGranularityWord": "Mot",
+    "syncGranularityCharacter": "Caractère",
+    "syncGranularityHint": "Choisissez l’unité utilisée pour enregistrer le minutage",
+    "lineSyncHint": "Appuyez sur les paroles au début de la ligne.",
+    "wordSyncHint": "Appuyez ou faites glisser au rythme de chaque mot.",
     "buttonTooltip": "Créer synchro karaoké",
     "clickHereHint": "Cliquez ici pour synchroniser les paroles !",
     "loading": "Chargement...",

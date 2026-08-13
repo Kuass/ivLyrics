@@ -2529,6 +2529,13 @@ window.LANG_TH = {
   "syncCreator": {
     "loginRequired": "การสร้างซิงก์คาราโอเกะต้องเข้าสู่ระบบ Discord",
     "title": "สร้างซิงค์คาราโอเกะ",
+    "syncGranularityLabel": "หน่วยการซิงค์",
+    "syncGranularityLine": "บรรทัด",
+    "syncGranularityWord": "คำ",
+    "syncGranularityCharacter": "อักขระ",
+    "syncGranularityHint": "เลือกหน่วยที่ใช้บันทึกเวลา",
+    "lineSyncHint": "แตะเนื้อเพลงเมื่อบรรทัดเริ่มขึ้น",
+    "wordSyncHint": "แตะหรือลากให้ตรงกับแต่ละคำ",
     "buttonTooltip": "สร้างซิงค์คาราโอเกะ",
     "clickHereHint": "คลิกที่นี่เพื่อจับจังหวะเนื้อเพลง!",
     "loading": "กำลังโหลด...",

@@ -44,7 +44,10 @@ const SYNC_CREATOR_SPEAKER_TEXT_COLORS = {
 const SYNC_CREATOR_DEFAULT_SPEAKER = 'NORMAL';
 const SYNC_CREATOR_DEFAULT_KIND = 'vocal';
 const SYNC_CREATOR_MAX_MERGED_LINES = 5;
-const SYNC_CREATOR_SYNC_DATA_VERSION = 3;
+const SYNC_CREATOR_SYNC_DATA_VERSION = 4;
+const SYNC_CREATOR_GRANULARITIES = new Set(['line', 'word', 'character']);
+const SYNC_CREATOR_DEFAULT_GRANULARITY = 'character';
+const SYNC_CREATOR_GRANULARITY_STORAGE_KEY = 'ivLyrics:syncCreator:granularity';
 const SYNC_CREATOR_MIN_SEQUENTIAL_STEP_SEC = 0.001;
 const SYNC_CREATOR_PREVIEW_POSITION_UPDATE_INTERVAL_MS = 100;
 const SYNC_CREATOR_RECORD_POSITION_UPDATE_INTERVAL_MS = 50;
@@ -94,9 +97,142 @@ const countSyncCreatorRangeChars = (ranges) => (Array.isArray(ranges) ? ranges :
 }, 0);
 const isFiniteSyncCreatorTime = (value) => typeof value === 'number' && Number.isFinite(value);
 const roundSyncCreatorTime = (value) => Math.round(value * 1000) / 1000;
-const normalizeSyncCreatorTimeSequence = (rawChars, previousLineEndTime = -1) => {
+const normalizeSyncCreatorGranularity = (value) => (
+	SYNC_CREATOR_GRANULARITIES.has(String(value || '').trim().toLowerCase())
+		? String(value).trim().toLowerCase()
+		: SYNC_CREATOR_DEFAULT_GRANULARITY
+);
+const getSyncCreatorWordRanges = (chars, locale = undefined) => {
+	const sourceChars = Array.isArray(chars) ? chars : [];
+	if (sourceChars.length === 0) return [];
+	const text = sourceChars.join('');
+	const codeUnitOffsets = [0];
+	let codeUnitOffset = 0;
+	for (const char of sourceChars) {
+		codeUnitOffset += String(char).length;
+		codeUnitOffsets.push(codeUnitOffset);
+	}
+	const codeUnitToCharIndex = (offset) => {
+		let low = 0;
+		let high = codeUnitOffsets.length - 1;
+		while (low < high) {
+			const middle = Math.ceil((low + high) / 2);
+			if (codeUnitOffsets[middle] <= offset) low = middle;
+			else high = middle - 1;
+		}
+		return Math.max(0, Math.min(sourceChars.length - 1, low));
+	};
+
+	let wordStarts = [];
+	try {
+		if (typeof Intl?.Segmenter === 'function') {
+			const segmenter = new Intl.Segmenter(locale || undefined, { granularity: 'word' });
+			wordStarts = Array.from(segmenter.segment(text))
+				.filter(segment => segment?.isWordLike)
+				.map(segment => codeUnitToCharIndex(Number(segment.index) || 0));
+		}
+	} catch (error) {
+		wordStarts = [];
+	}
+
+	if (wordStarts.length === 0) {
+		for (let index = 0; index < sourceChars.length; index++) {
+			if (!/[\p{L}\p{N}]/u.test(sourceChars[index] || '')) continue;
+			if (index === 0 || !/[\p{L}\p{N}'’]/u.test(sourceChars[index - 1] || '')) {
+				wordStarts.push(index);
+			}
+		}
+	}
+
+	wordStarts = [...new Set(wordStarts)].sort((left, right) => left - right);
+	if (wordStarts.length === 0) return [{ start: 0, end: sourceChars.length - 1 }];
+	return wordStarts.map((start, index) => ({
+		start: index === 0 ? 0 : start,
+		end: index + 1 < wordStarts.length ? wordStarts[index + 1] - 1 : sourceChars.length - 1
+	}));
+};
+const getSyncCreatorGranularityRanges = (chars, granularity, locale = undefined) => {
+	const sourceChars = Array.isArray(chars) ? chars : [];
+	if (sourceChars.length === 0) return [];
+	const normalizedGranularity = normalizeSyncCreatorGranularity(granularity);
+	if (normalizedGranularity === 'line') return [{ start: 0, end: sourceChars.length - 1 }];
+	if (normalizedGranularity === 'word') return getSyncCreatorWordRanges(sourceChars, locale);
+	return sourceChars.map((_, index) => ({ start: index, end: index }));
+};
+const collapseSyncCreatorTimesByGranularity = (rawChars, sourceChars, granularity, locale = undefined) => {
+	const times = Array.isArray(rawChars) ? [...rawChars] : [];
+	const normalizedGranularity = normalizeSyncCreatorGranularity(granularity);
+	if (normalizedGranularity === 'character' || times.length === 0) return times;
+	const ranges = getSyncCreatorGranularityRanges(sourceChars, normalizedGranularity, locale);
+	let lastKnownTime = times.find(isFiniteSyncCreatorTime) ?? 0;
+	for (const range of ranges) {
+		const rangeTime = times
+			.slice(range.start, range.end + 1)
+			.find(isFiniteSyncCreatorTime);
+		if (isFiniteSyncCreatorTime(rangeTime)) lastKnownTime = rangeTime;
+		for (let index = range.start; index <= range.end && index < times.length; index++) {
+			times[index] = lastKnownTime;
+		}
+	}
+	return times;
+};
+const decodeSyncCreatorCompactTiming = (target, expectedLength) => {
+	if (!target || typeof target !== 'object') return target;
+	if (Array.isArray(target.chars)) return { ...target, granularity: normalizeSyncCreatorGranularity(target.granularity) };
+	const granularity = normalizeSyncCreatorGranularity(target.granularity);
+	const length = Math.max(0, Number(expectedLength) || 0);
+	if (length === 0) return { ...target, granularity };
+	let chars = null;
+	if (granularity === 'line' && isFiniteSyncCreatorTime(target.timing)) {
+		chars = new Array(length).fill(roundSyncCreatorTime(target.timing));
+	} else if (granularity === 'word' && Array.isArray(target.timing)) {
+		chars = new Array(length).fill(null);
+		let start = 0;
+		for (const mark of target.timing) {
+			if (!Array.isArray(mark) || mark.length !== 2) return target;
+			const end = Number(mark[0]);
+			const time = Number(mark[1]);
+			if (!Number.isInteger(end) || end < start || end >= length || !isFiniteSyncCreatorTime(time)) return target;
+			for (let index = start; index <= end; index++) chars[index] = roundSyncCreatorTime(time);
+			start = end + 1;
+		}
+		if (start !== length) return target;
+	}
+	if (!chars) return { ...target, granularity };
+	const decoded = { ...target, granularity, chars };
+	delete decoded.timing;
+	return decoded;
+};
+const encodeSyncCreatorCompactTiming = (target, sourceChars, locale = undefined) => {
+	if (!target || typeof target !== 'object' || !Array.isArray(target.chars)) return target;
+	const granularity = normalizeSyncCreatorGranularity(target.granularity);
+	const normalizedChars = collapseSyncCreatorTimesByGranularity(
+		target.chars,
+		sourceChars,
+		granularity,
+		locale
+	).map(roundSyncCreatorTime);
+	if (granularity === 'character') {
+		const encoded = { ...target, granularity, chars: normalizedChars };
+		delete encoded.timing;
+		return encoded;
+	}
+	const encoded = { ...target, granularity };
+	delete encoded.chars;
+	if (granularity === 'line') {
+		encoded.timing = normalizedChars.find(isFiniteSyncCreatorTime) ?? 0;
+		return encoded;
+	}
+	encoded.timing = getSyncCreatorWordRanges(sourceChars, locale).map(range => ([
+		range.end,
+		normalizedChars[range.start] ?? normalizedChars.find(isFiniteSyncCreatorTime) ?? 0
+	]));
+	return encoded;
+};
+const normalizeSyncCreatorTimeSequence = (rawChars, previousLineEndTime = -1, granularity = 'character') => {
 	const sourceChars = Array.isArray(rawChars) ? rawChars : [];
 	const normalizedChars = [];
+	const preserveEqualTimestamps = normalizeSyncCreatorGranularity(granularity) !== 'character';
 	let minimumAllowedTime = isFiniteSyncCreatorTime(previousLineEndTime) && previousLineEndTime >= 0
 		? previousLineEndTime
 		: 0;
@@ -105,7 +241,10 @@ const normalizeSyncCreatorTimeSequence = (rawChars, previousLineEndTime = -1) =>
 		const rawTime = isFiniteSyncCreatorTime(sourceChars[index])
 			? sourceChars[index]
 			: minimumAllowedTime;
-		const minimumForChar = index === 0
+		const mayReusePreviousTime = preserveEqualTimestamps
+			&& index > 0
+			&& rawTime <= minimumAllowedTime + (SYNC_CREATOR_MIN_SEQUENTIAL_STEP_SEC / 2);
+		const minimumForChar = index === 0 || mayReusePreviousTime
 			? minimumAllowedTime
 			: minimumAllowedTime + SYNC_CREATOR_MIN_SEQUENTIAL_STEP_SEC;
 		const normalizedTime = roundSyncCreatorTime(Math.max(minimumForChar, rawTime));
@@ -191,7 +330,7 @@ const repairSyncCreatorLineCharsFromParallel = (line) => {
 
 	return {
 		...line,
-		chars: normalizeSyncCreatorTimeSequence(rebuiltChars)
+		chars: normalizeSyncCreatorTimeSequence(rebuiltChars, -1, line?.granularity)
 	};
 };
 const getSyncCreatorRangesValidationError = (ranges, lineStart, lineEnd, label) => {
@@ -241,6 +380,9 @@ const getSyncCreatorSyncDataValidationError = (data) => {
 		if (backwardLineCharIndex >= 0) {
 			return `Line ${lineIndex + 1}, char ${backwardLineCharIndex}: time goes backwards`;
 		}
+		if (line.granularity !== undefined && normalizeSyncCreatorGranularity(line.granularity) !== line.granularity) {
+			return `Line ${lineIndex + 1}: invalid sync granularity`;
+		}
 
 		if (line.hiddenRanges !== undefined) {
 			const hiddenError = getSyncCreatorRangesValidationError(
@@ -275,6 +417,9 @@ const getSyncCreatorSyncDataValidationError = (data) => {
 			const backwardPartCharIndex = part.chars.findIndex((value, index) => index > 0 && value < part.chars[index - 1]);
 			if (backwardPartCharIndex >= 0) {
 				return `Line ${lineIndex + 1}, parallel part ${partLabel}, char ${backwardPartCharIndex}: time goes backwards`;
+			}
+			if (part.granularity !== undefined && normalizeSyncCreatorGranularity(part.granularity) !== part.granularity) {
+				return `Line ${lineIndex + 1}, parallel part ${partLabel}: invalid sync granularity`;
 			}
 		}
 
@@ -1994,7 +2139,24 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (!data || !Array.isArray(data.lines)) return data;
 		let migratedParallelRanges = false;
 		const lines = data.lines.map((line) => {
-			let nextLine = { ...line };
+			const lineStart = Number(line?.start);
+			const lineEnd = Number(line?.end);
+			const expectedLineLength = Number.isInteger(lineStart) && Number.isInteger(lineEnd) && lineEnd >= lineStart
+				? lineEnd - lineStart + 1
+				: 0;
+			let nextLine = decodeSyncCreatorCompactTiming(line, expectedLineLength);
+			if (nextLine.parallel && Array.isArray(nextLine.parallel.parts)) {
+				nextLine = {
+					...nextLine,
+					parallel: {
+						...nextLine.parallel,
+						parts: nextLine.parallel.parts.map(part => decodeSyncCreatorCompactTiming(
+							part,
+							countSyncCreatorRangeChars(part?.ranges)
+						))
+					}
+				};
+			}
 			const sourceSpeaker = nextLine.speaker;
 			const speaker = normalizeSyncCreatorSpeaker(sourceSpeaker);
 			if (speaker) nextLine.speaker = speaker;
@@ -2036,6 +2198,34 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			...(hasParallelLines || migratedParallelRanges
 				? { version: Math.max(Number.isFinite(version) ? version : 1, SYNC_CREATOR_SYNC_DATA_VERSION) }
 				: {}),
+			lines
+		};
+	};
+
+	const compactSyncCreatorSyncData = (data, fullTextChars = null, locale = undefined) => {
+		if (!data || !Array.isArray(data.lines)) return data;
+		const sourceChars = Array.isArray(fullTextChars) ? fullTextChars : [];
+		const lines = data.lines.map((line) => {
+			const lineChars = sourceChars.slice(Number(line.start), Number(line.end) + 1);
+			let nextLine = encodeSyncCreatorCompactTiming(line, lineChars, locale);
+			if (line.parallel && Array.isArray(line.parallel.parts)) {
+				nextLine = {
+					...nextLine,
+					parallel: {
+						...line.parallel,
+						parts: line.parallel.parts.map((part) => {
+							const partChars = (Array.isArray(part.ranges) ? part.ranges : [])
+								.flatMap(range => sourceChars.slice(Number(range.start), Number(range.end) + 1));
+							return encodeSyncCreatorCompactTiming(part, partChars, locale);
+						})
+					}
+				};
+			}
+			return nextLine;
+		});
+		return {
+			...data,
+			version: Math.max(SYNC_CREATOR_SYNC_DATA_VERSION, Number(data.version) || 1),
 			lines
 		};
 	};
@@ -2355,6 +2545,15 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const [characterPronunciationProgress, setCharacterPronunciationProgress] = useState(null);
 	const [showCharacterPronunciationConsent, setShowCharacterPronunciationConsent] = useState(false);
 	const [mode, setMode] = useState('idle');
+	const [syncGranularity, setSyncGranularity] = useState(() => {
+		try {
+			return normalizeSyncCreatorGranularity(
+				window.localStorage?.getItem(SYNC_CREATOR_GRANULARITY_STORAGE_KEY)
+			);
+		} catch (error) {
+			return SYNC_CREATOR_DEFAULT_GRANULARITY;
+		}
+	});
 	const [position, setPosition] = useState(0);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [recordingCharIndex, setRecordingCharIndex] = useState(-1);
@@ -3638,6 +3837,20 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (detected) return detected;
 		return SYNC_CREATOR_JAPANESE_KANA_REGEX.test(`${lyricsLines.join('\n')} ${trackName} ${artistName}`) ? 'ja' : null;
 	}, [lyricsLines, trackName, artistName]);
+	const currentGranularityRanges = useMemo(() => (
+		getSyncCreatorGranularityRanges(currentLineChars, syncGranularity, lyricsLanguage || undefined)
+	), [currentLineChars, syncGranularity, lyricsLanguage]);
+	const currentWordBoundaryStartIndexes = useMemo(() => new Set(
+		syncGranularity === 'word'
+			? currentGranularityRanges.slice(1).map(range => range.start)
+			: []
+	), [currentGranularityRanges, syncGranularity]);
+	const getGranularityRangeForIndex = useCallback((index) => (
+		currentGranularityRanges.find(range => index >= range.start && index <= range.end) || null
+	), [currentGranularityRanges]);
+	const getGranularityEndIndex = useCallback((index) => (
+		getGranularityRangeForIndex(index)?.end ?? index
+	), [getGranularityRangeForIndex]);
 	const shouldShowSyncCreatorFurigana = useMemo(() => {
 		if (lyricsLanguage !== 'ja') return false;
 		if (!lyricsLines.some(line => SYNC_CREATOR_KANJI_REGEX.test(line))) return false;
@@ -4638,7 +4851,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			return;
 		}
 		const firstEditableIndex = Math.max(0, lockIndex + 1);
-		const startIndex = Math.max(charIndex < 0 ? 0 : charIndex, firstEditableIndex);
+		const requestedStartIndex = Math.max(charIndex < 0 ? 0 : charIndex, firstEditableIndex);
+		const startIndex = Math.max(
+			firstEditableIndex,
+			Math.min(currentLineChars.length - 1, getGranularityEndIndex(requestedStartIndex))
+		);
 		const hasKeyboardProgress = isKeyboardSyncingRef.current
 			&& Array.isArray(charTimesRef.current)
 			&& charTimesRef.current.length === currentLineChars.length;
@@ -4707,7 +4924,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 		}
 		charTimesRef.current = nextCharTimes;
-	}, [mode, currentLineIndex, lyricsLines.length, currentLineChars.length, setRecordingProgressIndex, cacheCharHitBoxes, getActiveRecordingLockIndex, buildLockedCharTimes]);
+	}, [mode, currentLineIndex, lyricsLines.length, currentLineChars.length, setRecordingProgressIndex, cacheCharHitBoxes, getActiveRecordingLockIndex, buildLockedCharTimes, getGranularityEndIndex]);
 
 	const handleDragMove = useCallback((charIndex, e) => {
 		if (mode !== 'record' || !isDragging || dragStartTime === null) return;
@@ -4725,6 +4942,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			return;
 		}
 
+		charIndex = Math.min(currentLineChars.length - 1, getGranularityEndIndex(charIndex));
 		const lockIndex = getActiveRecordingLockIndex();
 		const firstEditableIndex = Math.max(0, lockIndex + 1);
 		if (charIndex < firstEditableIndex) {
@@ -4751,13 +4969,29 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 			setRecordingProgressIndex(Math.max(charIndex, lockIndex), { commitState: false });
 		}
-	}, [mode, isDragging, dragStartTime, setRecordingProgressIndex, getActiveRecordingLockIndex]);
+	}, [mode, isDragging, dragStartTime, currentLineChars.length, setRecordingProgressIndex, getActiveRecordingLockIndex, getGranularityEndIndex]);
 
 	// Commit-time normalization keeps the client aligned with backend validation:
 	// chars must be non-decreasing and a line must not start before the previous line ends.
-	const normalizeCommittedLineChars = useCallback((rawChars, previousLineEndTime = -1) => {
-		return normalizeSyncCreatorTimeSequence(rawChars, previousLineEndTime);
-	}, []);
+	const normalizeCommittedLineChars = useCallback((
+		rawChars,
+		previousLineEndTime = -1,
+		granularity = syncGranularity,
+		sourceChars = currentLineChars
+	) => {
+		const normalizedGranularity = normalizeSyncCreatorGranularity(granularity);
+		const collapsedChars = collapseSyncCreatorTimesByGranularity(
+			rawChars,
+			sourceChars,
+			normalizedGranularity,
+			lyricsLanguage || undefined
+		);
+		return normalizeSyncCreatorTimeSequence(
+			collapsedChars,
+			previousLineEndTime,
+			normalizedGranularity
+		);
+	}, [syncGranularity, currentLineChars, lyricsLanguage]);
 
 	const mergeCurrentLineWithNext = useCallback(() => {
 		if (!canMergeCurrentLineWithNext) return;
@@ -4823,6 +5057,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					start: lineStart,
 					end: lineEnd,
 					chars,
+					granularity: normalizeSyncCreatorGranularity(
+						directLine?.granularity || existingPart?.granularity || currentLineData?.granularity
+					),
 					speaker,
 					...(speakerFallback ? { 'speaker-fallback': speakerFallback } : {}),
 					'speaker-color': sanitizeSyncCreatorSpeakerColor(
@@ -4840,7 +5077,14 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				? {
 					start: currentStart,
 					end: mergedEnd,
-					chars: normalizeCommittedLineChars(snapshots.flatMap(snapshot => snapshot.chars), previousLineEndTime),
+					chars: normalizeSyncCreatorTimeSequence(
+						snapshots.flatMap(snapshot => snapshot.chars),
+						previousLineEndTime,
+						'word'
+					),
+					// Parallel parts carry their own precise timing. Keep only one line-level
+					// start mark instead of duplicating every character timestamp here.
+					granularity: 'line',
 					speaker: snapshots[0].speaker,
 					...(snapshots[0]['speaker-fallback'] ? { 'speaker-fallback': snapshots[0]['speaker-fallback'] } : {}),
 					...(snapshots[0]['speaker-color'] ? { 'speaker-color': snapshots[0]['speaker-color'] } : {}),
@@ -4851,6 +5095,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						parts: snapshots.map((snapshot, index) => ({
 							id: partIds[index] || `p${index + 1}`,
 							role: index === 0 ? 'lead' : 'background',
+							granularity: snapshot.granularity,
 							speaker: snapshot.speaker,
 							...(snapshot['speaker-fallback'] ? { 'speaker-fallback': snapshot['speaker-fallback'] } : {}),
 							...(snapshot['speaker-color'] ? { 'speaker-color': snapshot['speaker-color'] } : {}),
@@ -4939,11 +5184,16 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			return best;
 		}, null);
 		const previousLineEndTime = previousLine?.chars?.[previousLine.chars.length - 1] ?? -1;
-		const normalizedRawChars = normalizeCommittedLineChars(rawChars, previousLineEndTime);
+		const normalizedRawChars = normalizeCommittedLineChars(
+			rawChars,
+			previousLineEndTime,
+			syncGranularity,
+			currentLineChars
+		);
 
 		const buildFullLineChars = () => {
 			if (!activeParallelPart) {
-				return normalizeCommittedLineChars(rawChars, previousLineEndTime);
+				return normalizedRawChars;
 			}
 
 			const fullChars = Array.isArray(existingLine?.chars) && existingLine.chars.length === fullCharCount
@@ -4964,7 +5214,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				fullChars[index] = previous ?? next ?? firstKnown ?? 0;
 			}
 
-			return normalizeCommittedLineChars(fullChars, previousLineEndTime);
+			return normalizeSyncCreatorTimeSequence(fullChars, previousLineEndTime, 'word');
 		};
 
 		const fullLineChars = buildFullLineChars();
@@ -4972,7 +5222,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			...(existingLine || {}),
 			start: lineStart,
 			end: lineEnd,
-			chars: fullLineChars.map((time) => roundSyncTime(time))
+			chars: fullLineChars.map((time) => roundSyncTime(time)),
+			granularity: activeParallelPart
+				? normalizeSyncCreatorGranularity(existingLine?.granularity)
+				: syncGranularity
 		};
 		const leadMetaPart = currentParallelData?.parts?.find(part => part.role === 'lead') || currentParallelData?.parts?.[0] || activeParallelPart;
 		const lineMetaDraft = lineMetaDrafts[lineStart] || {};
@@ -5058,6 +5311,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					const nextPart = {
 						id: part.id,
 						role: part.role,
+						granularity: part.id === activeParallelPart.id
+							? syncGranularity
+							: normalizeSyncCreatorGranularity(existingPart?.granularity || part.granularity),
 						speaker: part.speaker,
 						...(partSpeakerFallback
 							? { 'speaker-fallback': partSpeakerFallback }
@@ -5077,6 +5333,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				.filter(Boolean);
 
 			if (parts.length > 0) {
+				lineData.granularity = parts.length > 1
+					? 'line'
+					: normalizeSyncCreatorGranularity(parts[0]?.granularity || lineData.granularity);
 				lineData.parallel = sanitizeSyncCreatorParallel({
 					layout: currentParallelData.layout || 'stack',
 					hiddenRanges: currentParallelData.hiddenRanges || [],
@@ -5102,7 +5361,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		const previousSortedLineEndTime = previousSortedLine?.chars?.[previousSortedLine.chars.length - 1] ?? -1;
 		const normalizedLineData = {
 			...lineData,
-			chars: normalizeCommittedLineChars(lineData.chars, previousSortedLineEndTime)
+			chars: normalizeSyncCreatorTimeSequence(
+				lineData.chars,
+				previousSortedLineEndTime,
+				lineData.granularity
+			)
 		};
 		const normalizedLastCharTime = normalizedLineData.chars[normalizedLineData.chars.length - 1];
 
@@ -5150,7 +5413,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		activeParallelTargetId,
 		isCurrentSyncTargetMetaComplete,
 		showMissingMetaToast,
-		normalizeCommittedLineChars
+		normalizeCommittedLineChars,
+		syncGranularity,
+		currentLineChars
 	]);
 
 	const handleDragEnd = useCallback((e) => {
@@ -5280,11 +5545,24 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		isKeyboardDraggingRef.current = false;
 	}, [setRecordingProgressIndex, clearRecordingLock]);
 
+	const handleSyncGranularityChange = useCallback((nextValue) => {
+		const nextGranularity = normalizeSyncCreatorGranularity(nextValue);
+		if (nextGranularity === syncGranularity) return;
+		claimSessionForLocalEditing();
+		resetCurrentSyncInput();
+		setSyncGranularity(nextGranularity);
+		try {
+			window.localStorage?.setItem(SYNC_CREATOR_GRANULARITY_STORAGE_KEY, nextGranularity);
+		} catch (error) {
+			// Keep the selected value for this session when storage is unavailable.
+		}
+	}, [claimSessionForLocalEditing, resetCurrentSyncInput, syncGranularity]);
+
 	const handleCharacterContextMenu = useCallback((charIndex, e) => {
 		e.preventDefault();
 		e.stopPropagation();
 
-		if (mode !== 'record' || currentLineIndex >= lyricsLines.length || !currentLineChars.length) return;
+		if (syncGranularity !== 'character' || mode !== 'record' || currentLineIndex >= lyricsLines.length || !currentLineChars.length) return;
 		if (!isCurrentSyncTargetMetaComplete) {
 			showMissingMetaToast();
 			return;
@@ -5342,6 +5620,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setIsDragging(false);
 		Toast.success(I18n.t('settings.syncLockSet') || 'Locked timing up to the selected character.');
 	}, [
+		syncGranularity,
 		mode,
 		currentLineIndex,
 		lyricsLines.length,
@@ -5456,6 +5735,21 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			pendingWordSyncRef.current = null;
 			pendingSyllableSyncRef.current = null;
 			clearRecordingLock();
+			setDragStartTime(null);
+			setRecordingProgressIndex(-1);
+		};
+
+		const syncWholeLine = (currentTime) => {
+			const lockIndex = getActiveRecordingLockIndex();
+			if (lockIndex >= 0) clearRecordingLock();
+			const chars = new Array(currentLineChars.length).fill(roundSyncTime(currentTime));
+			const committedLine = commitCurrentLineSync(chars, { createCheckpoint: true });
+			if (committedLine) advanceAfterCompletedTarget(committedLine);
+			isKeyboardSyncingRef.current = false;
+			keyboardCharIndexRef.current = -1;
+			charTimesRef.current = [];
+			pendingWordSyncRef.current = null;
+			pendingSyllableSyncRef.current = null;
 			setDragStartTime(null);
 			setRecordingProgressIndex(-1);
 		};
@@ -5795,17 +6089,76 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				}
 			};
 
+			const advanceOneSelectedWord = (currentTime) => {
+				const lockIndex = getActiveRecordingLockIndex();
+				if (lockIndex >= currentLineChars.length - 1) {
+					Toast.error(I18n.t('settings.syncLockNoEditableChars') || 'Right-click an earlier character so there is something left to re-sync.');
+					return -1;
+				}
+				if (!isKeyboardSyncingRef.current) {
+					isKeyboardSyncingRef.current = true;
+					charTimesRef.current = buildLockedCharTimes(lockIndex);
+					setDragStartTime(currentTime);
+					keyboardCharIndexRef.current = lockIndex;
+				}
+				const nextRange = currentGranularityRanges.find(range => range.end > keyboardCharIndexRef.current);
+				if (!nextRange) {
+					finishKeyboardSync();
+					return -1;
+				}
+				const start = Math.max(lockIndex + 1, keyboardCharIndexRef.current + 1, nextRange.start);
+				for (let index = start; index <= nextRange.end; index++) {
+					charTimesRef.current[index] = currentTime;
+				}
+				keyboardCharIndexRef.current = nextRange.end;
+				setRecordingProgressIndex(nextRange.end, { commitState: false });
+				if (nextRange.end >= currentLineChars.length - 1) {
+					finishKeyboardSync();
+					return -1;
+				}
+				return nextRange.end;
+			};
+
+			const revertOneSelectedWord = () => {
+				if (!isKeyboardSyncingRef.current || keyboardCharIndexRef.current < 0) return;
+				const lockIndex = getActiveRecordingLockIndex();
+				const currentRangeIndex = currentGranularityRanges.findIndex(range => (
+					keyboardCharIndexRef.current >= range.start && keyboardCharIndexRef.current <= range.end
+				));
+				const currentRange = currentGranularityRanges[currentRangeIndex];
+				if (!currentRange) return;
+				for (let index = Math.max(lockIndex + 1, currentRange.start); index <= currentRange.end; index++) {
+					charTimesRef.current[index] = null;
+				}
+				const previousRange = currentGranularityRanges[currentRangeIndex - 1];
+				keyboardCharIndexRef.current = previousRange && previousRange.end > lockIndex
+					? previousRange.end
+					: lockIndex;
+				setRecordingProgressIndex(keyboardCharIndexRef.current, { commitState: false });
+				if (keyboardCharIndexRef.current <= lockIndex) {
+					isKeyboardSyncingRef.current = false;
+					setDragStartTime(null);
+				}
+			};
+
 			// 오른쪽 방향키: 한 글자 싱크
 			if (shortcutAction === 'charForward') {
 				consumeKeyboardEvent();
 				const currentTime = Spicetify.Player.getProgress() / 1000;
-				advanceOneChar(currentTime);
+				if (syncGranularity === 'line') syncWholeLine(currentTime);
+				else if (syncGranularity === 'word') advanceOneSelectedWord(currentTime);
+				else advanceOneChar(currentTime);
 				return;
 			}
 
 			// 왼쪽 방향키: 한 글자 취소 (첫 글자도 취소 가능)
 			if (shortcutAction === 'charBack') {
 				consumeKeyboardEvent();
+				if (syncGranularity === 'word') {
+					pendingSyllableSyncRef.current = null;
+					revertOneSelectedWord();
+					return;
+				}
 				if (isKeyboardSyncingRef.current && keyboardCharIndexRef.current >= 0) {
 					const lockIndex = getActiveRecordingLockIndex();
 					if (keyboardCharIndexRef.current <= lockIndex) return;
@@ -5829,7 +6182,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			if (shortcutAction === 'wordForward') {
 				consumeKeyboardEvent();
 				const currentTime = Spicetify.Player.getProgress() / 1000;
-				advanceOneWord(currentTime);
+				if (syncGranularity === 'line') syncWholeLine(currentTime);
+				else if (syncGranularity === 'word') advanceOneSelectedWord(currentTime);
+				else advanceOneWord(currentTime);
 				return;
 			}
 
@@ -5837,7 +6192,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			if (shortcutAction === 'wordBack') {
 				consumeKeyboardEvent();
 				pendingSyllableSyncRef.current = null;
-				revertOneWord();
+				if (syncGranularity === 'word') revertOneSelectedWord();
+				else revertOneWord();
 				return;
 			}
 
@@ -5959,7 +6315,14 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					}
 
 					const time = Spicetify.Player.getProgress() / 1000;
-					const result = advanceOneChar(time);
+					if (syncGranularity === 'line') {
+						syncWholeLine(time);
+						stopKeyboardDragLoop();
+						return -1;
+					}
+					const result = syncGranularity === 'word'
+						? advanceOneSelectedWord(time)
+						: advanceOneChar(time);
 					if (result === -1) {
 						stopKeyboardDragLoop();
 					}
@@ -6094,7 +6457,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			document.removeEventListener('keypress', handleKeyPress, true);
 			document.removeEventListener('keyup', handleKeyUp, true);
 		};
-	}, [mode, currentLineIndex, activeParallelTargetId, lyricsLines.length, currentLineChars, currentLineEffectiveSyllableSegments, lineCharOffsets, commitCurrentLineSync, advanceAfterCompletedTarget, isCurrentSyncTargetMetaComplete, showMissingMetaToast, setRecordingProgressIndex, getActiveRecordingLockIndex, buildLockedCharTimes, clearRecordingLock]);
+	}, [mode, currentLineIndex, activeParallelTargetId, lyricsLines.length, currentLineChars, currentLineEffectiveSyllableSegments, currentGranularityRanges, lineCharOffsets, commitCurrentLineSync, advanceAfterCompletedTarget, isCurrentSyncTargetMetaComplete, showMissingMetaToast, setRecordingProgressIndex, getActiveRecordingLockIndex, buildLockedCharTimes, clearRecordingLock, syncGranularity]);
 
 	const handleContainerMouseDown = useCallback((e) => {
 		if (mode !== 'record' || currentLineIndex >= lyricsLines.length) return;
@@ -6438,7 +6801,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 					const speaker = normalizeSyncCreatorSpeaker(part?.speaker || mergedLine.speaker) || SYNC_CREATOR_DEFAULT_SPEAKER;
 					const kind = normalizeSyncCreatorKind(part?.kind || mergedLine.kind) || SYNC_CREATOR_DEFAULT_KIND;
-					return { start, end, chars, speaker, kind };
+					const granularity = normalizeSyncCreatorGranularity(part?.granularity || mergedLine.granularity);
+					return { start, end, chars, granularity, speaker, kind };
 				})
 				.filter(Boolean);
 			if (restoredLines.length !== currentMergedLineIndexes.length) return prev;
@@ -6787,14 +7151,20 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 		let persistedSyncData = null;
 		if (syncDataOverride) {
-			persistedSyncData = attachSelectedLrclibSource(syncDataOverride);
-			assertValidSyncCreatorSyncData(persistedSyncData);
+			const expandedSyncData = attachSelectedLrclibSource(syncDataOverride);
+			assertValidSyncCreatorSyncData(expandedSyncData);
+			persistedSyncData = compactSyncCreatorSyncData(
+				expandedSyncData,
+				lyricsFullTextChars,
+				lyricsLanguage || undefined
+			);
 		}
 
 		const editor = {
 			currentLineIndex,
 			activeParallelPartId,
 			multiVocalMode,
+			syncGranularity,
 			globalOffset,
 			parallelPartMetaDrafts: syncCreatorDraftStore.cloneValue(parallelPartMetaDrafts),
 			manualParallelSplitDrafts: syncCreatorDraftStore.cloneValue(manualParallelSplitDrafts),
@@ -6844,6 +7214,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		currentLineIndex,
 		globalOffset,
 		lineMetaDrafts,
+		lyricsFullTextChars,
+		lyricsLanguage,
 		lyrics?.karaokeSource,
 		lyricsText,
 		manualParallelSplitDrafts,
@@ -6859,6 +7231,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		sessionTrackKey,
 		syncCreatorDraftStore,
 		syncData,
+		syncGranularity,
 		trackDurationMs,
 		trackId,
 		trackIsrc,
@@ -6968,6 +7341,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setCurrentLineIndex(restoredLineIndex);
 		setActiveParallelPartId(String(editor.activeParallelPartId || 'full'));
 		setMultiVocalMode(editor.multiVocalMode === true);
+		if (Object.prototype.hasOwnProperty.call(editor, 'syncGranularity')) {
+			setSyncGranularity(normalizeSyncCreatorGranularity(editor.syncGranularity));
+		}
 		setGlobalOffset(Number.isFinite(Number(editor.globalOffset)) ? Number(editor.globalOffset) : 0);
 		setParallelPartMetaDrafts(restoreObject(editor.parallelPartMetaDrafts));
 		setManualParallelSplitDrafts(restoreObject(editor.manualParallelSplitDrafts));
@@ -7722,6 +8098,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			Toast.error(error?.message || I18n.t('syncCreator.submitError'));
 			return;
 		}
+		const compactSyncDataToSubmit = compactSyncCreatorSyncData(
+			syncDataToSubmit,
+			lyricsFullTextChars,
+			lyricsLanguage || undefined
+		);
 
 		const resolvedTrackIsrc = trackIsrc
 			|| await window.SyncDataService?.resolveTrackIsrc?.(trackId, {
@@ -7748,7 +8129,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				...(trackDurationMs > 0 ? { durationMs: trackDurationMs } : {})
 			};
 			if (typeof SyncDataService !== 'undefined' && SyncDataService.submitSyncData) {
-				const result = await SyncDataService.submitSyncData(trackId, provider, syncDataToSubmit, submitMetadata);
+				const result = await SyncDataService.submitSyncData(trackId, provider, compactSyncDataToSubmit, submitMetadata);
 				if (result) {
 					Toast.success(I18n.t('syncCreator.submitSuccess'));
 					// 캐시 무효화
@@ -7771,7 +8152,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					isrc: resolvedTrackIsrc,
 					'request-version': '20260701',
 					provider,
-					syncData: syncDataToSubmit,
+					syncData: compactSyncDataToSubmit,
 					...submitMetadata,
 					...(trackId ? { trackId } : {})
 				};
@@ -7805,7 +8186,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 
 		setIsSubmitting(false);
-	}, [syncData, lyricsLines, lineCharOffsets, multiVocalMode, trackId, trackIsrc, provider, trackName, artistName, albumName, trackInfo, onClose, attachSelectedLrclibSource, clearLyricsCachesAfterSyncSubmit, deleteActiveSyncCreatorDraft, getParallelTemplateForLineData, getMergedLineIndexesForStart, isLineCoveredByMergedPrevious, materializeSyncCreatorParallelDrafts]);
+	}, [syncData, lyricsLines, lyricsFullTextChars, lyricsLanguage, lineCharOffsets, multiVocalMode, trackId, trackIsrc, provider, trackName, artistName, albumName, trackInfo, onClose, attachSelectedLrclibSource, clearLyricsCachesAfterSyncSubmit, deleteActiveSyncCreatorDraft, getParallelTemplateForLineData, getMergedLineIndexesForStart, isLineCoveredByMergedPrevious, materializeSyncCreatorParallelDrafts]);
 
 	// 싱크 데이터 내보내기 (JSON 파일로 저장)
 	const exportSyncData = useCallback(async () => {
@@ -7815,8 +8196,13 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 
 		try {
-			const exportData = attachSelectedLrclibSource(materializeSyncCreatorParallelDrafts(syncData));
-			assertValidSyncCreatorSyncData(exportData);
+			const expandedExportData = attachSelectedLrclibSource(materializeSyncCreatorParallelDrafts(syncData));
+			assertValidSyncCreatorSyncData(expandedExportData);
+			const exportData = compactSyncCreatorSyncData(
+				expandedExportData,
+				lyricsFullTextChars,
+				lyricsLanguage || undefined
+			);
 			const exportBaseName = [trackName, artistName]
 				.map(value => String(value || '').trim())
 				.filter(Boolean)
@@ -7838,7 +8224,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			console.error('[SyncDataCreator] Export error:', error);
 			Toast.error(error?.message || I18n.t('syncCreator.submitError'));
 		}
-	}, [artistName, attachSelectedLrclibSource, materializeSyncCreatorParallelDrafts, syncData, trackId, trackName]);
+	}, [artistName, attachSelectedLrclibSource, lyricsFullTextChars, lyricsLanguage, materializeSyncCreatorParallelDrafts, syncData, trackId, trackName]);
 
 	// 싱크 데이터 불러오기 (JSON 파일에서)
 	const importSyncData = useCallback(() => {
@@ -8210,6 +8596,36 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			fontSize: '10.5px', fontWeight: '700',
 			letterSpacing: '0.02em',
 			border: '1px solid transparent'
+		},
+		granularityControl: {
+			display: 'inline-flex', alignItems: 'center', gap: '2px',
+			padding: '3px', borderRadius: '9px',
+			background: 'rgba(255,255,255,0.035)',
+			border: `1px solid ${TOSS_BORDER}`
+		},
+		granularityButton: {
+			height: '26px', padding: '0 9px', borderRadius: '6px',
+			background: 'transparent', border: '1px solid transparent',
+			color: 'var(--spice-subtext)', cursor: 'pointer',
+			fontSize: '10.5px', fontWeight: '600', lineHeight: 1,
+			whiteSpace: 'nowrap'
+		},
+		granularityButtonActive: {
+			background: TOSS_BLUE_SOFT,
+			borderColor: TOSS_BLUE_BORDER,
+			color: TOSS_BLUE
+		},
+		wordInputSeparator: {
+			display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+			alignSelf: 'stretch', flexShrink: 0, boxSizing: 'border-box',
+			margin: '0 0.22em',
+			padding: usePrimaryCharacterPronunciation
+				? '4px 0 6px'
+				: `${hasCurrentLineFurigana ? 18 : 10}px 0 ${(hasCurrentLineCharacterPronunciation && currentLineRenderedPronunciationUnits.length === 0) ? 26 : 10}px`,
+			fontSize: usePrimaryCharacterPronunciation ? '15px' : '32px',
+			lineHeight: usePrimaryCharacterPronunciation ? 1.05 : 1.15,
+			color: 'var(--spice-subtext)', opacity: 0.55,
+			fontWeight: '500', userSelect: 'none', pointerEvents: 'none'
 		},
 		submitBtn: {
 			background: TOSS_BLUE, color: '#fff',
@@ -9307,8 +9723,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			'data-iv-sync-creator-synced': !options.wordSpacer && isSynced ? '1' : '0',
 			'data-iv-sync-creator-base-background': baseBackground,
 			'data-iv-sync-creator-base-color': baseColor,
-			onContextMenu: options.wordSpacer ? undefined : (e) => handleCharacterContextMenu(i, e),
-			title: options.wordSpacer || mode !== 'record' ? undefined : (I18n.t('settings.syncLockTooltip') || 'Right-click to lock timing up to this character')
+			onContextMenu: options.wordSpacer || syncGranularity !== 'character' ? undefined : (e) => handleCharacterContextMenu(i, e),
+			title: options.wordSpacer || mode !== 'record' || syncGranularity !== 'character'
+				? undefined
+				: (I18n.t('settings.syncLockTooltip') || 'Right-click to lock timing up to this character')
 		},
 			usePrimaryLayout
 				? react.createElement('span', { style: s.charOriginalSmall }, originalContent)
@@ -9350,7 +9768,21 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		const displayItems = activeParallelPart && Array.isArray(activeParallelPart.ranges) && activeParallelPart.ranges.length > 1
 			? getSyncCreatorParallelPartDisplayItems(activeParallelPart, currentFullLineChars, currentLineStart)
 			: null;
+		const renderWordInputSeparator = (key) => react.createElement('span', {
+			key,
+			className: 'sync-creator-word-input-separator',
+			style: s.wordInputSeparator,
+			'aria-hidden': 'true'
+		}, '/');
 		if (useCurrentLineTextRun) {
+			const textRunContent = syncGranularity === 'word'
+				? currentGranularityRanges.flatMap((range, index) => [
+					index > 0 && renderWordInputSeparator(`rtl-separator-${index}`),
+					react.createElement('span', { key: `rtl-word-${index}` }, (
+						currentLineChars.slice(range.start, range.end + 1).join('')
+					))
+				]).filter(Boolean)
+				: (displayItems ? displayItems.map(item => item.text || item.char || '').join('') : currentLineText);
 			return react.createElement('span', {
 				ref: rtlTextRunRef,
 				className: 'lyrics-karaoke-text-run-segment',
@@ -9361,36 +9793,39 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					const charIndex = getCharIndexFromPoint(e.clientX, e.clientY);
 					if (charIndex >= 0) handleCharacterContextMenu(charIndex, e);
 				}
-			}, displayItems ? displayItems.map(item => item.text || item.char || '').join('') : currentLineText);
+			}, textRunContent);
 		}
 
 		const items = displayItems || currentLineChars.map((char, i) => ({ type: 'char', key: `char-${i}`, charIndex: i, char }));
-		return items.map((item) => {
+		return items.flatMap((item) => {
 			if (item.type === 'separator') {
-				return react.createElement('span', {
+				return [react.createElement('span', {
 					key: item.key,
 					style: s.charJoinSeparator
-				}, item.text === ' ' ? '\u00A0' : item.text);
+				}, item.text === ' ' ? '\u00A0' : item.text)];
 			}
 			const char = item.char;
 			const i = item.charIndex;
+			const wordSeparator = currentWordBoundaryStartIndexes.has(i)
+				? renderWordInputSeparator(`word-separator-${i}`)
+				: null;
 			const pronunciationUnit = currentLineRenderedPronunciationUnitByStart.get(i);
 			if (pronunciationUnit) {
-				return renderPronunciationUnit(pronunciationUnit);
+				return [wordSeparator, renderPronunciationUnit(pronunciationUnit)].filter(Boolean);
 			}
 			if (currentLineRenderedPronunciationCoveredIndexes.has(i)) {
-				return null;
+				return wordSeparator ? [wordSeparator] : [];
 			}
 			if (currentLineRenderedPronunciationUnits.length > 0 && /\s/u.test(char)) {
-				return renderCharacterSpan(char, i, {
+				return [wordSeparator, renderCharacterSpan(char, i, {
 					key: `word-space-${i}`,
 					hidePronunciation: true,
 					hideTime: true,
 					suppressPrimaryPronunciation: true,
 					wordSpacer: true
-				});
+				})].filter(Boolean);
 			}
-			return renderCharacterSpan(char, i);
+			return [wordSeparator, renderCharacterSpan(char, i)].filter(Boolean);
 		});
 	};
 	const renderParallelPartLine = (part, index) => {
@@ -9756,6 +10191,26 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		);
 	};
 
+	const renderGranularitySelector = () => react.createElement('div', {
+		className: 'sync-creator-granularity',
+		style: s.granularityControl,
+		role: 'group',
+		'aria-label': I18n.t('syncCreator.syncGranularityLabel') || 'Sync unit',
+		title: I18n.t('syncCreator.syncGranularityHint') || 'Choose how precisely timing is recorded'
+	}, [
+		['line', I18n.t('syncCreator.syncGranularityLine') || 'Line'],
+		['word', I18n.t('syncCreator.syncGranularityWord') || 'Word'],
+		['character', I18n.t('syncCreator.syncGranularityCharacter') || 'Character']
+	].map(([value, label]) => react.createElement('button', {
+		key: value,
+		type: 'button',
+		style: syncGranularity === value
+			? { ...s.granularityButton, ...s.granularityButtonActive }
+			: s.granularityButton,
+		'aria-pressed': syncGranularity === value,
+		onClick: () => handleSyncGranularityChange(value)
+	}, label)));
+
 	const renderHeader = () => react.createElement('div', { className: 'sync-creator-header', style: s.header },
 		react.createElement('button', {
 			className: 'sync-creator-header-back',
@@ -9772,6 +10227,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		),
 		react.createElement('h2', { className: 'sync-creator-header-title', style: s.title }, I18n.t('syncCreator.title')),
 		react.createElement('span', { className: 'sync-creator-mode-badge', style: { ...s.modeBadge, ...getModeStyle() } }, getModeLabel()),
+		renderGranularitySelector(),
 		react.createElement('button', {
 			className: 'sync-creator-submit',
 			style: { ...s.submitBtn, opacity: isSubmitting || !syncData ? 0.5 : 1, cursor: isSubmitting || !syncData ? 'not-allowed' : 'pointer' },
@@ -9885,6 +10341,12 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		)
 	);
 
+	const syncGranularityRecordingHint = syncGranularity === 'line'
+		? (I18n.t('syncCreator.lineSyncHint') || 'Tap the line at the moment it starts.')
+		: syncGranularity === 'word'
+			? (I18n.t('syncCreator.wordSyncHint') || 'Tap or drag in time with each word.')
+			: I18n.t('syncCreator.dragHint');
+
 	const renderProgressPanel = () => lyricsText && react.createElement('div', { className: 'sync-creator-section sync-creator-progress-section', style: s.panel },
 		react.createElement('div', { style: s.panelTitle }, I18n.t('syncCreator.progress') || '진행'),
 		react.createElement('div', { style: s.statsGrid },
@@ -9933,7 +10395,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 	const renderShortcutGuide = () => lyricsText && react.createElement('div', { className: 'sync-creator-section sync-creator-shortcut-section', style: s.panel },
 		react.createElement('div', { style: s.panelTitle }, 'Sync Creator 단축키'),
-		react.createElement('div', { style: s.panelSubtitle }, I18n.t('syncCreator.dragHint')),
+		react.createElement('div', { style: s.panelSubtitle }, syncGranularityRecordingHint),
 		react.createElement('div', { style: { ...s.shortcutsContainer, marginTop: 0, padding: 0, background: 'transparent', border: 'none' } },
 			[
 				[getSyncCreatorShortcutDisplay('charForward'), I18n.t('syncCreator.shortcuts.charForward') || '한 글자'],
@@ -10186,7 +10648,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					}
 				}, getSyncCreatorFuriganaReact(lyricsLines[nextNavigableLineIndex]))
 			),
-			mode === 'record' && react.createElement('div', { style: s.hint }, I18n.t('syncCreator.dragHint')),
+			mode === 'record' && react.createElement('div', { style: s.hint }, syncGranularityRecordingHint),
 			react.createElement('div', { style: s.effectStripRow },
 				react.createElement('span', { style: s.effectStripTitle }, I18n.t('syncCreator.typeLabel') || 'Text effect'),
 				renderTextEffectPicker(currentTextEffectKind, updateCurrentTextEffect, { compact: true })
@@ -11062,7 +11524,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						))
 					),
 
-					// Lyrics Box
+				// Lyrics Box
 				react.createElement('div', {
 					style: hasCurrentParallelParts
 						? { ...s.lyricsBox, ...s.lyricsBoxParallelScrollable }
@@ -11092,7 +11554,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					}, getSyncCreatorFuriganaReact(lyricsLines[nextNavigableLineIndex]))
 				),
 
-				mode === 'record' && react.createElement('div', { style: s.hint }, I18n.t('syncCreator.dragHint')),
+				mode === 'record' && react.createElement('div', { style: s.hint }, syncGranularityRecordingHint),
 
 				// 키보드 단축키 가이드 (record 모드일 때만 표시)
 				mode === 'record' && react.createElement('div', { style: s.shortcutsContainer },

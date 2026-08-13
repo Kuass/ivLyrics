@@ -2528,6 +2528,13 @@ window.LANG_HI = {
   "syncCreator": {
     "loginRequired": "कराओके सिंक बनाने के लिए Discord में लॉग इन करना आवश्यक है।",
     "title": "कराओके सिंक क्रिएटर",
+    "syncGranularityLabel": "सिंक इकाई",
+    "syncGranularityLine": "पंक्ति",
+    "syncGranularityWord": "शब्द",
+    "syncGranularityCharacter": "अक्षर",
+    "syncGranularityHint": "समय दर्ज करने की इकाई चुनें",
+    "lineSyncHint": "पंक्ति शुरू होते ही गीत के बोल पर टैप करें।",
+    "wordSyncHint": "हर शब्द के साथ टैप या ड्रैग करें।",
     "buttonTooltip": "कराओके सिंक बनाएं",
     "clickHereHint": "लिरिक्स सिंक करने के लिए यहाँ क्लिक करें!",
     "loading": "लोड हो रहा है...",

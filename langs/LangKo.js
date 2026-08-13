@@ -2529,6 +2529,13 @@ window.LANG_KO = {
   "syncCreator": {
     "loginRequired": "노래방 싱크 생성은 Discord 로그인이 필요합니다.",
     "title": "노래방 싱크 생성",
+    "syncGranularityLabel": "싱크 단위",
+    "syncGranularityLine": "라인",
+    "syncGranularityWord": "단어",
+    "syncGranularityCharacter": "글자",
+    "syncGranularityHint": "타이밍을 기록할 단위를 선택합니다",
+    "lineSyncHint": "라인이 시작되는 순간 가사를 눌러주세요.",
+    "wordSyncHint": "각 단어에 맞춰 누르거나 드래그해주세요.",
     "buttonTooltip": "노래방 싱크 생성",
     "clickHereHint": "여기를 눌러 가사의 싱크를 맞춰주세요!",
     "loading": "로딩 중...",

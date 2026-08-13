@@ -2528,6 +2528,13 @@ window.LANG_DE = {
   "syncCreator": {
     "loginRequired": "Zum Erstellen von Karaoke-Sync ist eine Discord-Anmeldung erforderlich.",
     "title": "Karaoke-Sync erstellen",
+    "syncGranularityLabel": "Synchronisierungseinheit",
+    "syncGranularityLine": "Zeile",
+    "syncGranularityWord": "Wort",
+    "syncGranularityCharacter": "Zeichen",
+    "syncGranularityHint": "Einheit für die Zeitaufzeichnung auswählen",
+    "lineSyncHint": "Tippe beim Beginn der Zeile auf den Text.",
+    "wordSyncHint": "Tippe oder ziehe passend zu jedem Wort.",
     "buttonTooltip": "Karaoke-Sync erstellen",
     "clickHereHint": "Klicken Sie hier, um den Songtext zu synchronisieren!",
     "loading": "Lade...",

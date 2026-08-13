@@ -2529,6 +2529,13 @@ window.LANG_JA = {
   "syncCreator": {
     "loginRequired": "カラオケ同期を作成するにはDiscordへのログインが必要です。",
     "title": "カラオケ同期作成",
+    "syncGranularityLabel": "同期単位",
+    "syncGranularityLine": "行",
+    "syncGranularityWord": "単語",
+    "syncGranularityCharacter": "文字",
+    "syncGranularityHint": "タイミングを記録する単位を選択します",
+    "lineSyncHint": "行が始まる瞬間に歌詞を押してください。",
+    "wordSyncHint": "各単語に合わせて押すかドラッグしてください。",
     "buttonTooltip": "カラオケ同期作成",
     "clickHereHint": "ここをクリックして歌詞の同期を合わせてください！",
     "loading": "読み込み中...",

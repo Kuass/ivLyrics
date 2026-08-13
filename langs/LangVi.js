@@ -2529,6 +2529,13 @@ window.LANG_VI = {
   "syncCreator": {
     "loginRequired": "Cần đăng nhập Discord để tạo đồng bộ karaoke.",
     "title": "Tạo đồng bộ Karaoke",
+    "syncGranularityLabel": "Đơn vị đồng bộ",
+    "syncGranularityLine": "Dòng",
+    "syncGranularityWord": "Từ",
+    "syncGranularityCharacter": "Ký tự",
+    "syncGranularityHint": "Chọn đơn vị dùng để ghi thời gian",
+    "lineSyncHint": "Chạm vào lời khi dòng bắt đầu.",
+    "wordSyncHint": "Chạm hoặc kéo theo nhịp của từng từ.",
     "buttonTooltip": "Tạo đồng bộ Karaoke",
     "clickHereHint": "Nhấn vào đây để khớp lời bài hát!",
     "loading": "Đang tải...",

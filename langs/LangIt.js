@@ -2529,6 +2529,13 @@ window.LANG_IT = {
   "syncCreator": {
     "loginRequired": "Per creare la sincronizzazione karaoke è richiesto l'accesso con Discord.",
     "title": "Crea Sync Karaoke",
+    "syncGranularityLabel": "Unità di sincronizzazione",
+    "syncGranularityLine": "Riga",
+    "syncGranularityWord": "Parola",
+    "syncGranularityCharacter": "Carattere",
+    "syncGranularityHint": "Scegli l’unità con cui registrare i tempi",
+    "lineSyncHint": "Tocca il testo quando inizia la riga.",
+    "wordSyncHint": "Tocca o trascina a tempo con ogni parola.",
     "buttonTooltip": "Crea Sync Karaoke",
     "clickHereHint": "Clicca qui per sincronizzare il testo!",
     "loading": "Caricamento...",

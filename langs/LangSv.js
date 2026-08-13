@@ -2528,6 +2528,13 @@ window.LANG_SV = {
   "syncCreator": {
     "loginRequired": "Discord-inloggning krävs för att skapa karaokesynkronisering.",
     "title": "Skapa Karaoke Sync",
+    "syncGranularityLabel": "Synkenhet",
+    "syncGranularityLine": "Rad",
+    "syncGranularityWord": "Ord",
+    "syncGranularityCharacter": "Tecken",
+    "syncGranularityHint": "Välj vilken enhet som ska tidsättas",
+    "lineSyncHint": "Tryck på texten när raden börjar.",
+    "wordSyncHint": "Tryck eller dra i takt med varje ord.",
     "buttonTooltip": "Skapa Karaoke Sync",
     "clickHereHint": "Klicka här för att synkronisera texterna!",
     "loading": "Laddar...",

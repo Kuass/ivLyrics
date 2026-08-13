@@ -2529,6 +2529,13 @@ window.LANG_BN = {
   "syncCreator": {
     "loginRequired": "কারাওকে সিঙ্ক তৈরি করতে Discord-এ লগইন করতে হবে।",
     "title": "কারাওকে সিঙ্ক তৈরি",
+    "syncGranularityLabel": "সিঙ্ক একক",
+    "syncGranularityLine": "লাইন",
+    "syncGranularityWord": "শব্দ",
+    "syncGranularityCharacter": "অক্ষর",
+    "syncGranularityHint": "সময় রেকর্ড করার একক বেছে নিন",
+    "lineSyncHint": "লাইন শুরু হওয়ার মুহূর্তে গানের কথায় ট্যাপ করুন।",
+    "wordSyncHint": "প্রতিটি শব্দের সঙ্গে মিলিয়ে ট্যাপ বা ড্র্যাগ করুন।",
     "buttonTooltip": "কারাওকে সিঙ্ক তৈরি করুন",
     "clickHereHint": "গানের লিরিক্স সিঙ্ক মেলাতে এখানে ক্লিক করুন!",
     "loading": "লোড হচ্ছে...",

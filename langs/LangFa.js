@@ -2528,6 +2528,13 @@ window.LANG_FA = {
   "syncCreator": {
     "loginRequired": "برای ساخت همگام‌سازی کارائوکه باید وارد دیسکورد شوید.",
     "title": "ایجاد سینک کارائوکه",
+    "syncGranularityLabel": "واحد همگام‌سازی",
+    "syncGranularityLine": "خط",
+    "syncGranularityWord": "واژه",
+    "syncGranularityCharacter": "نویسه",
+    "syncGranularityHint": "واحد ثبت زمان‌بندی را انتخاب کنید",
+    "lineSyncHint": "هنگام شروع خط روی متن ترانه بزنید.",
+    "wordSyncHint": "هم‌زمان با هر واژه بزنید یا بکشید.",
     "buttonTooltip": "ایجاد سینک کارائوکه",
     "clickHereHint": "برای هماهنگ کردن متن اینجا کلیک کنید!",
     "loading": "در حال بارگذاری...",
