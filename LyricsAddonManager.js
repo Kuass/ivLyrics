@@ -100,7 +100,8 @@
         'line-timing-pseudo'
     ]);
     const CANONICAL_INSTRUMENTAL_BREAK_MARKER = '♪';
-    const NOTE_ONLY_INSTRUMENTAL_BREAK_PATTERN = /^[\s\u00A0\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFE0E\uFE0F\uFEFF\u2669-\u266F\u{1D100}-\u{1D1FF}\u{1F3B5}-\u{1F3BC}]+$/u;
+    const NOTE_INSTRUMENTAL_BREAK_CHARACTER_PATTERN = /[\u2669-\u266F\u{1D100}-\u{1D1FF}\u{1F3B5}-\u{1F3BC}]/u;
+    const NOTE_ONLY_INSTRUMENTAL_BREAK_PATTERN = /^[\s\u00A0\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFE0E\uFE0F\uFEFF\u2669-\u266F\u{1D100}-\u{1D1FF}\u{1F3B5}-\u{1F3BC}·•・。.、,，…⋯~〜～\-–—_|/\\:：]+$/u;
 
     function hasLyricsContent(lines) {
         return Array.isArray(lines) && lines.length > 0;
@@ -219,7 +220,8 @@
         }
         const normalized = decodeInstrumentalBreakEntities(value).trim();
         if (!normalized) return null;
-        if (NOTE_ONLY_INSTRUMENTAL_BREAK_PATTERN.test(normalized)) {
+        if (NOTE_INSTRUMENTAL_BREAK_CHARACTER_PATTERN.test(normalized)
+            && NOTE_ONLY_INSTRUMENTAL_BREAK_PATTERN.test(normalized)) {
             return CANONICAL_INSTRUMENTAL_BREAK_MARKER;
         }
 
@@ -227,7 +229,8 @@
         if (!wrapped) return null;
 
         const label = wrapped[1].normalize('NFKC').trim();
-        return NOTE_ONLY_INSTRUMENTAL_BREAK_PATTERN.test(label)
+        return NOTE_INSTRUMENTAL_BREAK_CHARACTER_PATTERN.test(label)
+            && NOTE_ONLY_INSTRUMENTAL_BREAK_PATTERN.test(label)
             ? CANONICAL_INSTRUMENTAL_BREAK_MARKER
             : null;
     }
@@ -357,11 +360,11 @@
             const directEndTime = toFiniteLyricsTime(line.endTime);
             const resolvedEndTime = timed && startTime !== null
                 ? (
-                    directEndTime !== null && directEndTime > startTime
-                        ? directEndTime
-                        : (nextStartTime !== null && nextStartTime > startTime
-                            ? nextStartTime
-                            : (durationMs !== null && durationMs > startTime ? durationMs : null))
+                    nextStartTime !== null && nextStartTime > startTime
+                        ? nextStartTime
+                        : (durationMs !== null && durationMs > startTime
+                            ? durationMs
+                            : (directEndTime !== null && directEndTime > startTime ? directEndTime : null))
                 )
                 : null;
             const textChanged = line.text !== marker

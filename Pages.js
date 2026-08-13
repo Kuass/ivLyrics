@@ -3024,7 +3024,10 @@ const getCurrentTrackDurationMs = () => {
 		return null;
 	}
 
-	return toFiniteTime(Spicetify.Player?.data?.item?.duration?.milliseconds);
+	return toFiniteTime(
+		Spicetify.Player?.data?.item?.duration?.milliseconds
+		?? Spicetify.Player?.data?.item?.metadata?.duration
+	);
 };
 
 const KARAOKE_TRAILING_INTERLUDE_DELAY_MS = 2500;
@@ -3400,11 +3403,11 @@ const getInterludeInfo = (line, nextLine = null, lineIndex = -1, lineCount = 0) 
 	const directEndTime = toFiniteTime(line?.endTime);
 	const nextStartTime = toFiniteTime(nextLine?.startTime);
 	const trackEndTime = lineIndex === Math.max(0, lineCount - 1) ? getCurrentTrackDurationMs() : null;
-	const endTime = directEndTime !== null && directEndTime > startTime
-		? directEndTime
-		: (nextStartTime !== null && nextStartTime > startTime
-			? nextStartTime
-			: (trackEndTime !== null && trackEndTime > startTime ? trackEndTime : null));
+	const endTime = nextStartTime !== null && nextStartTime > startTime
+		? nextStartTime
+		: (trackEndTime !== null && trackEndTime > startTime
+			? trackEndTime
+			: (directEndTime !== null && directEndTime > startTime ? directEndTime : null));
 	const durationMs = endTime !== null ? endTime - startTime : 0;
 
 	return {
@@ -5924,13 +5927,44 @@ const getKaraokeWordBounceValues = (position, isActive, startTime, endTime, atte
 	}
 
 	const duration = Math.max(1, endTime - startTime);
-	const progress = (position - startTime) / duration;
-	if (progress <= 0 || progress >= 1) {
+	const overlapRatio = 0.15;
+	const anticipationDuration = Math.min(
+		duration * 0.35,
+		Math.max(50, Math.min(80, duration * overlapRatio))
+	);
+	const releaseOverlapDuration = Math.min(
+		duration * 0.45,
+		Math.max(80, Math.min(120, duration * overlapRatio))
+	);
+	const animationStartTime = startTime - anticipationDuration;
+	const peakTime = startTime + duration * 0.35;
+	const animationEndTime = endTime + releaseOverlapDuration;
+	if (position <= animationStartTime || position >= animationEndTime) {
 		return KARAOKE_BOUNCE_IDLE;
 	}
 
-	const waveStrength = Math.pow(Math.sin(Math.PI * progress), 0.82)
-		* Math.max(0, Math.min(1, attenuation));
+	let waveStrength;
+	if (position < startTime) {
+		const anticipationProgress = Math.max(
+			0,
+			Math.min(1, (position - animationStartTime) / Math.max(1, anticipationDuration))
+		);
+		waveStrength = 0.22 * easeOutCubic(anticipationProgress);
+	} else if (position <= peakTime) {
+		const riseProgress = Math.max(
+			0,
+			Math.min(1, (position - startTime) / Math.max(1, peakTime - startTime))
+		);
+		waveStrength = 0.22 + 0.78 * easeOutCubic(riseProgress);
+	} else {
+		const releaseProgress = Math.max(
+			0,
+			Math.min(1, (position - peakTime) / Math.max(1, animationEndTime - peakTime))
+		);
+		waveStrength = Math.pow(1 - releaseProgress, 1.18);
+	}
+
+	waveStrength *= Math.max(0, Math.min(1, attenuation));
 	if (waveStrength < 0.025) {
 		return KARAOKE_BOUNCE_IDLE;
 	}

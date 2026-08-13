@@ -7,7 +7,8 @@
 	"use strict";
 
 	const CANONICAL_MARKER = "♪";
-	const NOTE_ONLY_PATTERN = /^[\s\u00A0\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFE0E\uFE0F\uFEFF\u2669-\u266F\u{1D100}-\u{1D1FF}\u{1F3B5}-\u{1F3BC}]+$/u;
+	const NOTE_CHARACTER_PATTERN = /[\u2669-\u266F\u{1D100}-\u{1D1FF}\u{1F3B5}-\u{1F3BC}]/u;
+	const NOTE_ONLY_PATTERN = /^[\s\u00A0\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFE0E\uFE0F\uFEFF\u2669-\u266F\u{1D100}-\u{1D1FF}\u{1F3B5}-\u{1F3BC}·•・。.、,，…⋯~〜～\-–—_|/\\:：]+$/u;
 	const WRAPPER_PAIRS = new Map([
 		["<", ">"],
 		["＜", "＞"],
@@ -64,7 +65,7 @@
 		if (!decoded) return null;
 
 		const normalized = unwrapMarker(decoded).normalize("NFKC").trim();
-		return normalized && NOTE_ONLY_PATTERN.test(normalized)
+		return normalized && NOTE_CHARACTER_PATTERN.test(normalized) && NOTE_ONLY_PATTERN.test(normalized)
 			? CANONICAL_MARKER
 			: null;
 	};

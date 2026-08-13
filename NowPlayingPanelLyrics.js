@@ -2685,7 +2685,10 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             return null;
         }
 
-        return toFiniteTime(Spicetify.Player?.data?.item?.duration?.milliseconds);
+        return toFiniteTime(
+            Spicetify.Player?.data?.item?.duration?.milliseconds
+            ?? Spicetify.Player?.data?.item?.metadata?.duration
+        );
     };
 
     const getLastSyllableEndTime = (line) => {
@@ -2706,13 +2709,20 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         return lastEndTime;
     };
 
-    const getInterludeInfo = (line, lineIndex = -1, lineCount = 0) => {
+    const getInterludeInfo = (line, nextLine = null, lineIndex = -1, lineCount = 0) => {
         const startTime = toFiniteTime(line?.startTime);
         if (startTime === null || !isInterludeMarkerText(getInterludeCandidateText(line))) {
             return { isInterlude: false, durationMs: 0 };
         }
 
-        const endTime = toFiniteTime(line?.endTime);
+        const directEndTime = toFiniteTime(line?.endTime);
+        const nextStartTime = toFiniteTime(nextLine?.startTime);
+        const trackEndTime = lineIndex === Math.max(0, lineCount - 1) ? getCurrentTrackDurationMs() : null;
+        const endTime = nextStartTime !== null && nextStartTime > startTime
+            ? nextStartTime
+            : (trackEndTime !== null && trackEndTime > startTime
+                ? trackEndTime
+                : (directEndTime !== null && directEndTime > startTime ? directEndTime : null));
         const durationMs = endTime !== null && endTime > startTime ? endTime - startTime : 0;
 
         return {
@@ -3267,7 +3277,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const lineStyle = getPanelSpeakerStyle(line?.speaker, line?.['speaker-color'], line?.['speaker-fallback']);
         const lineKindClasses = getTextEffectKindClassParts(line?.kind);
         const lineClass = `ivlyrics-panel-line ${isActive ? 'active' : ''} ${isPast ? 'past' : ''} ${isFuture ? 'future' : ''} ${isPlaceholder ? 'placeholder' : ''} ${hasVocalStack ? 'vocal-stack' : ''} ${lineKindClasses.join(' ')} ${speakerClass ? `speaker-${speakerClass}` : ''}`;
-        const interludeInfo = isPlaceholder ? { isInterlude: false, durationMs: 0 } : (line?.interludeInfo || getInterludeInfo(line, lineIndex, lineCount));
+        const interludeInfo = isPlaceholder ? { isInterlude: false, durationMs: 0 } : (line?.interludeInfo || getInterludeInfo(line, null, lineIndex, lineCount));
 
         // 노래방 가사인지 확인
         const syllables = useMemo(() => vocalRows?.[0]?.syllables || getSyllablesFromLine(line), [line, vocalRows]);
@@ -4474,7 +4484,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 .map((line, index) => ({
                     line,
                     index,
-                    interludeInfo: getInterludeInfo(line, index, lyrics.length)
+                    interludeInfo: getInterludeInfo(line, lyrics[index + 1], index, lyrics.length)
                 }))
                 .filter((entry) => !entry.interludeInfo.isInterlude || entry.index === currentIndex)
                 .flatMap((entry) => {
