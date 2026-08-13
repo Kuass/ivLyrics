@@ -41,6 +41,8 @@
 		"langs/LangTr.js",
 		"I18n.js",
 		"LyricsPresentationPublisher.js",
+		"TinySegmenter.js",
+		"LyricsWordSegmenter.js",
 		"Pages.js",
 		"VinylActiveLyricRenderer.js",
 		"VinylPlayerMode.js",

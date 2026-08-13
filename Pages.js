@@ -4099,7 +4099,7 @@ const getCachedKaraokeStateClassName = (classNames, state, isBouncing, isComplet
 	classNames[state][(isBouncing ? 2 : 0) + (isComplete ? 1 : 0)]
 );
 
-const assignKaraokeWordIndexes = (timedChars, preferSourceUnits = false) => {
+const assignKaraokeWordIndexes = (timedChars, preferSourceUnits = false, locale = "auto") => {
 	if (!Array.isArray(timedChars) || timedChars.length === 0) {
 		return timedChars;
 	}
@@ -4123,6 +4123,23 @@ const assignKaraokeWordIndexes = (timedChars, preferSourceUnits = false) => {
 
 	if (preferSourceUnits) {
 		assignFromSourceUnits();
+	} else if (window.LyricsWordSegmenter?.segmentRanges) {
+		const text = timedChars.map((charInfo) => String(charInfo?.char || "")).join("");
+		const charUtf16Offsets = [];
+		let utf16Offset = 0;
+		timedChars.forEach((charInfo) => {
+			charUtf16Offsets.push(utf16Offset);
+			utf16Offset += String(charInfo?.char || "").length;
+		});
+
+		window.LyricsWordSegmenter.segmentRanges(text, locale).forEach((segment, nextWordIndex) => {
+			for (let index = 0; index < charUtf16Offsets.length; index += 1) {
+				const charStart = charUtf16Offsets[index];
+				if (charStart >= segment.start && charStart < segment.end) {
+					wordIndexes[index] = nextWordIndex;
+				}
+			}
+		});
 	} else if (typeof Intl !== "undefined" && typeof Intl.Segmenter === "function") {
 		const text = timedChars.map((charInfo) => String(charInfo?.char || "")).join("");
 		const charUtf16Offsets = [];
@@ -4133,7 +4150,7 @@ const assignKaraokeWordIndexes = (timedChars, preferSourceUnits = false) => {
 		});
 
 		let nextWordIndex = 0;
-		for (const segment of new Intl.Segmenter(undefined, { granularity: "word" }).segment(text)) {
+		for (const segment of new Intl.Segmenter(locale === "auto" ? undefined : locale, { granularity: "word" }).segment(text)) {
 			if (!segment.segment || /^\s+$/u.test(segment.segment)) continue;
 			const segmentStart = segment.index;
 			const segmentEnd = segmentStart + segment.segment.length;
@@ -6125,6 +6142,7 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 
 	const furiganaEnabled = CONFIG?.visual?.["furigana-enabled"] === true;
 	const furiganaReady = window.FuriganaConverter?.isAvailable?.() === true;
+	const lyricsLocale = String(window.Utils?.getDetectedLanguage?.() || "auto");
 
 	const { furiganaMap, timedChars, endTime, wrapByWord, textDirection, useTextRun } = useMemo(() => {
 		const sourceSyllables = Array.isArray(line.syllables) && line.syllables.length > 0
@@ -6145,7 +6163,7 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 		const detectedTextDirection = getKaraokeTextDirection(rawLineText);
 
 		const renderTimedChars = wordTimed
-			? assignKaraokeWordIndexes(fillTimedChars, line.karaokeGranularity === "word")
+			? assignKaraokeWordIndexes(fillTimedChars, line.karaokeGranularity === "word", lyricsLocale)
 			: fillTimedChars;
 
 		return {
@@ -6161,7 +6179,7 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 			textDirection: detectedTextDirection,
 			useTextRun: shouldUseKaraokeTextRun(rawLineText),
 		};
-	}, [line, furiganaEnabled, furiganaReady, furiganaMapOverride, wordTimed]);
+	}, [line, furiganaEnabled, furiganaReady, furiganaMapOverride, wordTimed, lyricsLocale]);
 	const isComplete = isActive && position >= endTime;
 	const timedText = timedChars.map(charInfo => String(charInfo?.char || "")).join("");
 	const wordStartTimes = new Map();

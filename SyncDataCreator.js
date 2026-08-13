@@ -126,7 +126,10 @@ const getSyncCreatorWordRanges = (chars, locale = undefined) => {
 
 	let wordStarts = [];
 	try {
-		if (typeof Intl?.Segmenter === 'function') {
+		if (window.LyricsWordSegmenter?.segmentRanges) {
+			wordStarts = window.LyricsWordSegmenter.segmentRanges(text, locale || 'auto')
+				.map(segment => codeUnitToCharIndex(Number(segment.start) || 0));
+		} else if (typeof Intl?.Segmenter === 'function') {
 			const segmenter = new Intl.Segmenter(locale || undefined, { granularity: 'word' });
 			wordStarts = Array.from(segmenter.segment(text))
 				.filter(segment => segment?.isWordLike)
@@ -3819,6 +3822,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 	const lyricsLanguage = useMemo(() => {
 		if (!lyricsLines.length) return null;
+		const selectedOrDetected = String(Utils?.getDetectedLanguage?.() || '').trim();
+		if (selectedOrDetected && selectedOrDetected !== 'auto') return selectedOrDetected;
 
 		const lyricObjects = lyricsLines.map(text => ({ text }));
 		const detected = window.LyricsService?.detectLanguage?.(lyricObjects)
