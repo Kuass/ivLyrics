@@ -10523,8 +10523,6 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			),
 			I18n.t('syncCreator.back') || '닫기'
 		),
-		react.createElement('h2', { className: 'sync-creator-header-title', style: s.title }, I18n.t('syncCreator.title')),
-		react.createElement('span', { className: 'sync-creator-mode-badge', style: { ...s.modeBadge, ...getModeStyle() } }, getModeLabel()),
 		renderGranularitySelector(),
 		react.createElement('button', {
 			className: 'sync-creator-submit',
