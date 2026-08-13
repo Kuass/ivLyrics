@@ -84,7 +84,7 @@
     const DEFAULT_FONT_SCALE = 100; // 폰트 크기 배율 (50% ~ 200%)
     const DEFAULT_FONT_FAMILY = "Pretendard Variable";
     const DEFAULT_PANEL_WIDTH = 280;
-    const PANEL_LINE_TRANSITION_DURATION_MS = 820;
+    const PANEL_LINE_TRANSITION_DURATION_MS = 280;
     const PANEL_LINE_TRANSITION_EASING = "cubic-bezier(0.20, 0.70, 0.42, 0.96)";
 
     const createPanelOutsideTextOutlineShadow = (widthValue, colorValue = "#000000") => {
@@ -440,7 +440,7 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   gap: var(--ivlyrics-panel-line-stack-gap, 10px) !important;
   transform: translateY(var(--ivlyrics-panel-stack-y, 0px)) !important;
   transition:
-    transform var(--ivlyrics-panel-line-transition-duration, 820ms)
+    transform var(--ivlyrics-panel-line-transition-duration, 280ms)
       var(--ivlyrics-panel-line-transition-easing, cubic-bezier(0.20, 0.70, 0.42, 0.96)) !important;
   will-change: transform !important;
 }
@@ -3214,9 +3214,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 );
             }
 
-            const fillTimedItems = window.LyricsService?.applyLatinKaraokeFillTiming?.(items) || items;
             const wrapByWord = shouldWrapKaraokeByWord(joinedText);
-            const wordElements = fillTimedItems.map((syllable, idx) =>
+            const wordElements = items.map((syllable, idx) =>
                 react.createElement(KaraokeWord, {
                     key: keyPrefix + "-" + idx,
                     syllable,
@@ -3226,7 +3225,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 })
             );
             const renderElements = wrapByWord
-                ? buildKaraokeWordGroupElements(fillTimedItems, wordElements, keyPrefix)
+                ? buildKaraokeWordGroupElements(items, wordElements, keyPrefix)
                 : wordElements;
 
             return react.createElement("div", {

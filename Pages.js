@@ -3631,7 +3631,7 @@ const getElementOffsetTopWithin = (element, container) => {
   return (elementRect.top - containerRect.top) + (container.scrollTop || 0);
 };
 
-const LYRICS_CENTERING_DURATION_MS = 820;
+const LYRICS_CENTERING_DURATION_MS = 280;
 const LYRICS_CENTERING_BEZIER = [0.20, 0.70, 0.42, 0.96];
 const syncedLyricsScrollAnimations = new WeakMap();
 
@@ -3861,18 +3861,9 @@ const prepareGlobalCharTimeline = (lyrics) => {
 				}
 			}
 
-			const fillTimedChars = window.LyricsService?.applyLatinKaraokeFillTiming?.(sourceChars, {
-				getText: (charInfo) => charInfo?.char || "",
-				getStartTime: (charInfo) => charInfo?.startTime,
-				getEndTime: (charInfo) => charInfo?.endTime,
-			}) || sourceChars;
-			fillTimedChars.forEach((charInfo) => {
-				const charStart = Number.isFinite(charInfo?.karaokeFillStartTime)
-					? charInfo.karaokeFillStartTime
-					: charInfo.startTime;
-				const charEnd = Number.isFinite(charInfo?.karaokeFillEndTime)
-					? charInfo.karaokeFillEndTime
-					: charInfo.endTime;
+			sourceChars.forEach((charInfo) => {
+				const charStart = charInfo.startTime;
+				const charEnd = charInfo.endTime;
 				chars.push(charStart, charEnd, Math.max(1, charEnd - charStart));
 				totalChars++;
 			});
@@ -4030,6 +4021,9 @@ const applyKaraokeFillCorrectionCurve = (value) => {
 	if (normalizedValue >= 1) return 1;
 
 	const points = getKaraokeFillCorrectionPoints();
+	if (points.every((point) => Math.abs(point.y - point.x) < 0.000001)) {
+		return normalizedValue;
+	}
 	let segmentIndex = 0;
 	for (let index = 0; index < points.length - 1; index += 1) {
 		if (normalizedValue >= points[index].x && normalizedValue <= points[index + 1].x) {
@@ -5222,7 +5216,7 @@ const useSyncedLyricsEngine = ({
 				"--animation-index": Math.abs(animationIndex) + 1,
 				"--line-shift-duration": isScrolling || suppressLayoutShiftAnimation
 					? "0s"
-					: "var(--iv-lyrics-centering-duration, 820ms)",
+					: "var(--iv-lyrics-centering-duration, 280ms)",
 				"--line-shift-delay": "0s",
 				"--blur-index": Math.min(Math.abs(animationIndex), 3),
 			};
@@ -5411,7 +5405,7 @@ const useSyncedLyricsEngine = ({
 						"--animation-index": Math.abs(virtualAnimationIndex) + 1,
 						"--line-shift-duration": isScrolling || suppressLayoutShiftAnimation
 							? "0s"
-							: "var(--iv-lyrics-centering-duration, 820ms)",
+							: "var(--iv-lyrics-centering-duration, 280ms)",
 						"--line-shift-delay": "0s",
 						"--blur-index": 0,
 					},
@@ -5849,11 +5843,7 @@ const buildKaraokeVocalRowRenderData = (line, row, includeBounds) => {
 	const timedChars = applyKaraokeWhitespaceCompensation(buildKaraokeTimedChars(rowLine));
 	return {
 		line: rowLine,
-		timedChars: window.LyricsService?.applyLatinKaraokeFillTiming?.(timedChars, {
-			getText: (charInfo) => charInfo?.char || "",
-			getStartTime: (charInfo) => charInfo?.startTime,
-			getEndTime: (charInfo) => charInfo?.endTime,
-		}) || timedChars,
+		timedChars,
 		bounds: includeBounds ? getKaraokeLineBounds(rowLine) : null,
 	};
 };
@@ -6198,16 +6188,11 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 			? ""
 			: Utils.applyFuriganaIfEnabled(rawLineText);
 		const compensatedTimedChars = applyKaraokeWhitespaceCompensation(buildKaraokeTimedChars(line));
-		const fillTimedChars = window.LyricsService?.applyLatinKaraokeFillTiming?.(compensatedTimedChars, {
-			getText: (charInfo) => charInfo?.char || "",
-			getStartTime: (charInfo) => charInfo?.startTime,
-			getEndTime: (charInfo) => charInfo?.endTime,
-		}) || compensatedTimedChars;
 		const detectedTextDirection = getKaraokeTextDirection(rawLineText);
 
 		const renderTimedChars = wordTimed
-			? assignKaraokeWordIndexes(fillTimedChars, line.karaokeGranularity === "word", lyricsLocale)
-			: fillTimedChars;
+			? assignKaraokeWordIndexes(compensatedTimedChars, line.karaokeGranularity === "word", lyricsLocale)
+			: compensatedTimedChars;
 
 		return {
 			furiganaMap: furiganaMapOverride instanceof Map
