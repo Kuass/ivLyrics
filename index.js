@@ -612,9 +612,18 @@ const mergeVocalTranslationFields = (baseVocals, modeVocals, targetField, transf
   };
   const applyPart = (sourcePart, getTargetPart) => {
     const rawValue = sourcePart?.[targetField];
-    const transformedValue = transformValue(typeof rawValue === "string" ? rawValue : String(rawValue || ""));
+    const baseTargetPart = getTargetPart(baseVocals);
+    const transformedValue = transformValue(
+      typeof rawValue === "string" ? rawValue : String(rawValue || ""),
+      baseTargetPart,
+      sourcePart
+    );
     const value = typeof transformedValue === "string" ? transformedValue.trim() : String(transformedValue || "").trim();
     if (!value) {
+      if (baseTargetPart && Object.prototype.hasOwnProperty.call(baseTargetPart, targetField)) {
+        const targetPart = getTargetPart(ensureVocals());
+        if (targetPart) delete targetPart[targetField];
+      }
       return;
     }
 
@@ -690,7 +699,9 @@ const mapTranslationLinesToLyrics = (lyrics = [], linesInput = [], options = {})
 
     const requestEntries = requestResultsByLine.get(lineIndex) || [];
     const translatedText = requestEntries
-      .map((entry) => entry.resultText)
+      .map((entry) => window.ivLyricsTextComparison.areEquivalent(entry.resultText, entry.text)
+        ? ""
+        : entry.resultText)
       .filter(Boolean)
       .join(" / ");
 
@@ -698,8 +709,15 @@ const mapTranslationLinesToLyrics = (lyrics = [], linesInput = [], options = {})
     let vocals = line?.vocals;
     if (targetField && vocalEntries.length > 0 && line?.vocals?.lead) {
       vocals = cloneTranslationVocals(line.vocals);
+      delete vocals.lead[targetField];
+      if (Array.isArray(vocals.background)) {
+        vocals.background.forEach((part) => delete part[targetField]);
+      }
       vocalEntries.forEach((entry) => {
-        assignTranslationVocalResult(vocals, entry.vocalPart, targetField, entry.resultText);
+        const value = window.ivLyricsTextComparison.areEquivalent(entry.resultText, entry.text)
+          ? ""
+          : entry.resultText;
+        assignTranslationVocalResult(vocals, entry.vocalPart, targetField, value);
       });
     }
 
@@ -6266,6 +6284,26 @@ class LyricsContainer extends react.Component {
     let translationLoadingToken = null;
     let phoneticCompleted = false;
     let translationCompleted = false;
+    const regenerationToastKind = needPhonetic && needTranslation
+      ? "both"
+      : needPhonetic
+        ? "phonetic"
+        : "translation";
+    const regenerationToastStart = regenerationToastKind === "phonetic"
+      ? I18n.t("notifications.requestingPronunciation")
+      : regenerationToastKind === "both"
+        ? `${I18n.t("notifications.requestingPronunciation")} ${I18n.t("notifications.requestingTranslation")}`
+        : I18n.t("notifications.regeneratingTranslation");
+    const regenerationToastSuccess = regenerationToastKind === "translation"
+      ? I18n.t("notifications.translationRegenerated")
+      : `${regenerationToastKind === "phonetic"
+        ? I18n.t("menu.pronunciation")
+        : I18n.t("menu.regenerateBoth")} · ${I18n.t("generationStatus.complete")}`;
+    const regenerationToastFailure = regenerationToastKind === "phonetic"
+      ? I18n.t("notifications.romajiTranslationFailed")
+      : regenerationToastKind === "both"
+        ? `${I18n.t("notifications.romajiTranslationFailed")} / ${I18n.t("notifications.translationRegenerateFailed")}`
+        : I18n.t("notifications.translationRegenerateFailed");
 
     try {
       if (needPhonetic) {
@@ -6275,7 +6313,7 @@ class LyricsContainer extends react.Component {
         translationLoadingToken = this.startTranslationLoading();
       }
 
-      Toast.show(I18n.t("notifications.regeneratingTranslation"), false, 2000);
+      Toast.show(regenerationToastStart, false, 2000);
 
       // 진행 중인 동일 트랙 요청만 정리하고, 선택하지 않은 캐시 항목은 보존합니다.
       try {
@@ -6587,10 +6625,10 @@ class LyricsContainer extends react.Component {
       this.invalidateSharedLyricsPresentation(currentUri);
       // lyricsSource를 다시 호출하여 기존 로직으로 화면 및 오버레이 업데이트
       this.lyricsSource(this.state, currentMode);
-      Toast.success(I18n.t("notifications.translationRegenerated"));
+      Toast.success(regenerationToastSuccess);
     } catch (error) {
       if (this.isCurrentLyricsUri(requestUri)) {
-        Toast.error(`${I18n.t("notifications.translationRegenerateFailed")}: ${error.message}`);
+        Toast.error(`${regenerationToastFailure}: ${error.message}`);
       }
     } finally {
       if (needPhonetic) {
@@ -7751,14 +7789,10 @@ class LyricsContainer extends react.Component {
     };
 
     // Helper function to normalize text for comparison
-    const normalizeForComparison = (text) => {
-      if (!text || typeof text !== "string") return "";
-      return text
-        .toLowerCase()
-        .replace(/[^\p{L}\p{N}\s]/gu, "") // remove punctuation/symbols but keep letters/numbers of any script
-        .replace(/\s+/g, " ")
-        .trim();
-    };
+    const normalizeForComparison = (text) =>
+      window.ivLyricsTextComparison.normalize(text);
+    const areTextsEquivalent = (text1, text2) =>
+      window.ivLyricsTextComparison.areEquivalent(text1, text2);
 
     // Helper function to check if two translations are similar (>85% similarity)
     const areTranslationsSimilar = (text1, text2) => {
@@ -7766,7 +7800,7 @@ class LyricsContainer extends react.Component {
       const norm1 = normalizeForComparison(text1);
       const norm2 = normalizeForComparison(text2);
       if (!norm1 || !norm2) return false;
-      if (norm1 === norm2) return true;
+      if (areTextsEquivalent(text1, text2)) return true;
       const words1 = norm1.split(" ").filter((w) => w.length > 2);
       const words2 = norm2.split(" ").filter((w) => w.length > 2);
       if (words1.length === 0 || words2.length === 0) return false;
@@ -7813,18 +7847,17 @@ class LyricsContainer extends react.Component {
       if (isNoteLine(translation1)) translation1 = "";
       if (isNoteLine(translation2)) translation2 = "";
 
-      const normalizedOriginal = normalizeForComparison(originalText);
       const normalizedTrans1 = normalizeForComparison(translation1);
       const normalizedTrans2 = normalizeForComparison(translation2);
 
       const trans1SameAsOriginal =
-        normalizedTrans1 && normalizedTrans1 === normalizedOriginal;
+        normalizedTrans1 && areTextsEquivalent(translation1, originalText);
       const trans2SameAsOriginal =
-        normalizedTrans2 && normalizedTrans2 === normalizedOriginal;
+        normalizedTrans2 && areTextsEquivalent(translation2, originalText);
       const translationsSame =
         normalizedTrans1 &&
         normalizedTrans2 &&
-        (normalizedTrans1 === normalizedTrans2 ||
+        (areTextsEquivalent(translation1, translation2) ||
           areTranslationsSimilar(translation1, translation2));
 
       let finalText = null; // This will be phonetic (romaji/발음)
@@ -7892,12 +7925,15 @@ class LyricsContainer extends react.Component {
           finalVocals,
           modeLine?.vocals,
           targetField,
-          (value) => {
+          (value, originalPart) => {
             const processedValue = isPhoneticMode
               ? processPhoneticHyphen(value)
               : value;
             const text = String(processedValue || "").trim();
-            return isNoteLine(text) ? "" : text;
+            return isNoteLine(text)
+              || areTextsEquivalent(text, getTranslationPartText(originalPart))
+              ? ""
+              : text;
           }
         );
       };
@@ -7914,9 +7950,17 @@ class LyricsContainer extends react.Component {
         ...(line && typeof line === "object" ? line : {}),
         vocals: finalVocals,
         originalText: String(originalText),
-        phoneticText: finalText ? String(finalText) : (line?.phoneticText || null),
+        phoneticText: finalText
+          ? String(finalText)
+          : (mode1IsPhonetic || mode2IsPhonetic)
+            ? null
+            : (line?.phoneticText || null),
         text: finalText ? String(finalText) : null,
-        text2: finalText2 ? String(finalText2) : (line.text2 ? String(line.text2) : null),
+        text2: finalText2
+          ? String(finalText2)
+          : ((mode1 && !mode1IsPhonetic) || (mode2 && !mode2IsPhonetic))
+            ? null
+            : (line.text2 ? String(line.text2) : null),
       };
 
       return safeLine;

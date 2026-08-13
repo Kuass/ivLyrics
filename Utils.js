@@ -79,6 +79,33 @@ const YOUTUBE_ID_PATTERNS = [
 const IV_LYRICS_DISCORD_LOGIN_PENDING_KEY = "ivLyrics:discord-login-pending";
 const IV_LYRICS_DISCORD_LOGIN_PENDING_TTL_MS = 10 * 60 * 1000;
 const IV_LYRICS_DISCORD_CLIENT_NONCE_REGEX = /^[A-Za-z0-9_-]{43,128}$/;
+const IV_LYRICS_COMPARISON_APOSTROPHE_REGEX = /[\u0060\u00B4\u02B9\u02BB\u02BC\u02BE\u02BF\u055A\u07F4\u07F5\u2018\u2019\u201B\u2032\u275B\u275C\uFF07]/gu;
+
+const normalizeIvLyricsComparableText = (value) => String(value || "")
+  .normalize("NFKC")
+  .toLowerCase()
+  // Some apostrophe-like characters are Unicode letters, so normalize them
+  // before removing punctuation. Otherwise identical contractions can differ.
+  .replace(IV_LYRICS_COMPARISON_APOSTROPHE_REGEX, "'")
+  .replace(/[\p{P}\p{S}\p{M}\p{Cf}]/gu, "")
+  .replace(/[\s\p{Z}]+/gu, " ")
+  .trim();
+
+const areIvLyricsTextsEquivalent = (leftValue, rightValue) => {
+  const left = normalizeIvLyricsComparableText(leftValue);
+  const right = normalizeIvLyricsComparableText(rightValue);
+  if (!left || !right) return false;
+  if (left === right) return true;
+
+  // AI providers sometimes insert visual word spacing into CJK lyrics or
+  // around an apostrophe. Those spaces do not add another displayable line.
+  return left.replace(/[\s\p{Z}]+/gu, "") === right.replace(/[\s\p{Z}]+/gu, "");
+};
+
+window.ivLyricsTextComparison = Object.freeze({
+  normalize: normalizeIvLyricsComparableText,
+  areEquivalent: areIvLyricsTextsEquivalent,
+});
 
 const IV_LYRICS_DEFAULT_SPEAKER_TEXT_COLORS = {
   "MALE 1": "#a8ccff",

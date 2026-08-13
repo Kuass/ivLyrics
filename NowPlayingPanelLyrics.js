@@ -2265,11 +2265,29 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const resultsByLine = new Map();
         let phoneticIndex = 0;
         let translationIndex = 0;
-        const normalizeForComparison = (text) => String(text || '')
-            .toLowerCase()
-            .replace(/[^\p{L}\p{N}\s]/gu, '')
-            .replace(/\s+/g, ' ')
-            .trim();
+        const normalizeForComparison = (text) => {
+            if (window.ivLyricsTextComparison?.normalize) {
+                return window.ivLyricsTextComparison.normalize(text);
+            }
+            return String(text || '')
+                .normalize('NFKC')
+                .toLowerCase()
+                .replace(/[\u0060\u00B4\u02B9\u02BB\u02BC\u02BE\u02BF\u055A\u07F4\u07F5\u2018\u2019\u201B\u2032\u275B\u275C\uFF07]/gu, "'")
+                .replace(/[\p{P}\p{S}\p{M}\p{Cf}]/gu, '')
+                .replace(/[\s\p{Z}]+/gu, ' ')
+                .trim();
+        };
+        const areTextsEquivalent = (leftValue, rightValue) => {
+            if (window.ivLyricsTextComparison?.areEquivalent) {
+                return window.ivLyricsTextComparison.areEquivalent(leftValue, rightValue);
+            }
+            const left = normalizeForComparison(leftValue);
+            const right = normalizeForComparison(rightValue);
+            return !!left && !!right && (
+                left === right
+                || left.replace(/[\s\p{Z}]+/gu, '') === right.replace(/[\s\p{Z}]+/gu, '')
+            );
+        };
         const isNoteLine = (text) => {
             const value = String(text || '').trim();
             return !value || /^[\s♪♩♫♬·•・。、…~\-]+$/.test(value);
@@ -2294,17 +2312,16 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             return value;
         };
         requests.forEach((request) => {
-            const normalizedOriginal = normalizeForComparison(request.text);
             let phonetic = processPhoneticHyphen(readResultLine(phoneticLines, 'phonetic'));
             let translation = readResultLine(translationLines, 'translation');
-            if (isNoteLine(phonetic) || normalizeForComparison(phonetic) === normalizedOriginal) {
+            if (isNoteLine(phonetic) || areTextsEquivalent(phonetic, request.text)) {
                 phonetic = '';
             }
-            if (isNoteLine(translation) || normalizeForComparison(translation) === normalizedOriginal) {
+            if (isNoteLine(translation) || areTextsEquivalent(translation, request.text)) {
                 translation = '';
             }
             if (phonetic && translation &&
-                normalizeForComparison(phonetic) === normalizeForComparison(translation)) {
+                areTextsEquivalent(phonetic, translation)) {
                 phonetic = '';
             }
             const results = resultsByLine.get(request.lineIndex) || [];
@@ -2333,6 +2350,12 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                         ? line.vocals.background.map(part => ({ ...part }))
                         : []
                 };
+                delete vocals.lead.phonetic;
+                delete vocals.lead.translation;
+                vocals.background.forEach((part) => {
+                    delete part.phonetic;
+                    delete part.translation;
+                });
                 results.forEach((result) => {
                     const targetPart = result.vocalRowIndex === 0
                         ? vocals.lead
@@ -2343,11 +2366,12 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 });
             }
 
+            const hasGeneratedResults = results.length > 0;
             const phoneticText = results.map(result => result.phonetic).filter(Boolean).join(' / ')
-                || line?.phoneticText
+                || (hasGeneratedResults ? '' : line?.phoneticText)
                 || '';
             const translationText = results.map(result => result.translation).filter(Boolean).join(' / ')
-                || line?.text2
+                || (hasGeneratedResults ? '' : line?.text2)
                 || '';
 
             return {
