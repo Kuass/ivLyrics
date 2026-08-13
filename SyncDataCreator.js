@@ -45,6 +45,7 @@ const SYNC_CREATOR_DEFAULT_SPEAKER = 'NORMAL';
 const SYNC_CREATOR_DEFAULT_KIND = 'vocal';
 const SYNC_CREATOR_MAX_MERGED_LINES = 5;
 const SYNC_CREATOR_SYNC_DATA_VERSION = 4;
+const SYNC_CREATOR_SOURCE_ADDON_ID = 'lrclib';
 const SYNC_CREATOR_GRANULARITIES = new Set(['line', 'word', 'character']);
 const SYNC_CREATOR_DEFAULT_GRANULARITY = 'character';
 const SYNC_CREATOR_GRANULARITY_STORAGE_KEY = 'ivLyrics:syncCreator:granularity';
@@ -643,15 +644,6 @@ const getSyncCreatorProgressGradient = (
 ) => (
 	`linear-gradient(${direction === 'rtl' ? 'to left' : 'to right'}, ${color} 0%, ${color} ${percent}%, ${inactiveColor} ${percent}%, ${inactiveColor} 100%)`
 );
-const isSyncCreatorLyricsProvider = (addon) => (
-	Boolean(addon?.id) && addon.useIvLyricsSync !== false
-);
-const getSyncCreatorLyricsProviders = (manager) => {
-	const enabledProviders = manager?.getEnabledProviders?.();
-	return Array.isArray(enabledProviders)
-		? enabledProviders.filter(isSyncCreatorLyricsProvider)
-		: [];
-};
 const normalizeSyncCreatorIsrc = (value) => {
 	if (typeof value !== 'string') return '';
 	const normalized = value.trim().replace(/[\s-]/g, '').toUpperCase();
@@ -2520,7 +2512,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 	// 상태 관리
 	const [provider, setProvider] = useState('');   // 상세 provider (sync-data 매칭용, 예: spotify-MusixMatch)
-	const [addonId, setAddonId] = useState('');     // 실제 addon ID (가사 로드용, 예: spotify)
+	const [addonId, setAddonId] = useState(SYNC_CREATOR_SOURCE_ADDON_ID);
 	const [lyrics, setLyrics] = useState(null);
 	const [lyricsText, setLyricsText] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
@@ -2562,7 +2554,6 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const [dragStartCharIndex, setDragStartCharIndex] = useState(-1);
 	const [isDragging, setIsDragging] = useState(false);
 	const [globalOffset, setGlobalOffset] = useState(0);
-	const [availableProviders, setAvailableProviders] = useState([]);
 	const [lrclibCandidates, setLrclibCandidates] = useState([]);
 	const [selectedLrclibCandidateKey, setSelectedLrclibCandidateKey] = useState('');
 	const [selectedLrclibSource, setSelectedLrclibSource] = useState(null);
@@ -3092,7 +3083,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 		try {
 			const syntheticResult = buildSyntheticLrclibResult(candidate);
-			const applied = await applyLoadedLyricsResult(syntheticResult, 'lrclib', sourceChangeRequestId);
+			const applied = await applyLoadedLyricsResult(syntheticResult, SYNC_CREATOR_SOURCE_ADDON_ID, sourceChangeRequestId);
 			if (!applied || !isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
 			setSelectedLrclibCandidateKey(candidate.candidateKey);
 			setSelectedLrclibSourceValue(syntheticResult.lrclibSource || buildLrclibSyncSource(candidate));
@@ -3212,8 +3203,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 
 			const syntheticResult = buildSyntheticLrclibResult(decoratedCandidate);
-			setAddonId('lrclib');
-			setProviderValue('lrclib');
+			setAddonId(SYNC_CREATOR_SOURCE_ADDON_ID);
+			setProviderValue(SYNC_CREATOR_SOURCE_ADDON_ID);
 			setLrclibCandidates([decoratedCandidate]);
 			setSelectedLrclibCandidateKey(decoratedCandidate.candidateKey);
 			setPreviewLrclibCandidateKey(decoratedCandidate.candidateKey);
@@ -3226,7 +3217,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				directLrclibId: lrclibId
 			});
 			setShowLrclibCandidates(true);
-			const applied = await applyLoadedLyricsResult(syntheticResult, 'lrclib', sourceChangeRequestId);
+			const applied = await applyLoadedLyricsResult(syntheticResult, SYNC_CREATOR_SOURCE_ADDON_ID, sourceChangeRequestId);
 			if (!applied || !isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
 			setSelectedLrclibSourceValue(syntheticResult.lrclibSource || buildLrclibSyncSource(decoratedCandidate));
 			Toast.success(I18n.t('syncCreator.lrclibIdLoadSuccess') || 'Loaded lyrics from LRCLIB ID.');
@@ -4168,31 +4159,17 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		};
 	}, [trackUri]);
 
-	// Provider 목록 로드 (활성화 및 ivLyrics Sync 연동된 Provider만, 사용자 설정 순서대로)
-	useEffect(() => {
-		const loadProviders = () => {
-			setAvailableProviders(getSyncCreatorLyricsProviders(window.LyricsAddonManager));
-		};
-		loadProviders();
-
-		// 리스너 등록 (Addon이 나중에 로드될 수 있음, 활성화 상태/순서 변경도 반영)
-		if (window.LyricsAddonManager) {
-			const unsub1 = window.LyricsAddonManager.on('addon:registered', loadProviders);
-			const unsub2 = window.LyricsAddonManager.on('provider:enabled:changed', loadProviders);
-			const unsub3 = window.LyricsAddonManager.on('provider:order:changed', loadProviders);
-			return () => { unsub1(); unsub2(); unsub3(); };
-		}
-	}, []);
-
-	// 가사 로드 (Spotify -> LRCLIB 순서로 자동 시도)
-	// 가사 로드 (Spotify -> LRCLIB 순서로 자동 시도)
-	const loadLyrics = useCallback(async (preferredProvider = null) => {
+	// 새 sync-data의 원본 가사는 LRCLIB에서만 불러온다. 이미 등록된 다른
+	// 제공자의 sync-data를 재생하는 경로와는 별개인 제작 전용 제한이다.
+	const loadLyrics = useCallback(async () => {
 		const sourceChangeRequestId = beginSyncCreatorSourceChange();
 		setIsLoading(true);
 		setError(null);
 		setLyrics(null);
 		setLyricsText('');
 		setSyncData(null);
+		setAddonId(SYNC_CREATOR_SOURCE_ADDON_ID);
+		setProviderValue('');
 		setCurrentLineIndex(0);
 		setMultiVocalMode(false);
 		setManualParallelSplitDrafts({});
@@ -4209,101 +4186,53 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				Spicetify.Player?.data?.item?.artists?.[0]?.name ||
 				artistName.split(',')[0].trim();
 
-			// 선택 요청과 자동 조회 모두 ivLyrics Sync 연동 Provider만 허용한다.
-			const syncCreatorAddons = getSyncCreatorLyricsProviders(window.LyricsAddonManager);
-			if (preferredProvider && !syncCreatorAddons.some(addon => addon.id === preferredProvider)) {
-				setAddonId('');
-				setProviderValue('');
-				setError(I18n.t('syncCreator.noLyrics'));
-				if (isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) setIsLoading(false);
-				return;
-			}
-			const providersToTry = preferredProvider
-				? [preferredProvider]
-				: syncCreatorAddons.map(addon => addon.id);
-
 			let result = null;
-			let usedProvider = null;
+			const info = {
+				uri: trackInfo?.uri || Spicetify.Player?.data?.item?.uri,
+				title: trackName,
+				name: trackName,
+				artist: firstArtist,
+				album: trackInfo?.album?.name || Spicetify.Player?.data?.item?.album?.name || '',
+				duration: Spicetify.Player?.data?.item?.duration?.milliseconds || 0
+			};
+			const lrclibAddon = window.LyricsAddonManager?.getAddon?.(SYNC_CREATOR_SOURCE_ADDON_ID);
+			window.__ivLyricsDebugLog?.('[SyncDataCreator] Trying fixed provider:', SYNC_CREATOR_SOURCE_ADDON_ID);
 
-			for (const tryProvider of providersToTry) {
-				const info = {
-					uri: trackInfo?.uri || Spicetify.Player?.data?.item?.uri,
-					title: trackName,
-					name: trackName,
-					artist: tryProvider === 'lrclib' ? firstArtist : artistName,
-					album: trackInfo?.album?.name || Spicetify.Player?.data?.item?.album?.name || '',
-					duration: Spicetify.Player?.data?.item?.duration?.milliseconds || 0
-				};
-
-				// Provider ID 그대로 사용
-				let realProvider = tryProvider;
-
-				// Legacy compatibility for spotify-xxx IDs if needed, but per user request, we trust the ID.
-				// However, if the old Providers object is used, we might need adjustment. 
-				// But we prioritize LyricsAddonManager now.
-
-				window.__ivLyricsDebugLog?.('[SyncDataCreator] Trying provider:', tryProvider);
-
-				try {
-					if (realProvider === 'lrclib' && window.LyricsAddonManager?.getAddon) {
-						const lrclibAddon = window.LyricsAddonManager.getAddon(realProvider);
-						if (typeof lrclibAddon?.searchCandidates === 'function') {
-							const searchResult = await lrclibAddon.searchCandidates(info);
-							if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
-							if (!searchResult?.success) {
-								throw new Error(searchResult?.error || 'No lyrics found');
-							}
-
-							const candidates = Array.isArray(searchResult.candidates) ? searchResult.candidates : [];
-							const selectedCandidate = candidates.find(candidate => candidate.candidateKey === searchResult.selectedCandidateKey)
-								|| candidates[0]
-								|| null;
-
-							if (!selectedCandidate) {
-								throw new Error('No ranked LRCLIB candidates');
-							}
-
-							setLrclibCandidates(candidates);
-							setSelectedLrclibCandidateKey(selectedCandidate.candidateKey);
-							setPreviewLrclibCandidateKey(selectedCandidate.candidateKey);
-							setLrclibSearchMeta(searchResult);
-							setShowLrclibCandidates(true);
-							result = buildSyntheticLrclibResult(selectedCandidate);
-						} else {
-							result = await window.LyricsAddonManager.getLyricsFrom(realProvider, info);
-							if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
-						}
-						if (result && result.error) throw new Error(result.error);
-					} else if (window.LyricsAddonManager) {
-						result = await window.LyricsAddonManager.getLyricsFrom(realProvider, info);
-						if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
-						if (result && result.error) throw new Error(result.error);
-					} else if (typeof Providers !== 'undefined' && Providers[realProvider]) {
-						result = await Providers[realProvider](info);
-						if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
-					} else if (typeof LyricsService !== 'undefined' && LyricsService.getLyrics) {
-						result = await LyricsService.getLyrics(info, realProvider);
-						if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
-					}
-
-					if (result && (result.synced || result.unsynced)) {
-						usedProvider = tryProvider;
-						window.__ivLyricsDebugLog?.('[SyncDataCreator] Found lyrics from:', tryProvider);
-						break;
-					}
-				} catch (providerError) {
-					if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
-					window.__ivLyricsDebugLog?.('[SyncDataCreator] Provider', tryProvider, 'failed:', providerError.message);
+			if (typeof lrclibAddon?.searchCandidates === 'function') {
+				const searchResult = await lrclibAddon.searchCandidates(info);
+				if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
+				if (!searchResult?.success) {
+					throw new Error(searchResult?.error || 'No lyrics found');
 				}
+
+				const candidates = Array.isArray(searchResult.candidates) ? searchResult.candidates : [];
+				const selectedCandidate = candidates.find(candidate => candidate.candidateKey === searchResult.selectedCandidateKey)
+					|| candidates[0]
+					|| null;
+				if (!selectedCandidate) throw new Error('No ranked LRCLIB candidates');
+
+				setLrclibCandidates(candidates);
+				setSelectedLrclibCandidateKey(selectedCandidate.candidateKey);
+				setPreviewLrclibCandidateKey(selectedCandidate.candidateKey);
+				setLrclibSearchMeta(searchResult);
+				setShowLrclibCandidates(true);
+				result = buildSyntheticLrclibResult(selectedCandidate);
+			} else if (window.LyricsAddonManager?.getLyricsFrom) {
+				result = await window.LyricsAddonManager.getLyricsFrom(SYNC_CREATOR_SOURCE_ADDON_ID, info);
+				if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
+			} else if (typeof Providers !== 'undefined' && Providers[SYNC_CREATOR_SOURCE_ADDON_ID]) {
+				result = await Providers[SYNC_CREATOR_SOURCE_ADDON_ID](info);
+				if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
+			} else {
+				throw new Error('LRCLIB provider is unavailable');
 			}
+
+			if (result?.error) throw new Error(result.error);
 
 			if (result && (result.synced || result.unsynced)) {
-				await applyLoadedLyricsResult(result, usedProvider, sourceChangeRequestId);
+				await applyLoadedLyricsResult(result, SYNC_CREATOR_SOURCE_ADDON_ID, sourceChangeRequestId);
 			} else {
 				if (!isCurrentSyncCreatorSourceChange(sourceChangeRequestId)) return;
-				// 만약 수동 선택했는데 실패했으면 provider는 그 선택한걸로 유지해서 UI에 보여줌?
-				// 아니면 실패 메시지 띄우고 provider는 유지
-				if (preferredProvider) setProviderValue(preferredProvider);
 				setError(I18n.t('syncCreator.noLyrics'));
 			}
 		} catch (e) {
@@ -7313,6 +7242,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		);
 		const restoredProvider = String(record.provider || record.lrclibSource?.provider || '').trim();
 		const restoredAddonId = String(record.addonId || restoredProvider.split('-')[0] || '').trim();
+		if (restoredAddonId.toLowerCase() !== SYNC_CREATOR_SOURCE_ADDON_ID) {
+			throw new Error('Only LRCLIB Sync Creator sessions can be restored.');
+		}
 		const validatedRecord = {
 			...record,
 			draft: {
@@ -7324,7 +7256,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (options.automatic === true && sessionAutoRecoveryBlockedRef.current) return null;
 
 		setProviderValue(restoredProvider);
-		setAddonId(restoredAddonId);
+		setAddonId(SYNC_CREATOR_SOURCE_ADDON_ID);
 		setLyrics({
 			provider: restoredProvider,
 			synced: restoredLines,
@@ -9566,6 +9498,12 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		sourceTrack: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', minWidth: 0 },
 		sourceAlbumArt: { width: '52px', height: '52px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0, boxShadow: '0 8px 24px rgba(0,0,0,0.36)' },
 		sourceControls: { display: 'flex', flexDirection: 'column', gap: '6px' },
+		sourceProvider: {
+			display: 'flex', alignItems: 'center', gap: '8px',
+			minHeight: '34px', padding: '0 11px', borderRadius: '10px',
+			background: 'rgba(255,255,255,0.035)', border: `1px solid ${TOSS_BORDER}`
+		},
+		sourceProviderName: { fontSize: '12px', fontWeight: '700', color: 'var(--spice-text)' },
 		sourceButtonRow: { display: 'grid', gridTemplateColumns: '1fr', gap: '6px' },
 		fullWidthButton: { width: '100%', justifyContent: 'center' },
 		lrclibIdBox: {
@@ -10246,30 +10184,17 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			)
 		),
 		react.createElement('div', { style: s.sourceControls },
-			react.createElement('select', {
-				style: { ...s.select, width: '100%' },
-				value: addonId || '',
-				onChange: (e) => {
-					const newAddonId = e.target.value;
-					if (newAddonId) {
-						setAddonId(newAddonId);
-						loadLyrics(newAddonId);
-					}
-				}
-			},
-				[
-					react.createElement('option', { key: 'default', value: '', disabled: true }, I18n.t('syncCreator.selectProvider') || '제공자 선택...'),
-					...availableProviders.map(p => react.createElement('option', { key: p.id, value: p.id }, p.name))
-				]
+			react.createElement('div', { style: s.sourceProvider },
+				react.createElement('span', { style: s.sourceProviderName }, 'LRCLIB')
 			),
 			react.createElement('div', { style: s.sourceButtonRow },
 				react.createElement('button', {
 					style: { ...s.loadBtn, ...s.fullWidthButton, opacity: isLoading ? 0.5 : 1 },
-					onClick: () => loadLyrics(addonId),
+					onClick: loadLyrics,
 					disabled: isLoading
 				}, isLoading ? I18n.t('syncCreator.loading') : I18n.t('syncCreator.reload') || '다시 로드')
 			),
-			addonId === 'lrclib' && react.createElement('div', { style: s.lrclibIdBox },
+			addonId === SYNC_CREATOR_SOURCE_ADDON_ID && react.createElement('div', { style: s.lrclibIdBox },
 				react.createElement('div', { style: s.lrclibIdLabel }, I18n.t('syncCreator.lrclibIdLabel') || 'LRCLIB ID'),
 				react.createElement('div', { style: s.lrclibIdRow },
 					react.createElement('input', {
@@ -10442,7 +10367,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		)
 	);
 
-	const renderLrclibCandidatesPanel = () => addonId === 'lrclib' && react.createElement('div', {
+	const renderLrclibCandidatesPanel = () => addonId === SYNC_CREATOR_SOURCE_ADDON_ID && react.createElement('div', {
 		className: 'sync-creator-candidate-section',
 		style: { ...s.candidatePanel, padding: '14px 18px', borderRadius: 0 }
 	},
@@ -10604,7 +10529,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		error && react.createElement('div', { style: { ...s.error, display: 'flex', flexDirection: 'column', alignItems: 'center' } },
 			react.createElement('div', null, error)
 		),
-		!isLoading && !error && !lyricsText && react.createElement('div', { style: s.loading }, I18n.t('syncCreator.selectProvider')),
+		!isLoading && !error && !lyricsText && react.createElement('div', { style: s.loading }, I18n.t('syncCreator.loadLyrics')),
 		lyricsText && lyricsLines.length > 0 && react.createElement('div', { style: s.stageBody },
 			react.createElement('div', { style: s.lineNav },
 				react.createElement('button', { style: { ...s.navBtn, opacity: previousNavigableLineIndex < 0 ? 0.3 : 1 }, onClick: goToPrevLine, disabled: previousNavigableLineIndex < 0 }, '‹'),
@@ -11165,25 +11090,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			),
 			react.createElement('div', { style: s.providerRow },
 				react.createElement('span', { style: { fontSize: '12px', color: 'var(--spice-subtext)' } }, 'Provider:'),
-				react.createElement('select', {
-					style: s.select,
-					value: addonId || '',
-					onChange: (e) => {
-						const newAddonId = e.target.value;
-						if (newAddonId) {
-							setAddonId(newAddonId);
-							loadLyrics(newAddonId);
-						}
-					}
-				},
-					[
-						react.createElement('option', { key: 'default', value: '', disabled: true }, I18n.t('syncCreator.selectProvider') || '제공자 선택...'),
-						...availableProviders.map(p =>
-							react.createElement('option', { key: p.id, value: p.id }, p.name)
-						)
-					]
-				),
-				react.createElement('button', { style: { ...s.loadBtn, opacity: isLoading ? 0.5 : 1 }, onClick: () => loadLyrics(addonId), disabled: isLoading },
+				react.createElement('span', { style: s.virtualKaraokeBadge }, 'LRCLIB'),
+				react.createElement('button', { style: { ...s.loadBtn, opacity: isLoading ? 0.5 : 1 }, onClick: loadLyrics, disabled: isLoading },
 					isLoading ? I18n.t('syncCreator.loading') : I18n.t('syncCreator.reload') || '다시 로드'
 				),
 				lyricsLines.length > 0 && react.createElement('button', {
@@ -11232,7 +11140,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			)
 		),
 
-		addonId === 'lrclib' && react.createElement('div', { style: s.candidatePanel },
+		addonId === SYNC_CREATOR_SOURCE_ADDON_ID && react.createElement('div', { style: s.candidatePanel },
 			react.createElement('div', { style: s.candidatePanelHeader },
 				react.createElement('div', { style: s.candidatePanelTitle },
 					`${I18n.t('syncCreator.lrclibSearchResults') || 'LRCLIB Search Results'} ${(lrclibSearchMeta?.totalResults || lrclibCandidates.length || 0) > 0 ? `(${lrclibSearchMeta?.totalResults || lrclibCandidates.length})` : ''}`
@@ -11366,7 +11274,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			error && react.createElement('div', { style: { ...s.error, display: 'flex', flexDirection: 'column', alignItems: 'center' } },
 				react.createElement('div', null, error)
 			),
-			!isLoading && !error && !lyricsText && react.createElement('div', { style: s.loading }, I18n.t('syncCreator.selectProvider')),
+			!isLoading && !error && !lyricsText && react.createElement('div', { style: s.loading }, I18n.t('syncCreator.loadLyrics')),
 
 			lyricsText && lyricsLines.length > 0 && react.createElement(react.Fragment, null,
 				// Line Navigation (이전/다음 버튼)

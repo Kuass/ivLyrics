@@ -70,7 +70,6 @@
             unsynced: true
         },
         supportsLocalTracks: true,
-        useIvLyricsSync: false,
         icon: 'M5 4a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm14 0a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM5 14a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm14 0a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM8 7h8v2H8V7zm0 8h8v2H8v-2z'
     };
 

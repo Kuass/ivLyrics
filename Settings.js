@@ -1417,7 +1417,7 @@ const getLyricsProviderGranularitySupport = (provider) => {
   }
   const legacyGeneric = declared.size === 0 && provider?.supports?.karaoke === true;
   return {
-    character: provider?.useIvLyricsSync === true || declared.has('character') || legacyGeneric,
+    character: declared.has('character') || legacyGeneric,
     word: declared.has('word') || legacyGeneric
   };
 };
@@ -1457,9 +1457,6 @@ const LyricsProviderCard = ({ provider, isEnabled, onToggle, isExpanded, onExpan
     }
     if (provider.supports?.unsynced) {
       badges.push(react.createElement(ProviderSupportIconChip, { key: "unsynced", type: "unsynced", label: I18n.t("settings.lyricsProviders.supports.unsynced") || "Plain" }));
-    }
-    if (provider.useIvLyricsSync) {
-      badges.push(react.createElement(ProviderSupportIconChip, { key: "ivsync", type: "ivsync", label: I18n.t("settings.lyricsProviders.supports.ivLyricsSync") || "ivLyrics Sync" }));
     }
     return badges;
   };
@@ -1519,7 +1516,6 @@ const LyricsProviderCard = ({ provider, isEnabled, onToggle, isExpanded, onExpan
         .map((lyricsType) =>
           `${lyricsType} ${I18n.t(`settings.lyricsProviders.types.${lyricsType}`) || ""}`
         ),
-      provider.useIvLyricsSync ? "ivLyrics Sync" : "",
     ].filter(Boolean).join(" "),
   },
     // 카드 헤더

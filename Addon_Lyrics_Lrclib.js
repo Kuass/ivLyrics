@@ -266,9 +266,6 @@
         // Spotify 트랙 ID 없이 제목/아티스트/앨범/재생 시간으로 검색 가능
         supportsLocalTracks: true,
 
-        // 【ivLyrics Sync 통합】 true면 커뮤니티 싱크 데이터 자동 적용
-        useIvLyricsSync: true,
-
         // 【아이콘】 SVG path 데이터 - LRC 파일을 나타내는 문서 아이콘
         icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM8 12h8v2H8v-2zm0 4h8v2H8v-2zm0-8h3v2H8V8z'
     };

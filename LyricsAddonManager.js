@@ -16,6 +16,7 @@
     const STORAGE_PREFIX = 'ivLyrics:lyrics:';
     const PREFER_SYNC_DATA_PROVIDER_SETTING = 'prefer-sync-data-provider';
     const PREFER_SYNC_DATA_PROVIDER_STORAGE_KEY = `ivLyrics:visual:${PREFER_SYNC_DATA_PROVIDER_SETTING}`;
+    const LRCLIB_PROVIDER_ID = 'lrclib';
     const PREFER_LYRICS_TYPE_OVER_PROVIDER_ORDER_SETTING = 'prefer-lyrics-type-over-provider-order';
     const PREFER_LYRICS_TYPE_OVER_PROVIDER_ORDER_STORAGE_KEY = `ivLyrics:visual:${PREFER_LYRICS_TYPE_OVER_PROVIDER_ORDER_SETTING}`;
     const getStoredValue = (key) => window.ivLyricsStoragePersistence
@@ -988,22 +989,25 @@
                     : await this._getAvailableSyncDataProviderIds(trackId, trackIsrc, info);
                 if (preferredAddonIds.size === 0) return providers;
 
+                const lrclibPreferred = [];
                 const preferred = [];
                 const remaining = [];
                 for (const provider of providers) {
                     const addonId = getLyricsAddonIdForSyncProvider(provider?.id);
                     const typeSettings = this._getProviderTypeSettings(provider);
-                    const canUseSyncData = provider?.useIvLyricsSync !== false
-                        && typeSettings[LYRICS_TYPES.CHARACTER] !== false;
-                    if (canUseSyncData && preferredAddonIds.has(addonId)) {
-                        preferred.push(provider);
+                    if (typeSettings[LYRICS_TYPES.CHARACTER] !== false && preferredAddonIds.has(addonId)) {
+                        if (addonId === LRCLIB_PROVIDER_ID) {
+                            lrclibPreferred.push(provider);
+                        } else {
+                            preferred.push(provider);
+                        }
                     } else {
                         remaining.push(provider);
                     }
                 }
 
-                if (preferred.length === 0) return providers;
-                const prioritizedProviders = [...preferred, ...remaining];
+                if (lrclibPreferred.length === 0 && preferred.length === 0) return providers;
+                const prioritizedProviders = [...lrclibPreferred, ...preferred, ...remaining];
                 console.info('[ivLyrics sync-data]', 'LyricsAddonManager:provider-priority', {
                     isrc: trackIsrc,
                     syncProviders: Array.from(preferredAddonIds),
@@ -1088,12 +1092,13 @@
             const karaokeFallback = legacyKaraoke === null || legacyKaraoke === undefined
                 ? true
                 : legacyKaraoke !== false;
+            const declaredGranularities = getDeclaredKaraokeGranularities(provider);
+            const hasNativeCharacterLyrics = declaredGranularities.has(LYRICS_TYPES.CHARACTER)
+                || (declaredGranularities.size === 0 && provider?.supports?.karaoke === true);
             return {
-                [LYRICS_TYPES.CHARACTER]: this.getAddonSetting(
-                    provider.id,
-                    'enable_character',
-                    karaokeFallback
-                ) !== false,
+                [LYRICS_TYPES.CHARACTER]: hasNativeCharacterLyrics
+                    ? this.getAddonSetting(provider.id, 'enable_character', karaokeFallback) !== false
+                    : true,
                 [LYRICS_TYPES.WORD]: this.getAddonSetting(
                     provider.id,
                     'enable_word',
@@ -1109,8 +1114,7 @@
 
             if (KARAOKE_GRANULARITIES.has(lyricsType)) {
                 const addonId = getLyricsAddonIdForSyncProvider(provider?.id);
-                const hasKnownSyncData = provider?.useIvLyricsSync !== false
-                    && syncDataProviderIds instanceof Set
+                const hasKnownSyncData = syncDataProviderIds instanceof Set
                     && syncDataProviderIds.has(addonId);
                 if (lyricsType === LYRICS_TYPES.CHARACTER && hasKnownSyncData) {
                     return true;
@@ -1319,7 +1323,7 @@
                 || this._isPseudoKaraoke(result)
             );
             const hasBaseLyrics = resultHasSynced || resultHasUnsynced;
-            const useIvLyricsSync = provider.useIvLyricsSync !== false;
+            const shouldApplyRegisteredSyncData = needsCharacterKaraoke && hasBaseLyrics;
 
             window.__ivLyricsDebugLog?.(`[LyricsAddonManager] Got lyrics from: ${provider.id}`, {
                 hasKaraoke: resultHasKaraoke,
@@ -1330,7 +1334,7 @@
             console.info('[ivLyrics sync-data]', 'LyricsAddonManager:sync-check', {
                 providerId: provider.id,
                 resultProvider: result.provider || null,
-                useIvLyricsSync,
+                shouldApplyRegisteredSyncData,
                 allowCharacter,
                 allowWord,
                 hasKaraoke: resultHasKaraoke,
@@ -1343,7 +1347,7 @@
                 hasSyncDataService: !!window.SyncDataService?.getSyncData
             });
 
-            if (useIvLyricsSync && needsCharacterKaraoke && hasBaseLyrics) {
+            if (shouldApplyRegisteredSyncData) {
                 if ((trackId || trackIsrc) && window.SyncDataService?.getSyncData) {
                     try {
                         const syncProvider = result.provider || provider.id;
@@ -1384,7 +1388,7 @@
                     } catch (error) {
                         console.warn('[LyricsAddonManager] Failed to get sync-data:', error);
                     }
-                } else if (provider.useIvLyricsSync && window.LyricsService?.applyIvLyricsSyncData) {
+                } else if (window.LyricsService?.applyIvLyricsSyncData) {
                     try {
                         const karaokeBeforeSyncData = result.karaoke;
                         const syncedBeforeSyncData = result.synced;
@@ -1758,8 +1762,7 @@
                 if (!addon.supports) return false;
                 const declaredGranularities = getDeclaredKaraokeGranularities(addon);
                 if (normalizedType === LYRICS_TYPES.CHARACTER) {
-                    return addon.useIvLyricsSync === true
-                        || declaredGranularities.has(LYRICS_TYPES.CHARACTER)
+                    return declaredGranularities.has(LYRICS_TYPES.CHARACTER)
                         || (declaredGranularities.size === 0 && addon.supports.karaoke === true);
                 }
                 if (normalizedType === LYRICS_TYPES.WORD) {

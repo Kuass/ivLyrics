@@ -75,7 +75,6 @@
             unsynced: true
         },
         supportsLocalTracks: true,
-        useIvLyricsSync: false,
         icon: 'M9 3v10.55A4 4 0 1 0 11 17V7h6V3H9v10a4 4 0 1 0 2 3.45V7h4v6a4 4 0 1 0 2 3.45V3H9z'
     };
 
