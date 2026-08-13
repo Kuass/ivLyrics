@@ -3482,7 +3482,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
 
     const getPanelStackTranslateY = (wrapper) => {
         const stack = wrapper?.querySelector('.ivlyrics-panel-lines-stack');
-        const currentCell = wrapper?.querySelector('.ivlyrics-panel-line-cell.current');
+        const currentCell = wrapper?.querySelector('.ivlyrics-panel-line-cell.visual-anchor')
+            || wrapper?.querySelector('.ivlyrics-panel-line-cell.current');
         if (!stack || !currentCell) return null;
 
         const wrapperCenter = wrapper.clientHeight / 2;
@@ -3531,6 +3532,51 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         return translateY;
     };
 
+    const getPanelTimedLineIndex = (lyrics, time) => {
+        let left = 0;
+        let right = lyrics.length - 1;
+        let result = 0;
+
+        while (left <= right) {
+            const mid = left + ((right - left) >>> 1);
+            const startTime = lyrics[mid]?.startTime;
+
+            if (startTime === undefined || startTime <= time) {
+                result = mid;
+                left = mid + 1;
+            } else {
+                right = mid - 1;
+            }
+        }
+
+        return result;
+    };
+
+    const getPrecenteredPanelLineIndex = (lyrics, time, activeLineIndex, advanceMs) => {
+        if (!Array.isArray(lyrics) || lyrics.length === 0 || advanceMs <= 0) {
+            return activeLineIndex;
+        }
+
+        const advancedLineIndex = getPanelTimedLineIndex(lyrics, time + advanceMs);
+        return Math.min(
+            lyrics.length - 1,
+            activeLineIndex + 1,
+            Math.max(activeLineIndex, advancedLineIndex)
+        );
+    };
+
+    const getPanelTrailingInterludeState = (lineIndex, interludeInfo, time, advanceMs) => {
+        const key = getTrailingKaraokeInterludeKey(lineIndex, interludeInfo);
+        if (!key || time >= interludeInfo.endTime) {
+            return { activeKey: null, visualKey: null };
+        }
+
+        return {
+            activeKey: time >= interludeInfo.startTime ? key : null,
+            visualKey: time >= interludeInfo.startTime - Math.max(0, advanceMs) ? key : null
+        };
+    };
+
     // ============================================
     // 패널 가사 메인 컴포넌트
     // ============================================
@@ -3548,7 +3594,9 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const [lyrics, setLyrics] = useState(initialLyrics);
         const [karaokeSource, setKaraokeSource] = useState(initialKaraokeSource);
         const [currentIndex, setCurrentIndex] = useState(0);
+        const [visualIndex, setVisualIndex] = useState(0);
         const [activeTrailingInterludeKey, setActiveTrailingInterludeKey] = useState(null);
+        const [visualTrailingInterludeKey, setVisualTrailingInterludeKey] = useState(null);
         // currentTime은 더 이상 상태로 관리하지 않음 - 전역 변수 사용
         const [trackOffset, setTrackOffset] = useState(0); // 곡별 싱크 오프셋
         const [globalOffset, setGlobalOffset] = useState(() => window.Utils?.getGlobalSyncOffset?.() || 0);
@@ -3560,6 +3608,11 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const [textEffectRevision, setTextEffectRevision] = useState(0);
         const [, setMotionRevision] = useState(0);
         const [isPlaybackPaused, setIsPlaybackPaused] = useState(getPlaybackPaused);
+        const reducePanelMotion = isPanelMotionReduced();
+        const hasKaraokeTiming = useMemo(() => lyrics.some((line) => (
+            (Array.isArray(line?.syllables) && line.syllables.length > 0)
+            || (Array.isArray(line?.vocals?.lead?.syllables) && line.vocals.lead.syllables.length > 0)
+        )), [lyrics]);
         const containerRef = useRef(null);
         const scrollRef = useRef(null);
         const previousLyricsLayoutRef = useRef(initialLyrics);
@@ -3750,7 +3803,9 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                             presentationComplete: false
                         });
                         setCurrentIndex(0);
+                        setVisualIndex(0);
                         setActiveTrailingInterludeKey(null);
+                        setVisualTrailingInterludeKey(null);
 
                         // 곡별 싱크 오프셋은 가사 스냅샷 재사용 여부와 무관하게 복원한다.
                         await loadTrackOffset(trackUri);
@@ -4039,7 +4094,9 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 setLyrics([]);
                 setKaraokeSource(null);
                 setCurrentIndex(0);
+                setVisualIndex(0);
                 setActiveTrailingInterludeKey(null);
+                setVisualTrailingInterludeKey(null);
                 setTrackOffset(0);
                 currentLyricsState.lyrics = [];
                 currentLyricsState.currentIndex = 0;
@@ -4071,6 +4128,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 if (event.detail?.name === 'instrumental-break-auto-detect') {
                     setAutoInstrumentalBreakEnabled(isAutoInstrumentalBreakEnabled());
                     setActiveTrailingInterludeKey(null);
+                    setVisualTrailingInterludeKey(null);
                 }
                 if (event.detail?.name === 'karaoke-text-effects' ||
                     event.detail?.name === 'sync-data-custom-speaker-colors-enabled') {
@@ -4488,44 +4546,14 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         // 최적화: setInterval 사용 (30ms), LocalStorage 캐싱, 이진 탐색
         useEffect(() => {
             let lastIndex = currentIndex;
+            let lastVisualIndex = visualIndex;
             let lastTrailingInterludeKey = null;
+            let lastVisualTrailingInterludeKey = null;
             let intervalId = null;
             let cachedDelay = null;
             let lastTrackUri = null;
             const UPDATE_INTERVAL = 30; // 업데이트 간격 (ms) - RAF보다 CPU 효율적
             const resolveTrailingInterludeInfo = createTrailingKaraokeInterludeResolver(lyrics);
-
-            // 이진 탐색으로 현재 라인 찾기 (O(log n))
-            const findCurrentLine = (time) => {
-                let left = 0;
-                let right = lyrics.length - 1;
-                let result = 0;
-
-                if (right <= 0) {
-                    if (right === 0) {
-                        // Preserve the original property access and comparison coercion.
-                        const startTime = lyrics[0].startTime;
-                        if (startTime !== undefined) {
-                            void (startTime <= time);
-                        }
-                    }
-                    return result;
-                }
-
-                while (left <= right) {
-                    const mid = left + ((right - left) >>> 1);
-                    const startTime = lyrics[mid].startTime;
-
-                    if (startTime === undefined || startTime <= time) {
-                        result = mid;
-                        left = mid + 1;
-                    } else {
-                        right = mid - 1;
-                    }
-                }
-
-                return result;
-            };
 
             const updatePosition = () => {
                 if (!lyrics || lyrics.length === 0) {
@@ -4560,24 +4588,47 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 window._ivLyricsPanelCurrentTime = adjustedPosition;
 
                 // 현재 라인 찾기 (이진 탐색)
-                const newIndex = findCurrentLine(adjustedPosition);
+                const newIndex = getPanelTimedLineIndex(lyrics, adjustedPosition);
+                const newVisualIndex = hasKaraokeTiming && !reducePanelMotion
+                    ? getPrecenteredPanelLineIndex(
+                        lyrics,
+                        adjustedPosition,
+                        newIndex,
+                        PANEL_LINE_TRANSITION_DURATION_MS
+                    )
+                    : newIndex;
                 const trailingInterludeInfo = resolveTrailingInterludeInfo(newIndex);
-                const nextTrailingInterludeKey = trailingInterludeInfo.isInterlude &&
-                    adjustedPosition >= trailingInterludeInfo.startTime &&
-                    adjustedPosition < trailingInterludeInfo.endTime
-                    ? getTrailingKaraokeInterludeKey(newIndex, trailingInterludeInfo)
-                    : null;
+                const visualInterludeAdvanceMs = hasKaraokeTiming && !reducePanelMotion
+                    ? PANEL_LINE_TRANSITION_DURATION_MS
+                    : 0;
+                const trailingInterludeState = getPanelTrailingInterludeState(
+                    newIndex,
+                    trailingInterludeInfo,
+                    adjustedPosition,
+                    visualInterludeAdvanceMs
+                );
+                const nextTrailingInterludeKey = trailingInterludeState.activeKey;
+                const nextVisualTrailingInterludeKey = trailingInterludeState.visualKey;
                 const lineChanged = newIndex !== lastIndex;
                 const trailingInterludeChanged = nextTrailingInterludeKey !== lastTrailingInterludeKey;
+                const visualTrailingInterludeChanged = nextVisualTrailingInterludeKey !== lastVisualTrailingInterludeKey;
 
                 // 라인이 변경될 때만 상태 업데이트 (리렌더링 최소화)
                 if (lineChanged) {
                     lastIndex = newIndex;
                     setCurrentIndex(newIndex);
                 }
+                if (newVisualIndex !== lastVisualIndex) {
+                    lastVisualIndex = newVisualIndex;
+                    setVisualIndex(newVisualIndex);
+                }
                 if (trailingInterludeChanged) {
                     lastTrailingInterludeKey = nextTrailingInterludeKey;
                     setActiveTrailingInterludeKey(nextTrailingInterludeKey);
+                }
+                if (visualTrailingInterludeChanged) {
+                    lastVisualTrailingInterludeKey = nextVisualTrailingInterludeKey;
+                    setVisualTrailingInterludeKey(nextVisualTrailingInterludeKey);
                 }
 
                 // 활성 라인만 구독하므로 매 tick 연속 fill을 갱신해도 비용이 제한된다.
@@ -4598,7 +4649,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 // 전역 변수 정리
                 window._ivLyricsPanelCurrentTime = 0;
             };
-        }, [lyrics, isEnabled, trackOffset, globalOffset, karaokeSource, pseudoKaraokeAdvanceMs, autoInstrumentalBreakEnabled]); // currentIndex 의존성 제거
+        }, [lyrics, isEnabled, trackOffset, globalOffset, karaokeSource, pseudoKaraokeAdvanceMs, autoInstrumentalBreakEnabled, hasKaraokeTiming, reducePanelMotion]); // currentIndex 의존성 제거
 
         // 스크롤 애니메이션 비활성화 - Now Playing 탭 스크롤 문제 방지
         // useEffect(() => {
@@ -4628,14 +4679,18 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     index,
                     interludeInfo: getInterludeInfo(line, lyrics[index + 1], index, lyrics.length)
                 }))
-                .filter((entry) => !entry.interludeInfo.isInterlude || entry.index === currentIndex)
+                .filter((entry) => (
+                    !entry.interludeInfo.isInterlude
+                    || entry.index === currentIndex
+                    || entry.index === visualIndex
+                ))
                 .flatMap((entry) => {
                     const trailingInterludeInfo = entry.index === currentIndex
                         ? getTrailingKaraokeInterludeInfo(entry.line, lyrics[entry.index + 1], entry.index, lyrics.length)
                         : null;
                     const trailingInterludeKey = getTrailingKaraokeInterludeKey(entry.index, trailingInterludeInfo);
 
-                    if (!trailingInterludeKey || trailingInterludeKey !== activeTrailingInterludeKey) {
+                    if (!trailingInterludeKey || trailingInterludeKey !== visualTrailingInterludeKey) {
                         return [entry];
                     }
 
@@ -4658,18 +4713,21 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                         }
                     ];
                 });
-            const currentDisplayIndex = Math.max(
+            const visualDisplayIndex = Math.max(
                 0,
-                displayableLyrics.findIndex((entry) => activeTrailingInterludeKey
+                displayableLyrics.findIndex((entry) => visualTrailingInterludeKey
+                    && visualIndex === currentIndex
                     ? entry.isVirtualTrailingInterlude
-                    : entry.index === currentIndex)
+                    : entry.index === visualIndex)
             );
 
             return displayableLyrics.map((entry, displayIndex) => {
                 const i = entry.sourceIndex ?? entry.index;
                 const line = entry.line;
                 const isVirtualTrailingInterlude = entry.isVirtualTrailingInterlude === true;
-                const relativeIndex = displayIndex - currentDisplayIndex;
+                const isVirtualTrailingInterludeActive = isVirtualTrailingInterlude
+                    && activeTrailingInterludeKey === visualTrailingInterludeKey;
+                const relativeIndex = displayIndex - visualDisplayIndex;
 
                 return {
                     index: entry.index,
@@ -4679,14 +4737,17 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     originalText: line?.originalText || line?.text || '',
                     phonetic: line?.phoneticText || ((line?.originalText && line?.text !== line?.originalText) ? line?.text : ''),
                     translation: line?.text2 || '',
-                    isActive: isVirtualTrailingInterlude || (i === currentIndex && !activeTrailingInterludeKey),
+                    isActive: isVirtualTrailingInterludeActive || (i === currentIndex && !activeTrailingInterludeKey),
+                    isVisualAnchor: visualTrailingInterludeKey && visualIndex === currentIndex
+                        ? isVirtualTrailingInterlude
+                        : !isVirtualTrailingInterlude && i === visualIndex,
                     isPast: !isVirtualTrailingInterlude && (i < currentIndex || (i === currentIndex && !!activeTrailingInterludeKey)),
                     isFuture: i > currentIndex,
                     isPlaceholder: false,
                     isLayoutHidden: Math.abs(relativeIndex) > halfLines
                 };
             });
-        }, [lyrics, currentIndex, visibleLineCount, activeTrailingInterludeKey, autoInstrumentalBreakEnabled]);
+        }, [lyrics, currentIndex, visualIndex, visibleLineCount, activeTrailingInterludeKey, visualTrailingInterludeKey, autoInstrumentalBreakEnabled]);
 
         // currentTime은 더 이상 상태로 관리하지 않음 (전역 변수 window._ivLyricsPanelCurrentTime 사용)
 
@@ -4714,7 +4775,6 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const panelBgType = getStorageValue(BG_TYPE_KEY, DEFAULT_BG_TYPE);
         const usesBlurGradientPanelBg = panelBgType === 'album' || panelBgType === 'gradient';
         const usesTransparentPanelBg = panelBgType === 'transparent';
-        const reducePanelMotion = isPanelMotionReduced();
         const sectionClassName = `${PANEL_SECTION_CLASS}${isPlaybackPaused ? " playback-paused" : ""}${usesBlurGradientPanelBg ? " blur-gradient-bg" : ""}${usesTransparentPanelBg ? " transparent-bg" : ""}${reducePanelMotion ? " motion-reduced" : ""}`;
         const panelBackgroundLayer = usesBlurGradientPanelBg
             ? react.createElement("div", {
@@ -4776,6 +4836,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             panelLines,
             lyrics,
             currentIndex,
+            visualIndex,
             activeTrailingInterludeKey,
             fontScale,
             panelLineSlotHeight,
@@ -4805,7 +4866,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 frameId = requestAnimationFrame(updateStackPosition);
             };
             const scheduleAnchorUpdate = () => {
-                const currentCell = wrapper.querySelector('.ivlyrics-panel-line-cell.current');
+                const currentCell = wrapper.querySelector('.ivlyrics-panel-line-cell.visual-anchor')
+                    || wrapper.querySelector('.ivlyrics-panel-line-cell.current');
                 const anchorStack = currentCell?.querySelector('[data-panel-vocal-anchor-position]');
                 const anchorPosition = anchorStack?.getAttribute('data-panel-vocal-anchor-position') || '';
                 const anchorRowCount = anchorStack?.getAttribute('data-panel-vocal-row-count') || '';
@@ -4824,7 +4886,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 observer = new ResizeObserver(scheduleUpdate);
                 observer.observe(wrapper);
                 const stack = wrapper.querySelector('.ivlyrics-panel-lines-stack');
-                const currentCell = wrapper.querySelector('.ivlyrics-panel-line-cell.current');
+                const currentCell = wrapper.querySelector('.ivlyrics-panel-line-cell.visual-anchor')
+                    || wrapper.querySelector('.ivlyrics-panel-line-cell.current');
                 const currentAnchor = currentCell?.querySelector?.('.ivlyrics-panel-current-anchor');
                 if (stack) observer.observe(stack);
                 if (currentCell) observer.observe(currentCell);
@@ -4844,7 +4907,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 window.removeEventListener('resize', scheduleUpdate);
                 window.removeEventListener('ivlyrics-panel-anchor-update', scheduleAnchorUpdate);
             };
-        }, [panelLines, currentIndex, activeTrailingInterludeKey, fontScale, panelLineSlotHeight, instrumentalBreakRevision, textEffectRevision]);
+        }, [panelLines, currentIndex, visualIndex, activeTrailingInterludeKey, fontScale, panelLineSlotHeight, instrumentalBreakRevision, textEffectRevision]);
         const renderPanelLine = (panelLine, keyPrefix) => react.createElement(LyricLine, {
             key: `${keyPrefix}-${panelLine.index}`,
             line: panelLine.line,
@@ -4899,7 +4962,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     panelLines.map((panelLine) =>
                         react.createElement("div", {
                             key: `cell-${panelLine.index}`,
-                            className: `ivlyrics-panel-line-cell${panelLine.isActive ? " current ivlyrics-panel-current-line" : ""}${panelLine.isLayoutHidden ? " layout-hidden" : ""}`,
+                            className: `ivlyrics-panel-line-cell${panelLine.isActive ? " current ivlyrics-panel-current-line" : ""}${panelLine.isVisualAnchor ? " visual-anchor" : ""}${panelLine.isLayoutHidden ? " layout-hidden" : ""}`,
                             "data-panel-line-key": String(panelLine.index)
                         },
                             renderPanelLine(panelLine, "stack")

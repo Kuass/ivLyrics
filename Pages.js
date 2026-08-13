@@ -3485,17 +3485,23 @@ const createActiveTrailingKaraokeInterludeLine = ({
 	position = 0,
 	isActiveLine = false,
 	isKara = false,
+	activationAdvanceMs = 0,
 }) => {
 	if (!isKara || !isActiveLine || line?.interludeInfo?.isInterlude) {
 		return null;
 	}
 
 	const interludeInfo = getTrailingKaraokeInterludeInfo(line, nextLine, lineIndex, lineCount);
+	const previewStartTime = interludeInfo.startTime !== null
+		? interludeInfo.startTime - Math.max(0, activationAdvanceMs)
+		: null;
 	if (
 		!interludeInfo.isInterlude ||
 		interludeInfo.startTime === null ||
 		interludeInfo.endTime === null ||
-		!isTrailingKaraokeInterludePositionActive(interludeInfo, position)
+		previewStartTime === null ||
+		position < previewStartTime ||
+		(interludeInfo.kind !== "postlude" && position >= interludeInfo.endTime)
 	) {
 		return null;
 	}
@@ -3508,6 +3514,7 @@ const createActiveTrailingKaraokeInterludeLine = ({
 		text2: "",
 		interludeInfo,
 		isVirtualTrailingInterlude: true,
+		isPrecentered: !isTrailingKaraokeInterludePositionActive(interludeInfo, position),
 	};
 };
 
@@ -4487,8 +4494,10 @@ const buildPaddedSyncedLyrics = (lyrics, leadingEmptyLines) =>
 			lineNumber,
 		}));
 
-const shouldIncludeSyncedLineInCompactView = (line, activeLineIndex) =>
-	!line?.interludeInfo?.isInterlude || line.lineNumber === activeLineIndex;
+const shouldIncludeSyncedLineInCompactView = (line, activeLineIndex, visualLineIndex = activeLineIndex) =>
+	!line?.interludeInfo?.isInterlude
+	|| line.lineNumber === activeLineIndex
+	|| line.lineNumber === visualLineIndex;
 
 const getActiveTimedLineIndex = (lines, position) => {
 	for (let i = lines.length - 1; i >= 0; i--) {
@@ -4499,6 +4508,21 @@ const getActiveTimedLineIndex = (lines, position) => {
 	}
 
 	return 0;
+};
+
+const getPrecenteredTimedLineIndex = (lines, position, activeLineIndex, advanceMs) => {
+	if (!Array.isArray(lines) || lines.length === 0 || advanceMs <= 0) {
+		return activeLineIndex;
+	}
+
+	const advancedLineIndex = getActiveTimedLineIndex(lines, position + advanceMs);
+	// A very short lyric can put multiple starts inside the pre-centering window.
+	// Advance by at most one row so an intermediate line is never skipped visually.
+	return Math.min(
+		lines.length - 1,
+		activeLineIndex + 1,
+		Math.max(activeLineIndex, advancedLineIndex)
+	);
 };
 
 const getSyncedAnimationIndex = ({ compact, isScrolling, activeLineIndex, lineNumber, visibleIndex }) => {
@@ -4887,6 +4911,20 @@ const useSyncedLyricsEngine = ({
 		() => getActiveTimedLineIndex(paddedLyrics, position),
 		[paddedLyrics, position]
 	);
+	const shouldPrecenterKaraokeTransitions = isKara
+		&& !isScrolling
+		&& CONFIG.visual["karaoke-line-transition"]
+		&& !prefersReducedLyricsMotion();
+	const visualLineIndex = useMemo(() => {
+		return shouldPrecenterKaraokeTransitions
+			? getPrecenteredTimedLineIndex(
+				paddedLyrics,
+				position,
+				activeLineIndex,
+				LYRICS_CENTERING_DURATION_MS
+			)
+			: activeLineIndex;
+	}, [paddedLyrics, position, activeLineIndex, shouldPrecenterKaraokeTransitions, settingsRevision]);
 
 	const compactDisplayLines = useMemo(() => {
 		if (!compact || isScrolling) {
@@ -4894,12 +4932,12 @@ const useSyncedLyricsEngine = ({
 		}
 
 		return paddedLyrics
-			.filter((line) => shouldIncludeSyncedLineInCompactView(line, activeLineIndex))
+			.filter((line) => shouldIncludeSyncedLineInCompactView(line, activeLineIndex, visualLineIndex))
 			.map((line, displayLineNumber) => ({
 				...line,
 				displayLineNumber,
 			}));
-	}, [compact, isScrolling, paddedLyrics, activeLineIndex]);
+	}, [compact, isScrolling, paddedLyrics, activeLineIndex, visualLineIndex]);
 
 	const activeDisplayLineIndex = useMemo(() => {
 		if (!compact || isScrolling) {
@@ -4910,13 +4948,22 @@ const useSyncedLyricsEngine = ({
 		return index >= 0 ? index : Math.min(activeLineIndex, Math.max(0, compactDisplayLines.length - 1));
 	}, [compact, isScrolling, compactDisplayLines, activeLineIndex]);
 
+	const visualDisplayLineIndex = useMemo(() => {
+		if (!compact || isScrolling) {
+			return visualLineIndex;
+		}
+
+		const index = compactDisplayLines.findIndex((line) => line.lineNumber === visualLineIndex);
+		return index >= 0 ? index : Math.min(visualLineIndex, Math.max(0, compactDisplayLines.length - 1));
+	}, [compact, isScrolling, compactDisplayLines, visualLineIndex]);
+
 	const compactWindowStartIndex = useMemo(() => {
 		if (!compact) {
 			return 0;
 		}
 
-		return Math.max(activeDisplayLineIndex - CONFIG.visual["lines-before"], 0);
-	}, [compact, activeDisplayLineIndex]);
+		return Math.max(visualDisplayLineIndex - CONFIG.visual["lines-before"], 0);
+	}, [compact, visualDisplayLineIndex]);
 
 	const linesToRender = useMemo(() => {
 		if (!compact || isScrolling) {
@@ -4925,17 +4972,7 @@ const useSyncedLyricsEngine = ({
 
 		return compactDisplayLines;
 	}, [compact, isScrolling, paddedLyrics, compactDisplayLines]);
-	const compactAnchorIndex = compact
-		? Math.min(CONFIG.visual["lines-before"], leadingEmptyLines)
-		: activeLineIndex;
-	const activeElementIndex = compact
-		? (isScrolling
-			? activeLineIndex
-			: Math.max(Math.min(activeDisplayLineIndex, CONFIG.visual["lines-before"]), compactAnchorIndex))
-		: activeLineIndex;
-	const visualAnchorLineNumber = compact && activeLineIndex < leadingEmptyLines
-		? leadingEmptyLines
-		: activeLineIndex;
+	const visualAnchorLineNumber = visualLineIndex;
 
 	const globalCharTimeline = useMemo(() => {
 		if (!isKara) {
@@ -4952,7 +4989,7 @@ const useSyncedLyricsEngine = ({
 	), [globalCharTimeline, position]);
 
 	const activeSourceLineIndex = activeLineIndex - leadingEmptyLines;
-	const activeTrailingInterludeLine = useMemo(() => (
+	const trailingInterludeLine = useMemo(() => (
 		activeSourceLineIndex >= 0
 			? createActiveTrailingKaraokeInterludeLine({
 				line: preparedLyrics[activeSourceLineIndex],
@@ -4962,12 +4999,19 @@ const useSyncedLyricsEngine = ({
 				position,
 				isActiveLine: true,
 				isKara,
+				activationAdvanceMs: shouldPrecenterKaraokeTransitions
+					? LYRICS_CENTERING_DURATION_MS
+					: 0,
 			})
 			: null
-	), [activeSourceLineIndex, preparedLyrics, position, isKara]);
-	const activeTrailingInterludeKey = activeTrailingInterludeLine
-		? `${activeTrailingInterludeLine.startTime}:${activeTrailingInterludeLine.endTime}`
+	), [activeSourceLineIndex, preparedLyrics, position, isKara, shouldPrecenterKaraokeTransitions]);
+	const isTrailingInterludeActive = !!trailingInterludeLine
+		&& trailingInterludeLine.isPrecentered !== true;
+	const trailingInterludeKey = trailingInterludeLine
+		? `${trailingInterludeLine.startTime}:${trailingInterludeLine.endTime}:${isTrailingInterludeActive ? "active" : "preview"}`
 		: "";
+	const visualAnchorUsesTrailingInterlude = !!trailingInterludeLine
+		&& visualLineIndex === activeLineIndex;
 
 	// Was invoked inline on every render — and position updates trigger a render every
 	// frame, so this layout read fired 60 times/sec and forced a synchronous reflow
@@ -5034,7 +5078,7 @@ const useSyncedLyricsEngine = ({
 
   useSyncedLayoutEffect(() => {
           syncCompactOffset();
-  }, [syncCompactOffset, activeLineIndex, activeTrailingInterludeKey, containerReady, lyricsId, preparedLyrics, settingsRevision, anchorRevision]);
+  }, [syncCompactOffset, visualLineIndex, trailingInterludeKey, containerReady, lyricsId, preparedLyrics, settingsRevision, anchorRevision]);
 
 	useSyncedLayoutEffect(() => {
 		if (!compact || isScrolling || typeof ResizeObserver === "undefined") {
@@ -5087,7 +5131,7 @@ const useSyncedLyricsEngine = ({
 				cancelRaf(frameId);
 			}
 		};
-  }, [compact, isScrolling, activeLineIndex, activeTrailingInterludeKey, containerReady, lyricsId, preparedLyrics, settingsRevision, anchorRevision, syncCompactOffset]);
+  }, [compact, isScrolling, visualLineIndex, trailingInterludeKey, containerReady, lyricsId, preparedLyrics, settingsRevision, anchorRevision, syncCompactOffset]);
 
 	useEffect(() => {
 		const actualIndex = Math.max(0, activeLineIndex - leadingEmptyLines);
@@ -5118,7 +5162,7 @@ const useSyncedLyricsEngine = ({
 		}
 
 		return undefined;
-	}, [compact, activeLineIndex, isScrolling, containerRef, activeLineRef, activeTrailingInterludeKey, preparedLyrics]);
+	}, [compact, visualLineIndex, isScrolling, containerRef, activeLineRef, trailingInterludeKey, preparedLyrics]);
 
 	useEffect(() => {
 		if (compact || !isScrolling || !activeLineRef.current) {
@@ -5130,7 +5174,7 @@ const useSyncedLyricsEngine = ({
 		}, 0);
 
 		return () => clearTimeout(timeoutId);
-	}, [compact, activeLineIndex, isScrolling, containerRef, activeLineRef, activeTrailingInterludeKey, preparedLyrics]);
+	}, [compact, activeLineIndex, isScrolling, containerRef, activeLineRef, trailingInterludeKey, preparedLyrics]);
 
 	useEffect(() => {
 		if (compact || isScrolling || typeof ResizeObserver === "undefined") {
@@ -5182,14 +5226,14 @@ const useSyncedLyricsEngine = ({
 				cancelRaf(frameId);
 			}
 		};
-	}, [compact, isScrolling, activeLineIndex, activeTrailingInterludeKey, containerRef, activeLineRef, preparedLyrics]);
+	}, [compact, isScrolling, visualLineIndex, trailingInterludeKey, containerRef, activeLineRef, preparedLyrics]);
 
 	const stableLineStyles = useMemo(() => {
 		if (compact && isScrolling) {
 			return null;
 		}
 
-		const hasActiveTrailingInterlude = !!activeTrailingInterludeLine;
+		const hasTrailingInterlude = !!trailingInterludeLine;
 		return linesToRender.map((line, visibleIndex) => {
 			const {
 				lineNumber = visibleIndex,
@@ -5201,11 +5245,11 @@ const useSyncedLyricsEngine = ({
 			let animationIndex = getSyncedAnimationIndex({
 				compact,
 				isScrolling,
-				activeLineIndex: compact && !isScrolling ? activeDisplayLineIndex : activeLineIndex,
+				activeLineIndex: compact && !isScrolling ? visualDisplayLineIndex : visualLineIndex,
 				lineNumber: compact && !isScrolling ? displayLineNumber : lineNumber,
 				visibleIndex: compactVisibleIndex,
 			});
-			if (hasActiveTrailingInterlude && lineNumber <= activeLineIndex) {
+			if (hasTrailingInterlude && lineNumber <= activeLineIndex) {
 				animationIndex -= 1;
 			}
 
@@ -5226,9 +5270,10 @@ const useSyncedLyricsEngine = ({
 		compact,
 		isScrolling,
 		activeLineIndex,
-		activeDisplayLineIndex,
+		visualLineIndex,
+		visualDisplayLineIndex,
 		compactWindowStartIndex,
-		activeTrailingInterludeKey,
+		trailingInterludeKey,
 		suppressLayoutShiftAnimation,
 		settingsRevision,
 	]);
@@ -5296,7 +5341,7 @@ const useSyncedLyricsEngine = ({
 							subText: null,
 							subText2: null,
 							isActiveLine: true,
-							trackLineRef: true,
+							trackLineRef: visualAnchorUsesTrailingInterlude,
 							canSeek: false,
 							karaokeActive: false,
 							globalCharOffset: 0,
@@ -5348,21 +5393,28 @@ const useSyncedLyricsEngine = ({
 			let animationIndex = getSyncedAnimationIndex({
 				compact,
 				isScrolling,
-				activeLineIndex: compact && !isScrolling ? activeDisplayLineIndex : activeLineIndex,
+				activeLineIndex: compact && !isScrolling ? visualDisplayLineIndex : visualLineIndex,
 				lineNumber: compact && !isScrolling ? displayLineNumber : lineNumber,
 				visibleIndex: compactVisibleIndex,
 			});
-			if (activeTrailingInterludeLine && lineNumber <= activeLineIndex) {
+			if (trailingInterludeLine && lineNumber <= activeLineIndex) {
 				animationIndex -= 1;
 			}
+			const visibilityAnimationIndex = compact && !isScrolling
+				? displayLineNumber - activeDisplayLineIndex
+				: animationIndex;
 			let className = `lyrics-lyricsContainer-LyricsLine ${getKaraokeLineMetaClass(line)}`;
-			const isCurrentRenderedLine = isActiveLine && !activeTrailingInterludeLine;
+			const isCurrentRenderedLine = isActiveLine && !isTrailingInterludeActive;
 			if (isCurrentRenderedLine) {
 				className += " lyrics-lyricsContainer-LyricsLine-active";
 			}
-			if (shouldHideSyncedLine({ compact, isScrolling, animationIndex })) {
+			if (lineNumber !== visualAnchorLineNumber && shouldHideSyncedLine({
+				compact,
+				isScrolling,
+				animationIndex: visibilityAnimationIndex,
+			})) {
 				className += " lyrics-lyricsContainer-LyricsLine-paddingLine";
-				className += animationIndex < 0
+				className += visibilityAnimationIndex < 0
 					? " lyrics-lyricsContainer-LyricsLine-paddingBefore"
 					: " lyrics-lyricsContainer-LyricsLine-paddingAfter";
 			}
@@ -5379,26 +5431,26 @@ const useSyncedLyricsEngine = ({
 				subText,
 				subText2,
 				isActiveLine: isCurrentRenderedLine,
-				trackLineRef: isCurrentRenderedLine && lineNumber === visualAnchorLineNumber,
+				trackLineRef: !visualAnchorUsesTrailingInterlude && lineNumber === visualAnchorLineNumber,
 				canSeek: lineNumber >= leadingEmptyLines && Number.isFinite(startTime),
-				karaokeActive: isCurrentRenderedLine && (compact ? compactVisibleIndex === activeElementIndex : isActiveLine),
+				karaokeActive: isCurrentRenderedLine,
 				globalCharOffset: lineNumber >= leadingEmptyLines && lineNumber - leadingEmptyLines < globalCharOffsets.length
 					? globalCharOffsets[lineNumber - leadingEmptyLines]
 					: 0,
 				activeGlobalCharIndex: isCurrentRenderedLine ? activeGlobalCharIndex : -1,
 			};
 
-			if (!activeTrailingInterludeLine || lineNumber !== activeLineIndex) {
+			if (!trailingInterludeLine || lineNumber !== activeLineIndex) {
 				return [item];
 			}
 
-			const virtualAnimationIndex = 0;
+			const virtualAnimationIndex = visualAnchorUsesTrailingInterlude ? 0 : -1;
 			return [
 				item,
 				{
 					type: "line",
-					key: `trailing-interlude-${lineNumber}-${activeTrailingInterludeLine.startTime}`,
-					className: "lyrics-lyricsContainer-LyricsLine lyrics-lyricsContainer-LyricsLine-active",
+					key: `trailing-interlude-${lineNumber}-${trailingInterludeLine.startTime}`,
+					className: `lyrics-lyricsContainer-LyricsLine${isTrailingInterludeActive ? " lyrics-lyricsContainer-LyricsLine-active" : ""}`,
 					style: {
 						cursor: "default",
 						"--position-index": virtualAnimationIndex,
@@ -5409,14 +5461,14 @@ const useSyncedLyricsEngine = ({
 						"--line-shift-delay": "0s",
 						"--blur-index": 0,
 					},
-					line: activeTrailingInterludeLine,
-					startTime: activeTrailingInterludeLine.startTime,
+					line: trailingInterludeLine,
+					startTime: trailingInterludeLine.startTime,
 					originalText: "",
 					mainText: "",
 					subText: null,
 					subText2: null,
-					isActiveLine: true,
-					trackLineRef: true,
+					isActiveLine: isTrailingInterludeActive,
+					trackLineRef: visualAnchorUsesTrailingInterlude,
 					canSeek: false,
 					karaokeActive: false,
 					globalCharOffset: 0,
@@ -5435,10 +5487,14 @@ const useSyncedLyricsEngine = ({
 		paddedLyrics,
 		isScrolling,
 		isKara,
-		activeElementIndex,
 		activeDisplayLineIndex,
+		visualLineIndex,
+		visualDisplayLineIndex,
 		compactWindowStartIndex,
 		visualAnchorLineNumber,
+		visualAnchorUsesTrailingInterlude,
+		trailingInterludeKey,
+		isTrailingInterludeActive,
 		globalCharOffsets,
 		activeGlobalCharIndex,
 		stableLineStyles,
