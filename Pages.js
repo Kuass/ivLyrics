@@ -4296,10 +4296,8 @@ const buildKaraokeWordElements = (
 				: charInfo?.endTime;
 			return Number.isFinite(value) ? Math.max(maximum, value) : maximum;
 		}, -Infinity);
-		const centerIndex = globalCharOffset + currentWordStart + Math.max(0, currentWord.length - 1) / 2;
-		const attenuation = getKaraokeBounceAttenuation(centerIndex, activeGlobalCharIndex);
 		const bounce = wordTimed && Number.isFinite(startTime) && Number.isFinite(endTime)
-			? getKaraokeWordBounceValues(position, isActive, startTime, endTime, attenuation)
+			? getKaraokeWordBounceValues(position, isActive, startTime, endTime)
 			: { active: false };
 		const style = bounce.active ? {
 			"--karaoke-bounce-y": `${bounce.offsetY}px`,
@@ -4369,7 +4367,7 @@ const getKaraokeSegmentFill = (segment, position, isActive, isComplete) => {
 	if (isComplete) {
 		return 100;
 	}
-	if (!isActive || !segment) {
+	if (!segment) {
 		return 0;
 	}
 
@@ -4389,7 +4387,7 @@ const getKaraokeSegmentFill = (segment, position, isActive, isComplete) => {
 
 const getKaraokeInstantWordFill = (segment, position, isActive, isComplete) => {
 	if (isComplete) return 100;
-	if (!isActive || !segment) return 0;
+	if (!segment) return 0;
 	const startTime = Number.isFinite(segment.startTime) ? segment.startTime : 0;
 	return position >= startTime ? 100 : 0;
 };
@@ -4505,7 +4503,9 @@ const buildKaraokeTextRunElements = (
 		const gradientDirection = segmentDirection === "rtl" ? "to left" : "to right";
 		const segmentState = fillValue <= 0 ? "pending" : fillValue >= 100 ? "done" : "active";
 		const segmentCenterIndex = globalCharOffset + segment.startIndex + Math.max(0, segment.text.length - 1) / 2;
-		const bounceAttenuation = getKaraokeBounceAttenuation(segmentCenterIndex, activeGlobalCharIndex);
+		const bounceAttenuation = wordTimed
+			? 1
+			: getKaraokeBounceAttenuation(segmentCenterIndex, activeGlobalCharIndex);
 		const bounce = wordTimed
 			? getKaraokeWordBounceValues(position, isActive, segment.startTime, segment.endTime, bounceAttenuation)
 			: getKaraokeBounceValues(position, isActive, segment.startTime, segment.endTime, bounceAttenuation);
@@ -4528,6 +4528,7 @@ const buildKaraokeTextRunElements = (
 			bounce.active,
 			isComplete
 		);
+		if (wordTimed) segmentClassName += " is-word-timed";
 		if (segment.styleKind || segment.styleSpeaker) {
 			const kindClasses = getKaraokeKindClassParts(segment.styleKind);
 			segmentClassName += ` ivlyrics-karaoke-range-style${kindClasses.length ? ` ${kindClasses.join(' ')}` : ''}`;
@@ -5072,6 +5073,10 @@ const useSyncedLyricsEngine = ({
 			return paddedLyrics;
 		}
 
+		// Keep stable keyed rows mounted so their translateY values can interpolate
+		// across the 280 ms pre-center hand-off. CSS suppresses compositor layers and
+		// effects for hidden rows, which retains the performance gain without turning
+		// a line transition into a remount/snap.
 		return compactDisplayLines;
 	}, [compact, isScrolling, paddedLyrics, compactDisplayLines]);
 	const visualAnchorLineNumber = visualLineIndex;
@@ -6090,9 +6095,9 @@ const getKaraokeBounceAttenuation = (globalCharIndex, activeGlobalCharIndex) => 
 	return Math.max(0.22, 1 - distance * 0.23);
 };
 
-const getKaraokeCharFill = (position, isActive, startTime, endTime) => {
-	if (!isActive) {
-		return 0;
+const getKaraokeCharFill = (position, isActive, startTime, endTime, isComplete = false) => {
+	if (isComplete) {
+		return 1;
 	}
 	if (position <= startTime) {
 		return 0;
@@ -6150,46 +6155,36 @@ const getKaraokeBounceValues = (position, isActive, startTime, endTime, attenuat
 };
 
 const getKaraokeWordBounceValues = (position, isActive, startTime, endTime, attenuation = 1) => {
-	if (!CONFIG.visual["karaoke-bounce"] || !isActive || attenuation <= 0) {
+	if (!CONFIG.visual["karaoke-bounce"] || attenuation <= 0) {
 		return KARAOKE_BOUNCE_IDLE;
 	}
 
 	const duration = Math.max(1, endTime - startTime);
-	const overlapRatio = 0.15;
-	const anticipationDuration = Math.min(
-		duration * 0.35,
-		Math.max(50, Math.min(80, duration * overlapRatio))
-	);
-	const releaseOverlapDuration = Math.min(
-		duration * 0.45,
-		Math.max(80, Math.min(120, duration * overlapRatio))
-	);
-	const animationStartTime = startTime - anticipationDuration;
-	const peakTime = startTime + duration * 0.35;
-	const animationEndTime = endTime + releaseOverlapDuration;
-	if (position <= animationStartTime || position >= animationEndTime) {
+	const riseDuration = Math.min(180, Math.max(60, duration * 0.38));
+	const releaseDuration = Math.min(280, Math.max(180, duration * 0.45));
+	const peakTime = Math.min(endTime, startTime + riseDuration);
+	const animationEndTime = endTime + releaseDuration;
+	if (position < startTime || position >= animationEndTime) {
 		return KARAOKE_BOUNCE_IDLE;
 	}
 
 	let waveStrength;
-	if (position < startTime) {
-		const anticipationProgress = Math.max(
-			0,
-			Math.min(1, (position - animationStartTime) / Math.max(1, anticipationDuration))
-		);
-		waveStrength = 0.22 * easeOutCubic(anticipationProgress);
-	} else if (position <= peakTime) {
+	if (position <= peakTime) {
 		const riseProgress = Math.max(
 			0,
 			Math.min(1, (position - startTime) / Math.max(1, peakTime - startTime))
 		);
-		waveStrength = 0.22 + 0.78 * easeOutCubic(riseProgress);
+		waveStrength = easeOutCubic(riseProgress);
+	} else if (position <= endTime) {
+		// Keep the word lifted for its full playback window. The following word can
+		// rise while this one is still up, which avoids the stop-and-go motion.
+		waveStrength = 1;
 	} else {
 		const releaseProgress = Math.max(
 			0,
-			Math.min(1, (position - peakTime) / Math.max(1, animationEndTime - peakTime))
+			Math.min(1, (position - endTime) / Math.max(1, releaseDuration))
 		);
-		waveStrength = Math.pow(1 - releaseProgress, 1.18);
+		waveStrength = Math.pow(1 - releaseProgress, 1.25);
 	}
 
 	waveStrength *= Math.max(0, Math.min(1, attenuation));
@@ -6370,7 +6365,10 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 			preserveInlineStyles: !KARAOKE_JOINING_SCRIPT_REGEX.test(rawLineText),
 		};
 	}, [line, furiganaEnabled, furiganaReady, furiganaMapOverride, wordTimed, lyricsLocale]);
-	const isComplete = isActive && position >= endTime;
+	// Keep completed glyphs on the active paint path while the parent line fades
+	// out. Gating this by isActive made the fill disappear in a single frame at
+	// every line hand-off.
+	const isComplete = endTime > 0 && position >= endTime;
 	const timedText = timedChars.map(charInfo => String(charInfo?.char || "")).join("");
 	const wordStartTimes = new Map();
 	if (wordTimed) {
@@ -6436,7 +6434,8 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 				position,
 				isActive,
 				Number.isFinite(charInfo?.karaokeFillStartTime) ? charInfo.karaokeFillStartTime : charInfo.startTime,
-				Number.isFinite(charInfo?.karaokeFillEndTime) ? charInfo.karaokeFillEndTime : charInfo.endTime
+				Number.isFinite(charInfo?.karaokeFillEndTime) ? charInfo.karaokeFillEndTime : charInfo.endTime,
+				isComplete
 			);
 		const charState = fillRatio <= 0 ? "pending" : fillRatio >= 1 ? "done" : "active";
 		const globalCharIndex = globalCharOffset + index;
