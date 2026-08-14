@@ -3143,7 +3143,7 @@ const areKaraokeTextEffectsEnabled = () => (
 
 const getKaraokeKindClassParts = (kind) => {
 	const kindClass = String(kind || "").trim().toLowerCase();
-	if (!kindClass) {
+	if (!kindClass || (kindClass !== "vocal" && !KARAOKE_TEXT_EFFECT_KIND_CLASSES.has(kindClass))) {
 		return [];
 	}
 
@@ -3158,9 +3158,12 @@ const getKaraokeLineMetaClass = (line) => {
 	const classes = [];
 	const speakerClass = normalizeKaraokeSpeakerClass(line?.speaker, line?.['speaker-color'], line?.['speaker-fallback']);
 	if (speakerClass) classes.push(`speaker-${speakerClass}`);
-	const hasInlineStyles = Array.isArray(line?.syllables)
-		&& line.syllables.some(syllable => syllable?.inlineStyle === true);
-	if (line?.kind && !hasInlineStyles) classes.push(...getKaraokeKindClassParts(line.kind));
+	const hasInlineEffects = Array.isArray(line?.syllables)
+		&& line.syllables.some(syllable => (
+			syllable?.inlineStyle === true
+			&& KARAOKE_TEXT_EFFECT_KIND_CLASSES.has(String(syllable?.styleKind || "").trim().toLowerCase())
+		));
+	if (line?.kind && !hasInlineEffects) classes.push(...getKaraokeKindClassParts(line.kind));
 	return classes.join(" ");
 };
 
@@ -4175,6 +4178,95 @@ const assignKaraokeWordIndexes = (timedChars, preferSourceUnits = false, locale 
 	}));
 };
 
+const getKaraokeInlineStylePresentation = (charInfo) => {
+	if (charInfo?.inlineStyle !== true) return null;
+
+	const kind = String(charInfo?.styleKind || "").trim().toLowerCase();
+	const kindClasses = getKaraokeKindClassParts(kind);
+	const speakerClass = normalizeKaraokeSpeakerClass(
+		charInfo?.styleSpeaker,
+		charInfo?.styleSpeakerColor,
+		charInfo?.styleSpeakerFallback
+	);
+	if (kindClasses.length === 0 && !speakerClass) return null;
+
+	return {
+		key: [
+			kindClasses.join(" "),
+			speakerClass,
+			String(charInfo?.styleSpeakerColor || "").trim().toLowerCase(),
+			String(charInfo?.styleSpeakerFallback || "").trim().toUpperCase(),
+		].join("|"),
+		className: [
+			"ivlyrics-karaoke-range-style",
+			...kindClasses,
+			speakerClass ? `speaker-${speakerClass}` : "",
+		].filter(Boolean).join(" "),
+		style: getKaraokeSpeakerStyle(
+			charInfo?.styleSpeaker,
+			charInfo?.styleSpeakerColor,
+			charInfo?.styleSpeakerFallback
+		),
+	};
+};
+
+const KARAOKE_INLINE_STYLE_MAX_RUN_LENGTH = 12;
+
+const wrapKaraokeInlineStyleRuns = (
+	timedChars,
+	elements,
+	{ keyPrefix = "karaoke-inline-style", sourceIndexOffset = 0 } = {}
+) => {
+	if (!Array.isArray(timedChars)
+		|| !Array.isArray(elements)
+		|| timedChars.length !== elements.length
+		|| timedChars.length === 0) {
+		return elements;
+	}
+
+	const result = [];
+	let run = null;
+	const flush = () => {
+		if (!run) return;
+		if (!run.presentation) {
+			result.push(...run.elements);
+		} else {
+			result.push(react.createElement(
+				"span",
+				{
+					className: run.presentation.className,
+					style: {
+						...run.presentation.style,
+						"--ivlyrics-range-index": sourceIndexOffset + run.startIndex,
+					},
+					key: `${keyPrefix}-${sourceIndexOffset + run.startIndex}`,
+				},
+				run.elements
+			));
+		}
+		run = null;
+	};
+
+	for (let index = 0; index < timedChars.length; index += 1) {
+		const presentation = getKaraokeInlineStylePresentation(timedChars[index]);
+		const styleKey = presentation?.key || "";
+		if (!run
+			|| run.styleKey !== styleKey
+			|| run.elements.length >= KARAOKE_INLINE_STYLE_MAX_RUN_LENGTH) {
+			flush();
+			run = {
+				styleKey,
+				presentation,
+				startIndex: index,
+				elements: [],
+			};
+		}
+		run.elements.push(elements[index]);
+	}
+	flush();
+	return result;
+};
+
 const buildKaraokeWordElements = (
 	timedChars,
 	charElements,
@@ -4213,6 +4305,10 @@ const buildKaraokeWordElements = (
 			"--karaoke-bounce-y": `${bounce.offsetY}px`,
 			"--karaoke-bounce-scale": bounce.scale,
 		} : undefined;
+		const styledWordElements = wrapKaraokeInlineStyleRuns(wordChars, currentWord, {
+			keyPrefix: "karaoke-word-inline-style",
+			sourceIndexOffset: currentWordStart,
+		});
 		wordElements.push(react.createElement(
 			"span",
 			{
@@ -4220,7 +4316,7 @@ const buildKaraokeWordElements = (
 				style,
 				key: `karaoke-word-${currentWordStart}`,
 			},
-			currentWord
+			styledWordElements
 		));
 		currentWord = [];
 		currentWordUnit = null;
@@ -4255,7 +4351,10 @@ const buildKaraokeWordElements = (
 
 		if (isWhitespace) {
 			flushWord();
-			wordElements.push(element);
+			wordElements.push(...wrapKaraokeInlineStyleRuns([charInfo], [element], {
+				keyPrefix: "karaoke-space-inline-style",
+				sourceIndexOffset: index,
+			}));
 			continue;
 		}
 
@@ -4295,11 +4394,12 @@ const getKaraokeInstantWordFill = (segment, position, isActive, isComplete) => {
 	return position >= startTime ? 100 : 0;
 };
 
-const buildKaraokeTextRunSegments = (timedChars, wordTimed = false) => {
+const buildKaraokeTextRunSegments = (timedChars, wordTimed = false, preserveInlineStyles = true) => {
 	if (!Array.isArray(timedChars) || timedChars.length === 0) {
 		return [];
 	}
-	const hasInlineStyles = timedChars.some(charInfo => charInfo?.inlineStyle === true);
+	const hasInlineStyles = preserveInlineStyles
+		&& timedChars.some(charInfo => charInfo?.inlineStyle === true);
 	const sharedSegments = !wordTimed && !hasInlineStyles && window.LyricsService?.buildKaraokeWordSegments?.(timedChars, {
 		getText: (charInfo) => charInfo?.char || "",
 		getStartTime: (charInfo) => charInfo?.startTime,
@@ -4330,10 +4430,11 @@ const buildKaraokeTextRunSegments = (timedChars, wordTimed = false) => {
 			&& unitIndex !== null
 			&& currentSegment.unitIndex !== null
 			&& currentSegment.unitIndex !== unitIndex;
-		const styleKind = charInfo?.inlineStyle === true ? String(charInfo?.styleKind || 'vocal') : '';
-		const styleSpeaker = charInfo?.inlineStyle === true ? String(charInfo?.styleSpeaker || '') : '';
-		const styleSpeakerColor = charInfo?.inlineStyle === true ? String(charInfo?.styleSpeakerColor || '') : '';
-		const styleSpeakerFallback = charInfo?.inlineStyle === true ? String(charInfo?.styleSpeakerFallback || '') : '';
+		const hasInlineStyle = preserveInlineStyles && charInfo?.inlineStyle === true;
+		const styleKind = hasInlineStyle ? String(charInfo?.styleKind || '') : '';
+		const styleSpeaker = hasInlineStyle ? String(charInfo?.styleSpeaker || '') : '';
+		const styleSpeakerColor = hasInlineStyle ? String(charInfo?.styleSpeakerColor || '') : '';
+		const styleSpeakerFallback = hasInlineStyle ? String(charInfo?.styleSpeakerFallback || '') : '';
 		const styleChanged = currentSegment
 			&& (
 				currentSegment.styleKind !== styleKind
@@ -4379,9 +4480,10 @@ const buildKaraokeTextRunElements = (
 	textDirection,
 	globalCharOffset = 0,
 	activeGlobalCharIndex = -1,
-	wordTimed = false
+	wordTimed = false,
+	preserveInlineStyles = true
 ) => {
-	const segments = buildKaraokeTextRunSegments(timedChars, wordTimed);
+	const segments = buildKaraokeTextRunSegments(timedChars, wordTimed, preserveInlineStyles);
 	const renderSegments = textDirection === "rtl" ? [...segments].reverse() : segments;
 
 	return renderSegments.map((segment) => {
@@ -4427,7 +4529,8 @@ const buildKaraokeTextRunElements = (
 			isComplete
 		);
 		if (segment.styleKind || segment.styleSpeaker) {
-			segmentClassName += ` ivlyrics-karaoke-range-style lyrics-karaoke-part ${segment.styleKind || 'vocal'}`;
+			const kindClasses = getKaraokeKindClassParts(segment.styleKind);
+			segmentClassName += ` ivlyrics-karaoke-range-style${kindClasses.length ? ` ${kindClasses.join(' ')}` : ''}`;
 			const speakerClass = normalizeKaraokeSpeakerClass(
 				segment.styleSpeaker,
 				segment.styleSpeakerColor,
@@ -4439,7 +4542,6 @@ const buildKaraokeTextRunElements = (
 				segment.styleSpeakerColor,
 				segment.styleSpeakerFallback
 			));
-			if (segment.styleKind && !areKaraokeTextEffectsEnabled()) segmentClassName += ' text-effects-disabled';
 		}
 		segmentStyle['--ivlyrics-range-index'] = segment.startIndex;
 
@@ -5769,7 +5871,7 @@ const buildKaraokeTimedChars = (line) => {
 					karaokeUnitIndex,
 					...(syllable.inlineStyle === true ? {
 						inlineStyle: true,
-						styleKind: syllable.styleKind || 'vocal',
+						styleKind: syllable.styleKind || '',
 						styleSpeaker: syllable.styleSpeaker || '',
 						styleSpeakerColor: syllable.styleSpeakerColor || '',
 						styleSpeakerFallback: syllable.styleSpeakerFallback || ''
@@ -6151,12 +6253,15 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 		  const stackChildren = vocalRows.map((row, rowIndex) => {
                   const rowRenderData = vocalRowRenderData[rowIndex];
 			const rowLine = rowRenderData.line;
-			const rowHasInlineStyles = Array.isArray(row.syllables)
-				&& row.syllables.some(syllable => syllable?.inlineStyle === true);
+			const rowHasInlineEffects = Array.isArray(row.syllables)
+				&& row.syllables.some(syllable => (
+					syllable?.inlineStyle === true
+					&& KARAOKE_TEXT_EFFECT_KIND_CLASSES.has(String(syllable?.styleKind || "").trim().toLowerCase())
+				));
                   const classParts = [
                           "lyrics-karaoke-part",
                           row.role === "background" ? "background" : "lead",
-						  ...(rowHasInlineStyles ? [] : getKaraokeKindClassParts(row.kind || "vocal")),
+						  ...(rowHasInlineEffects ? [] : getKaraokeKindClassParts(row.kind || "vocal")),
                           shouldUseVocalRowAnchor && rowIndex === activeVocalRowIndex ? "active-vocal-row" : "",
                           row.speakerClass ? `speaker-${row.speakerClass}` : "",
                   ].filter(Boolean);
@@ -6233,7 +6338,7 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 	const furiganaReady = window.FuriganaConverter?.isAvailable?.() === true;
 	const lyricsLocale = String(window.Utils?.getDetectedLanguage?.() || "auto");
 
-	const { furiganaMap, timedChars, endTime, wrapByWord, textDirection, useTextRun } = useMemo(() => {
+	const { furiganaMap, timedChars, endTime, wrapByWord, textDirection, useTextRun, preserveInlineStyles } = useMemo(() => {
 		const sourceSyllables = Array.isArray(line.syllables) && line.syllables.length > 0
 			? line.syllables
 			: getTimedSyllablesFromLine(line);
@@ -6262,6 +6367,7 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 			wrapByWord: shouldWrapKaraokeByWord(rawLineText),
 			textDirection: detectedTextDirection,
 			useTextRun: shouldUseKaraokeTextRun(rawLineText),
+			preserveInlineStyles: !KARAOKE_JOINING_SCRIPT_REGEX.test(rawLineText),
 		};
 	}, [line, furiganaEnabled, furiganaReady, furiganaMapOverride, wordTimed, lyricsLocale]);
 	const isComplete = isActive && position >= endTime;
@@ -6388,32 +6494,6 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 				react.createElement("rt", null, reading)
 			)
 			: charNode;
-		if (charInfo?.inlineStyle === true) {
-			const inlineKind = String(charInfo.styleKind || 'vocal').trim().toLowerCase() || 'vocal';
-			const inlineSpeakerClass = normalizeKaraokeSpeakerClass(
-				charInfo.styleSpeaker,
-				charInfo.styleSpeakerColor,
-				charInfo.styleSpeakerFallback
-			);
-			const inlineStyle = {
-				'--ivlyrics-range-index': index,
-				...getKaraokeSpeakerStyle(
-					charInfo.styleSpeaker,
-					charInfo.styleSpeakerColor,
-					charInfo.styleSpeakerFallback
-				)
-			};
-			renderedCharNode = react.createElement(
-				'span',
-				{
-					className: `ivlyrics-karaoke-range-style lyrics-karaoke-part ${getKaraokeKindClassParts(inlineKind).join(' ')}${inlineSpeakerClass ? ` speaker-${inlineSpeakerClass}` : ''}`,
-					style: inlineStyle,
-					key: `karaoke-inline-style-${index}`
-				},
-				renderedCharNode
-			);
-		}
-
 		const culturalMarkers = culturalMarkersByCharIndex.get(index) || [];
 		if (culturalMarkers.length === 0) {
 			return renderedCharNode;
@@ -6442,7 +6522,8 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 			textDirection,
 			globalCharOffset,
 			activeGlobalCharIndex,
-			wordTimed
+			wordTimed,
+			preserveInlineStyles
 		)
 		: (wrapByWord || wordTimed)
 		? buildKaraokeWordElements(timedChars, charElements, {
@@ -6453,7 +6534,7 @@ const KaraokeLine = react.memo(({ line, position, isActive, settingsRevision = 0
 			activeGlobalCharIndex,
 			wordTimed,
 		})
-		: charElements;
+		: wrapKaraokeInlineStyleRuns(timedChars, charElements);
 
 	return react.createElement(
 		"span",
