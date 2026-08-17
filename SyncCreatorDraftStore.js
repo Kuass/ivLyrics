@@ -17,7 +17,9 @@
   const STORE_NAME = "drafts";
   const CHARACTER_PRONUNCIATION_STORE_NAME = "characterPronunciations";
   const RECORD_VERSION = 1;
-  const CHARACTER_PRONUNCIATION_CACHE_VERSION = 1;
+  // v2 invalidates results generated before the pronunciation writing-system
+  // selector and script validation were introduced.
+  const CHARACTER_PRONUNCIATION_CACHE_VERSION = 2;
   const MAX_HISTORY_STATES = 40;
   const MAX_TRACK_DRAFTS = 6;
   const MAX_CHARACTER_PRONUNCIATION_CACHE_ENTRIES = 100;
@@ -513,8 +515,15 @@
 
         const allRecordsRequest = store.getAll();
         allRecordsRequest.onsuccess = () => {
-          const records = (Array.isArray(allRecordsRequest.result) ? allRecordsRequest.result : [])
-            .map(normalizeCharacterPronunciationRecord)
+          const rawRecords = Array.isArray(allRecordsRequest.result) ? allRecordsRequest.result : [];
+          const records = rawRecords
+            .map((record) => {
+              const normalized = normalizeCharacterPronunciationRecord(record);
+              if (!normalized && typeof record?.cacheKey === "string" && record.cacheKey) {
+                store.delete(record.cacheKey);
+              }
+              return normalized;
+            })
             .filter(Boolean)
             .sort((left, right) => right.updatedAt - left.updatedAt);
           records

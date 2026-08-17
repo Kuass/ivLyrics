@@ -62,18 +62,35 @@ const SYNC_CREATOR_PROGRESS_COLOR = 'rgb(var(--spice-rgb-accent, 30, 215, 96))';
 const SYNC_CREATOR_PROGRESS_BACKGROUND = 'rgba(var(--spice-rgb-accent, 30, 215, 96), 0.18)';
 const SYNC_CREATOR_SYNCED_BACKGROUND = 'rgba(255, 255, 255, 0.055)';
 const SYNC_CREATOR_RECORDING_BACKGROUND = 'rgba(255, 152, 0, 0.6)';
-const getSyncCreatorPronunciationTargetLanguage = () => {
+const SYNC_CREATOR_PRONUNCIATION_TARGET_STORAGE_KEY = 'ivLyrics:syncCreator:pronunciation-target-mode';
+const SYNC_CREATOR_PRONUNCIATION_TARGET_MODES = new Set(['latin', 'translation']);
+const normalizeSyncCreatorPronunciationTargetMode = (value) => {
+	const normalized = String(value || '').trim().toLowerCase();
+	return SYNC_CREATOR_PRONUNCIATION_TARGET_MODES.has(normalized) ? normalized : 'latin';
+};
+const getSyncCreatorUiLanguage = () => (
+	window.I18n?.getCurrentLanguage?.()
+	|| window.CONFIG?.visual?.language
+	|| Spicetify.Locale?.getLocale?.()?.split('-')[0]
+	|| navigator.language?.split('-')[0]
+	|| 'en'
+);
+const getSyncCreatorTranslationTargetLanguage = () => {
 	const configuredLanguage = window.CONFIG?.visual?.['translate:target-language']
 		|| localStorage.getItem('ivLyrics:visual:translate:target-language');
 	if (configuredLanguage && configuredLanguage !== 'auto') {
 		return configuredLanguage;
 	}
-
-	return window.I18n?.getCurrentLanguage?.()
-		|| window.CONFIG?.visual?.language
-		|| Spicetify.Locale?.getLocale?.()?.split('-')[0]
-		|| navigator.language?.split('-')[0]
-		|| 'en';
+	return getSyncCreatorUiLanguage();
+};
+const getSyncCreatorPronunciationTargetLanguage = (mode = 'latin') => {
+	switch (normalizeSyncCreatorPronunciationTargetMode(mode)) {
+		case 'translation':
+			return getSyncCreatorTranslationTargetLanguage();
+		case 'latin':
+		default:
+			return 'en';
+	}
 };
 const getSyncCreatorLockedPlaybackProgressIndex = (previewIndex, lockIndex, recordingIndex) => {
 	const numericLockIndex = Number(lockIndex);
@@ -2736,6 +2753,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const [characterPronunciations, setCharacterPronunciations] = useState(null);
 	const [showCharacterPronunciations, setShowCharacterPronunciations] = useState(false);
 	const [isCharacterPronunciationPrimary, setIsCharacterPronunciationPrimary] = useState(false);
+	const [characterPronunciationTargetMode, setCharacterPronunciationTargetMode] = useState(() => (
+		normalizeSyncCreatorPronunciationTargetMode(
+			localStorage.getItem(SYNC_CREATOR_PRONUNCIATION_TARGET_STORAGE_KEY)
+		)
+	));
 	const [isGeneratingCharacterPronunciations, setIsGeneratingCharacterPronunciations] = useState(false);
 	const [characterPronunciationProgress, setCharacterPronunciationProgress] = useState(null);
 	const [showCharacterPronunciationConsent, setShowCharacterPronunciationConsent] = useState(false);
@@ -2835,6 +2857,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const characterPronunciationCacheRequestRef = useRef(0);
 	const characterPronunciationGenerationRequestRef = useRef(0);
 	const characterPronunciationProgressOwnerRef = useRef(0);
+	const characterPronunciationConsentForceRef = useRef(false);
 	const nextSessionClientRevision = useCallback(() => {
 		const wallClockRevision = Date.now() * 1000;
 		sessionClientRevisionRef.current = Math.max(
@@ -4037,7 +4060,14 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (detected) return detected;
 		return SYNC_CREATOR_JAPANESE_KANA_REGEX.test(`${lyricsLines.join('\n')} ${trackName} ${artistName}`) ? 'ja' : null;
 	}, [lyricsLines, trackName, artistName]);
-	const characterPronunciationTargetLanguage = getSyncCreatorPronunciationTargetLanguage();
+	const characterPronunciationTargetLanguage = getSyncCreatorPronunciationTargetLanguage(
+		characterPronunciationTargetMode
+	);
+	const handleCharacterPronunciationTargetModeChange = useCallback((nextMode) => {
+		const normalizedMode = normalizeSyncCreatorPronunciationTargetMode(nextMode);
+		localStorage.setItem(SYNC_CREATOR_PRONUNCIATION_TARGET_STORAGE_KEY, normalizedMode);
+		setCharacterPronunciationTargetMode(normalizedMode);
+	}, []);
 	const characterPronunciationCacheOptions = useMemo(() => ({
 		trackKey: sessionTrackKey,
 		lyricsFingerprint: sessionLyricsFingerprint,
@@ -4303,7 +4333,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	}, []);
 
 	const handleCharacterPronunciationToggle = useCallback(async (options = {}) => {
+		const forceRegenerate = options?.forceRegenerate === true;
 		if (
+			!forceRegenerate
+			&&
 			characterPronunciations
 			&& isSyncCreatorCharacterPronunciationCompatible(characterPronunciations, lyricsLines)
 		) {
@@ -4315,11 +4348,13 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			return;
 		}
 
-		const cachedPronunciation = await readCachedCharacterPronunciation();
-		if (cachedPronunciation) {
-			setCharacterPronunciations(cachedPronunciation);
-			setShowCharacterPronunciations(true);
-			return;
+		if (!forceRegenerate) {
+			const cachedPronunciation = await readCachedCharacterPronunciation();
+			if (cachedPronunciation) {
+				setCharacterPronunciations(cachedPronunciation);
+				setShowCharacterPronunciations(true);
+				return;
+			}
 		}
 
 		if (typeof window.AIAddonManager?.generateCharacterPronunciation !== 'function') {
@@ -4328,9 +4363,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 
 		if (options?.skipConsent !== true) {
+			characterPronunciationConsentForceRef.current = forceRegenerate;
 			setShowCharacterPronunciationConsent(true);
 			return;
 		}
+		characterPronunciationConsentForceRef.current = false;
 
 		const generationRequestId = ++characterPronunciationGenerationRequestRef.current;
 		characterPronunciationProgressOwnerRef.current = generationRequestId;
@@ -9810,6 +9847,16 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		sourceTrack: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', minWidth: 0 },
 		sourceAlbumArt: { width: '52px', height: '52px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0, boxShadow: '0 8px 24px rgba(0,0,0,0.36)' },
 		sourceControls: { display: 'flex', flexDirection: 'column', gap: '6px' },
+		characterPronunciationTarget: {
+			display: 'flex', flexDirection: 'column', gap: '6px',
+			padding: '9px 0 3px', color: 'var(--spice-subtext)'
+		},
+		characterPronunciationTargetCompact: {
+			display: 'inline-flex', alignItems: 'center', gap: '6px'
+		},
+		characterPronunciationTargetLabel: {
+			fontSize: '10.5px', fontWeight: '700', letterSpacing: '0.02em'
+		},
 		sourceProvider: {
 			display: 'flex', alignItems: 'center', gap: '8px',
 			minHeight: '34px', padding: '0 11px', borderRadius: '10px',
@@ -10532,6 +10579,29 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}, isSubmitting ? I18n.t('syncCreator.submitting') : I18n.t('syncCreator.submit'))
 	);
 
+	const renderCharacterPronunciationTargetControl = ({ compact = false } = {}) => react.createElement('label', {
+		style: compact
+			? s.characterPronunciationTargetCompact
+			: s.characterPronunciationTarget,
+		title: I18n.t('syncCreator.characterPronunciationTargetDesc') || 'Choose the writing system used for generated pronunciation.'
+	},
+		!compact && react.createElement('span', { style: s.characterPronunciationTargetLabel },
+			I18n.t('syncCreator.characterPronunciationTarget') || 'Pronunciation notation'
+		),
+		react.createElement('select', {
+			style: compact
+				? { ...s.select, minWidth: '150px' }
+				: { ...s.select, width: '100%' },
+			value: characterPronunciationTargetMode,
+			onChange: (event) => handleCharacterPronunciationTargetModeChange(event.target.value),
+			disabled: isGeneratingCharacterPronunciations,
+			'aria-label': I18n.t('syncCreator.characterPronunciationTarget') || 'Pronunciation notation'
+		},
+			react.createElement('option', { value: 'latin' }, I18n.t('syncCreator.characterPronunciationTargetLatin') || 'Latin (Romanization)'),
+			react.createElement('option', { value: 'translation' }, I18n.t('syncCreator.characterPronunciationTargetTranslation') || 'Translation language')
+		)
+	);
+
 	const renderSourcePanel = () => react.createElement('div', { className: 'sync-creator-section sync-creator-source-section', style: s.panel },
 		react.createElement('div', { style: s.panelTitle }, 'Source'),
 		react.createElement('div', { style: s.sourceTrack },
@@ -10577,6 +10647,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						: (I18n.t('syncCreator.lrclibIdLoad') || 'Load by ID'))
 				)
 			),
+			lyricsLines.length > 0 && renderCharacterPronunciationTargetControl(),
 			lyricsLines.length > 0 && react.createElement('button', {
 				style: {
 					...s.secondaryBtn,
@@ -10587,7 +10658,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				},
 				onClick: handleCharacterPronunciationToggle,
 				disabled: isGeneratingCharacterPronunciations,
-				title: I18n.t('syncCreator.characterPronunciationDesc') || 'AI로 글자별 한국어 발음을 생성해 현재 라인 아래에 표시합니다.'
+				title: I18n.t('syncCreator.characterPronunciationDesc') || 'Generate character-aligned pronunciation with AI and show it below the current line.'
 			}, isGeneratingCharacterPronunciations
 				? (characterPronunciationProgressInfo?.buttonLabel || I18n.t('syncCreator.characterPronunciationGenerating') || 'AI 발음 생성 중...')
 				: characterPronunciations
@@ -10596,6 +10667,12 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						: (I18n.t('syncCreator.characterPronunciationShow') || '발음 표시'))
 					: (I18n.t('syncCreator.characterPronunciationGenerate') || 'AI 글자 발음')
 			),
+			characterPronunciations && react.createElement('button', {
+				style: { ...s.secondaryBtn, ...s.fullWidthButton },
+				onClick: () => handleCharacterPronunciationToggle({ forceRegenerate: true }),
+				disabled: isGeneratingCharacterPronunciations,
+				title: I18n.t('syncCreator.characterPronunciationRegenerateDesc') || 'Ignore the saved result and generate pronunciation again.'
+			}, I18n.t('syncCreator.characterPronunciationRegenerate') || 'Regenerate Pronunciation'),
 			isGeneratingCharacterPronunciations && characterPronunciationProgressInfo && react.createElement('div', {
 				style: { ...s.characterPronunciationProgress, width: '100%', maxWidth: '100%' },
 				title: characterPronunciationProgressInfo.label
@@ -11593,7 +11670,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		renderBulkCustomSpeakerDialog(),
 		showCharacterPronunciationConsent && react.createElement('div', {
 			style: s.lrcLibModal,
-			onClick: (e) => e.target === e.currentTarget && setShowCharacterPronunciationConsent(false)
+			onClick: (e) => {
+				if (e.target !== e.currentTarget) return;
+				characterPronunciationConsentForceRef.current = false;
+				setShowCharacterPronunciationConsent(false);
+			}
 		},
 			react.createElement('div', { style: s.lrcLibContent },
 				react.createElement('h3', { style: s.lrcLibTitle },
@@ -11616,13 +11697,18 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				react.createElement('div', { style: s.lrcLibBtnRow },
 					react.createElement('button', {
 						style: s.lrcLibBtnCancel,
-						onClick: () => setShowCharacterPronunciationConsent(false)
+						onClick: () => {
+							characterPronunciationConsentForceRef.current = false;
+							setShowCharacterPronunciationConsent(false);
+						}
 					}, I18n.t('syncCreator.characterPronunciationTokenWarningCancel') || I18n.t('cancel') || 'Cancel'),
 					react.createElement('button', {
 						style: s.lrcLibBtn,
 						onClick: () => {
+							const forceRegenerate = characterPronunciationConsentForceRef.current;
+							characterPronunciationConsentForceRef.current = false;
 							setShowCharacterPronunciationConsent(false);
-							handleCharacterPronunciationToggle({ skipConsent: true });
+							handleCharacterPronunciationToggle({ skipConsent: true, forceRegenerate });
 						}
 					}, I18n.t('syncCreator.characterPronunciationTokenWarningConfirm') || 'I understand and generate')
 				)
@@ -11691,6 +11777,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				react.createElement('button', { style: { ...s.loadBtn, opacity: isLoading ? 0.5 : 1 }, onClick: loadLyrics, disabled: isLoading },
 					isLoading ? I18n.t('syncCreator.loading') : I18n.t('syncCreator.reload') || '다시 로드'
 				),
+				lyricsLines.length > 0 && renderCharacterPronunciationTargetControl({ compact: true }),
 				lyricsLines.length > 0 && react.createElement('button', {
 					style: {
 						...s.secondaryBtn,
@@ -11699,7 +11786,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					},
 					onClick: handleCharacterPronunciationToggle,
 					disabled: isGeneratingCharacterPronunciations,
-					title: I18n.t('syncCreator.characterPronunciationDesc') || 'AI로 글자별 한국어 발음을 생성해 현재 라인 아래에 표시합니다.'
+					title: I18n.t('syncCreator.characterPronunciationDesc') || 'Generate character-aligned pronunciation with AI and show it below the current line.'
 				}, isGeneratingCharacterPronunciations
 					? (characterPronunciationProgressInfo?.buttonLabel || I18n.t('syncCreator.characterPronunciationGenerating') || 'AI 발음 생성 중...')
 					: characterPronunciations
@@ -11708,6 +11795,12 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 							: (I18n.t('syncCreator.characterPronunciationShow') || '발음 표시'))
 						: (I18n.t('syncCreator.characterPronunciationGenerate') || 'AI 글자 발음')
 				),
+				characterPronunciations && react.createElement('button', {
+					style: s.secondaryBtn,
+					onClick: () => handleCharacterPronunciationToggle({ forceRegenerate: true }),
+					disabled: isGeneratingCharacterPronunciations,
+					title: I18n.t('syncCreator.characterPronunciationRegenerateDesc') || 'Ignore the saved result and generate pronunciation again.'
+				}, I18n.t('syncCreator.characterPronunciationRegenerate') || 'Regenerate Pronunciation'),
 				isGeneratingCharacterPronunciations && characterPronunciationProgressInfo && react.createElement('div', {
 					style: s.characterPronunciationProgress,
 					title: characterPronunciationProgressInfo.label
@@ -12218,9 +12311,13 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		renderBulkCustomSpeakerDialog(),
 
 		// AI character pronunciation token usage modal
-		showCharacterPronunciationConsent && react.createElement('div', {
-			style: s.lrcLibModal,
-			onClick: (e) => e.target === e.currentTarget && setShowCharacterPronunciationConsent(false)
+	showCharacterPronunciationConsent && react.createElement('div', {
+		style: s.lrcLibModal,
+		onClick: (e) => {
+			if (e.target !== e.currentTarget) return;
+			characterPronunciationConsentForceRef.current = false;
+			setShowCharacterPronunciationConsent(false);
+		}
 		},
 			react.createElement('div', { style: s.lrcLibContent },
 				react.createElement('h3', { style: s.lrcLibTitle },
@@ -12241,16 +12338,21 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					}
 				}, I18n.t('syncCreator.characterPronunciationTokenWarningUsage') || 'Expected usage: about 3-6x more tokens than a normal line-by-line pronunciation request. Actual usage varies by lyrics length, language, and provider retries.'),
 				react.createElement('div', { style: s.lrcLibBtnRow },
-					react.createElement('button', {
-						style: s.lrcLibBtnCancel,
-						onClick: () => setShowCharacterPronunciationConsent(false)
+				react.createElement('button', {
+					style: s.lrcLibBtnCancel,
+					onClick: () => {
+						characterPronunciationConsentForceRef.current = false;
+						setShowCharacterPronunciationConsent(false);
+					}
 					}, I18n.t('syncCreator.characterPronunciationTokenWarningCancel') || I18n.t('cancel') || 'Cancel'),
 					react.createElement('button', {
-						style: s.lrcLibBtn,
-						onClick: () => {
-							setShowCharacterPronunciationConsent(false);
-							handleCharacterPronunciationToggle({ skipConsent: true });
-						}
+					style: s.lrcLibBtn,
+					onClick: () => {
+						const forceRegenerate = characterPronunciationConsentForceRef.current;
+						characterPronunciationConsentForceRef.current = false;
+						setShowCharacterPronunciationConsent(false);
+						handleCharacterPronunciationToggle({ skipConsent: true, forceRegenerate });
+					}
 					}, I18n.t('syncCreator.characterPronunciationTokenWarningConfirm') || 'I understand and generate')
 				)
 			)

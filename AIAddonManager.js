@@ -912,9 +912,55 @@
             instruction: 'Write every pronounceable lyric sound in Thai script using natural Thai phonetic spelling. Do not use Japanese Kana, Han characters, Hangul, or another source-language script.'
         }
     });
+    const LATIN_PHONETIC_SCRIPT_RULE = Object.freeze({
+        id: 'latin',
+        name: 'standard Latin alphabet',
+        instruction: 'Use only Latin letters (including language-appropriate Latin diacritics), spaces, apostrophes, and hyphens for pronounceable lyric sounds. Never use Hiragana, Katakana, Kanji/Hanzi, Hangul, Thai, Cyrillic, Arabic, Devanagari, Bengali, or any other non-Latin script for lyric sounds.'
+    });
     const CHARACTER_PRONUNCIATION_CJK_LANG_RE = /^(ja|jp|ko|kr|zh|zh-cn|zh-tw|cn|tw|yue|cmn)$/i;
     const CHARACTER_PRONUNCIATION_CJK_SCRIPT_RE = /[\u3040-\u30ff\uff66-\uff9f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/u;
     const CHARACTER_PRONUNCIATION_WORD_TEXT_RE = /[\p{L}\p{N}]/u;
+    const CHARACTER_PRONUNCIATION_LETTER_RE = /\p{L}/u;
+    const CHARACTER_PRONUNCIATION_LATIN_LETTER_RE = /\p{Script=Latin}/u;
+
+    const getPronunciationScriptRule = (lang) => {
+        const normalizedLang = String(lang || 'en').trim().replace(/_/g, '-').toLowerCase();
+        const shortLang = normalizedLang.split('-')[0];
+        const nonLatinRule = NON_LATIN_PHONETIC_SCRIPT_RULES[normalizedLang]
+            || NON_LATIN_PHONETIC_SCRIPT_RULES[shortLang];
+        return nonLatinRule
+            ? { id: normalizedLang, ...nonLatinRule }
+            : LATIN_PHONETIC_SCRIPT_RULE;
+    };
+
+    const buildCharacterPronunciationTargetExamples = (scriptRule, targetLang, isWordMode) => {
+        if (scriptRule.id === 'latin') {
+            return `Latin-target examples:
+${isWordMode ? '- In word mode, return each spoken word as one u item, never as a character-level p array.' : ''}
+- Japanese 高く (takaku): 高=taka, く=ku.
+- Japanese 耐え難い (taegatai): p=["ta","e","gata","i"], not ["tae","e","gata","i"].
+- Japanese のって should be close to "notte", not "no tsu te": の=no, っ=t, て=te.
+- Japanese 爺ちゃん should be close to "jiichan": 爺=jii, ち=cha, ゃ="", ん=n.
+- English "night" must be a spoken reading, not letter names. Keep helper/silent slots empty where necessary.`;
+        }
+
+        if (/^(ko|kr)(-|$)/i.test(String(targetLang || ''))) {
+            return `Korean-target examples:
+${isWordMode ? '- In word mode, return each spoken word as one u item, never as a character-level p array.' : ''}
+- Japanese 高く => 高=타카, く=쿠; 急ぎ => 急=이소, ぎ=기; 懐かしい => 懐=나츠, か=카, し=시, い=이.
+- Japanese 耐え難い: p=["타","에","가타","이"], not ["타에","에","가타","이"].
+- English "night" should sound like "나이트", not "엔 아이 지 에이치 티".
+- Japanese のって should be close to "노ㅅ데" or "노옷데", not "노 츠 테".
+- Japanese 爺ちゃん should be close to "지이챠안": 爺=지이, ち=챠, ゃ="", ん=안.`;
+        }
+
+        return `Target-script alignment examples:
+${isWordMode ? '- In word mode, return each spoken word as one u item, never as a character-level p array.' : ''}
+- For 高く, keep the reading of 高 in the first slot and the sound of く in the second slot.
+- For 耐え難い, keep four aligned readings. Do not merge the sound of え into 耐 or the sound of い into 難.
+- For のって, represent small っ as a consonant stop or gemination in ${scriptRule.name}; never pronounce it as full-size つ.
+- For 爺ちゃん, combine small ゃ with the preceding ち reading and leave the ゃ slot empty when the target writing system does not need a separate mark.`;
+    };
 
     const validateLyricsTranslationResult = (result, params, providerId) => {
         const field = params?.wantSmartPhonetic ? 'phonetic' : 'translation';
@@ -953,14 +999,7 @@
         const normalizedText = String(text ?? '').replace(/\r\n?/g, '\n');
         const langInfo = getProviderPromptLanguageInfo(lang);
         const lineCount = normalizedText.split('\n').length;
-        const normalizedLang = String(lang || 'en').trim().replace(/_/g, '-').toLowerCase();
-        const shortLang = normalizedLang.split('-')[0];
-        const scriptRule = NON_LATIN_PHONETIC_SCRIPT_RULES[normalizedLang]
-            || NON_LATIN_PHONETIC_SCRIPT_RULES[shortLang]
-            || {
-                name: 'standard Latin alphabet',
-                instruction: 'Use only Latin letters (including language-appropriate Latin diacritics), spaces, apostrophes, and hyphens for pronounceable lyric sounds. Never use Hiragana, Katakana, Kanji/Hanzi, Hangul, Thai, Cyrillic, Arabic, Devanagari, Bengali, or any other non-Latin script for lyric sounds.'
-            };
+        const scriptRule = getPronunciationScriptRule(lang);
         const personalStudyPrefix = providerId === 'perplexity'
             ? 'This request is only for personal study. '
             : '';
@@ -1013,6 +1052,7 @@ Return exactly ${lineCount} pronunciation lines in ${scriptRule.name}, and nothi
     function buildCharacterPronunciationPrompt({ lines, lang = 'ko', sourceLang = 'auto', unitMode = 'char' } = {}) {
         const safeLines = (Array.isArray(lines) ? lines : []).map(line => String(line ?? ''));
         const langInfo = getProviderPromptLanguageInfo(lang);
+        const scriptRule = getPronunciationScriptRule(lang);
         const isWordMode = unitMode === 'word';
         const payload = safeLines.map((text, index) => {
             const chars = Array.from(text);
@@ -1024,12 +1064,12 @@ Return exactly ${lineCount} pronunciation lines in ${scriptRule.name}, and nothi
             ? `- Output compact JSON only: top key l; each line has i and u; each pronunciation item has s=start character index, e=end character index, and p=whole word pronunciation.
 - Split each line by whitespace into word/token ranges. Do not split alphabetic words into letters.
 - Omit whitespace and punctuation-only tokens from u to save tokens.
-- p must be one natural spoken pronunciation for the whole word/token in ${langInfo.native}.`
+- p must be one natural spoken pronunciation for the whole word/token, written in ${scriptRule.name}.`
             : `- Output compact JSON only: top key l; each line has i and p.
 - p must be an array of exactly n strings, one per input character a[index].
 - If n is 12, p must contain exactly 12 strings. An array with 11 or 13 strings is invalid even if the pronunciation sounds correct.
 - Use an empty string for characters with no separate pronunciation. Do not omit array slots.
-- Each p[index] must be short and readable in ${langInfo.native}.`;
+- Each p[index] must be short and written in ${scriptRule.name}.`;
         const alignmentRules = isWordMode
             ? `- For alphabetic and whitespace-separated languages, convert each whole word to spoken pronunciation once. Do not assign syllables to individual letters.
 - Example: English "hello" should be one unit like {"s":0,"e":4,"p":"??"}, not h=?/e=?/l=?.
@@ -1041,12 +1081,13 @@ Return exactly ${lineCount} pronunciation lines in ${scriptRule.name}, and nothi
         const outputShape = isWordMode
             ? '{"l":[{"i":0,"u":[{"s":0,"e":4,"p":"??"}]}]}'
             : '{"l":[{"i":0,"p":["?"]}]}';
+        const targetExamples = buildCharacterPronunciationTargetExamples(scriptRule, lang, isWordMode);
 
         return `You are a multilingual lyrics pronunciation aligner for karaoke sync editing.
 
 Task:
 - Read each full lyric line first, infer the natural pronunciation in context for the input source language (${sourceLang}), then align that sound back onto the original lyric text for karaoke timing.
-- Return ${isWordMode ? 'word-level' : 'character-level'} pronunciation hints in ${langInfo.name} (${langInfo.native}), not a meaning translation.
+- Return ${isWordMode ? 'word-level' : 'character-level'} pronunciation hints for ${langInfo.name} (${langInfo.native}) speakers, written only in ${scriptRule.name}; this is not a meaning translation.
 - Do NOT pronounce each character in isolation. The output must sound natural when the character hints are read in sequence.
 
 Rules:
@@ -1057,26 +1098,23 @@ Rules:
 - In character mode, never output c or index-numbered pronunciation items. Output p as exactly n strings. p[k] is the pronunciation for source character a[k], and may contain multiple target syllables or be empty.
 ${outputRules}
 ${alignmentRules}
+- The target language determines the output writing system. The source lyric language never determines it.
+- ${scriptRule.instruction}
+- Before answering, inspect every pronunciation value. Rewrite any pronounceable token that is not written in ${scriptRule.name}.
 - For syllabic scripts, align by natural syllable sound while keeping exactly one p array slot per source character.
 - For logographic scripts such as hanzi/kanji/hanja, infer the common reading from the word and put each source character's reading in that character's p slot. If a character has no separate sound, use an empty string.
 - For mixed writing systems, keep pronounced suffix/helper characters aligned to their own source characters. Do not hide a following character's sound inside the previous base character.
 - For Japanese specifically, handle kanji, okurigana, small kana, and sound changes naturally:
   - Never shift readings after small kana or ん. Each p array slot is tied to the exact original source character at the same array position.
   - In character mode, keep timing alignment per source character. Do not merge ordinary kana/okurigana into the previous kanji.
-  - For okurigana, put its spoken sound on that kana. Example: 高く => 高=타카, く=쿠; 急ぎ => 急=이소, ぎ=기; 懐かしい => 懐=나츠, か=카, し=시, い=이.
-  - Do not compress several source characters into one p slot. Example for a=["耐","え","難","い"]: p=["타","에","가타","이"], not ["타에","","가","타이"].
-  - small っ should be a geminated consonant or brief stop, not つ. Example: のって => の=노, っ=ㅅ, て=데.
+  - For okurigana, put its spoken sound on that kana's own slot.
+  - Do not compress several source characters into one p slot.
+  - small っ should be a geminated consonant or brief stop, not full-size つ.
   - small ゃ/ゅ/ょ should combine with the previous kana; leave the small kana itself empty/omitted unless the target writing system truly needs a separate mark.
   - ん should use the context-sensitive nasal sound at the ん character itself. Do not put the next character's pronunciation on ん.
-  - Correct Korean-target p array example for a=["爺","ち","ゃ","ん","婆","ち","ゃ","ん","久","し","ぶ","り"]: p=["지이","챠","","안","바","챠","","안","히","사","부","리"].
   - long vowels and vowel sequences such as ー, おう, えい, ああ should preserve length naturally.
   - particles は, へ, を should use the particle pronunciation when clearly used as particles.
-Korean target examples:
-${isWordMode ? '- In word mode, return English examples as whole u items per word, never as character-level p arrays.' : ''}
-- English "night" should sound like "나이트", not "엔 아이 지 에이치 티". Example split: n=나, i=이, t=트; omit silent g/h.
-- English "the" should sound like "더", not "티 에이치 이". Example split: t=더; omit helper h/e.
-- のって should be close to "노ㅅ데" or "노옷데", not "노 츠 테". Example split: の=노, っ=ㅅ, て=데.
-- 爺ちゃん should be close to "지이챠안", not "지 치 야 응". Example split: 爺=지이, ち=챠, ん=안; omit helper ゃ.
+${targetExamples}
 
 Return this compact JSON shape:
 ${outputShape}
@@ -2615,12 +2653,42 @@ ${normalizedText}
             };
         }
 
+        _validateCharacterPronunciationWritingSystem(result, options = {}) {
+            const scriptRule = getPronunciationScriptRule(options.lang);
+            if (scriptRule.id !== 'latin') {
+                return result;
+            }
+
+            const values = [];
+            (Array.isArray(result?.lines) ? result.lines : []).forEach((line) => {
+                (Array.isArray(line?.chars) ? line.chars : []).forEach((item) => {
+                    if (typeof item?.pronunciation === 'string' && item.pronunciation.trim()) {
+                        values.push(item.pronunciation.trim());
+                    }
+                });
+                (Array.isArray(line?.units) ? line.units : []).forEach((item) => {
+                    if (typeof item?.pronunciation === 'string' && item.pronunciation.trim()) {
+                        values.push(item.pronunciation.trim());
+                    }
+                });
+            });
+
+            const invalidValue = values.find(value => Array.from(value).some(character => (
+                CHARACTER_PRONUNCIATION_LETTER_RE.test(character)
+                && !CHARACTER_PRONUNCIATION_LATIN_LETTER_RE.test(character)
+            )));
+            if (invalidValue) {
+                throw new Error(`Character pronunciation response used the wrong writing system for Latin output: ${invalidValue.slice(0, 24)}`);
+            }
+            return result;
+        }
+
         _isCharacterPronunciationTruncationError(error) {
             return /JSON response was truncated|output token limit|Unexpected end|unterminated/i.test(error?.message || '');
         }
 
         _isCharacterPronunciationFormatError(error) {
-            return /Character pronunciation response .*returned \d+ slots, expected|Character pronunciation response .*outside line|Character pronunciation response duplicated index|Character pronunciation response .*missing p array/i.test(error?.message || '');
+            return /Character pronunciation response .*returned \d+ slots, expected|Character pronunciation response .*outside line|Character pronunciation response duplicated index|Character pronunciation response .*missing p array|Character pronunciation response used the wrong writing system/i.test(error?.message || '');
         }
 
         _isCharacterPronunciationRetryableError(error) {
@@ -2710,6 +2778,9 @@ ${normalizedText}
                 });
                 const normalized = this._normalizeCharacterPronunciationResult(result, chunkLines, {
                     unitMode: unitMode || characterPronunciationUnitMode || 'char'
+                });
+                this._validateCharacterPronunciationWritingSystem(normalized, {
+                    lang: providerParams.lang
                 });
                 return normalized.lines.map((line, index) => ({
                     segment: chunk.segments[index],
