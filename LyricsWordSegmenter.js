@@ -263,7 +263,11 @@
 	const defaultSegmenter = createLyricsSegmenter();
 	const segmentLyrics = defaultSegmenter.segmentLyrics;
 	const segmentRanges = defaultSegmenter.segmentRanges;
-	const api = Object.freeze({ normalizeLocale, createLyricsSegmenter, segmentLyrics, segmentRanges });
+	const segmentGraphemes = (text, locale = "auto") => {
+		const source = String(text || "");
+		return source ? graphemes(source, normalizeLocale(locale, source)) : [];
+	};
+	const api = Object.freeze({ normalizeLocale, createLyricsSegmenter, segmentLyrics, segmentRanges, segmentGraphemes });
 	globalThis.LyricsWordSegmenter = api;
 	if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();
