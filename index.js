@@ -7975,46 +7975,44 @@ class LyricsContainer extends react.Component {
       // Assign to correct slots based on mode types
       let phoneticText = "";
       let translationText = "";
+      let phoneticSameAsOriginal = false;
+      let translationSameAsOriginal = false;
 
       if (mode1IsPhonetic) {
         phoneticText = processPhoneticHyphen(translation1);
+        phoneticSameAsOriginal = Boolean(trans1SameAsOriginal);
       } else if (mode1) {
         translationText = translation1;
+        translationSameAsOriginal = Boolean(trans1SameAsOriginal);
       }
 
       if (mode2IsPhonetic) {
         phoneticText = processPhoneticHyphen(translation2);
+        phoneticSameAsOriginal = Boolean(trans2SameAsOriginal);
       } else if (mode2) {
         translationText = translation2;
+        translationSameAsOriginal = Boolean(trans2SameAsOriginal);
       }
 
       // Deduplication logic
       if (translationsSame) {
-        // Both are the same, always show in translation slot (not phonetic)
         const combinedText = translation1 || translation2;
-        if (!trans1SameAsOriginal) {
-          finalText2 = combinedText; // Always use translation slot when they're the same
+        const bothPhonetic = mode1IsPhonetic && mode2IsPhonetic;
+        if (bothPhonetic) {
+          if (!phoneticSameAsOriginal) {
+            finalText = processPhoneticHyphen(combinedText);
+          }
+        } else if (!translationSameAsOriginal && !trans1SameAsOriginal && !trans2SameAsOriginal) {
+          // When pronunciation and translation unexpectedly return identical text,
+          // keep a single copy in the translation slot. This prevents translated
+          // prose from being presented as pronunciation.
+          finalText2 = combinedText;
         }
       } else {
-        // Different results - assign to correct slots
-        // finalText = phonetic, finalText2 = translation
-        if (!trans1SameAsOriginal && phoneticText) finalText = phoneticText;
-        if (!trans2SameAsOriginal && translationText)
-          finalText2 = translationText;
-        // Also handle case where trans1 is same but trans2 is not
-        if (trans1SameAsOriginal && !trans2SameAsOriginal) {
-          if (mode2IsPhonetic) {
-            finalText = translation2;
-          } else {
-            finalText2 = translation2;
-          }
-        } else if (!trans1SameAsOriginal && trans2SameAsOriginal) {
-          if (mode1IsPhonetic) {
-            finalText = translation1;
-          } else {
-            finalText2 = translation1;
-          }
-        }
+        // Compare each semantic result with the original associated with that
+        // same result. Mode order may be translation-first or pronunciation-first.
+        if (!phoneticSameAsOriginal && phoneticText) finalText = phoneticText;
+        if (!translationSameAsOriginal && translationText) finalText2 = translationText;
       }
 
       // Provider/cached lines may already contain supplement fields. The
