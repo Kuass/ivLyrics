@@ -3550,9 +3550,16 @@ const getTrailingKaraokeInterludeInfo = (line, nextLine = null, lineIndex = -1, 
 		return { isInterlude: false, durationMs: 0, source: "karaoke-trailing-gap" };
 	}
 
+	const nextStartTime = toFiniteTime(nextLine?.startTime);
+	if (
+		nextStartTime !== null
+		&& isInterludeMarkerText(getInterludeCandidateText(nextLine))
+	) {
+		return { isInterlude: false, durationMs: 0, source: "karaoke-trailing-gap" };
+	}
+
 	const fillEndTime = getKaraokeLineFillEndTime(line);
 	const startTime = fillEndTime !== null ? fillEndTime + KARAOKE_TRAILING_INTERLUDE_DELAY_MS : null;
-	const nextStartTime = toFiniteTime(nextLine?.startTime);
 	const trackEndTime = lineIndex === Math.max(0, lineCount - 1) ? getCurrentTrackDurationMs() : null;
 	const endTime = nextStartTime ?? trackEndTime;
 	const durationMs = startTime !== null && endTime !== null && endTime > startTime

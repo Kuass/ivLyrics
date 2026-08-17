@@ -3066,9 +3066,16 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             return { isInterlude: false, durationMs: 0, source: "karaoke-trailing-gap" };
         }
 
+        const nextStartTime = toFiniteTime(nextLine?.startTime);
+        if (
+            nextStartTime !== null
+            && isInterludeMarkerText(getInterludeCandidateText(nextLine))
+        ) {
+            return { isInterlude: false, durationMs: 0, source: "karaoke-trailing-gap" };
+        }
+
         const lyricEndTime = getLastSyllableEndTime(line);
         const startTime = lyricEndTime !== null ? lyricEndTime + KARAOKE_TRAILING_INTERLUDE_DELAY_MS : null;
-        const nextStartTime = toFiniteTime(nextLine?.startTime);
         const trackEndTime = lineIndex === Math.max(0, lineCount - 1) ? getCurrentTrackDurationMs() : null;
         const endTime = nextStartTime ?? trackEndTime;
         const durationMs = startTime !== null && endTime !== null && endTime > startTime
