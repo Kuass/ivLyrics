@@ -3174,6 +3174,34 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
       return `${autoText} (${getDisplayLanguageName(interfaceLang)})`;
     };
     const translationTargetName = getTranslationTargetDisplay();
+    const normalizePronunciationNotation = (value) => {
+      const sharedNormalize = window.ivLyricsPronunciationNotation?.normalize;
+      if (typeof sharedNormalize === "function") {
+        return sharedNormalize(value);
+      }
+      const normalized = String(value || "").trim().toLowerCase();
+      return normalized === "latin" || normalized === "ipa"
+        ? normalized
+        : "translation";
+    };
+    const pronunciationNotation = normalizePronunciationNotation(
+      CONFIG.visual?.["translate:pronunciation-notation"] ||
+      StorageManager.getItem(`${APP_NAME}:visual:translate:pronunciation-notation`)
+    );
+    const pronunciationNotationOptions = [
+      {
+        key: "translation",
+        value: I18n.t("menu.pronunciationNotationTranslation") || "Current translation language",
+      },
+      {
+        key: "latin",
+        value: I18n.t("menu.pronunciationNotationLatin") || "Latin (Romanization)",
+      },
+      {
+        key: "ipa",
+        value: I18n.t("menu.pronunciationNotationIpa") || "International Phonetic Alphabet (IPA)",
+      },
+    ];
 
     // 현재 트랙 URI 가져오기
     const currentTrackUri = Spicetify.Player.data?.item?.uri || "";
@@ -3249,6 +3277,19 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
               CONFIG.visual[`translation-mode:${modeKey}`] !== "none",
             renderInline: true,
             info: I18n.t("menu.pronunciationInfo"),
+          },
+          {
+            desc: react.createElement(SettingRowDescription, {
+              icon: ICONS.language,
+              text: I18n.t("menu.pronunciationNotation") || "Pronunciation notation",
+            }),
+            key: "translate:pronunciation-notation",
+            type: OptionsMenu,
+            options: pronunciationNotationOptions,
+            defaultValue:
+              pronunciationNotationOptions.find(option => option.key === pronunciationNotation) ||
+              pronunciationNotationOptions[0],
+            info: I18n.t("menu.pronunciationNotationInfo") || "Choose how generated pronunciation is written. Regenerate pronunciation to update the current lyrics.",
           },
           {
             desc: react.createElement(SettingRowDescription, {
@@ -3345,6 +3386,13 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
         return;
       }
 
+      if (name === "translate:pronunciation-notation") {
+        const normalizedNotation = normalizePronunciationNotation(value);
+        CONFIG.visual[name] = normalizedNotation;
+        StorageManager.setItem(`${APP_NAME}:visual:${name}`, normalizedNotation);
+        return;
+      }
+
       // Handle toggle values - convert boolean to appropriate mode string
       if (name.startsWith("translation-mode")) {
         // For first line (발음), set to romaji or none
@@ -3376,7 +3424,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 
   return react.createElement(
     Spicetify.ReactComponent.TooltipWrapper,
-    { label: I18n.t("menu.translation") },
+    { label: I18n.t("menu.translation"), showDelay: 0 },
     react.createElement(
       "button",
       {
@@ -3532,7 +3580,7 @@ const LyricsProviderSelectButton = react.memo(
 
     return react.createElement(
       Spicetify.ReactComponent.TooltipWrapper,
-      { label: isLocalTrack ? getOptionsText("menu.localLyricsTools", "로컬 가사") : I18n.t("menu.lyricsProviderSelect") },
+      { label: isLocalTrack ? getOptionsText("menu.localLyricsTools", "로컬 가사") : I18n.t("menu.lyricsProviderSelect"), showDelay: 0 },
       react.createElement(
         "button",
         {
@@ -3628,7 +3676,7 @@ const RegenerateTranslationButton = react.memo(
   ({ onRegenerate, isEnabled, isLoading }) => {
     return react.createElement(
       Spicetify.ReactComponent.TooltipWrapper,
-      { label: I18n.t("menu.regenerateTranslation") },
+      { label: I18n.t("menu.regenerateTranslation"), showDelay: 0 },
       react.createElement(
         "button",
         {
@@ -3707,7 +3755,7 @@ const TrackBackgroundButton = react.memo(
 
     return react.createElement(
       Spicetify.ReactComponent.TooltipWrapper,
-      { label: getOptionsText("menu.trackBackground", "개별 배경") },
+      { label: getOptionsText("menu.trackBackground", "개별 배경"), showDelay: 0 },
       react.createElement(
         "button",
         {
@@ -4356,7 +4404,7 @@ const SyncAdjustButtonFluent = react.memo(({
     null,
     react.createElement(
       Spicetify.ReactComponent.TooltipWrapper,
-      { label: modalTitle },
+      { label: modalTitle, showDelay: 0 },
       react.createElement(
         "button",
         {
@@ -4433,7 +4481,7 @@ const CommunityVideoButton = react.memo(({ trackUri, videoInfo, onVideoSelect, d
 
   return react.createElement(
     Spicetify.ReactComponent.TooltipWrapper,
-    { label: I18n.t("communityVideo.selectVideo") },
+    { label: I18n.t("communityVideo.selectVideo"), showDelay: 0 },
     react.createElement(
       "button",
       {
@@ -4453,7 +4501,7 @@ const SettingsMenu = react.memo(() => {
 
   return react.createElement(
     Spicetify.ReactComponent.TooltipWrapper,
-    { label: I18n.t("menu.settings") },
+    { label: I18n.t("menu.settings"), showDelay: 0 },
     react.createElement(
       "button",
       {
@@ -5574,7 +5622,7 @@ const ShareImageButton = react.memo(({ lyrics, trackInfo }) => {
 
   return react.createElement(
     Spicetify.ReactComponent.TooltipWrapper,
-    { label: I18n.t("menu.shareImage") },
+    { label: I18n.t("menu.shareImage"), showDelay: 0 },
     react.createElement(
       "button",
       {
@@ -5755,7 +5803,7 @@ const SyncDataCreatorButton = react.memo(({ trackInfo, showHint, isFullscreen = 
       inlineHint,
     react.createElement(
       Spicetify.ReactComponent.TooltipWrapper,
-      { label: hasTrackId ? (I18n.t("syncCreator.buttonTooltip") || "Create Karaoke Sync") : disabledTooltip },
+      { label: hasTrackId ? (I18n.t("syncCreator.buttonTooltip") || "Create Karaoke Sync") : disabledTooltip, showDelay: 0 },
       react.createElement(
         "button",
         {

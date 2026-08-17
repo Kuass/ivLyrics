@@ -354,6 +354,29 @@ const getCurrentTranslationTargetLanguage = () => {
   );
 };
 
+const LYRICS_PRONUNCIATION_NOTATION_STORAGE_KEY =
+  "ivLyrics:visual:translate:pronunciation-notation";
+const LYRICS_PHONETIC_PROMPT_CACHE_VERSION = 2;
+
+const normalizeIvLyricsPronunciationNotation = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "latin" || normalized === "ipa"
+    ? normalized
+    : "translation";
+};
+
+const getCurrentLyricsPronunciationNotation = () =>
+  normalizeIvLyricsPronunciationNotation(
+    window.CONFIG?.visual?.["translate:pronunciation-notation"] ||
+    localStorage.getItem(LYRICS_PRONUNCIATION_NOTATION_STORAGE_KEY)
+  );
+
+window.ivLyricsPronunciationNotation = Object.freeze({
+  storageKey: LYRICS_PRONUNCIATION_NOTATION_STORAGE_KEY,
+  normalize: normalizeIvLyricsPronunciationNotation,
+  getCurrent: getCurrentLyricsPronunciationNotation,
+});
+
 const getTranslationPartText = (part) => {
   const directText = typeof part?.text === "string" ? part.text.trim() : "";
   if (directText) {
@@ -463,6 +486,12 @@ const getTranslationSourceCacheHash = (text) => {
   return `src-${(hash >>> 0).toString(36)}-${value.length.toString(36)}`;
 };
 
+const getTranslationResultCacheHash = (text, isPhonetic = false) => {
+  const sourceHash = getTranslationSourceCacheHash(text);
+  if (!isPhonetic) return sourceHash;
+  return `${sourceHash}:phonetic-prompt=${LYRICS_PHONETIC_PROMPT_CACHE_VERSION}:notation=${getCurrentLyricsPronunciationNotation()}`;
+};
+
 const getLyricsProcessingShapeSignature = (lyrics = []) => {
   if (!Array.isArray(lyrics)) return "0:0:src-0-0:";
   const requests = buildTranslationLineRequests(lyrics);
@@ -492,7 +521,7 @@ const getCachedTranslationForText = async ({
   }
 
   try {
-    const sourceHash = getTranslationSourceCacheHash(text);
+    const sourceHash = getTranslationResultCacheHash(text, isPhonetic);
     const cached = await cacheApi.getTranslation(trackId, lang, isPhonetic, provider, sourceHash);
     if (!cached) return null;
 
@@ -555,7 +584,7 @@ const setCachedTranslationForText = async ({
   }
 
   try {
-    const sourceHash = getTranslationSourceCacheHash(text);
+    const sourceHash = getTranslationResultCacheHash(text, isPhonetic);
     return await cacheApi.setTranslation(
       trackId,
       lang,
@@ -2782,6 +2811,9 @@ const CONFIG = {
     "translate:target-language":
       StorageManager.getItem("ivLyrics:visual:translate:target-language") ||
       "auto",
+    "translate:pronunciation-notation": normalizeIvLyricsPronunciationNotation(
+      StorageManager.getItem(LYRICS_PRONUNCIATION_NOTATION_STORAGE_KEY)
+    ),
     "cultural-annotations-enabled": StorageManager.get(
       "ivLyrics:visual:cultural-annotations-enabled",
       false
@@ -3526,7 +3558,10 @@ const getDisplayModeCacheKey = (lyricsState = {}, mode = "") => {
     || lyricsState.unsynced
     || [];
   const lyricsShape = getLyricsProcessingShapeSignature(sourceLyrics);
-  return `${lyricsState.uri}:${providerKey}:${mode}:${getSyncDataRendererCacheVersion(lyricsState)}:${providerCacheVersion}:${lyricsShape}`;
+  const pronunciationNotation = mode === "gemini_romaji"
+    ? `:${getCurrentLyricsPronunciationNotation()}`
+    : "";
+  return `${lyricsState.uri}:${providerKey}:${mode}${pronunciationNotation}:${getSyncDataRendererCacheVersion(lyricsState)}:${providerCacheVersion}:${lyricsShape}`;
 };
 
 // Enhanced cache system with memory-efficient LRU and automatic cleanup
@@ -3943,7 +3978,7 @@ const Prefetcher = {
     const uri = trackInfo.uri;
     const trackId = Utils.extractTrackId(uri);  // spotify:track:XXXX -> XXXX
     const cacheKeyBase = `prefetch:translation:${uri}`;
-    const versionedCacheKeyBase = `${cacheKeyBase}:${getSyncDataRendererCacheVersion(lyrics)}`;
+    const versionedCacheKeyBase = `${cacheKeyBase}:${getSyncDataRendererCacheVersion(lyrics)}:pronunciation=${getCurrentLyricsPronunciationNotation()}`;
 
     // 이미 캐시에 있으면 스킵
     if (this._prefetchCache.has(versionedCacheKeyBase)) {
@@ -4035,6 +4070,7 @@ const Prefetcher = {
                 title: trackInfo.title,
                 text,
                 wantSmartPhonetic: true,
+                sourceLang: detectedLanguage || "auto",
                 provider: lyrics.provider,
                 ignoreCache: false,
               });
@@ -6044,6 +6080,7 @@ class LyricsContainer extends react.Component {
       displayMode2 = null,
       detectedLanguage = null,
       translationTargetLanguage = this.getTranslationTargetLanguage(),
+      pronunciationNotation = getCurrentLyricsPronunciationNotation(),
       translationSourceLyrics = null,
       translationSourceText,
       presentationComplete = true,
@@ -6063,6 +6100,7 @@ class LyricsContainer extends react.Component {
       displayMode2,
       detectedLanguage,
       translationTargetLanguage,
+      pronunciationNotation,
       presentationComplete,
     };
 
@@ -6385,6 +6423,8 @@ class LyricsContainer extends react.Component {
       this._dmResults[currentUri].lastRendererVersion = getSyncDataRendererCacheVersion(lyricsState);
       this._dmResults[currentUri].lastLyricsShapeSignature =
         getLyricsProcessingShapeSignature(originalLyrics);
+      this._dmResults[currentUri].lastPronunciationNotation =
+        getCurrentLyricsPronunciationNotation();
 
       const mapResultLinesToLyrics = (linesInput, targetField) => {
         return mapTranslationLinesToLyrics(originalLyrics, linesInput, { targetField });
@@ -6532,6 +6572,8 @@ class LyricsContainer extends react.Component {
           title: this.state.title || lyricsState.title,
           text,
           wantSmartPhonetic: true,
+          sourceLang:
+            this.trackLanguageOverride || this.provideLanguageCode(originalLyrics) || "auto",
           provider: lyricsState.provider,
           ignoreCache: true,
           onLine: handlePhoneticStreamLine,
@@ -6628,6 +6670,8 @@ class LyricsContainer extends react.Component {
       this._dmResults[currentUri].mode2 = translatedLyrics2;
       this._dmResults[currentUri].lastMode1 = mode1;
       this._dmResults[currentUri].lastMode2 = mode2;
+      this._dmResults[currentUri].lastPronunciationNotation =
+        getCurrentLyricsPronunciationNotation();
 
       // CacheManager에도 새 결과 저장 (getGeminiTranslation에서 캐시 히트하도록)
       this._dmResults[currentUri].lastProvider = currentProvider;
@@ -7233,6 +7277,7 @@ class LyricsContainer extends react.Component {
         (sharedSnapshot.displayMode2 || 'none') === expectedDisplayMode2 &&
         (sharedSnapshot.detectedLanguage || '') === (presentationLanguage || '') &&
         (sharedSnapshot.translationTargetLanguage || '') === getCurrentTranslationTargetLanguage() &&
+        (sharedSnapshot.pronunciationNotation || 'translation') === getCurrentLyricsPronunciationNotation() &&
         (!sharedSnapshot.translationSourceText ||
           sharedSnapshot.translationSourceText === getNonSectionLyricsText(initialLyricsForMode || []))
         ? sharedDisplayLyrics
@@ -7452,12 +7497,13 @@ class LyricsContainer extends react.Component {
       (sharedSnapshot.displayMode2 || 'none') === (displayMode2 || 'none') &&
       (sharedSnapshot.detectedLanguage || '') === (originalLanguage || '') &&
       (sharedSnapshot.translationTargetLanguage || '') === this.getTranslationTargetLanguage() &&
+      (sharedSnapshot.pronunciationNotation || 'translation') === getCurrentLyricsPronunciationNotation() &&
       (!sharedSnapshot.translationSourceText ||
         sharedSnapshot.translationSourceText === getNonSectionLyricsText(lyrics));
     if (sharedPresentationMatches) {
       this._sharedPresentationKeys.set(
         uri,
-        `${lyricsState.provider || ''}:${displayMode1 || 'none'}:${displayMode2 || 'none'}:${getSyncDataRendererCacheVersion(lyricsState)}`
+        `${lyricsState.provider || ''}:${displayMode1 || 'none'}:${displayMode2 || 'none'}:${getCurrentLyricsPronunciationNotation()}:${getSyncDataRendererCacheVersion(lyricsState)}`
       );
       const sharedDisplayLyrics = this.applyCulturalAnnotations(
         sharedSnapshot.displayLyrics,
@@ -7550,6 +7596,7 @@ class LyricsContainer extends react.Component {
     const currentProvider = lyricsState.provider || '';
     const currentRendererVersion = getSyncDataRendererCacheVersion(lyricsState);
     const currentLyricsShapeSignature = getLyricsProcessingShapeSignature(lyrics);
+    const currentPronunciationNotation = getCurrentLyricsPronunciationNotation();
     if (this._dmResults[currentUri]) {
       const cached = this._dmResults[currentUri];
       // If provider, renderer, or selected lyric shape changed, invalidate all cache for this track.
@@ -7572,6 +7619,10 @@ class LyricsContainer extends react.Component {
       if (cached.lastMode2 !== displayMode2) {
         cached.mode2 = null;
       }
+      if (cached.lastPronunciationNotation !== currentPronunciationNotation) {
+        if (displayMode1 === "gemini_romaji") cached.mode1 = null;
+        if (displayMode2 === "gemini_romaji") cached.mode2 = null;
+      }
     }
 
     this._dmResults[currentUri] = this._dmResults[currentUri] || {
@@ -7583,6 +7634,7 @@ class LyricsContainer extends react.Component {
     this._dmResults[currentUri].lastProvider = currentProvider;
     this._dmResults[currentUri].lastRendererVersion = currentRendererVersion;
     this._dmResults[currentUri].lastLyricsShapeSignature = currentLyricsShapeSignature;
+    this._dmResults[currentUri].lastPronunciationNotation = currentPronunciationNotation;
 
     let lyricsMode1 = this._dmResults[currentUri].mode1;
     let lyricsMode2 = this._dmResults[currentUri].mode2;
@@ -8176,6 +8228,8 @@ class LyricsContainer extends react.Component {
             title: this.state.title || lyricsState.title,
             text,
             wantSmartPhonetic,
+            sourceLang:
+              this.trackLanguageOverride || this.provideLanguageCode(lyrics) || "auto",
             provider: lyricsState.provider,
             onLine: handleStreamLine,
             onStreamReset: handleStreamReset,
@@ -10073,7 +10127,7 @@ class LyricsContainer extends react.Component {
       CONFIG.visual["karaoke-mode-enabled"] &&
       react.createElement(
         Spicetify.ReactComponent.TooltipWrapper,
-        { key: "character", label: getModeButtonLabel(KARAOKE, "modes.character") },
+        { key: "character", label: getModeButtonLabel(KARAOKE, "modes.character"), showDelay: 0 },
         react.createElement(
           "button",
           {
@@ -10092,7 +10146,7 @@ class LyricsContainer extends react.Component {
       CONFIG.visual["karaoke-mode-enabled"] &&
       react.createElement(
         Spicetify.ReactComponent.TooltipWrapper,
-        { key: "word", label: getModeButtonLabel(WORD_KARAOKE, "modes.word") },
+        { key: "word", label: getModeButtonLabel(WORD_KARAOKE, "modes.word"), showDelay: 0 },
         react.createElement(
           "button",
           {
@@ -10110,7 +10164,7 @@ class LyricsContainer extends react.Component {
       this.state.synced &&
       react.createElement(
         Spicetify.ReactComponent.TooltipWrapper,
-        { key: "synced", label: getModeButtonLabel(SYNCED, "modes.synced") },
+        { key: "synced", label: getModeButtonLabel(SYNCED, "modes.synced"), showDelay: 0 },
         react.createElement(
           "button",
           {
@@ -10128,7 +10182,7 @@ class LyricsContainer extends react.Component {
       this.state.unsynced &&
       react.createElement(
         Spicetify.ReactComponent.TooltipWrapper,
-        { key: "unsynced", label: getModeButtonLabel(UNSYNCED, "modes.unsynced") },
+        { key: "unsynced", label: getModeButtonLabel(UNSYNCED, "modes.unsynced"), showDelay: 0 },
         react.createElement(
           "button",
           {
@@ -10572,6 +10626,7 @@ class LyricsContainer extends react.Component {
               Spicetify.ReactComponent.TooltipWrapper,
               {
                 label: I18n.t("lyricsCacheEditor.button"),
+                showDelay: 0,
               },
               react.createElement(
                 "button",
@@ -10596,7 +10651,7 @@ class LyricsContainer extends react.Component {
             },
             react.createElement(
               Spicetify.ReactComponent.TooltipWrapper,
-              { label: I18n.t("marketplace.title") },
+              { label: I18n.t("marketplace.title"), showDelay: 0 },
               react.createElement(
                 "button",
                 {
@@ -10620,6 +10675,7 @@ class LyricsContainer extends react.Component {
               Spicetify.ReactComponent.TooltipWrapper,
               {
                 label: this.state.isFullscreen ? I18n.t("menu.exitFullscreen") || "Exit Fullscreen" : I18n.t("menu.fullscreen"),
+                showDelay: 0,
               },
               react.createElement(
                 "button",

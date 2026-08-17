@@ -7599,6 +7599,7 @@
                     lyricsType: snapshot.lyricsType,
                     displayMode1: snapshot.displayMode1,
                     displayMode2: snapshot.displayMode2,
+                    pronunciationNotation: snapshot.pronunciationNotation,
                     translationSourceText: snapshot.translationSourceText,
                     presentationComplete: snapshot.presentationComplete
                 }
@@ -7989,6 +7990,7 @@
                     lyricsType,
                     displayMode1: mode1,
                     displayMode2: mode2,
+                    pronunciationNotation: getServicePronunciationNotation(),
                     translationSourceText: overlayTranslationSourceText,
                     presentationComplete: false
                 };
@@ -8020,6 +8022,7 @@
                                 title: info.title,
                                 text: lyricsText,
                                 wantSmartPhonetic: wantPhonetic,
+                                sourceLang: detectedLanguage || 'auto',
                                 provider: provider
                             });
                             pronResult = wantPhonetic ? response.phonetic : response.translation;
@@ -8035,6 +8038,7 @@
                                 title: info.title,
                                 text: lyricsText,
                                 wantSmartPhonetic: wantPhonetic,
+                                sourceLang: detectedLanguage || 'auto',
                                 provider: provider
                             });
                             transResult = wantPhonetic ? response.phonetic : response.translation;
@@ -8136,6 +8140,7 @@
                     lyricsType,
                     displayMode1: mode1,
                     displayMode2: mode2,
+                    pronunciationNotation: getServicePronunciationNotation(),
                     translationSourceText: overlayTranslationSourceText,
                     presentationComplete,
                     source: skipTranslation
@@ -8390,6 +8395,24 @@
     const _translatorInflightRequests = new Map();
     const _translatorPendingRetries = new Map();
     const PHONETIC_PROMPT_CACHE_VERSION = 2;
+
+    function normalizeServicePronunciationNotation(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        return normalized === 'latin' || normalized === 'ipa'
+            ? normalized
+            : 'translation';
+    }
+
+    function getServicePronunciationNotation() {
+        try {
+            const sharedValue = window.ivLyricsPronunciationNotation?.getCurrent?.();
+            if (sharedValue) return normalizeServicePronunciationNotation(sharedValue);
+        } catch {}
+        return normalizeServicePronunciationNotation(
+            window.CONFIG?.visual?.['translate:pronunciation-notation'] ||
+            getStorageItem('ivLyrics:visual:translate:pronunciation-notation')
+        );
+    }
 
     // 진행 중인 요청 키 생성
     function getTranslatorRequestKey(trackId, wantSmartPhonetic, lang, provider = null, sourceHash = null) {
@@ -8729,14 +8752,21 @@
             ignoreCache = false,
             onLine = null,
             onStreamReset = null,
+            pronunciationNotation = null,
+            sourceLang = null,
         }) {
             if (!text?.trim()) throw new Error("No text provided for translation");
             const sourceTextHash = getLyricsTextCacheHash(text);
+            const resolvedPronunciationNotation = wantSmartPhonetic
+                ? normalizeServicePronunciationNotation(
+                    pronunciationNotation || getServicePronunciationNotation()
+                )
+                : null;
             const translationStyle = wantSmartPhonetic
                 ? null
                 : (window.AIAddonManager?.getTranslationStyle?.() || 'natural');
             const sourceHash = wantSmartPhonetic
-                ? `${sourceTextHash}:phonetic-prompt=${PHONETIC_PROMPT_CACHE_VERSION}`
+                ? `${sourceTextHash}:phonetic-prompt=${PHONETIC_PROMPT_CACHE_VERSION}:notation=${resolvedPronunciationNotation}`
                 : (translationStyle !== 'natural'
                     ? `${sourceTextHash}:style=${translationStyle}`
                     : sourceTextHash);
@@ -8750,6 +8780,15 @@
             }
 
             const userLang = getTranslationTargetLanguage();
+            const resolvedSourceLang = sourceLang || (() => {
+                try {
+                    return window.LyricsService?.detectLanguage?.(
+                        String(text).split('\n').map(line => ({ text: line }))
+                    ) || 'auto';
+                } catch {
+                    return 'auto';
+                }
+            })();
 
             // 로컬 캐시 확인
             if (!ignoreCache) {
@@ -8791,6 +8830,8 @@
                             text,
                             lang: userLang,
                             wantSmartPhonetic,
+                            pronunciationNotation: resolvedPronunciationNotation,
+                            sourceLang: resolvedSourceLang,
                             provider,
                             onLine,
                             onStreamReset
@@ -9336,6 +9377,7 @@
             context.provider || '',
             context.displayMode1 || 'none',
             context.displayMode2 || 'none',
+            context.pronunciationNotation || 'translation',
             getLyricsTextCacheHash(sourceText)
         ]);
     };
@@ -10983,6 +11025,7 @@
             lyricsType: detail.lyricsType,
             displayMode1: detail.displayMode1,
             displayMode2: detail.displayMode2,
+            pronunciationNotation: detail.pronunciationNotation,
             detectedLanguage: detail.detectedLanguage,
             translationTargetLanguage: detail.translationTargetLanguage,
             translationSourceText: detail.translationSourceText,

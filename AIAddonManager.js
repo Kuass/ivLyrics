@@ -917,6 +917,11 @@
         name: 'standard Latin alphabet',
         instruction: 'Use only Latin letters (including language-appropriate Latin diacritics), spaces, apostrophes, and hyphens for pronounceable lyric sounds. Never use Hiragana, Katakana, Kanji/Hanzi, Hangul, Thai, Cyrillic, Arabic, Devanagari, Bengali, or any other non-Latin script for lyric sounds.'
     });
+    const IPA_PHONETIC_SCRIPT_RULE = Object.freeze({
+        id: 'ipa',
+        name: 'International Phonetic Alphabet (IPA)',
+        instruction: 'Write the sung pronunciation in Unicode IPA using broad, readable phonemic transcription. Use IPA stress, length, tone, and combining marks only when they materially affect pronunciation. Do not use ordinary romanization or the source orthography, and do not wrap output lines in slashes or square brackets.'
+    });
     const CHARACTER_PRONUNCIATION_CJK_LANG_RE = /^(ja|jp|ko|kr|zh|zh-cn|zh-tw|cn|tw|yue|cmn)$/i;
     const CHARACTER_PRONUNCIATION_CJK_SCRIPT_RE = /[\u3040-\u30ff\uff66-\uff9f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/u;
     const CHARACTER_PRONUNCIATION_WORD_TEXT_RE = /[\p{L}\p{N}]/u;
@@ -931,6 +936,20 @@
         return nonLatinRule
             ? { id: normalizedLang, ...nonLatinRule }
             : LATIN_PHONETIC_SCRIPT_RULE;
+    };
+
+    const normalizeLyricsPronunciationNotation = (value) => {
+        const normalized = String(value || '').trim().toLowerCase();
+        return normalized === 'latin' || normalized === 'ipa'
+            ? normalized
+            : 'translation';
+    };
+
+    const getLyricsPronunciationScriptRule = (lang, notation) => {
+        const normalizedNotation = normalizeLyricsPronunciationNotation(notation);
+        if (normalizedNotation === 'latin') return LATIN_PHONETIC_SCRIPT_RULE;
+        if (normalizedNotation === 'ipa') return IPA_PHONETIC_SCRIPT_RULE;
+        return getPronunciationScriptRule(lang);
     };
 
     const buildCharacterPronunciationTargetExamples = (scriptRule, targetLang, isWordMode) => {
@@ -991,34 +1010,90 @@ ${isWordMode ? '- In word mode, return each spoken word as one u item, never as 
         return result;
     };
 
+    const validateLyricsPhoneticWritingSystem = (result, params, providerId) => {
+        if (!params?.wantSmartPhonetic) return result;
+
+        const notation = normalizeLyricsPronunciationNotation(params.pronunciationNotation);
+        if (notation === 'translation') return result;
+
+        const lines = Array.isArray(result?.phonetic)
+            ? result.phonetic
+            : (typeof result?.phonetic === 'string'
+                ? result.phonetic.replace(/\r\n?/g, '\n').split('\n')
+                : []);
+        const disallowedIpaScript = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Cyrillic}\p{Script=Arabic}\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Thai}]/u;
+        const invalidLine = lines.find((line) => Array.from(String(line || '')).some((character) => {
+            if (notation === 'ipa') return disallowedIpaScript.test(character);
+            return CHARACTER_PRONUNCIATION_LETTER_RE.test(character)
+                && !CHARACTER_PRONUNCIATION_LATIN_LETTER_RE.test(character);
+        }));
+
+        if (invalidLine !== undefined) {
+            throw new Error(
+                `[AIAddonManager] Provider ${String(providerId || 'unknown')} returned pronunciation in the wrong writing system for ${notation}: ${String(invalidLine).slice(0, 48)}`
+            );
+        }
+        return result;
+    };
+
     // ============================================
     // Shared Prompt Builders
     // ============================================
 
-    function buildLyricsPhoneticPrompt({ text, lang, providerId } = {}) {
+    function buildLyricsPhoneticPrompt({
+        text,
+        lang,
+        providerId,
+        pronunciationNotation = 'translation',
+        sourceLang = 'auto'
+    } = {}) {
         const normalizedText = String(text ?? '').replace(/\r\n?/g, '\n');
         const langInfo = getProviderPromptLanguageInfo(lang);
         const lineCount = normalizedText.split('\n').length;
-        const scriptRule = getPronunciationScriptRule(lang);
+        const normalizedNotation = normalizeLyricsPronunciationNotation(pronunciationNotation);
+        const scriptRule = getLyricsPronunciationScriptRule(lang, normalizedNotation);
+        const isIpa = normalizedNotation === 'ipa';
+        const sourceLanguageHint = String(sourceLang || 'auto').trim() || 'auto';
         const personalStudyPrefix = providerId === 'perplexity'
             ? 'This request is only for personal study. '
             : '';
-        const phoneticDescription = PROVIDERS_WITHOUT_PHONETIC_DESCRIPTION.has(providerId)
+        const phoneticDescription = isIpa || PROVIDERS_WITHOUT_PHONETIC_DESCRIPTION.has(providerId)
             ? ''
             : langInfo.phoneticDesc || '';
-
-        const systemPrompt = `You are the pronunciation conversion system for ivLyrics.
-
-Convert lyric sounds for ${langInfo.name} (${langInfo.native}) speakers. The required output writing system is ${scriptRule.name}.
-
-MANDATORY SCRIPT POLICY:
-- The target language selected by the user determines the output script. The source lyric language NEVER determines the output script.
+        const audienceLine = isIpa
+            ? `Transcribe the original sung lyric sounds into ${scriptRule.name}. The source-language hint is ${sourceLanguageHint}; infer the language from the lyrics when the hint is auto or uncertain.`
+            : `Convert lyric sounds for ${langInfo.name} (${langInfo.native}) speakers. The required output writing system is ${scriptRule.name}.`;
+        const notationPolicy = isIpa
+            ? `- The user's pronunciation notation is IPA. The translation target language does not change the IPA symbols.
+- Use the source-language hint (${sourceLanguageHint}) and the full lyric context to infer the actual sung pronunciation.
+- ${scriptRule.instruction}
+- Prefer a broad standard-language transcription. Preserve a clearly written dialectal or contracted pronunciation only when the lyric spelling makes it explicit.
+- Fully transcribe every pronounceable lyric token. Never copy source orthography merely because it resembles IPA.`
+            : `- The target language selected by the user determines the output script. The source lyric language NEVER determines the output script.
 - ${scriptRule.instruction}
 - ${phoneticDescription
     ? `Follow the target convention: ${phoneticDescription}.`
     : `Use natural phonetic spelling that a ${langInfo.name} speaker can read aloud.`}
 - Fully transliterate every pronounceable lyric token into ${scriptRule.name}. Do not leave Japanese, Korean, Thai, or any other source-script text mixed into the pronunciation.
-- Before answering, inspect every output line character by character. If a pronounceable token uses the source script or any script other than ${scriptRule.name}, rewrite that token in ${scriptRule.name}.
+- Before answering, inspect every output line character by character. If a pronounceable token uses the source script or any script other than ${scriptRule.name}, rewrite that token in ${scriptRule.name}.`;
+        const scriptExamples = isIpa
+            ? `- English: night → naɪt
+- Japanese: 夢 → jɯme
+- Korean: 사랑해 → saɾaŋɦɛ
+- Do not return ordinary romanization such as yume or saranghae when IPA is requested.`
+            : `- Target Indonesian or English (Latin): 夢ならばどれほどよかったでしょう → yume naraba dorehodo yokatta deshou
+  Wrong for a Latin target: ユメナラバ ドレホド ヨカッタ デショウ or ゆめならば どれほど よかった でしょう
+- Target Indonesian or English (Latin): 사랑해 → saranghae
+  Wrong for a Latin target: 사랑해, サランヘ, or Thai-script output
+- Target Korean (Hangul): 夢ならばどれほどよかったでしょう → 유메나라바 도레호도 요캇타 데쇼오
+  Wrong for Korean: ユメナラバ ドレホド ヨカッタ デショウ or yume naraba dorehodo yokatta deshou`;
+
+        const systemPrompt = `You are the pronunciation conversion system for ivLyrics.
+
+${audienceLine}
+
+MANDATORY SCRIPT POLICY:
+${notationPolicy}
 
 TASK RULES:
 - This is a PRONUNCIATION task, not a translation task. Preserve the sound; do not translate the meaning.
@@ -1030,14 +1105,11 @@ TASK RULES:
 - Return only the pronunciation lines.
 
 SCRIPT EXAMPLES:
-- Target Indonesian or English (Latin): 夢ならばどれほどよかったでしょう → yume naraba dorehodo yokatta deshou
-  Wrong for a Latin target: ユメナラバ ドレホド ヨカッタ デショウ or ゆめならば どれほど よかった でしょう
-- Target Indonesian or English (Latin): 사랑해 → saranghae
-  Wrong for a Latin target: 사랑해, サランヘ, or Thai-script output
-- Target Korean (Hangul): 夢ならばどれほどよかったでしょう → 유메나라바 도레호도 요캇타 데쇼오
-  Wrong for Korean: ユメナラバ ドレホド ヨカッタ デショウ or yume naraba dorehodo yokatta deshou`;
+${scriptExamples}`;
 
-        const userPrompt = `${personalStudyPrefix}Convert the following ${lineCount} lyric lines into pronunciation for ${langInfo.name} speakers.
+        const userPrompt = `${personalStudyPrefix}${isIpa
+    ? `Transcribe the following ${lineCount} lyric lines into broad Unicode IPA. Source-language hint: ${sourceLanguageHint}.`
+    : `Convert the following ${lineCount} lyric lines into pronunciation for ${langInfo.name} speakers.`}
 Use ${scriptRule.name} for every pronounceable lyric sound. Do not answer in the source lyric's writing system.
 
 <lyrics>
@@ -2416,7 +2488,9 @@ ${normalizedText}
                         ? this.buildLyricsPhoneticPrompt({
                             text: params.text,
                             lang: params.lang,
-                            providerId: addon.id
+                            providerId: addon.id,
+                            pronunciationNotation: params.pronunciationNotation,
+                            sourceLang: params.sourceLang
                         })
                         : null,
                     onLine: typeof params.onLine === 'function'
@@ -2434,8 +2508,13 @@ ${normalizedText}
 
                 try {
                     window.__ivLyricsDebugLog?.(`[AIAddonManager] Trying translate provider: ${addon.id}`);
-                    const result = validateLyricsTranslationResult(
+                    let result = validateLyricsTranslationResult(
                         await this._callProvider(addon, 'translateLyrics', providerParams),
+                        params,
+                        addon.id
+                    );
+                    result = validateLyricsPhoneticWritingSystem(
+                        result,
                         params,
                         addon.id
                     );
