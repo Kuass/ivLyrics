@@ -4904,6 +4904,7 @@ const LyricsLineBlock = react.memo(({
 	subText2CopyFailureKey = "notifications.secondTranslationCopyFailed",
 	culturalNote = null,
 	singleLineScroll = false,
+	hiddenFromAccessibility = false,
 }) => {
 	const mainLine = line || (typeof mainText === "object" ? mainText : {
 		text: mainText,
@@ -5015,8 +5016,9 @@ const LyricsLineBlock = react.memo(({
                   style,
                   dir,
                   ref: lineRef,
-                  onClick: Number.isFinite(seekTime) ? handleClick : null,
-				  ...(Number.isFinite(seekTime) ? {
+				  "aria-hidden": hiddenFromAccessibility ? true : undefined,
+                  onClick: !hiddenFromAccessibility && Number.isFinite(seekTime) ? handleClick : null,
+				  ...(!hiddenFromAccessibility && Number.isFinite(seekTime) ? {
 					  role: "button",
 					  tabIndex: 0,
 					  title: `Seek to ${Math.max(0, Math.round(seekTime / 1000))} seconds`,
@@ -5105,6 +5107,7 @@ const renderLyricsItems = ({ items, isKara, karaokeRenderGranularity = null, pos
 			settingsRevision,
 			globalCharOffset: item.globalCharOffset,
 			activeGlobalCharIndex: item.activeGlobalCharIndex,
+			hiddenFromAccessibility: item.hiddenFromAccessibility === true,
 		});
 	});
 };
@@ -5648,10 +5651,23 @@ const useSyncedLyricsEngine = ({
 			return undefined;
 		}
 
-		const lines = Array.from(lineRoot.children).filter((element) => (
+		const allLines = Array.from(lineRoot.children).filter((element) => (
 			element instanceof Element
 			&& element.classList.contains("lyrics-lyricsContainer-LyricsLine")
-			&& !element.classList.contains("lyrics-lyricsContainer-LyricsLine-paddingLine")
+		));
+		const paddingBeforeLines = allLines.filter((element) => (
+			element.classList.contains("lyrics-lyricsContainer-LyricsLine-paddingBefore")
+		));
+		const paddingAfterLines = allLines.filter((element) => (
+			element.classList.contains("lyrics-lyricsContainer-LyricsLine-paddingAfter")
+		));
+		const boundaryPaddingLines = new Set([
+			paddingBeforeLines[paddingBeforeLines.length - 1],
+			paddingAfterLines[0],
+		].filter(Boolean));
+		const lines = allLines.filter((element) => (
+			!element.classList.contains("lyrics-lyricsContainer-LyricsLine-paddingLine")
+			|| boundaryPaddingLines.has(element)
 		));
 		const visibleLines = new Set(lines);
 		animations.forEach((animation, element) => {
@@ -5883,11 +5899,14 @@ const useSyncedLyricsEngine = ({
 			if (isCurrentRenderedLine) {
 				className += " lyrics-lyricsContainer-LyricsLine-active";
 			}
-			if (!isHighlightedLine && lineNumber !== visualAnchorLineNumber && shouldHideSyncedLine({
-				compact,
-				isScrolling,
-				animationIndex: visibilityAnimationIndex,
-			})) {
+			const isOutsideVisibleRange = !isHighlightedLine
+				&& lineNumber !== visualAnchorLineNumber
+				&& shouldHideSyncedLine({
+					compact,
+					isScrolling,
+					animationIndex: visibilityAnimationIndex,
+				});
+			if (isOutsideVisibleRange) {
 				className += " lyrics-lyricsContainer-LyricsLine-paddingLine";
 				className += visibilityAnimationIndex < 0
 					? " lyrics-lyricsContainer-LyricsLine-paddingBefore"
@@ -5914,6 +5933,7 @@ const useSyncedLyricsEngine = ({
 					? globalCharOffsets[lineNumber - leadingEmptyLines]
 					: 0,
 				activeGlobalCharIndex: isAnimatingLine ? activeGlobalCharIndex : -1,
+				hiddenFromAccessibility: isOutsideVisibleRange,
 			};
 
 			if (!trailingInterludeLine || lineNumber !== activeLineIndex) {
