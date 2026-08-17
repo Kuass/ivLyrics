@@ -10218,7 +10218,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			),
 			isActive
 				? react.createElement('div', {
-					className: 'lyrics-karaoke-line is-active',
+					className: 'lyrics-karaoke-line is-active is-effect-live is-effect-focused',
 					style: useCurrentLineTextRun ? { ...s.rtlLyricsLine, direction: currentLineDirection, paddingLeft: 0, paddingRight: 0 } : s.parallelStackText
 				},
 					renderCurrentLineCharacters()
@@ -10363,12 +10363,15 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			className: `ivlyrics-sync-kind-preview lyrics-karaoke-part lead ${value}${textEffectsDisabled ? ' text-effects-disabled' : ''}`,
 			'aria-hidden': true
 		}, react.createElement('span', {
-			className: 'lyrics-karaoke-line is-active'
+			className: 'lyrics-karaoke-line is-active is-effect-live is-effect-focused'
 		}, Array.from(label).map((char, index) => react.createElement('span', {
 			key: `${value}-${index}`,
 			className: 'ivlyrics-sync-kind-preview-char lyrics-karaoke-char lyrics-karaoke-char--done',
-			style: char === ' ' ? { minWidth: '0.35em' } : null
-		}, char === ' ' ? '\u00A0' : char))));
+			style: char === ' ' ? { minWidth: '0.35em' } : null,
+			'data-outline-text': char === ' ' ? '' : char
+		}, react.createElement('span', {
+			className: 'lyrics-karaoke-glyph-fill'
+		}, char === ' ' ? '\u00A0' : char)))));
 
 		return react.createElement('div', {
 			className: compact ? 'sync-creator-effect-strip' : undefined,
@@ -11232,7 +11235,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						className: `ivlyrics-sync-stage-effect-preview lyrics-karaoke-part lead ${currentTextEffectKind}${textEffectsDisabled ? ' text-effects-disabled' : ''}`,
 						style: s.stageEffectPreview
 					}, react.createElement('div', {
-						className: 'lyrics-karaoke-line is-active',
+						className: 'lyrics-karaoke-line is-active is-effect-live is-effect-focused',
 						style: useCurrentLineTextRun ? { ...s.rtlLyricsLine, direction: currentLineDirection } : s.lyricsLine
 					}, renderCurrentLineCharacters()))
 			),
