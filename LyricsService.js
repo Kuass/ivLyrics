@@ -7525,9 +7525,11 @@
                     { ...previous, ...definedUpdate }
                 );
                 if (previousPresentationKey === nextPresentationKey) {
+                    const presentationContext = { ...previous, ...definedUpdate };
                     const preserved = preserveOverlayAuxiliaryLyrics(
                         previous.displayLyrics,
-                        definedUpdate.displayLyrics
+                        definedUpdate.displayLyrics,
+                        getOverlaySupplementVisibility(presentationContext)
                     );
                     definedUpdate.displayLyrics = preserved.lyrics;
                 }
@@ -9114,7 +9116,55 @@
         };
     };
 
-    const mapLyricsForSender = (lyrics, offset) => {
+    const OVERLAY_PRONUNCIATION_MODES = new Set([
+        'gemini_romaji',
+        'romaji',
+        'romaja',
+        'pinyin',
+        'hiragana',
+        'katakana',
+        'furigana'
+    ]);
+
+    const isOverlayPronunciationMode = (mode) =>
+        OVERLAY_PRONUNCIATION_MODES.has(String(mode || '').trim().toLowerCase());
+
+    const getOverlaySupplementVisibility = (presentationContext = null) => {
+        const hasExplicitModes = !!presentationContext && (
+            Object.prototype.hasOwnProperty.call(presentationContext, 'displayMode1')
+            || Object.prototype.hasOwnProperty.call(presentationContext, 'displayMode2')
+        );
+        if (!hasExplicitModes) {
+            return { pronunciation: true, translation: true };
+        }
+
+        const activeModes = [
+            presentationContext?.displayMode1,
+            presentationContext?.displayMode2
+        ].filter(mode => mode && mode !== 'none');
+        return {
+            pronunciation: activeModes.some(isOverlayPronunciationMode),
+            translation: activeModes.some(mode => !isOverlayPronunciationMode(mode))
+        };
+    };
+
+    const areOverlayTextsEquivalent = (left, right) => {
+        if (typeof left !== 'string' || typeof right !== 'string') return false;
+        const compare = window.ivLyricsTextComparison?.areEquivalent;
+        if (typeof compare === 'function') {
+            return compare(left, right);
+        }
+        return left.normalize('NFC').replace(/\s+/gu, ' ').trim()
+            === right.normalize('NFC').replace(/\s+/gu, ' ').trim();
+    };
+
+    const getDistinctOverlaySupplement = (value, originalText) => {
+        if (typeof value !== 'string') return '';
+        const text = value.trim();
+        return text && !areOverlayTextsEquivalent(text, originalText) ? text : '';
+    };
+
+    const mapLyricsForSender = (lyrics, offset, visibility = { pronunciation: true, translation: true }) => {
         const safeOffset = Number(offset);
         const normalizedOffset = Number.isFinite(safeOffset) ? safeOffset : 0;
 
@@ -9159,6 +9209,7 @@
             if (syllables.length === 0) return null;
 
             const getString = (value) => typeof value === 'string' ? value : '';
+            const text = getString(part.text) || syllables.map(syllable => syllable.text).join('');
             return {
                 id: getString(part.id),
                 role: getString(part.role) || fallbackRole,
@@ -9166,9 +9217,13 @@
                 speakerColor: getString(part.speakerColor ?? part['speaker-color']),
                 speakerFallback: getString(part.speakerFallback ?? part['speaker-fallback']),
                 kind: getString(part.kind) || 'vocal',
-                text: getString(part.text) || syllables.map(syllable => syllable.text).join(''),
-                phonetic: getString(part.phonetic ?? part.phoneticText ?? part.pronText),
-                translation: getString(part.translation ?? part.translationText ?? part.transText),
+                text,
+                phonetic: visibility.pronunciation
+                    ? getDistinctOverlaySupplement(part.phonetic ?? part.phoneticText ?? part.pronText, text)
+                    : '',
+                translation: visibility.translation
+                    ? getDistinctOverlaySupplement(part.translation ?? part.translationText ?? part.transText, text)
+                    : '',
                 syllables
             };
         };
@@ -9178,24 +9233,26 @@
             const originalText = typeof originalCandidate === 'string'
                 ? originalCandidate
                 : String(originalCandidate ?? '');
-            const pronText = [
+            const pronText = visibility.pronunciation ? [
                 line?.phoneticText,
                 line?.pronunciationText,
                 line?.pronText,
-                typeof line?.text === 'string' && line.text !== line?.originalText
+                typeof line?.text === 'string'
                     ? line.text
                     : null
             ]
-                .find(value => typeof value === 'string' && value.trim() && value !== originalText)
-                || null;
-            const transText = [
+                .map(value => getDistinctOverlaySupplement(value, originalText))
+                .find(Boolean)
+                || null : null;
+            const transText = visibility.translation ? [
                 line?.text2,
                 line?.translation,
                 line?.translationText,
                 line?.transText
             ]
-                .find(value => typeof value === 'string' && value.trim() && value !== originalText)
-                || null;
+                .map(value => getDistinctOverlaySupplement(value, originalText))
+                .find(Boolean)
+                || null : null;
 
             const rawStartTime = Number(line?.startTime);
             const rawEndTime = line?.endTime == null ? null : Number(line.endTime);
@@ -9251,7 +9308,7 @@
                 line?.phoneticText,
                 line?.pronunciationText,
                 line?.pronText,
-                typeof line?.text === 'string' && line.text !== line?.originalText
+                typeof line?.text === 'string'
                     ? line.text
                     : null
             ]
@@ -9263,7 +9320,8 @@
             ];
 
         return candidates
-            .find(value => typeof value === 'string' && value.trim() && value !== originalText)
+            .map(value => getDistinctOverlaySupplement(value, originalText))
+            .find(Boolean)
             || null;
     };
 
@@ -9284,7 +9342,11 @@
 
     // 같은 곡/표시 설정의 스트리밍·부트스트랩 요청이 엇갈릴 때, 늦게 도착한
     // 원문 또는 불완전 결과가 이미 표시된 발음/번역을 지우지 않도록 보완한다.
-    const preserveOverlayAuxiliaryLyrics = (previousLyrics, nextLyrics) => {
+    const preserveOverlayAuxiliaryLyrics = (
+        previousLyrics,
+        nextLyrics,
+        visibility = { pronunciation: true, translation: true }
+    ) => {
         if (
             !Array.isArray(previousLyrics)
             || !Array.isArray(nextLyrics)
@@ -9317,10 +9379,18 @@
                 return line;
             }
 
-            const previousPronunciation = getOverlayLineAuxiliaryText(previousLine, 'pronunciation');
-            const nextPronunciation = getOverlayLineAuxiliaryText(line, 'pronunciation');
-            const previousTranslation = getOverlayLineAuxiliaryText(previousLine, 'translation');
-            const nextTranslation = getOverlayLineAuxiliaryText(line, 'translation');
+            const previousPronunciation = visibility.pronunciation
+                ? getOverlayLineAuxiliaryText(previousLine, 'pronunciation')
+                : null;
+            const nextPronunciation = visibility.pronunciation
+                ? getOverlayLineAuxiliaryText(line, 'pronunciation')
+                : null;
+            const previousTranslation = visibility.translation
+                ? getOverlayLineAuxiliaryText(previousLine, 'translation')
+                : null;
+            const nextTranslation = visibility.translation
+                ? getOverlayLineAuxiliaryText(line, 'translation')
+                : null;
             let nextLine = line;
 
             if (!nextPronunciation && previousPronunciation) {
@@ -9766,9 +9836,10 @@
                 lyrics,
                 effectivePresentationContext
             );
+            const supplementVisibility = getOverlaySupplementVisibility(effectivePresentationContext);
             const preserved = this._lastTrackInfo?.uri === trackInfo.uri
                 && this._lastPresentationKey === presentationKey
-                ? preserveOverlayAuxiliaryLyrics(this._lastLyrics, lyrics)
+                ? preserveOverlayAuxiliaryLyrics(this._lastLyrics, lyrics, supplementVisibility)
                 : {
                     lyrics,
                     preservedPronunciationCount: 0,
@@ -9836,7 +9907,7 @@
                 albumArt = resolveSpotifyImageUrl(imageUrl);
             } catch (e) { }
 
-            const mappedLines = mapLyricsForSender(lyricsToSend, offset);
+            const mappedLines = mapLyricsForSender(lyricsToSend, offset, supplementVisibility);
 
             // 현재 트랙 정보 가져오기 (Spicetify.Player.data에서 최신 정보 사용)
             const originalTitle = trackInfo.title || Spicetify.Player.data?.item?.metadata?.title || '';
@@ -10383,9 +10454,10 @@
                     lyrics,
                     effectivePresentationContext
                 );
+                const supplementVisibility = getOverlaySupplementVisibility(effectivePresentationContext);
                 const preserved = this._lastTrackInfo?.uri === trackInfo.uri
                     && this._lastPresentationKey === presentationKey
-                    ? preserveOverlayAuxiliaryLyrics(this._lastLyrics, lyrics)
+                    ? preserveOverlayAuxiliaryLyrics(this._lastLyrics, lyrics, supplementVisibility)
                     : {
                         lyrics,
                         preservedPronunciationCount: 0,
@@ -10453,7 +10525,7 @@
                     albumArt = resolveSpotifyImageUrl(imageUrl);
                 } catch (e) { }
 
-                const mappedLines = mapLyricsForSender(lyricsToSend, offset);
+                const mappedLines = mapLyricsForSender(lyricsToSend, offset, supplementVisibility);
 
                 // 현재 트랙 정보 가져오기 (Spicetify.Player.data에서 최신 정보 사용)
                 const currentTitle = trackInfo.title || Spicetify.Player.data?.item?.metadata?.title || '';

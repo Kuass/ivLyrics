@@ -2286,6 +2286,108 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
 		return result;
 	};
 
+    const PANEL_PRONUNCIATION_MODES = new Set([
+        'gemini_romaji',
+        'romaji',
+        'romaja',
+        'pinyin',
+        'hiragana',
+        'katakana',
+        'furigana'
+    ]);
+
+    const isPanelPronunciationMode = (mode) =>
+        PANEL_PRONUNCIATION_MODES.has(String(mode || '').trim().toLowerCase());
+
+    const getPanelSupplementVisibility = (displayMode1, displayMode2, hasExplicitModes = true) => {
+        if (!hasExplicitModes) {
+            return { pronunciation: false, translation: false };
+        }
+        const modes = [displayMode1, displayMode2].filter(mode => mode && mode !== 'none');
+        return {
+            pronunciation: modes.some(isPanelPronunciationMode),
+            translation: modes.some(mode => !isPanelPronunciationMode(mode))
+        };
+    };
+
+    const arePanelTextsEquivalent = (left, right) => {
+        if (typeof left !== 'string' || typeof right !== 'string') return false;
+        if (window.ivLyricsTextComparison?.areEquivalent) {
+            return window.ivLyricsTextComparison.areEquivalent(left, right);
+        }
+        return left.normalize('NFC').replace(/\s+/gu, ' ').trim()
+            === right.normalize('NFC').replace(/\s+/gu, ' ').trim();
+    };
+
+    const getDistinctPanelSupplement = (value, originalText, visible) => {
+        if (!visible || typeof value !== 'string') return '';
+        const text = value.trim();
+        return text && !arePanelTextsEquivalent(text, originalText) ? text : '';
+    };
+
+    const sanitizePanelLyricsSupplements = (lyrics, visibility) => (
+        Array.isArray(lyrics) ? lyrics.map((line) => {
+            if (!line || typeof line !== 'object') return line;
+            const originalText = String(line.originalText || line.text || '');
+            const sanitizePart = (part) => {
+                if (!part || typeof part !== 'object') return part;
+                const partText = String(part.text || (Array.isArray(part.syllables)
+                    ? part.syllables.map(syllable => syllable?.text || '').join('')
+                    : ''));
+                const nextPart = { ...part };
+                const phonetic = getDistinctPanelSupplement(
+                    part.phonetic ?? part.phoneticText ?? part.pronText,
+                    partText,
+                    visibility.pronunciation
+                );
+                const translation = getDistinctPanelSupplement(
+                    part.translation ?? part.translationText ?? part.transText,
+                    partText,
+                    visibility.translation
+                );
+                if (phonetic) nextPart.phonetic = phonetic;
+                else delete nextPart.phonetic;
+                delete nextPart.phoneticText;
+                delete nextPart.pronText;
+                if (translation) nextPart.translation = translation;
+                else delete nextPart.translation;
+                delete nextPart.translationText;
+                delete nextPart.transText;
+                return nextPart;
+            };
+            const vocals = line.vocals?.lead ? {
+                ...line.vocals,
+                lead: sanitizePart(line.vocals.lead),
+                background: Array.isArray(line.vocals.background)
+                    ? line.vocals.background.map(sanitizePart)
+                    : line.vocals.background
+            } : line.vocals;
+            const phoneticText = getDistinctPanelSupplement(
+                line.phoneticText ?? line.pronunciationText ?? line.pronText,
+                originalText,
+                visibility.pronunciation
+            );
+            const translationText = getDistinctPanelSupplement(
+                line.text2 ?? line.translation ?? line.translationText ?? line.transText,
+                originalText,
+                visibility.translation
+            );
+            const nextLine = {
+                ...line,
+                vocals,
+                phoneticText,
+                text2: translationText,
+                translationText
+            };
+            delete nextLine.phonetic;
+            delete nextLine.pronunciationText;
+            delete nextLine.pronText;
+            delete nextLine.translation;
+            delete nextLine.transText;
+            return nextLine;
+        }) : []
+    );
+
     const getVocalRowsFromLine = (line) => {
         if (!Array.isArray(line?.vocals?.lead?.syllables) || line.vocals.lead.syllables.length === 0) return null;
         const getPartText = (part) => {
@@ -2304,8 +2406,16 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             kind: line.vocals.lead.kind || 'vocal',
             speakerClass: getPanelSpeakerPresentation(line.vocals.lead.speaker, line.vocals.lead['speaker-color'], line.vocals.lead['speaker-fallback']).speakerClass,
             speakerStyle: getPanelSpeakerStyle(line.vocals.lead.speaker, line.vocals.lead['speaker-color'], line.vocals.lead['speaker-fallback']),
-            phonetic: line.vocals.lead.phonetic || '',
-            translation: line.vocals.lead.translation || '',
+            phonetic: getDistinctPanelSupplement(
+                line.vocals.lead.phonetic,
+                getPartText(line.vocals.lead),
+                true
+            ),
+            translation: getDistinctPanelSupplement(
+                line.vocals.lead.translation,
+                getPartText(line.vocals.lead),
+                true
+            ),
             text: getPartText(line.vocals.lead),
             syllables: splitRenderableSyllables(line.vocals.lead.syllables)
         }];
@@ -2322,8 +2432,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                         kind: part.kind || 'vocal',
                         speakerClass: getPanelSpeakerPresentation(part.speaker, part['speaker-color'], part['speaker-fallback']).speakerClass,
                         speakerStyle: getPanelSpeakerStyle(part.speaker, part['speaker-color'], part['speaker-fallback']),
-                        phonetic: part.phonetic || '',
-                        translation: part.translation || '',
+                        phonetic: getDistinctPanelSupplement(part.phonetic, getPartText(part), true),
+                        translation: getDistinctPanelSupplement(part.translation, getPartText(part), true),
                         text: getPartText(part),
                         syllables: splitRenderableSyllables(part.syllables)
                     });
@@ -3692,9 +3802,17 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const hasInitialPresentation = Array.isArray(initialSnapshot?.displayLyrics);
         const hasCompleteInitialPresentation = hasInitialPresentation &&
             initialSnapshot?.presentationComplete === true;
-        const initialLyrics = hasInitialPresentation
-            ? initialSnapshot.displayLyrics
-            : (currentLyricsState.trackUri === initialTrackUri ? currentLyricsState.lyrics : []);
+        const initialSupplementVisibility = getPanelSupplementVisibility(
+            initialSnapshot?.displayMode1,
+            initialSnapshot?.displayMode2,
+            hasCompleteInitialPresentation
+        );
+        const initialLyrics = sanitizePanelLyricsSupplements(
+            hasInitialPresentation
+                ? initialSnapshot.displayLyrics
+                : (currentLyricsState.trackUri === initialTrackUri ? currentLyricsState.lyrics : []),
+            initialSupplementVisibility
+        );
         const initialKaraokeSource = initialSnapshot?.karaokeSource
             || (currentLyricsState.trackUri === initialTrackUri ? currentLyricsState.karaokeSource : null);
         const [lyrics, setLyrics] = useState(initialLyrics);
@@ -3887,6 +4005,10 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                             panelDebug("[PanelLyrics] Karaoke sample:", lyricsData[0].syllables || lyricsData[0].vocals);
                         }
 
+                        lyricsData = sanitizePanelLyricsSupplements(
+                            lyricsData,
+                            getPanelSupplementVisibility(null, null, false)
+                        );
                         setLyrics(lyricsData);
                         setKaraokeSource(nextKaraokeSource);
                         currentLyricsState.lyrics = lyricsData;
@@ -4046,7 +4168,13 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 // 발음/번역이 모두 비활성화되어 있으면 스킵
                 if ((!displayMode1 || displayMode1 === "none") && (!displayMode2 || displayMode2 === "none")) {
                     panelDebug("[PanelLyrics] Translation/phonetic disabled for this language");
-                    publishCurrentPresentation(lyricsData, {
+                    const originalOnlyLyrics = sanitizePanelLyricsSupplements(
+                        lyricsData,
+                        getPanelSupplementVisibility(displayMode1, displayMode2)
+                    );
+                    setLyrics(originalOnlyLyrics);
+                    currentLyricsState.lyrics = originalOnlyLyrics;
+                    publishCurrentPresentation(originalOnlyLyrics, {
                         phoneticLines: [],
                         translationLines: []
                     });
@@ -4061,6 +4189,10 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     .reverse()
                     .find(mode => mode !== 'gemini_romaji') || null;
                 const needTranslation = !!translationMode;
+                const visibleLyricsData = sanitizePanelLyricsSupplements(
+                    lyricsData,
+                    { pronunciation: needPhonetic, translation: needTranslation }
+                );
 
                 panelDebug(`[PanelLyrics] Need phonetic: ${needPhonetic}, Need translation: ${needTranslation}`);
 
@@ -4161,7 +4293,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 // 결과 병합
                 if (phoneticLines.length > 0 || translationLines.length > 0) {
                     const updatedLyrics = applyPanelTranslationResults(
-                        lyricsData,
+                        visibleLyricsData,
                         translationRequests,
                         phoneticLines,
                         translationLines
@@ -4175,7 +4307,9 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                         translationLines
                     });
                 } else {
-                    publishCurrentPresentation(lyricsData, {
+                    setLyrics(visibleLyricsData);
+                    currentLyricsState.lyrics = visibleLyricsData;
+                    publishCurrentPresentation(visibleLyricsData, {
                         phoneticLines: [],
                         translationLines: []
                     });
@@ -4356,10 +4490,20 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     loadSeqRef.current += 1;
                     loadingRef.current = false;
                 }
+                const hasExplicitModes = Object.prototype.hasOwnProperty.call(detail, 'displayMode1')
+                    || Object.prototype.hasOwnProperty.call(detail, 'displayMode2');
+                const nextLyrics = sanitizePanelLyricsSupplements(
+                    detail.displayLyrics,
+                    getPanelSupplementVisibility(
+                        detail.displayMode1,
+                        detail.displayMode2,
+                        hasExplicitModes
+                    )
+                );
                 lastTrackUri.current = currentUri;
-                setLyrics(detail.displayLyrics);
+                setLyrics(nextLyrics);
                 setKaraokeSource(detail.karaokeSource || null);
-                currentLyricsState.lyrics = detail.displayLyrics;
+                currentLyricsState.lyrics = nextLyrics;
                 currentLyricsState.trackUri = currentUri;
                 currentLyricsState.karaokeSource = detail.karaokeSource || null;
             };
@@ -4841,8 +4985,16 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     lineIndex: i,
                     lineCount: lyrics.length,
                     originalText: line?.originalText || line?.text || '',
-                    phonetic: line?.phoneticText || ((line?.originalText && line?.text !== line?.originalText) ? line?.text : ''),
-                    translation: line?.text2 || '',
+                    phonetic: getDistinctPanelSupplement(
+                        line?.phoneticText,
+                        line?.originalText || line?.text || '',
+                        true
+                    ),
+                    translation: getDistinctPanelSupplement(
+                        line?.text2,
+                        line?.originalText || line?.text || '',
+                        true
+                    ),
                     isActive: isVirtualTrailingInterludeActive || (i === currentIndex && !activeTrailingInterludeKey),
                     isVisualAnchor: visualTrailingInterludeKey && visualIndex === currentIndex
                         ? isVirtualTrailingInterlude

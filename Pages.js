@@ -2093,10 +2093,12 @@ const getLyricsDisplayMode = (isKara, line, text, originalText, text2) => {
 	let mainText, subText, subText2;
 
 	if (isKara) {
-		// For karaoke mode, safely handle the line object
+		// Pronunciation is carried in explicit fields by the presentation pipeline.
+		// Do not infer it from `text`: provider lines commonly keep the original in
+		// both `text` and `originalText`, and small normalization differences can
+		// otherwise duplicate the original in the pronunciation row.
 		const karaokePhoneticText = line?.phoneticText
-			|| line?.phonetic
-			|| (line?.originalText && text && text !== line.originalText ? text : null);
+			|| line?.phonetic;
 		const karaokeTranslationText = line?.translationText || line?.translation || text2;
 		mainText = line; // Keep as object for KaraokeLine component
 		subText = karaokePhoneticText ? safeRenderText(karaokePhoneticText) : null;
@@ -2142,10 +2144,10 @@ const getEmbeddedAuxiliaryDisplayValues = (line) => {
 	if (!phoneticText && !translationText) {
 		const hasExplicitOriginalText = line?.originalText !== null && line?.originalText !== undefined;
 		return {
-			// Raw provider lines initially arrive as { text: original }. Until the
-			// presentation pipeline adds originalText, treating text as an auxiliary
-			// row renders the only lyric at the much smaller phonetic size.
-			text: hasExplicitOriginalText ? line?.text : null,
+			// A raw provider may supply both fields with the same original lyric.
+			// Generic `text` is not a typed pronunciation value, so never promote it
+			// into the pronunciation slot when no explicit supplement exists.
+			text: null,
 			originalText: hasExplicitOriginalText ? line?.originalText : line?.text,
 			text2: line?.text2,
 		};

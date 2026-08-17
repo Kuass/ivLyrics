@@ -583,6 +583,32 @@ const cloneTranslationVocals = (vocals) => {
   };
 };
 
+const withoutVocalSupplementField = (vocals, field) => {
+  if (!vocals?.lead || !field) {
+    return vocals;
+  }
+
+  const nextVocals = cloneTranslationVocals(vocals);
+  delete nextVocals.lead[field];
+  if (Array.isArray(nextVocals.background)) {
+    nextVocals.background.forEach((part) => delete part[field]);
+  }
+  return nextVocals;
+};
+
+const PRONUNCIATION_DISPLAY_MODES = new Set([
+  "gemini_romaji",
+  "romaji",
+  "romaja",
+  "pinyin",
+  "hiragana",
+  "katakana",
+  "furigana",
+]);
+
+const isPronunciationDisplayMode = (mode) =>
+  PRONUNCIATION_DISPLAY_MODES.has(String(mode || "").trim().toLowerCase());
+
 const assignTranslationVocalResult = (vocals, vocalPart, targetField, value) => {
   if (!vocals || !vocalPart || !targetField || !value) {
     return;
@@ -7778,8 +7804,13 @@ class LyricsContainer extends react.Component {
     }
 
     // Determine which mode is phonetic (romaji) and which is translation
-    const mode1IsPhonetic = displayMode1 === "gemini_romaji";
-    const mode2IsPhonetic = displayMode2 === "gemini_romaji";
+    const mode1IsPhonetic = isPronunciationDisplayMode(displayMode1);
+    const mode2IsPhonetic = isPronunciationDisplayMode(displayMode2);
+    const phoneticModeEnabled = mode1IsPhonetic || mode2IsPhonetic;
+    const translationModeEnabled = Boolean(
+      (displayMode1 && displayMode1 !== "none" && !mode1IsPhonetic) ||
+      (displayMode2 && displayMode2 !== "none" && !mode2IsPhonetic)
+    );
 
     // Helper: note/placeholder-only line (e.g., ♪, …)
     const isNoteLine = (text) => {
@@ -7840,7 +7871,23 @@ class LyricsContainer extends react.Component {
 
       // If original is a note/placeholder line, never show sub-lines
       if (isNoteLine(originalText)) {
-        return { ...line, originalText, text: null, text2: null };
+        let vocals = withoutVocalSupplementField(line?.vocals, "phonetic");
+        vocals = withoutVocalSupplementField(vocals, "translation");
+        const noteLine = {
+          ...line,
+          vocals,
+          originalText,
+          text: null,
+          text2: null,
+          phoneticText: null,
+          translationText: null,
+        };
+        delete noteLine.phonetic;
+        delete noteLine.pronunciationText;
+        delete noteLine.pronText;
+        delete noteLine.translation;
+        delete noteLine.transText;
+        return noteLine;
       }
 
       // Ignore translations that are notes-only
@@ -7918,7 +7965,16 @@ class LyricsContainer extends react.Component {
         }
       }
 
+      // Provider/cached lines may already contain supplement fields. The
+      // language rule is authoritative: disabled supplements must not leak
+      // back into the renderer from the base line or a previous presentation.
       let finalVocals = line?.vocals;
+      if (!phoneticModeEnabled) {
+        finalVocals = withoutVocalSupplementField(finalVocals, "phonetic");
+      }
+      if (!translationModeEnabled) {
+        finalVocals = withoutVocalSupplementField(finalVocals, "translation");
+      }
       const mergeModeVocalResults = (modeLine, isPhoneticMode) => {
         const targetField = isPhoneticMode ? "phonetic" : "translation";
         finalVocals = mergeVocalTranslationFields(
@@ -7946,22 +8002,27 @@ class LyricsContainer extends react.Component {
       }
 
       // Create safe line object ensuring all properties are valid
+      const finalPhoneticText = finalText ? String(finalText) : null;
+      const finalTranslationText = finalText2 ? String(finalText2) : null;
       const safeLine = {
         ...(line && typeof line === "object" ? line : {}),
         vocals: finalVocals,
         originalText: String(originalText),
-        phoneticText: finalText
-          ? String(finalText)
-          : (mode1IsPhonetic || mode2IsPhonetic)
-            ? null
-            : (line?.phoneticText || null),
-        text: finalText ? String(finalText) : null,
-        text2: finalText2
-          ? String(finalText2)
-          : ((mode1 && !mode1IsPhonetic) || (mode2 && !mode2IsPhonetic))
-            ? null
-            : (line.text2 ? String(line.text2) : null),
+        phoneticText: finalPhoneticText,
+        text: finalPhoneticText,
+        text2: finalTranslationText,
+        translationText: finalTranslationText,
       };
+
+      if (!finalPhoneticText) {
+        delete safeLine.phonetic;
+        delete safeLine.pronunciationText;
+        delete safeLine.pronText;
+      }
+      if (!finalTranslationText) {
+        delete safeLine.translation;
+        delete safeLine.transText;
+      }
 
       return safeLine;
     });
