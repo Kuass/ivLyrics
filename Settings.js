@@ -16318,16 +16318,21 @@ const ConfigModal = ({
     width: 38px !important;
     min-width: 38px;
     height: 22px !important;
+    padding: 0 !important;
     border: 0.5px solid var(--settings-border-strong) !important;
+    border-radius: 999px !important;
     background: #1a1c1e !important;
+    box-sizing: border-box;
 }
 
 #${APP_NAME}-config-container .switch-checkbox::after {
-    top: 3px !important;
-    left: 3px !important;
-    width: 14px !important;
-    height: 14px !important;
+    top: 50% !important;
+    left: 2.5px !important;
+    width: 16px !important;
+    height: 16px !important;
+    border-radius: 50% !important;
     background: #666b70 !important;
+    transform: translateY(-50%) !important;
 }
 
 #${APP_NAME}-config-container .switch-checkbox.active {
@@ -16337,10 +16342,10 @@ const ConfigModal = ({
 
 #${APP_NAME}-config-container .switch-checkbox.active::after {
     background: #0a0b0c !important;
-    transform: translateX(16px) !important;
+    transform: translate(16px, -50%) !important;
 }
 
-#${APP_NAME}-config-container[data-ui-theme="light"] .switch-checkbox {
+#${APP_NAME}-config-container[data-ui-theme="light"] .switch-checkbox:not(.active) {
     background: #e1e4e6 !important;
 }
 
@@ -16455,15 +16460,18 @@ const ConfigModal = ({
     border: 0.5px solid var(--settings-border-strong) !important;
     border-radius: 999px !important;
     background: #1a1c1e !important;
+    box-sizing: border-box;
 }
 
 #${APP_NAME}-config-container .lyrics-provider-toggle .toggle-slider::before {
     width: 16px !important;
     height: 16px !important;
     left: 2.5px !important;
-    bottom: 2.5px !important;
+    top: 50% !important;
+    bottom: auto !important;
     border-radius: 50% !important;
     background: #666b70 !important;
+    transform: translateY(-50%) !important;
 }
 
 #${APP_NAME}-config-container .lyrics-provider-toggle input:checked + .toggle-slider {
@@ -16473,7 +16481,11 @@ const ConfigModal = ({
 
 #${APP_NAME}-config-container .lyrics-provider-toggle input:checked + .toggle-slider::before {
     background: #0a0b0c !important;
-    transform: translateX(16px) !important;
+    transform: translate(16px, -50%) !important;
+}
+
+#${APP_NAME}-config-container[data-ui-theme="light"] .lyrics-provider-toggle input:not(:checked) + .toggle-slider {
+    background: #e1e4e6 !important;
 }
 
 #${APP_NAME}-config-container .lyrics-provider-title-group {
