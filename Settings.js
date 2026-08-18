@@ -9393,7 +9393,10 @@ const ConfigModal = ({
 
     const renderSidebarTab = (tab) => {
       const sectionItems = sidebarSectionsByTab[tab.id] || [];
-      const hasSubmenu = !tab.standalone && sectionItems.length > 0;
+      // Section items are discovered from each tab's DOM after that tab is
+      // rendered. Keep non-standalone tabs as groups before discovery so their
+      // disclosure indicator is present on the initial sidebar render too.
+      const hasSubmenu = !tab.standalone;
       const isExpanded = expandedGroupIds.includes(tab.id);
       const isTabActive = activeTab === tab.id;
       const submenuId = `${APP_NAME}-settings-nav-${tab.id}`;
