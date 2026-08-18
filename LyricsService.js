@@ -2367,7 +2367,9 @@
                     && typeof contributor === 'object'
                     && (contributor.isPrivate === true || contributor.profilePublic === false)
                 ),
-                identityRedacted: true
+                identityRedacted: true,
+				...(contributor?.syncType ? { syncType: contributor.syncType } : {}),
+				...(Number.isFinite(Number(contributor?.syncPoints)) ? { syncPoints: Number(contributor.syncPoints) } : {})
             });
             const cached = { ...syncData };
             if (Array.isArray(syncData.contributors)) {
@@ -3844,6 +3846,10 @@
                             provider: data.provider || provider,
                             syncData: syncDataBody,
                             contributors: data.contributors || [],
+							syncType: data.syncType || 'unknown',
+							syncPoints: Number(data.syncPoints || 2),
+							syncTypeSource: data.syncTypeSource || 'legacy',
+							syncTypeBreakdown: data.syncTypeBreakdown || null,
                             createdAt: data.createdAt || null,
                             updatedAt: data.updatedAt || null
                         };
@@ -8292,6 +8298,9 @@
                     result.karaoke = karaoke;
                     result.syncDataApplied = true;
                     result.syncDataProvider = result.provider;
+					result.syncType = syncData.syncType || 'unknown';
+					result.syncPoints = Number(syncData.syncPoints || 2);
+					result.syncTypeBreakdown = syncData.syncTypeBreakdown || null;
 
                     // sync-data가 있으면 synced도 오버라이드
                     const syncedFromSyncData = window.SyncDataService.convertKaraokeToSynced(karaoke);

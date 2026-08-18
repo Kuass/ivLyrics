@@ -3474,6 +3474,9 @@ const emptyState = {
   synced: null,
   unsynced: null,
   currentLyrics: null,
+  syncType: null,
+  syncPoints: null,
+  syncTypeBreakdown: null,
 };
 
 const getPlainLyricsLineText = (line) => {
@@ -4824,6 +4827,9 @@ class LyricsContainer extends react.Component {
       trackLyricsProviderOverride: null,
       trackBackgroundOverride: null,
       contributors: null,
+	  syncType: null,
+	  syncPoints: null,
+	  syncTypeBreakdown: null,
       colors: {
         background: "",
         inactive: "",
@@ -10182,6 +10188,9 @@ class LyricsContainer extends react.Component {
         unsynced: renderedUnsyncedLyrics,
         provider: this.state.provider,
         contributors: this.state.contributors,
+		syncType: this.state.syncType,
+		syncPoints: this.state.syncPoints,
+		syncTypeBreakdown: this.state.syncTypeBreakdown,
         copyright: this.state.copyright,
         isLoading: this.state.isLoading,
         showMarketplace: this.state.showMarketplace,

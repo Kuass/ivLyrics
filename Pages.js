@@ -12,6 +12,13 @@ function getCreatorProfileCopy() {
 		switchToLight: I18n.t("settingsUi.theme.light") || "Switch to light mode",
 		contributions: I18n.t("creatorProfile.contributions") || "Sync Contributions",
 		tracks: I18n.t("creatorProfile.tracks") || "Synced tracks",
+		points: I18n.t("creatorProfile.points") || "Contribution points",
+		pointsShort: I18n.t("creatorProfile.pointsShort") || "pts",
+		typeLine: I18n.t("creatorProfile.typeLine") || "Line",
+		typeWord: I18n.t("creatorProfile.typeWord") || "Word",
+		typeCharacter: I18n.t("creatorProfile.typeCharacter") || "Character",
+		typeMixed: I18n.t("creatorProfile.typeMixed") || "Mixed",
+		typeUnknown: I18n.t("creatorProfile.typeUnknown") || "Legacy sync",
 		likes: I18n.t("creatorProfile.likes") || "Likes",
 		like: I18n.t("creatorProfile.like") || "Like",
 		liked: I18n.t("creatorProfile.liked") || "Liked",
@@ -57,6 +64,41 @@ function getCreatorProfileCopy() {
 		supportRoleRefreshFailed: I18n.t("creatorProfile.supportRoleRefreshFailed") || "Failed to refresh supporter role."
 	};
 }
+
+function normalizePublicSyncType(value) {
+	const normalized = String(value || "").trim().toLowerCase();
+	return ["line", "word", "character", "mixed"].includes(normalized) ? normalized : "unknown";
+}
+
+function getSyncTypePresentation(value, copy = getCreatorProfileCopy()) {
+	const type = normalizePublicSyncType(value);
+	return {
+		type,
+		label: type === "line" ? copy.typeLine : type === "word" ? copy.typeWord : type === "character" ? copy.typeCharacter : type === "mixed" ? copy.typeMixed : copy.typeUnknown
+	};
+}
+
+const SyncTypeBadge = ({ type, points = null, compact = false, hideUnknown = false }) => {
+	const copy = getCreatorProfileCopy();
+	const presentation = getSyncTypePresentation(type, copy);
+	if (hideUnknown && presentation.type === "unknown") return null;
+	const numericPoints = Number(points);
+	const title = Number.isFinite(numericPoints) && numericPoints > 0
+		? `${presentation.label} · ${numericPoints} ${copy.pointsShort}`
+		: presentation.label;
+	return react.createElement(
+		"span",
+		{
+			className: `lyrics-sync-type-badge is-${presentation.type}${compact ? " is-compact" : ""}`,
+			title,
+			"aria-label": title
+		},
+		presentation.label,
+		!compact && Number.isFinite(numericPoints) && numericPoints > 0
+			? react.createElement("span", { className: "lyrics-sync-type-points" }, `+${numericPoints}`)
+			: null
+	);
+};
 
 function getSupportBadgeLabel(tier, copy = getCreatorProfileCopy()) {
 	if (tier === "monthly") return copy.monthlySupporter;
@@ -173,7 +215,9 @@ function normalizeContributorEntry(contributor, options = {}) {
 		identityRedacted,
 		decoration: !identityHidden && contributor.decoration && typeof contributor.decoration === "object"
 			? contributor.decoration
-			: null
+			: null,
+		syncType: normalizePublicSyncType(contributor.syncType),
+		syncPoints: Number.isFinite(Number(contributor.syncPoints)) ? Number(contributor.syncPoints) : null
 	};
 }
 
@@ -795,7 +839,11 @@ const SyncCreatorProfileModal = react.memo(({
 	const avatarUrl = account?.profileImage || contributor?.avatarUrl || null;
 	const initial = (displayName || copy.anonymous).charAt(0).toUpperCase();
 	const trackCount = Number(profileData.stats?.trackCount || 0);
+	const contributionPoints = Number(profileData.stats?.contributionPoints || 0);
 	const likeCount = Number(profileData.stats?.likeCount || 0);
+	const typeCounts = profileData.stats?.typeCounts && typeof profileData.stats.typeCounts === "object"
+		? profileData.stats.typeCounts
+		: {};
 	const artistGroupCount = Number(profileData.stats?.artistGroupCount || 0);
 	const totalContributionCount = Number(profileData.pagination?.totalCount || trackCount || 0);
 	const loadedContributionCount = contributions.length;
@@ -1198,20 +1246,38 @@ const SyncCreatorProfileModal = react.memo(({
 							react.createElement("strong", null, trackCount.toLocaleString()),
 							react.createElement("span", null, copy.tracks)
 						),
+					react.createElement(
+						"div",
+						{ className: "lyrics-creator-profile-stat" },
+						react.createElement("strong", null, likeCount.toLocaleString()),
+						react.createElement("span", null, copy.likes)
+					),
+					react.createElement(
+						"div",
+						{ className: "lyrics-creator-profile-stat is-points" },
+						react.createElement("strong", null, contributionPoints.toLocaleString()),
+						react.createElement("span", null, copy.points),
 						react.createElement(
-							"div",
-							{ className: "lyrics-creator-profile-stat" },
-							react.createElement("strong", null, likeCount.toLocaleString()),
-							react.createElement("span", null, copy.likes)
+							"span",
+							{ className: "lyrics-creator-profile-type-summary" },
+							...["line", "word", "character", "mixed"]
+								.filter((type) => Number(typeCounts[type] || 0) > 0)
+								.map((type) => react.createElement(
+									"span",
+									{ key: type, className: `lyrics-creator-profile-type-count is-${type}` },
+									react.createElement(SyncTypeBadge, { type, compact: true }),
+									Number(typeCounts[type] || 0).toLocaleString()
+								))
 						)
 					)
-					: react.createElement(
-						"div",
-						{ className: "lyrics-creator-profile-inline-state" },
-						copy.loading
-					)
+				)
+				: react.createElement(
+					"div",
+					{ className: "lyrics-creator-profile-inline-state" },
+					copy.loading
 			)
-		),
+		)
+	),
 		error
 			? react.createElement(
 				"div",
@@ -1315,9 +1381,10 @@ const SyncCreatorProfileModal = react.memo(({
 											react.createElement("div", { className: "lyrics-creator-profile-track-artist" }, item.artists || item.trackId)
 										),
 										react.createElement(
-											"div",
-											{ className: "lyrics-creator-profile-track-side" },
-											react.createElement("span", { className: "lyrics-creator-profile-track-provider" }, item.provider),
+										"div",
+										{ className: "lyrics-creator-profile-track-side" },
+										react.createElement(SyncTypeBadge, { type: item.syncType, points: item.syncPoints }),
+										react.createElement("span", { className: "lyrics-creator-profile-track-provider" }, item.provider),
 											updatedLabel && react.createElement("span", { className: "lyrics-creator-profile-track-updated" }, `${copy.updated} ${updatedLabel}`)
 										)
 									);
@@ -1915,10 +1982,10 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 					{ className: "lyrics-credit-footer-label" },
 					I18n.t("misc.lyricsProvider") || "Lyrics Provider"
 				),
-				react.createElement(
-					"span",
-					{ className: "lyrics-credit-footer-value" },
-					provider
+					react.createElement(
+						"span",
+						{ className: "lyrics-credit-footer-value" },
+						provider
 				)
 			),
 			visibleContributors.length > 0 && react.createElement(
@@ -1937,7 +2004,7 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 						"span",
 						{ className: "lyrics-credit-footer-value lyrics-credit-footer-contributors" },
 						...visibleContributors.flatMap((contributor, index) => {
-							const supportInfo = contributor.userHash ? supportByUserHash[contributor.userHash] : null;
+						const supportInfo = contributor.userHash ? supportByUserHash[contributor.userHash] : null;
 							const decorationStyle = getCreatorDecorationStyle(supportInfo?.tier, supportInfo?.decoration);
 							const decorationClass = decorationStyle
 								? ` is-supporter${supportInfo?.tier === "monthly" ? " is-monthly" : ""}${supportInfo?.decoration?.mode === "gradient" && supportInfo?.tier === "monthly" ? " is-gradient" : ""}`
@@ -1970,9 +2037,9 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 									contributor.name
 								);
 
-							return index < visibleContributors.length - 1
-								? [node, react.createElement("span", { key: `${contributor.key}:comma`, className: "lyrics-credit-footer-separator" }, ", ")]
-								: [node];
+						return index < visibleContributors.length - 1
+							? [node, react.createElement("span", { key: `${contributor.key}:comma`, className: "lyrics-credit-footer-separator" }, ", ")]
+							: [node];
 						})
 					)
 				)
@@ -7875,7 +7942,9 @@ const LyricsPage = ({ lyricsContainer }) => {
 		lyricsContainer.render(),
 		react.createElement(CreditFooter, {
 			provider: lyricsContainer.state.provider,
-			contributors: lyricsContainer.state.contributors
+			contributors: lyricsContainer.state.contributors,
+			syncType: lyricsContainer.state.syncType,
+			syncPoints: lyricsContainer.state.syncPoints
 		})
 	);
 };
@@ -7903,6 +7972,9 @@ const LyricsPageRenderer = react.memo(({
 	unsynced = null,
 	provider = null,
 	contributors = null,
+	syncType = null,
+	syncPoints = null,
+	syncTypeBreakdown = null,
 	copyright = null,
 	isLoading = false,
 	showMarketplace = false,
@@ -7989,6 +8061,9 @@ const LyricsPageRenderer = react.memo(({
 		trackUri,
 		provider,
 		contributors,
+		syncType,
+		syncPoints,
+		syncTypeBreakdown,
 		copyright,
 		reRenderLyricsPage,
 	]);
@@ -8008,6 +8083,8 @@ const LyricsPageRenderer = react.memo(({
 		react.createElement(CreditFooter, {
 			provider,
 			contributors,
+			syncType,
+			syncPoints,
 		})
 	);
 });
