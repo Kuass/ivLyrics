@@ -477,9 +477,9 @@ download_file() {
         EXPECTED_SHA256=$(curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 "$CHECKSUM_URL" 2>/dev/null | awk 'NR == 1 {print tolower($1)}') || return 1
     fi
     case "$EXPECTED_SHA256" in
-        [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
-        *) return 1 ;;
+        ''|*[!0-9a-f]*) return 1 ;;
     esac
+    [ "${#EXPECTED_SHA256}" -eq 64 ] || return 1
     ACTUAL_SHA256=$(calculate_sha256 "$TEMP_ZIP") || return 1
     [ "$ACTUAL_SHA256" = "$EXPECTED_SHA256" ]
 }
