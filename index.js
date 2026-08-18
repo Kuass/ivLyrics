@@ -488,8 +488,15 @@ const getTranslationSourceCacheHash = (text) => {
 
 const getTranslationResultCacheHash = (text, isPhonetic = false) => {
   const sourceHash = getTranslationSourceCacheHash(text);
-  if (!isPhonetic) return sourceHash;
-  return `${sourceHash}:phonetic-prompt=${LYRICS_PHONETIC_PROMPT_CACHE_VERSION}:notation=${getCurrentLyricsPronunciationNotation()}`;
+  if (isPhonetic) {
+    return `${sourceHash}:phonetic-prompt=${LYRICS_PHONETIC_PROMPT_CACHE_VERSION}:notation=${getCurrentLyricsPronunciationNotation()}`;
+  }
+
+  const translationStyle =
+    window.AIAddonManager?.getTranslationStyle?.() || "natural";
+  return translationStyle !== "natural"
+    ? `${sourceHash}:style=${translationStyle}`
+    : sourceHash;
 };
 
 const getLyricsProcessingShapeSignature = (lyrics = []) => {
@@ -4859,7 +4866,11 @@ class LyricsContainer extends react.Component {
       lyricsEditOriginalLines: [],
       lyricsEditPronunciationText: "",
       lyricsEditTranslationText: "",
-      lyricsEditSourceHash: "",
+      lyricsEditPronunciationSourceHash: "",
+      lyricsEditTranslationSourceHash: "",
+      lyricsEditTrackUri: "",
+      lyricsEditProvider: null,
+      lyricsEditTargetLanguage: "",
       lyricsEditHasPronunciationCache: false,
       lyricsEditHasTranslationCache: false,
       lyricsEditError: "",
@@ -4871,6 +4882,7 @@ class LyricsContainer extends react.Component {
     this._lyricsFetchSeq = 0;
     this._activeLyricsFetchSeq = 0;
     this._lyricsPresentationSeq = 0;
+    this._lyricsEditRequestSeq = 0;
     this._playbackTrackResolutionSeq = 0;
     this._playbackTrackResolutionTimer = null;
     this.nextTrackUri = "";
@@ -5522,9 +5534,122 @@ class LyricsContainer extends react.Component {
   }
 
   getEditableCacheSourceLines() {
-    return (this.getEditingBaseLyrics() || [])
-      .map((line) => line?.originalText || line?.text || "")
-      .filter((line) => !Utils.isSectionHeader(line) && String(line).trim() !== "");
+    return buildTranslationLineRequests(this.getEditingBaseLyrics())
+      .map((request) => request.text);
+  }
+
+  getCacheEditorResultLines(cache, isPhonetic) {
+    const value = isPhonetic
+      ? cache?.phonetic
+      : (cache?.translation ?? cache?.vi);
+
+    if (Array.isArray(value)) {
+      return value.map((line) => String(line ?? ""));
+    }
+    if (typeof value === "string") {
+      return value.replace(/\r\n?/g, "\n").split("\n");
+    }
+    return null;
+  }
+
+  mapLegacyCacheLinesToEditor(lines, baseLyrics, sourceRequests) {
+    const legacyRequests = buildTranslationLineRequests(baseLyrics, {
+      splitVocalParts: false,
+    });
+    if (!Array.isArray(lines) || lines.length !== legacyRequests.length) {
+      return null;
+    }
+
+    const firstEditorIndexByLine = new Map();
+    sourceRequests.forEach((request, index) => {
+      if (!firstEditorIndexByLine.has(request.lineIndex)) {
+        firstEditorIndexByLine.set(request.lineIndex, index);
+      }
+    });
+
+    const editorLines = Array.from({ length: sourceRequests.length }, () => "");
+    legacyRequests.forEach((request, index) => {
+      const editorIndex = firstEditorIndexByLine.get(request.lineIndex);
+      if (editorIndex !== undefined) {
+        editorLines[editorIndex] = String(lines[index] ?? "");
+      }
+    });
+    return editorLines;
+  }
+
+  async getCacheEditorTranslation({
+    trackId,
+    targetLanguage,
+    isPhonetic,
+    provider,
+    baseLyrics,
+    sourceRequests,
+  }) {
+    const sourceText = sourceRequests.map((request) => request.text).join("\n");
+    const legacyText = getLegacyNonSectionLyricsText(baseLyrics);
+    const sourceHash = getTranslationResultCacheHash(sourceText, isPhonetic);
+    const legacyHash = getTranslationResultCacheHash(legacyText, isPhonetic);
+    const plainSourceHash = getTranslationSourceCacheHash(sourceText);
+    const plainLegacyHash = getTranslationSourceCacheHash(legacyText);
+    const providers = provider ? [provider, null] : [null];
+    const candidates = [];
+    const seen = new Set();
+    const addCandidate = (candidateProvider, hash, splitVocalParts) => {
+      const key = `${candidateProvider || ""}:${hash || ""}:${splitVocalParts}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      candidates.push({ provider: candidateProvider, hash, splitVocalParts });
+    };
+
+    providers.forEach((candidateProvider) =>
+      addCandidate(candidateProvider, sourceHash, true)
+    );
+    // Recover entries saved by older cache editors that did not include the
+    // pronunciation notation or translation style in the key.
+    providers.forEach((candidateProvider) =>
+      addCandidate(candidateProvider, plainSourceHash, true)
+    );
+    providers.forEach((candidateProvider) =>
+      addCandidate(candidateProvider, legacyHash, false)
+    );
+    providers.forEach((candidateProvider) =>
+      addCandidate(candidateProvider, plainLegacyHash, false)
+    );
+    providers.forEach((candidateProvider) =>
+      addCandidate(candidateProvider, null, false)
+    );
+
+    for (const candidate of candidates) {
+      const cache = await LyricsCache.getTranslation(
+        trackId,
+        targetLanguage,
+        isPhonetic,
+        candidate.provider,
+        candidate.hash
+      );
+      const cacheLines = this.getCacheEditorResultLines(cache, isPhonetic);
+      if (!cacheLines?.some((line) => line.trim() !== "")) {
+        continue;
+      }
+
+      if (candidate.splitVocalParts) {
+        if (cacheLines.length === sourceRequests.length) {
+          return cacheLines;
+        }
+        continue;
+      }
+
+      const mappedLines = this.mapLegacyCacheLinesToEditor(
+        cacheLines,
+        baseLyrics,
+        sourceRequests
+      );
+      if (mappedLines) {
+        return mappedLines;
+      }
+    }
+
+    return [];
   }
 
   buildCacheEditorText(lines, expectedCount) {
@@ -5551,23 +5676,28 @@ class LyricsContainer extends react.Component {
     return lines;
   }
 
-  closeLyricsEditModal() {
-    if (this.state.isLyricsEditSaving) {
+  closeLyricsEditModal({ force = false } = {}) {
+    if (this.state.isLyricsEditSaving && !force) {
       return;
     }
+
+    this._lyricsEditRequestSeq += 1;
 
     this.setState({
       isLyricsEditModalOpen: false,
       isLyricsEditLoading: false,
+      isLyricsEditSaving: false,
       lyricsEditError: "",
     });
   }
 
   async openLyricsEditModal() {
-    const sourceLines = this.getEditableCacheSourceLines();
-    const sourceText = getLegacyNonSectionLyricsText(this.getEditingBaseLyrics());
-    const sourceHash = getTranslationSourceCacheHash(sourceText);
-    const trackId = Utils.extractTrackId(this.state.uri);
+    const baseLyrics = this.getEditingBaseLyrics();
+    const sourceRequests = buildTranslationLineRequests(baseLyrics);
+    const sourceLines = sourceRequests.map((request) => request.text);
+    const sourceText = sourceLines.join("\n");
+    const trackUri = this.state.uri;
+    const trackId = Utils.extractTrackId(trackUri);
 
     if (!trackId || sourceLines.length === 0) {
       Toast.error(I18n.t("notifications.noLyricsLoaded"));
@@ -5576,6 +5706,7 @@ class LyricsContainer extends react.Component {
 
     const userLang = this.getTranslationTargetLanguage();
     const provider = this.state.provider || null;
+    const requestSeq = ++this._lyricsEditRequestSeq;
 
     this.setState({
       isLyricsEditModalOpen: true,
@@ -5584,33 +5715,50 @@ class LyricsContainer extends react.Component {
       lyricsEditOriginalLines: sourceLines,
       lyricsEditPronunciationText: "",
       lyricsEditTranslationText: "",
-      lyricsEditSourceHash: sourceHash,
+      lyricsEditPronunciationSourceHash: getTranslationResultCacheHash(
+        sourceText,
+        true
+      ),
+      lyricsEditTranslationSourceHash: getTranslationResultCacheHash(
+        sourceText,
+        false
+      ),
+      lyricsEditTrackUri: trackUri,
+      lyricsEditProvider: provider,
+      lyricsEditTargetLanguage: userLang,
       lyricsEditHasPronunciationCache: false,
       lyricsEditHasTranslationCache: false,
       lyricsEditError: "",
     });
 
     try {
-      const [
-        phoneticCache,
-        translationCache,
-        legacyPhoneticCache,
-        legacyTranslationCache,
-      ] = await Promise.all([
-        LyricsCache.getTranslation(trackId, userLang, true, provider, sourceHash),
-        LyricsCache.getTranslation(trackId, userLang, false, provider, sourceHash),
-        LyricsCache.getTranslation(trackId, userLang, true, provider),
-        LyricsCache.getTranslation(trackId, userLang, false, provider),
+      const [phoneticLines, translationLines] = await Promise.all([
+        this.getCacheEditorTranslation({
+          trackId,
+          targetLanguage: userLang,
+          isPhonetic: true,
+          provider,
+          baseLyrics,
+          sourceRequests,
+        }),
+        this.getCacheEditorTranslation({
+          trackId,
+          targetLanguage: userLang,
+          isPhonetic: false,
+          provider,
+          baseLyrics,
+          sourceRequests,
+        }),
       ]);
-      const activePhoneticCache = phoneticCache || legacyPhoneticCache;
-      const activeTranslationCache = translationCache || legacyTranslationCache;
 
-      const phoneticLines = Array.isArray(activePhoneticCache?.phonetic)
-        ? activePhoneticCache.phonetic
-        : [];
-      const translationLines = Array.isArray(activeTranslationCache?.translation)
-        ? activeTranslationCache.translation
-        : [];
+      if (
+        !this._isComponentMounted ||
+        requestSeq !== this._lyricsEditRequestSeq ||
+        !this.state.isLyricsEditModalOpen ||
+        this.state.uri !== trackUri
+      ) {
+        return;
+      }
 
       this.setState({
         isLyricsEditLoading: false,
@@ -5630,6 +5778,13 @@ class LyricsContainer extends react.Component {
         ),
       });
     } catch (error) {
+      if (
+        !this._isComponentMounted ||
+        requestSeq !== this._lyricsEditRequestSeq ||
+        this.state.uri !== trackUri
+      ) {
+        return;
+      }
       this.setState({
         isLyricsEditLoading: false,
         lyricsEditError: I18n.t("lyricsCacheEditor.loadFailed"),
@@ -5689,7 +5844,8 @@ class LyricsContainer extends react.Component {
       return;
     }
 
-    const trackId = Utils.extractTrackId(this.state.uri);
+    const editorTrackUri = this.state.lyricsEditTrackUri || this.state.uri;
+    const trackId = Utils.extractTrackId(editorTrackUri);
     if (!trackId) {
       this.setState({
         lyricsEditError: I18n.t("lyricsCacheEditor.trackMissing"),
@@ -5697,11 +5853,22 @@ class LyricsContainer extends react.Component {
       return;
     }
 
-    const userLang = this.getTranslationTargetLanguage();
-    const provider = this.state.provider || null;
-    const sourceHash =
-      this.state.lyricsEditSourceHash ||
-      getTranslationSourceCacheHash(getNonSectionLyricsText(this.getEditingBaseLyrics()));
+    const userLang =
+      this.state.lyricsEditTargetLanguage || this.getTranslationTargetLanguage();
+    const provider = this.state.lyricsEditProvider ?? this.state.provider ?? null;
+    const pronunciationSourceHash =
+      this.state.lyricsEditPronunciationSourceHash ||
+      getTranslationResultCacheHash(
+        getNonSectionLyricsText(this.getEditingBaseLyrics()),
+        true
+      );
+    const translationSourceHash =
+      this.state.lyricsEditTranslationSourceHash ||
+      getTranslationResultCacheHash(
+        getNonSectionLyricsText(this.getEditingBaseLyrics()),
+        false
+      );
+    const requestSeq = this._lyricsEditRequestSeq;
 
     this.setState({
       isLyricsEditSaving: true,
@@ -5716,7 +5883,7 @@ class LyricsContainer extends react.Component {
           true,
           { phonetic: pronunciationLines },
           provider,
-          sourceHash
+          pronunciationSourceHash
         ),
         LyricsCache.setTranslation(
           trackId,
@@ -5724,9 +5891,17 @@ class LyricsContainer extends react.Component {
           false,
           { translation: translationLines },
           provider,
-          sourceHash
+          translationSourceHash
         ),
       ]);
+
+      if (
+        !this._isComponentMounted ||
+        requestSeq !== this._lyricsEditRequestSeq ||
+        this.state.uri !== editorTrackUri
+      ) {
+        return;
+      }
 
       this.setState({
         isLyricsEditModalOpen: false,
@@ -8864,6 +9039,9 @@ class LyricsContainer extends react.Component {
     const transitionSeq = ++this._lyricsFetchSeq;
     this._activeLyricsFetchSeq = transitionSeq;
     this.clearPendingLyricsUpdates();
+    if (this.state.isLyricsEditModalOpen) {
+      this.closeLyricsEditModal({ force: true });
+    }
     this.setState({
       karaoke: null,
       karaokeGranularity: null,
@@ -8878,6 +9056,9 @@ class LyricsContainer extends react.Component {
 
   commitDjNarrationTrack(track, snapshot) {
     const uri = track?.uri || snapshot?.uri || "";
+    if (this.state.isLyricsEditModalOpen) {
+      this.closeLyricsEditModal({ force: true });
+    }
     const transitionSeq = ++this._lyricsFetchSeq;
     this._activeLyricsFetchSeq = transitionSeq;
     this.currentTrackUri = uri;
@@ -8914,7 +9095,7 @@ class LyricsContainer extends react.Component {
     }
 
     if (this.state.isLyricsEditModalOpen) {
-      this.closeLyricsEditModal();
+      this.closeLyricsEditModal({ force: true });
     }
     const previousTrackId = Utils.extractTrackId(this.currentTrackUri);
     if (previousTrackId) {
@@ -9430,6 +9611,7 @@ class LyricsContainer extends react.Component {
 
   componentWillUnmount() {
     this._isComponentMounted = false;
+    this._lyricsEditRequestSeq += 1;
     document.body.classList.remove('ivlyrics-page-active');
 
     // Core cleanup
