@@ -5767,7 +5767,8 @@ const evaluateKaraokeFillCurvePoints = (points, inputValue) => {
   const p2 = safePoints[segmentIndex + 1];
   const p3 = safePoints[Math.min(safePoints.length - 1, segmentIndex + 2)];
   const localProgress = (normalizedValue - p1.x) / Math.max(0.0001, p2.x - p1.x);
-  const controlY = (p1.y + p2.y) / 2 + (p2.y - p0.y + p3.y - p1.y) / 8;
+  const rawControlY = (p1.y + p2.y) / 2 + (p2.y - p0.y + p3.y - p1.y) / 8;
+  const controlY = Math.max(p1.y, Math.min(p2.y, rawControlY));
   const oneMinusProgress = 1 - localProgress;
   const curvedValue =
     oneMinusProgress * oneMinusProgress * p1.y +
