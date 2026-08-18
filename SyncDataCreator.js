@@ -7376,6 +7376,28 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 	}, [claimSessionForLocalEditing, nextNavigableLineIndex]);
 
+	useEffect(() => {
+		const handleLineNavigationShortcut = (event) => {
+			if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+			if (event.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+			const target = event.target;
+			if (
+				target?.isContentEditable
+				|| ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName)
+				|| target?.closest?.('[role="dialog"], [role="separator"], [role="slider"], [role="listbox"], [role="menu"], [role="menuitem"], [aria-haspopup]')
+			) return;
+			if (!lyricsText || lyricsLines.length === 0) return;
+
+			event.preventDefault();
+			event.stopPropagation();
+			if (event.key === 'ArrowUp') goToPrevLine();
+			else goToNextLine();
+		};
+
+		window.addEventListener('keydown', handleLineNavigationShortcut, true);
+		return () => window.removeEventListener('keydown', handleLineNavigationShortcut, true);
+	}, [goToNextLine, goToPrevLine, lyricsLines.length, lyricsText]);
+
 	const goToFirstLine = useCallback(() => {
 		claimSessionForLocalEditing();
 		setCurrentLineIndex(0);
@@ -10768,6 +10790,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				[getSyncCreatorShortcutDisplay('syllable'), I18n.t('syncCreator.shortcuts.syllable') || '음절'],
 				[getSyncCreatorShortcutDisplay('drag'), I18n.t('syncCreator.shortcuts.drag') || '누르면 드래그'],
 				[I18n.t('syncCreator.shortcuts.rightClick') || 'Right click', I18n.t('syncCreator.shortcuts.lockToCharacter') || '해당 글자까지 잠금'],
+				['↑ / ↓', `${I18n.t('syncCreator.prevLine') || 'Previous Line'} / ${I18n.t('syncCreator.nextLineBtn') || 'Next Line'}`],
 				['Enter', I18n.t('syncCreator.shortcuts.finish') || '라인 완료'],
 				['Backspace', I18n.t('syncCreator.shortcuts.cancel') || '취소'],
 				['Space', I18n.t('syncCreator.shortcuts.playPause') || '재생/일시정지'],
@@ -12190,6 +12213,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					react.createElement('div', { style: s.shortcutItem },
 						react.createElement('span', { style: s.shortcutKey }, I18n.t('syncCreator.shortcuts.rightClick') || '우클릭'),
 						react.createElement('span', { style: s.shortcutDesc }, I18n.t('syncCreator.shortcuts.lockToCharacter') || '해당 글자까지 잠금')
+					),
+					react.createElement('div', { style: s.shortcutItem },
+						react.createElement('span', { style: s.shortcutKey }, '↑ / ↓'),
+						react.createElement('span', { style: s.shortcutDesc }, `${I18n.t('syncCreator.prevLine') || '이전 줄'} / ${I18n.t('syncCreator.nextLineBtn') || '다음 줄'}`)
 					),
 					// 완료/취소
 					react.createElement('div', { style: s.shortcutItem },
