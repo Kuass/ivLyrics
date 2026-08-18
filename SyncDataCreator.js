@@ -2732,6 +2732,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const [error, setError] = useState(null);
 	const [currentLineIndex, setCurrentLineIndex] = useState(0);
 	const [activeParallelPartId, setActiveParallelPartId] = useState('full');
+	const pendingParallelNavigationRef = useRef(null);
 	const [parallelPartMetaDrafts, setParallelPartMetaDrafts] = useState({});
 	const [manualParallelSplitDrafts, setManualParallelSplitDrafts] = useState({});
 	const [parentheticalLayoutDrafts, setParentheticalLayoutDrafts] = useState({});
@@ -3922,6 +3923,19 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const currentTextEffectKind = normalizeSyncCreatorKind(currentSpeakerMeta?.kind) || SYNC_CREATOR_DEFAULT_KIND;
 	const textEffectsDisabled = window.CONFIG?.visual?.['karaoke-text-effects'] === false;
 	useEffect(() => {
+		const pendingNavigation = pendingParallelNavigationRef.current;
+		if (pendingNavigation?.lineIndex === currentLineIndex) {
+			pendingParallelNavigationRef.current = null;
+			if (multiVocalMode && hasCurrentParallelParts) {
+				const targetPart = pendingNavigation.edge === 'last'
+					? currentParallelParts[currentParallelParts.length - 1]
+					: currentParallelParts[0];
+				setActiveParallelPartId(targetPart?.id || 'full');
+				return;
+			}
+			setActiveParallelPartId('full');
+			return;
+		}
 		if (multiVocalMode && hasCurrentParallelParts) {
 			const hasActivePart = currentParallelParts.some(part => part.id === activeParallelPartId);
 			if (!hasActivePart) {
@@ -7376,6 +7390,48 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 	}, [claimSessionForLocalEditing, nextNavigableLineIndex]);
 
+	const goToSyncTarget = useCallback((lineIndex, edge = 'first') => {
+		if (lineIndex < 0 || lineIndex >= lyricsLines.length) return;
+		claimSessionForLocalEditing();
+		resetCurrentSyncInput();
+		pendingParallelNavigationRef.current = { lineIndex, edge };
+		setCurrentLineIndex(lineIndex);
+		setActiveParallelPartId('');
+		if (lyricsScrollRef.current) lyricsScrollRef.current.scrollLeft = 0;
+	}, [claimSessionForLocalEditing, lyricsLines.length, resetCurrentSyncInput]);
+
+	const goToPreviousSyncTarget = useCallback(() => {
+		const currentPartIndex = currentParallelParts.findIndex(part => part.id === activeParallelTargetId);
+		if (currentPartIndex > 0) {
+			selectParallelPart(currentParallelParts[currentPartIndex - 1].id);
+			return;
+		}
+		if (previousNavigableLineIndex < 0) return;
+		goToSyncTarget(previousNavigableLineIndex, 'last');
+	}, [
+		activeParallelTargetId,
+		currentParallelParts,
+		goToSyncTarget,
+		previousNavigableLineIndex,
+		selectParallelPart
+	]);
+
+	const goToNextSyncTarget = useCallback(() => {
+		const currentPartIndex = currentParallelParts.findIndex(part => part.id === activeParallelTargetId);
+		if (currentPartIndex >= 0 && currentPartIndex < currentParallelParts.length - 1) {
+			selectParallelPart(currentParallelParts[currentPartIndex + 1].id);
+			return;
+		}
+		if (nextNavigableLineIndex < 0) return;
+		goToSyncTarget(nextNavigableLineIndex, 'first');
+	}, [
+		activeParallelTargetId,
+		currentParallelParts,
+		goToSyncTarget,
+		nextNavigableLineIndex,
+		selectParallelPart
+	]);
+
 	useEffect(() => {
 		const handleLineNavigationShortcut = (event) => {
 			if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
@@ -7390,13 +7446,13 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 			event.preventDefault();
 			event.stopPropagation();
-			if (event.key === 'ArrowUp') goToPrevLine();
-			else goToNextLine();
+			if (event.key === 'ArrowUp') goToPreviousSyncTarget();
+			else goToNextSyncTarget();
 		};
 
 		window.addEventListener('keydown', handleLineNavigationShortcut, true);
 		return () => window.removeEventListener('keydown', handleLineNavigationShortcut, true);
-	}, [goToNextLine, goToPrevLine, lyricsLines.length, lyricsText]);
+	}, [goToNextSyncTarget, goToPreviousSyncTarget, lyricsLines.length, lyricsText]);
 
 	const goToFirstLine = useCallback(() => {
 		claimSessionForLocalEditing();
