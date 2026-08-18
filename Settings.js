@@ -5267,7 +5267,7 @@ const ConfigFontSelector = ({
     return react.createElement(
       "div",
       {
-        className: "setting-row",
+        className: "setting-row config-font-setting-row",
         "data-setting-key": settingKey,
         style: disabled ? { opacity: 0.5, pointerEvents: "none" } : {},
       },
@@ -16272,6 +16272,14 @@ const ConfigModal = ({
     background: transparent !important;
     box-shadow: none !important;
     transform: none !important;
+}
+
+#${APP_NAME}-config-container .setting-row.config-font-setting-row {
+    background: var(--settings-surface-1) !important;
+}
+
+#${APP_NAME}-config-container .setting-row.config-font-setting-row:hover {
+    background: var(--settings-surface-2) !important;
 }
 
 #${APP_NAME}-config-container .setting-row::after {
