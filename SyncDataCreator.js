@@ -5971,11 +5971,36 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 		const handleKeyDown = (e) => {
 			const normalizedHotkey = getNormalizedHotkeyFromEvent(e);
+			const consumeKeyboardEvent = () => {
+				e.preventDefault();
+				e.stopPropagation();
+				e.stopImmediatePropagation();
+			};
+			const isSeekHotkey = normalizedHotkey === 'z' || normalizedHotkey === 'x';
+			if (isSeekHotkey) {
+				const target = e.target;
+				if (
+					target?.isContentEditable
+					|| ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName)
+					|| target?.closest?.('[role="listbox"], [role="menu"], [role="menuitem"], [aria-haspopup]')
+				) return;
+
+				consumeKeyboardEvent();
+				const currentPos = Spicetify.Player.getProgress();
+				if (normalizedHotkey === 'z') {
+					Spicetify.Player.seek(Math.max(0, currentPos - 3000));
+				} else {
+					const duration = Spicetify.Player.getDuration();
+					Spicetify.Player.seek(Math.min(duration, currentPos + 3000));
+				}
+				return;
+			}
+
 			const isDragHotkey = isSyncCreatorDragHotkeyEvent(e, normalizedHotkey);
 			const shortcutBindings = getSyncCreatorShortcutBindings();
 			const shortcutAction = Object.entries(shortcutBindings)
 				.find(([, bindings]) => bindings.includes(normalizedHotkey))?.[0] || null;
-			const staticHotkeys = new Set(['enter', 'backspace', 'space', 'z', 'x']);
+			const staticHotkeys = new Set(['enter', 'backspace', 'space']);
 			if (!shortcutAction && !isDragHotkey && !staticHotkeys.has(normalizedHotkey)) return;
 
 			// record 모드가 아니면 처리하지 않음
@@ -5990,12 +6015,6 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			if (currentLineIndex >= lyricsLines.length) return;
 			if (!currentLineChars.length) return;
 			const shouldAutoAdvanceBoundaryChars = readSyncCreatorBooleanSetting(SYNC_CREATOR_AUTO_BOUNDARY_CHARS_KEY, true);
-
-			const consumeKeyboardEvent = () => {
-				e.preventDefault();
-				e.stopPropagation();
-				e.stopImmediatePropagation();
-			};
 
 			// 한 글자 앞으로 진행하는 헬퍼 함수
 			const advanceOneChar = (currentTime) => {
@@ -6612,22 +6631,6 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				return;
 			}
 
-			// z: 3초 뒤로
-			if (normalizedHotkey === 'z') {
-				consumeKeyboardEvent();
-				const currentPos = Spicetify.Player.getProgress();
-				Spicetify.Player.seek(Math.max(0, currentPos - 3000));
-				return;
-			}
-
-			// x: 3초 앞으로
-			if (normalizedHotkey === 'x') {
-				consumeKeyboardEvent();
-				const currentPos = Spicetify.Player.getProgress();
-				const duration = Spicetify.Player.getDuration();
-				Spicetify.Player.seek(Math.min(duration, currentPos + 3000));
-				return;
-			}
 		};
 
 		const handleKeyPress = (e) => {
