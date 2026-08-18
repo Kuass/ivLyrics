@@ -4050,6 +4050,7 @@ const useSyncedLayoutEffect = react.useLayoutEffect || useEffect;
 const prepareGlobalCharTimeline = (lyrics) => {
 	const offsets = new Array(lyrics.length);
 	const chars = [];
+	const entries = [];
 	let totalChars = 0;
 
 	for (let i = 0; i < lyrics.length; i++) {
@@ -4095,15 +4096,42 @@ const prepareGlobalCharTimeline = (lyrics) => {
 			coalesceKaraokeTimedGraphemes(sourceChars).forEach((charInfo) => {
 				const charStart = charInfo.startTime;
 				const charEnd = charInfo.endTime;
-				chars.push(charStart, charEnd, Math.max(1, charEnd - charStart));
+				const charDuration = Math.max(1, charEnd - charStart);
+				chars.push(charStart, charEnd, charDuration);
+				entries.push({
+					startTime: charStart,
+					endTime: charEnd,
+					duration: charDuration,
+					charIndex: totalChars,
+				});
 				totalChars++;
 			});
 		}
 	}
 
+	const activeEntries = [...entries].sort((first, second) => (
+		first.startTime - second.startTime
+		|| first.charIndex - second.charIndex
+	));
+	const activePrefixMaxEnd = new Float64Array(activeEntries.length);
+	let maximumEndTime = -Infinity;
+	for (let index = 0; index < activeEntries.length; index += 1) {
+		maximumEndTime = Math.max(maximumEndTime, activeEntries[index].endTime);
+		activePrefixMaxEnd[index] = maximumEndTime;
+	}
+	// For equal end times, place the lower source index last. The old linear scan
+	// kept the first matching character when multiple vocal rows ended together.
+	const passedEntries = [...entries].sort((first, second) => (
+		first.endTime - second.endTime
+		|| second.charIndex - first.charIndex
+	));
+
 	return {
 		globalCharOffsets: offsets,
 		chars,
+		activeEntries,
+		activePrefixMaxEnd,
+		passedEntries,
 	};
 };
 
@@ -4112,18 +4140,57 @@ const queryGlobalCharTimeline = (timeline, position) => {
 	let lastPassedCharIndex = -1;
 	let lastPassedCharEndTime = 0;
 	let lastPassedCharDuration = 100;
+	const activeEntries = timeline.activeEntries;
+	const activePrefixMaxEnd = timeline.activePrefixMaxEnd;
+	const passedEntries = timeline.passedEntries;
 
-	for (let valueIndex = 0, charIndex = 0; valueIndex < timeline.chars.length; valueIndex += 3, charIndex++) {
-		const charStart = timeline.chars[valueIndex];
-		const charEnd = timeline.chars[valueIndex + 1];
-		const charDuration = timeline.chars[valueIndex + 2];
-		if (position >= charStart && position < charEnd) {
-			activeCharIndex = charIndex;
+	if (Array.isArray(activeEntries) && activePrefixMaxEnd?.length === activeEntries.length) {
+		let lower = 0;
+		let upper = activeEntries.length;
+		while (lower < upper) {
+			const middle = (lower + upper) >> 1;
+			if (activeEntries[middle].startTime <= position) lower = middle + 1;
+			else upper = middle;
 		}
-		if (position >= charEnd && charEnd > lastPassedCharEndTime) {
-			lastPassedCharEndTime = charEnd;
-			lastPassedCharIndex = charIndex;
-			lastPassedCharDuration = charDuration || 100;
+
+		for (let index = lower - 1; index >= 0 && activePrefixMaxEnd[index] > position; index -= 1) {
+			const entry = activeEntries[index];
+			if (position < entry.endTime) {
+				activeCharIndex = Math.max(activeCharIndex, entry.charIndex);
+			}
+		}
+	}
+
+	if (Array.isArray(passedEntries) && passedEntries.length > 0) {
+		let lower = 0;
+		let upper = passedEntries.length;
+		while (lower < upper) {
+			const middle = (lower + upper) >> 1;
+			if (passedEntries[middle].endTime <= position) lower = middle + 1;
+			else upper = middle;
+		}
+
+		const entry = passedEntries[lower - 1];
+		if (entry && entry.endTime > 0) {
+			lastPassedCharEndTime = entry.endTime;
+			lastPassedCharIndex = entry.charIndex;
+			lastPassedCharDuration = entry.duration || 100;
+		}
+	} else {
+		// Keep the exported helper compatible with timelines created by an older
+		// ivLyrics runtime during hot reloads.
+		for (let valueIndex = 0, charIndex = 0; valueIndex < timeline.chars.length; valueIndex += 3, charIndex++) {
+			const charStart = timeline.chars[valueIndex];
+			const charEnd = timeline.chars[valueIndex + 1];
+			const charDuration = timeline.chars[valueIndex + 2];
+			if (position >= charStart && position < charEnd) {
+				activeCharIndex = charIndex;
+			}
+			if (position >= charEnd && charEnd > lastPassedCharEndTime) {
+				lastPassedCharEndTime = charEnd;
+				lastPassedCharIndex = charIndex;
+				lastPassedCharDuration = charDuration || 100;
+			}
 		}
 	}
 
@@ -4903,11 +4970,17 @@ const getSyncedLinePlaybackState = (window, position) => {
 
 	const isSinging = position < window.contentEndTime;
 	const isSettling = position < window.contentEndTime + KARAOKE_RELEASE_WINDOW_MS;
+	const needsLiveReleasePosition = CONFIG.visual["karaoke-bounce"] === true;
 	return {
 		isHighlighted: position < window.holdEndTime,
 		isSinging,
 		isAnimating: isSinging || isSettling,
-		renderPosition: isSinging || isSettling ? position : window.completionPosition,
+		// Once filling has completed, only the optional bounce release consumes the
+		// live clock. Pin ordinary completed rows immediately so rapid songs do not
+		// keep re-rendering several outgoing lines for another 820 ms.
+		renderPosition: isSinging || (isSettling && needsLiveReleasePosition)
+			? position
+			: window.completionPosition,
 	};
 };
 
@@ -5394,12 +5467,12 @@ const useSyncedLyricsEngine = ({
 	const visualAnchorLineNumber = visualLineIndex;
 
 	const globalCharTimeline = useMemo(() => {
-		if (!isKara) {
+		if (!isKara || CONFIG.visual["karaoke-bounce"] !== true) {
 			return null;
 		}
 
 		return prepareGlobalCharTimeline(lyrics);
-	}, [lyrics, isKara]);
+	}, [lyrics, isKara, CONFIG.visual["karaoke-bounce"], settingsRevision]);
 
 	const { globalCharOffsets, activeGlobalCharIndex } = useMemo(() => (
 		globalCharTimeline
@@ -5544,8 +5617,6 @@ const useSyncedLyricsEngine = ({
 				subtree: true,
 			});
 		}
-		scheduleOffsetSync();
-
 		return () => {
 			observer.disconnect();
 			if (mutationObserver) {
@@ -5720,6 +5791,13 @@ const useSyncedLyricsEngine = ({
 			return undefined;
 		}
 
+		// Ref callbacks, anchor measurement, and compact-offset correction can all
+		// commit during the same browser turn. Defer the FLIP read/write work to one
+		// microtask so those commits collapse into a single animation instead of
+		// repeatedly cancelling and restarting every visible lyric row.
+		let cancelled = false;
+		const runScheduledLineShift = () => {
+			if (cancelled) return;
 		const lineRoot = containerRef.current?.querySelector?.(
 			".lyrics-lyricsContainer-SyncedLyrics"
 		);
@@ -5830,7 +5908,16 @@ const useSyncedLyricsEngine = ({
 			}, { once: true });
 		}
 
-		return undefined;
+		};
+		if (typeof queueMicrotask === "function") {
+			queueMicrotask(runScheduledLineShift);
+		} else {
+			Promise.resolve().then(runScheduledLineShift);
+		}
+
+		return () => {
+			cancelled = true;
+		};
 	}, [
 		usesScriptedCompactLineShift,
 		suppressLayoutShiftAnimation,
@@ -6134,24 +6221,40 @@ const AnimationManager = {
 	start() {
 		if (this.active) return;
 		this.active = true;
+		this.lastTime = 0;
 		this.updateFrameInterval();
 		// bind를 한 번만 수행하여 메모리 효율성 개선
 		if (!this.boundAnimate) {
 			this.boundAnimate = this.animate.bind(this);
 		}
-		this.timerId = setTimeout(this.boundAnimate, 0);
+		this.scheduleNext(false);
+	},
+
+	scheduleNext(settingsOpen) {
+		if (!this.active) return;
+
+		if (!document.hidden && !settingsOpen && typeof requestAnimationFrame === "function") {
+			this.frameId = requestAnimationFrame(this.boundAnimate);
+			return;
+		}
+
+		this.timerId = setTimeout(
+			this.boundAnimate,
+			document.hidden || settingsOpen ? 250 : this.frameInterval
+		);
 	},
 
 	stop() {
-		if (this.frameId) {
+		if (this.frameId !== null) {
 			cancelAnimationFrame(this.frameId);
 			this.frameId = null;
 		}
-		if (this.timerId) {
+		if (this.timerId !== null) {
 			clearTimeout(this.timerId);
 			this.timerId = null;
 		}
 		this.active = false;
+		this.lastTime = 0;
 	},
 
 	addCallback(callback) {
@@ -6166,12 +6269,26 @@ const AnimationManager = {
 		}
 	},
 
-	animate() {
+	animate(timestamp) {
 		if (!this.active) return;
+		this.frameId = null;
+		this.timerId = null;
 
 		const settingsOpen = document.documentElement.classList.contains("ivlyrics-settings-open")
 			|| document.body?.classList.contains("ivlyrics-settings-open");
-		if (!settingsOpen) {
+		this.updateFrameInterval();
+		if (document.hidden || settingsOpen) {
+			this.lastTime = 0;
+			this.scheduleNext(settingsOpen);
+			return;
+		}
+
+		const now = Number.isFinite(timestamp) ? timestamp : performance.now();
+		const elapsed = this.lastTime > 0 ? now - this.lastTime : Infinity;
+		// requestAnimationFrame timestamps can land a fraction below the nominal
+		// interval (16.666 ms vs 16.667 ms). A small tolerance prevents an
+		// accidental drop from 60 to 30 fps while still honoring lower FPS limits.
+		if (elapsed >= this.frameInterval - 1) {
 			for (const callback of this.callbacks) {
 				try {
 					callback();
@@ -6179,13 +6296,12 @@ const AnimationManager = {
 					// Error ignored
 				}
 			}
+
+			this.lastTime = elapsed >= this.frameInterval && Number.isFinite(elapsed)
+				? now - (elapsed % this.frameInterval)
+				: now;
 		}
-		this.lastTime = performance.now();
-		this.updateFrameInterval();
-		this.timerId = setTimeout(
-			this.boundAnimate,
-			document.hidden || settingsOpen ? 250 : this.frameInterval
-		);
+		this.scheduleNext(false);
 	}
 };
 
