@@ -6739,7 +6739,6 @@ function renderSettingsReleaseMarkdown(markdown) {
 const SETTINGS_SECTION_PARENT_BY_KEY = Object.freeze({
   "performance-visual-cost": "performance-rendering",
   "performance-background-work": "performance-rendering",
-  "karaoke-mode": "playback",
   "settings-presets": "export-import",
   "db-export-import": "export-import",
   "vinyl-tonearm": "vinyl-mode",
@@ -10650,20 +10649,19 @@ const ConfigModal = ({
     min-height: 150px;
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-md);
-    background:
-        linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02));
+    background: var(--karaoke-curve-surface);
     touch-action: none;
     user-select: none;
 }
 
 #${APP_NAME}-config-container .karaoke-fill-curve-grid-line {
-    stroke: rgba(255, 255, 255, 0.08);
+    stroke: var(--karaoke-curve-grid);
     stroke-width: 1;
 }
 
 #${APP_NAME}-config-container .karaoke-fill-curve-default-path {
     fill: none;
-    stroke: rgba(255, 255, 255, 0.24);
+    stroke: var(--karaoke-curve-reference);
     stroke-width: 2;
     stroke-dasharray: 6 6;
 }
@@ -10674,7 +10672,7 @@ const ConfigModal = ({
     stroke-width: 4;
     stroke-linecap: round;
     stroke-linejoin: round;
-    filter: drop-shadow(0 0 10px var(--accent-primary-light));
+    filter: drop-shadow(0 1px 4px var(--karaoke-curve-shadow));
 }
 
 #${APP_NAME}-config-container .karaoke-fill-curve-point {
@@ -10688,7 +10686,7 @@ const ConfigModal = ({
 
 #${APP_NAME}-config-container .karaoke-fill-curve-point circle {
     fill: var(--accent-primary);
-    stroke: rgba(255, 255, 255, 0.9);
+    stroke: var(--karaoke-curve-point-ring);
     stroke-width: 2;
 }
 
@@ -10698,7 +10696,7 @@ const ConfigModal = ({
     font-weight: 700;
     text-anchor: middle;
     paint-order: stroke;
-    stroke: rgba(0, 0, 0, 0.58);
+    stroke: var(--karaoke-curve-label-outline);
     stroke-width: 3px;
     pointer-events: none;
 }
@@ -15831,6 +15829,12 @@ const ConfigModal = ({
     --settings-row-min-height: 58px;
     --settings-row-padding-x: 14px;
     --settings-control-height: 34px;
+    --karaoke-curve-surface: #0d0f10;
+    --karaoke-curve-grid: rgba(238, 238, 238, 0.12);
+    --karaoke-curve-reference: rgba(238, 238, 238, 0.38);
+    --karaoke-curve-point-ring: rgba(238, 238, 238, 0.92);
+    --karaoke-curve-label-outline: rgba(10, 11, 12, 0.9);
+    --karaoke-curve-shadow: rgba(95, 216, 143, 0.3);
     width: 100%;
     height: min(92vh, 1080px);
     min-height: min(620px, calc(100vh - 32px));
@@ -15861,6 +15865,12 @@ const ConfigModal = ({
     --text-primary: #17191b;
     --text-secondary: #63686d;
     --text-tertiary: #94999e;
+    --karaoke-curve-surface: #f8faf9;
+    --karaoke-curve-grid: rgba(23, 25, 27, 0.16);
+    --karaoke-curve-reference: rgba(23, 25, 27, 0.46);
+    --karaoke-curve-point-ring: #ffffff;
+    --karaoke-curve-label-outline: rgba(255, 255, 255, 0.94);
+    --karaoke-curve-shadow: rgba(47, 143, 91, 0.28);
     background: var(--settings-page) !important;
 }
 
