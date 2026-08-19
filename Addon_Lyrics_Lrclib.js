@@ -1485,6 +1485,40 @@
         return `lrclib-${(hash >>> 0).toString(36)}-${codePointLength.toString(36)}`;
     }
 
+    function buildLrclibSyncSource(candidate) {
+        if (!candidate) return null;
+
+        const lrclibId = candidate.id === undefined || candidate.id === null
+            ? ''
+            : String(candidate.id).trim();
+        if (!/^[1-9]\d*$/.test(lrclibId)) return null;
+
+        const preferredLyricsSource = candidate.preferredLyricsSource
+            || (candidate.syncedLyrics ? 'synced' : (candidate.plainLyrics ? 'plain' : 'unknown'));
+        const comparableLines = getComparableLyricsLines(
+            getCandidateLyricsText(candidate, preferredLyricsSource)
+        );
+        if (comparableLines.length === 0) return null;
+
+        const comparableText = comparableLines.join('\n');
+        const lineCharCounts = getLineCharCounts(comparableLines);
+
+        return {
+            provider: ADDON_INFO.id,
+            lrclibId,
+            searchSource: candidate.searchSource || '',
+            preferredLyricsSource,
+            trackName: candidate.trackName || candidate.name || '',
+            artistName: candidate.artistName || '',
+            albumName: candidate.albumName || '',
+            duration: Number(candidate.duration || 0) || 0,
+            lyricsFingerprint: getLyricsTextFingerprint(comparableText),
+            lineCharCounts,
+            lineCount: lineCharCounts.length,
+            textCharCount: lineCharCounts.reduce((sum, count) => sum + count, 0)
+        };
+    }
+
     function getSyncDataLrclibSource(syncData) {
         const body = syncData?.syncData || syncData;
         const source = body?.source || body?.lyricsSource || null;
@@ -1611,6 +1645,10 @@
 
         if (candidate.id !== undefined && candidate.id !== null && String(candidate.id).trim()) {
             result.lrclibId = String(candidate.id).trim();
+        }
+        const syncSource = buildLrclibSyncSource(candidate);
+        if (syncSource) {
+            result.lrclibSource = syncSource;
         }
 
         if (candidate.instrumental) {
@@ -3156,6 +3194,10 @@
 
                 if (body.id !== undefined && body.id !== null && String(body.id).trim()) {
                     result.lrclibId = String(body.id).trim();
+                }
+                const syncSource = buildLrclibSyncSource(body);
+                if (syncSource) {
+                    result.lrclibSource = syncSource;
                 }
 
                 if (body.instrumental) {

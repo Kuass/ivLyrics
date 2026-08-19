@@ -4021,6 +4021,15 @@
         }
 
         async function submitSyncData(trackId, provider, syncData, metadata = {}) {
+            if (String(provider || '').trim().toLowerCase() === 'lrclib') {
+                const lrclibId = syncData?.source?.lrclibId === null || syncData?.source?.lrclibId === undefined
+                    ? ''
+                    : String(syncData.source.lrclibId).trim();
+                if (syncData?.source?.provider !== 'lrclib' || !/^[1-9]\d*$/.test(lrclibId)) {
+                    throw new Error(I18n.t('syncCreator.lrclibIdInvalid') || 'Enter a valid LRCLIB ID.');
+                }
+            }
+
             const identity = await resolveSyncDataIdentity(trackId, metadata);
             if (!identity) {
                 throw new Error('이 곡의 ISRC를 확인할 수 없어 sync-data를 등록할 수 없습니다.');

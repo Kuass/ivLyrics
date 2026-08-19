@@ -64,6 +64,25 @@ const SYNC_CREATOR_SYNCED_BACKGROUND = 'rgba(255, 255, 255, 0.055)';
 const SYNC_CREATOR_RECORDING_BACKGROUND = 'rgba(255, 152, 0, 0.6)';
 const SYNC_CREATOR_PRONUNCIATION_TARGET_STORAGE_KEY = 'ivLyrics:syncCreator:pronunciation-target-mode';
 const SYNC_CREATOR_PRONUNCIATION_TARGET_MODES = new Set(['latin', 'translation']);
+const normalizeSyncCreatorLrclibId = (value) => {
+	const normalized = value === null || value === undefined ? '' : String(value).trim();
+	return /^[1-9]\d*$/.test(normalized) ? normalized : '';
+};
+const isCompleteSyncCreatorLrclibSource = (source) => {
+	if (!source || source.provider !== SYNC_CREATOR_SOURCE_ADDON_ID) return false;
+	if (!normalizeSyncCreatorLrclibId(source.lrclibId)) return false;
+	if (!['synced', 'plain', 'unknown'].includes(source.preferredLyricsSource)) return false;
+	if (!Number.isFinite(Number(source.duration)) || Number(source.duration) < 0) return false;
+	if (!/^lrclib-[a-z0-9]+-[a-z0-9]+$/i.test(String(source.lyricsFingerprint || ''))) return false;
+	if (!Array.isArray(source.lineCharCounts) || source.lineCharCounts.length === 0) return false;
+	if (source.lineCount !== source.lineCharCounts.length) return false;
+	let textCharCount = 0;
+	for (const count of source.lineCharCounts) {
+		if (!Number.isInteger(count) || count < 0) return false;
+		textCharCount += count;
+	}
+	return source.textCharCount === textCharCount;
+};
 const normalizeSyncCreatorPronunciationTargetMode = (value) => {
 	const normalized = String(value || '').trim().toLowerCase();
 	return SYNC_CREATOR_PRONUNCIATION_TARGET_MODES.has(normalized) ? normalized : 'latin';
@@ -3096,11 +3115,14 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 	const buildLrclibSyncSource = useCallback((candidate) => {
 		if (!candidate) return null;
+		const lrclibId = normalizeSyncCreatorLrclibId(candidate.id ?? candidate.lrclibId);
+		if (!lrclibId) return null;
 		const text = getLrclibCandidateText(candidate).normalize('NFC');
 		const comparableLines = text
 			.split('\n')
 			.map(line => line.trim().normalize('NFC'))
 			.filter(Boolean);
+		if (comparableLines.length === 0) return null;
 		const comparableText = comparableLines.join('\n');
 		const lineCharCounts = comparableLines
 			.map(line => Array.from(line).length);
@@ -3109,7 +3131,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 		return {
 			provider: 'lrclib',
-			lrclibId: candidate.id ?? null,
+			lrclibId,
 			searchSource: candidate.searchSource || '',
 			preferredLyricsSource,
 			trackName: candidate.trackName || candidate.name || '',
@@ -7482,8 +7504,36 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 
 		const currentProvider = providerRef.current;
+		if (currentProvider !== 'lrclib') {
+			if (Object.prototype.hasOwnProperty.call(sanitized, 'source')) {
+				const { source, ...withoutSource } = sanitized;
+				return withoutSource;
+			}
+			return sanitized;
+		}
+
 		const currentLrclibSource = selectedLrclibSourceRef.current;
-		if (currentProvider !== 'lrclib' || !currentLrclibSource) {
+		const loadedLrclibSource = lyrics?.lrclibSource;
+		const persistedLrclibSource = sanitized?.source;
+		let resolvedSource = [currentLrclibSource, loadedLrclibSource, persistedLrclibSource]
+			.find(isCompleteSyncCreatorLrclibSource) || null;
+
+		if (!resolvedSource) {
+			const desiredLrclibId = [
+				currentLrclibSource?.lrclibId,
+				loadedLrclibSource?.lrclibId,
+				persistedLrclibSource?.lrclibId,
+				lyrics?.lrclibId
+			].map(normalizeSyncCreatorLrclibId).find(Boolean) || '';
+			const selectedCandidate = lrclibCandidates.find(candidate => (
+				desiredLrclibId
+					? normalizeSyncCreatorLrclibId(candidate?.id ?? candidate?.lrclibId) === desiredLrclibId
+					: candidate?.candidateKey === selectedLrclibCandidateKey
+			)) || null;
+			resolvedSource = buildLrclibSyncSource(selectedCandidate);
+		}
+
+		if (!resolvedSource) {
 			if (Object.prototype.hasOwnProperty.call(sanitized, 'source')) {
 				const { source, ...withoutSource } = sanitized;
 				return withoutSource;
@@ -7493,11 +7543,18 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		return {
 			...sanitized,
 			source: {
-				...currentLrclibSource,
-				provider: 'lrclib'
+				...resolvedSource,
+				provider: 'lrclib',
+				lrclibId: normalizeSyncCreatorLrclibId(resolvedSource.lrclibId)
 			}
 		};
-	}, [lyricsFullTextChars]);
+	}, [
+		buildLrclibSyncSource,
+		lrclibCandidates,
+		lyrics,
+		lyricsFullTextChars,
+		selectedLrclibCandidateKey
+	]);
 
 	const buildSyncCreatorSessionRecord = useCallback((syncDataOverride = syncData, editorOverrides = {}) => {
 		if (!syncCreatorDraftStore || !activeSessionDraftKey || !sessionTrackKey || !lyricsText) return null;
@@ -8453,6 +8510,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				return nextLine;
 			})
 		});
+		if (providerRef.current === 'lrclib' && !isCompleteSyncCreatorLrclibSource(syncDataToSubmit?.source)) {
+			Toast.error(I18n.t('syncCreator.lrclibIdInvalid') || 'Enter a valid LRCLIB ID.');
+			return;
+		}
 		try {
 			assertValidSyncCreatorSyncData(syncDataToSubmit);
 		} catch (error) {
