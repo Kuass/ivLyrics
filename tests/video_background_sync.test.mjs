@@ -10,7 +10,7 @@ assert.ok(helperBoundary > 0, "VideoBackground sync helpers must remain before t
 const context = vm.createContext({});
 vm.runInContext(
     `${source.slice(0, helperBoundary)}\n` +
-    "globalThis.__videoSyncTest = { getLyricsStartTimeSeconds, getVideoSyncOffsetSeconds, resolveVideoSyncState, wrapVideoSyncTime };",
+    "globalThis.__videoSyncTest = { getLyricsStartTimeSeconds, getVideoSyncOffsetSeconds, resolveVideoSyncState, wrapVideoSyncTime, syncYouTubePlayerTimeline, settleYouTubeHoldPrime };",
     context
 );
 
@@ -19,6 +19,8 @@ const {
     getVideoSyncOffsetSeconds,
     resolveVideoSyncState,
     wrapVideoSyncTime,
+    syncYouTubePlayerTimeline,
+    settleYouTubeHoldPrime,
 } = context.__videoSyncTest;
 
 test("converts the first lyric timestamp from milliseconds", () => {
@@ -110,4 +112,64 @@ test("wraps videos that are shorter than the mapped song timeline", () => {
     assert.equal(wrapVideoSyncTime(125, 60), 5);
     assert.equal(wrapVideoSyncTime(30, 60), 30);
     assert.equal(wrapVideoSyncTime(-10, 60), 0);
+});
+
+test("primes a paused YouTube iframe when a backward seek enters negative pre-roll", () => {
+    const calls = [];
+    const player = {
+        getPlayerState: () => 2,
+        getCurrentTime: () => 120,
+        seekTo: (...args) => calls.push(["seekTo", ...args]),
+        playVideo: () => calls.push(["playVideo"]),
+        pauseVideo: () => calls.push(["pauseVideo"]),
+    };
+    const holdState = { isHolding: false, primePending: false };
+
+    syncYouTubePlayerTimeline({
+        player,
+        targetVideoTime: 0,
+        shouldHoldAtStart: true,
+        shouldPlay: true,
+        holdState,
+    });
+
+    assert.deepEqual(calls, [["seekTo", 0, true], ["playVideo"]]);
+    assert.deepEqual(holdState, { isHolding: true, primePending: true });
+});
+
+test("pauses the YouTube iframe as soon as its refreshed start frame is decoded", () => {
+    const calls = [];
+    const holdState = { isHolding: true, primePending: true };
+    const settled = settleYouTubeHoldPrime({
+        player: { pauseVideo: () => calls.push("pauseVideo") },
+        playerState: 1,
+        holdState,
+    });
+
+    assert.equal(settled, true);
+    assert.deepEqual(calls, ["pauseVideo"]);
+    assert.deepEqual(holdState, { isHolding: true, primePending: false });
+});
+
+test("seeks exactly to the mapped time when leaving the held pre-roll", () => {
+    const calls = [];
+    const player = {
+        getPlayerState: () => 2,
+        getCurrentTime: () => 0.2,
+        seekTo: (...args) => calls.push(["seekTo", ...args]),
+        playVideo: () => calls.push(["playVideo"]),
+        pauseVideo: () => calls.push(["pauseVideo"]),
+    };
+    const holdState = { isHolding: true, primePending: false };
+
+    syncYouTubePlayerTimeline({
+        player,
+        targetVideoTime: 7.591,
+        shouldHoldAtStart: false,
+        shouldPlay: true,
+        holdState,
+    });
+
+    assert.deepEqual(calls, [["seekTo", 7.591, true], ["playVideo"]]);
+    assert.deepEqual(holdState, { isHolding: false, primePending: false });
 });

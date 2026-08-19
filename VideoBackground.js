@@ -89,6 +89,70 @@ const wrapVideoSyncTime = (targetVideoTime, duration) => {
     return safeTarget;
 };
 
+const syncYouTubePlayerTimeline = ({
+    player,
+    targetVideoTime,
+    shouldHoldAtStart,
+    shouldPlay,
+    holdState,
+}) => {
+    if (!player || !holdState) return;
+
+    const wasHoldingAtStart = holdState.isHolding === true;
+    holdState.isHolding = shouldHoldAtStart === true;
+
+    const playerState = player.getPlayerState();
+    if (shouldHoldAtStart) {
+        if (!wasHoldingAtStart) {
+            // A paused YouTube iframe can keep painting its previous decoded frame
+            // after seekTo(0). Let it reach PLAYING once so the frame is refreshed;
+            // onStateChange pauses it again as soon as that frame is available.
+            holdState.primePending = true;
+            player.seekTo(0, true);
+            player.playVideo();
+            return;
+        }
+
+        if (playerState === 1 || playerState === 3) {
+            player.pauseVideo();
+        }
+        return;
+    }
+
+    holdState.primePending = false;
+    const currentVideoTime = player.getCurrentTime();
+    if (
+        wasHoldingAtStart ||
+        !Number.isFinite(currentVideoTime) ||
+        Math.abs(currentVideoTime - targetVideoTime) > VIDEO_SYNC_SEEK_THRESHOLD_SECONDS
+    ) {
+        player.seekTo(targetVideoTime, true);
+    }
+
+    if (!shouldPlay) {
+        if (playerState === 1 || playerState === 3) {
+            player.pauseVideo();
+        }
+    } else if (playerState !== 1 && playerState !== 3) {
+        player.playVideo();
+    }
+};
+
+const settleYouTubeHoldPrime = ({ player, playerState, holdState }) => {
+    if (
+        !player ||
+        playerState !== 1 ||
+        holdState?.primePending !== true ||
+        holdState?.isHolding !== true
+    ) {
+        return false;
+    }
+
+    holdState.primePending = false;
+    player.pauseVideo();
+    return true;
+};
+
 const disableYouTubeCaptions = (player) => {
     if (!player) return;
 
@@ -184,6 +248,10 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
     const abortDownloadRef = useRef(null); // abort function for helper download
     const playerInitRetryRef = useRef(null);
     const lastCaptionDisableRef = useRef(0);
+    const youtubeHoldStateRef = useRef({
+        isHolding: false,
+        primePending: false,
+    });
     const brightnessValue = Math.min(Math.max(Number(brightness) || 0, 0), 100);
     const brightnessRatio = brightnessValue / 100;
     const blurValue = Math.min(Math.max(Number(blurAmount) || 0, 0), 80);
@@ -1168,6 +1236,8 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 console.error("[VideoBackground] YouTube player failed:", error);
             }
             setIsPlayerReady(false);
+            youtubeHoldStateRef.current.isHolding = false;
+            youtubeHoldStateRef.current.primePending = false;
             showVideoBackgroundError(I18n.t("videoBackground.error"));
         };
         const markPlayerReady = (player) => {
@@ -1259,6 +1329,11 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                         },
                         onStateChange: (event) => {
                             const state = event?.data;
+                            settleYouTubeHoldPrime({
+                                player: event?.target,
+                                playerState: state,
+                                holdState: youtubeHoldStateRef.current,
+                            });
                             if ([1, 2, 3, 5].includes(state) && !didReportReady) {
                                 markPlayerReady(event?.target);
                             }
@@ -1296,6 +1371,8 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 } catch (e) { }
                 playerRef.current = null;
             }
+            youtubeHoldStateRef.current.isHolding = false;
+            youtubeHoldStateRef.current.primePending = false;
         };
 
     }, [useHelper, videoInfo, reportVideoBackgroundStatus, showVideoBackgroundError]);
@@ -1338,23 +1415,13 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 ? player.getDuration()
                 : 0;
             const targetVideoTime = wrapVideoSyncTime(syncState.targetVideoTime, videoDuration);
-            const currentVideoTime = player.getCurrentTime();
-
-            if (
-                !Number.isFinite(currentVideoTime) ||
-                Math.abs(currentVideoTime - targetVideoTime) > VIDEO_SYNC_SEEK_THRESHOLD_SECONDS
-            ) {
-                player.seekTo(targetVideoTime, true);
-            }
-
-            const playerState = player.getPlayerState();
-            if (!isPlaying || syncState.shouldHoldAtStart) {
-                if (playerState === 1 || playerState === 3) {
-                    player.pauseVideo();
-                }
-            } else if (playerState !== 1 && playerState !== 3) {
-                player.playVideo();
-            }
+            syncYouTubePlayerTimeline({
+                player,
+                targetVideoTime,
+                shouldHoldAtStart: syncState.shouldHoldAtStart,
+                shouldPlay: isPlaying,
+                holdState: youtubeHoldStateRef.current,
+            });
         };
 
         syncVideo();
