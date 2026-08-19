@@ -40,6 +40,55 @@ const getVideoSyncOffsetSeconds = (captionStartTime, lyricsStartTime, videoInfo)
     return parsedCaptionStartTime - parsedLyricsStartTime;
 };
 
+const VIDEO_SYNC_INTERVAL_MS = 250;
+const VIDEO_SYNC_SEEK_THRESHOLD_SECONDS = 0.5;
+
+const resolveVideoSyncState = ({
+    spotifyTime,
+    lyricsStartTime,
+    videoInfo,
+    additionalDelaySeconds = 0,
+    mapVideoTime,
+}) => {
+    const parsedSpotifyTime = Number(spotifyTime);
+    const safeSpotifyTime = Number.isFinite(parsedSpotifyTime) ? parsedSpotifyTime : 0;
+    const parsedAdditionalDelay = Number(additionalDelaySeconds);
+    const safeAdditionalDelay = Number.isFinite(parsedAdditionalDelay) ? parsedAdditionalDelay : 0;
+    const captionStartTime = videoInfo?.captionStartTime;
+    const offset = getVideoSyncOffsetSeconds(captionStartTime, lyricsStartTime, videoInfo);
+    const baseVideoTime = safeSpotifyTime + offset + safeAdditionalDelay;
+
+    // The video has no timeline before 0. Keep its first frame still until the
+    // Spotify position reaches the point that maps to the beginning of the video.
+    if (baseVideoTime < 0) {
+        return {
+            baseVideoTime,
+            targetVideoTime: 0,
+            shouldHoldAtStart: true,
+        };
+    }
+
+    const mappedVideoTime = typeof mapVideoTime === "function"
+        ? Number(mapVideoTime(baseVideoTime, videoInfo?.skipSegments, captionStartTime))
+        : baseVideoTime;
+
+    return {
+        baseVideoTime,
+        targetVideoTime: Number.isFinite(mappedVideoTime) ? Math.max(0, mappedVideoTime) : 0,
+        shouldHoldAtStart: false,
+    };
+};
+
+const wrapVideoSyncTime = (targetVideoTime, duration) => {
+    const parsedTarget = Number(targetVideoTime);
+    const safeTarget = Number.isFinite(parsedTarget) ? Math.max(0, parsedTarget) : 0;
+    const parsedDuration = Number(duration);
+    if (Number.isFinite(parsedDuration) && parsedDuration > 0 && safeTarget >= parsedDuration) {
+        return safeTarget % parsedDuration;
+    }
+    return safeTarget;
+};
+
 const disableYouTubeCaptions = (player) => {
     if (!player) return;
 
@@ -801,33 +850,31 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 clearTimeout(readinessTimeout);
                 readinessTimeout = null;
             }
+            let readySyncState = null;
             // 영상이 준비되면 즉시 현재 Spotify 위치로 동기화
             if (videoInfo) {
                 const spotifyTime = Spicetify.Player.getProgress() / 1000;
                 const lyricsStartTime = getLyricsStartTimeSeconds(firstLyricTimeRef.current);
-                const captionStartTime = videoInfo.captionStartTime;
-                const offset = getVideoSyncOffsetSeconds(captionStartTime, lyricsStartTime, videoInfo);
                 const globalDelayMs = typeof CONFIG !== "undefined" && CONFIG.visual ? Number(CONFIG.visual.delay || 0) : 0;
                 const globalSyncOffsetMs = Number(window.Utils?.getGlobalSyncOffset?.() ?? CONFIG?.visual?.["global-sync-offset"] ?? 0) || 0;
                 const additionalDelaySeconds = (trackOffsetMsRef.current + globalDelayMs + globalSyncOffsetMs) / 1000;
-                let targetVideoTime = spotifyTime + offset + additionalDelaySeconds;
-                targetVideoTime = Utils.mapVideoTimeWithSkipSegments(
-                    targetVideoTime,
-                    videoInfo.skipSegments,
-                    captionStartTime
-                );
-
-                if (targetVideoTime >= 0 && video.duration > 0) {
-                    if (targetVideoTime >= video.duration) {
-                        targetVideoTime = targetVideoTime % video.duration;
-                    }
-                }
+                readySyncState = resolveVideoSyncState({
+                    spotifyTime,
+                    lyricsStartTime,
+                    videoInfo,
+                    additionalDelaySeconds,
+                    mapVideoTime: Utils.mapVideoTimeWithSkipSegments.bind(Utils),
+                });
+                const targetVideoTime = wrapVideoSyncTime(readySyncState.targetVideoTime, video.duration);
 
                 if (
-                    targetVideoTime >= 0 &&
                     (!Number.isFinite(video.currentTime) || Math.abs(video.currentTime - targetVideoTime) > 0.05)
                 ) {
                     video.currentTime = targetVideoTime;
+                }
+
+                if (readySyncState.shouldHoldAtStart && !video.paused) {
+                    video.pause();
                 }
             }
 
@@ -836,7 +883,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 didReportReady = true;
                 reportVideoBackgroundStatus("complete");
             }
-            if (isSpotifyPlaybackActive()) {
+            if (isSpotifyPlaybackActive() && !readySyncState?.shouldHoldAtStart) {
                 video.play().catch(() => { });
             } else if (!video.paused) {
                 video.pause();
@@ -990,11 +1037,24 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
     }, []);
 
     useEffect(() => {
+        const lyricsStartTime = getLyricsStartTimeSeconds(firstLyricTimeRef.current);
+        const globalDelayMs = typeof CONFIG !== "undefined" && CONFIG.visual ? Number(CONFIG.visual.delay || 0) : 0;
+        const globalSyncOffsetMs = Number(window.Utils?.getGlobalSyncOffset?.() ?? CONFIG?.visual?.["global-sync-offset"] ?? 0) || 0;
+        const syncState = videoInfo
+            ? resolveVideoSyncState({
+                spotifyTime: Spicetify.Player.getProgress() / 1000,
+                lyricsStartTime,
+                videoInfo,
+                additionalDelaySeconds: (trackOffsetMsRef.current + globalDelayMs + globalSyncOffsetMs) / 1000,
+            })
+            : null;
+        const shouldPlayVideo = isPlaying && !syncState?.shouldHoldAtStart;
+
         if (useHelper) {
             const video = videoRef.current;
             if (!video || !isPlayerReady) return;
 
-            if (!isPlaying) {
+            if (!shouldPlayVideo) {
                 if (!video.paused) {
                     video.pause();
                 }
@@ -1012,8 +1072,8 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
 
         try {
             const playerState = player.getPlayerState();
-            if (!isPlaying) {
-                if (playerState === 1) {
+            if (!shouldPlayVideo) {
+                if (playerState === 1 || playerState === 3) {
                     player.pauseVideo();
                 }
                 return;
@@ -1027,39 +1087,44 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
 
     // 헬퍼 모드: 동기화 로직
     useEffect(() => {
-        if (!useHelper || !videoRef.current || !isPlayerReady || !videoInfo || !isPlaying || document.visibilityState !== 'visible') return;
+        if (!useHelper || !videoRef.current || !isPlayerReady || !videoInfo || document.visibilityState !== 'visible') return;
 
         const video = videoRef.current;
 
-        const syncInterval = setInterval(() => {
+        const syncVideo = () => {
             const spotifyTime = Spicetify.Player.getProgress() / 1000;
             const lyricsStartTime = getLyricsStartTimeSeconds(firstLyricTime);
-            const captionStartTime = videoInfo.captionStartTime;
-            const offset = getVideoSyncOffsetSeconds(captionStartTime, lyricsStartTime, videoInfo);
             const globalDelayMs = typeof CONFIG !== "undefined" && CONFIG.visual ? Number(CONFIG.visual.delay || 0) : 0;
             const globalSyncOffsetMs = Number(window.Utils?.getGlobalSyncOffset?.() ?? CONFIG?.visual?.["global-sync-offset"] ?? 0) || 0;
             const additionalDelaySeconds = (trackOffsetMs + globalDelayMs + globalSyncOffsetMs) / 1000;
-            let targetVideoTime = spotifyTime + offset + additionalDelaySeconds;
-            targetVideoTime = Utils.mapVideoTimeWithSkipSegments(
-                targetVideoTime,
-                videoInfo.skipSegments,
-                captionStartTime
-            );
+            const syncState = resolveVideoSyncState({
+                spotifyTime,
+                lyricsStartTime,
+                videoInfo,
+                additionalDelaySeconds,
+                mapVideoTime: Utils.mapVideoTimeWithSkipSegments.bind(Utils),
+            });
+            const targetVideoTime = wrapVideoSyncTime(syncState.targetVideoTime, video.duration);
+            const currentVideoTime = video.currentTime;
 
-            // 영상 길이보다 음악이 길 경우, 영상을 처음부터 반복 재생
-            if (targetVideoTime >= 0 && video.duration > 0) {
-                if (targetVideoTime >= video.duration) {
-                    targetVideoTime = targetVideoTime % video.duration;
-                }
+            if (
+                !Number.isFinite(currentVideoTime) ||
+                Math.abs(currentVideoTime - targetVideoTime) > VIDEO_SYNC_SEEK_THRESHOLD_SECONDS
+            ) {
+                video.currentTime = targetVideoTime;
             }
 
-            if (targetVideoTime >= 0) {
-                const currentVideoTime = video.currentTime;
-                if (Math.abs(currentVideoTime - targetVideoTime) > 0.5) {
-                    video.currentTime = targetVideoTime;
+            if (!isPlaying || syncState.shouldHoldAtStart) {
+                if (!video.paused) {
+                    video.pause();
                 }
+            } else if (video.paused) {
+                video.play().catch(() => { });
             }
-        }, 500);
+        };
+
+        syncVideo();
+        const syncInterval = setInterval(syncVideo, VIDEO_SYNC_INTERVAL_MS);
 
         return () => clearInterval(syncInterval);
     }, [useHelper, isPlayerReady, videoInfo, firstLyricTime, trackOffsetMs, isPlaying]);
@@ -1237,9 +1302,9 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
 
     // 일반 모드 (YouTube IFrame): Sync Logic
     useEffect(() => {
-        if (useHelper || !isPlaying || document.visibilityState !== 'visible') return; // 헬퍼 모드면 스킵
-        // We use playerRef.current here
-        const syncInterval = setInterval(() => {
+        if (useHelper || document.visibilityState !== 'visible') return; // 헬퍼 모드면 스킵
+
+        const syncVideo = () => {
             const player = playerRef.current;
             if (!player || !isPlayerReady || !videoInfo) return;
             // Check if player has methods (sometimes it's not fully ready even if object exists)
@@ -1259,38 +1324,41 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
 
             const spotifyTime = Spicetify.Player.getProgress() / 1000;
             const lyricsStartTime = getLyricsStartTimeSeconds(firstLyricTime);
-            const captionStartTime = videoInfo.captionStartTime;
-
-            // captionStartTime이 null이면 (자막이 없는 영상) 오프셋 계산 없이 Spotify 시간을 그대로 사용
-            // captionStartTime이 있는 경우에만 가사와 자막 시작 시간 차이를 계산하여 오프셋 적용
-            const offset = getVideoSyncOffsetSeconds(captionStartTime, lyricsStartTime, videoInfo);
             const globalDelayMs = typeof CONFIG !== "undefined" && CONFIG.visual ? Number(CONFIG.visual.delay || 0) : 0;
             const globalSyncOffsetMs = Number(window.Utils?.getGlobalSyncOffset?.() ?? CONFIG?.visual?.["global-sync-offset"] ?? 0) || 0;
             const additionalDelaySeconds = (trackOffsetMs + globalDelayMs + globalSyncOffsetMs) / 1000;
-            let targetVideoTime = spotifyTime + offset + additionalDelaySeconds;
-            targetVideoTime = Utils.mapVideoTimeWithSkipSegments(
-                targetVideoTime,
-                videoInfo.skipSegments,
-                captionStartTime
-            );
+            const syncState = resolveVideoSyncState({
+                spotifyTime,
+                lyricsStartTime,
+                videoInfo,
+                additionalDelaySeconds,
+                mapVideoTime: Utils.mapVideoTimeWithSkipSegments.bind(Utils),
+            });
+            const videoDuration = typeof player.getDuration === 'function'
+                ? player.getDuration()
+                : 0;
+            const targetVideoTime = wrapVideoSyncTime(syncState.targetVideoTime, videoDuration);
+            const currentVideoTime = player.getCurrentTime();
 
-            // 영상 길이보다 음악이 길 경우, 영상을 처음부터 반복 재생
-            // getDuration()은 영상의 총 길이(초)를 반환
-            if (targetVideoTime >= 0 && typeof player.getDuration === 'function') {
-                const videoDuration = player.getDuration();
-                // 영상 길이가 0보다 크고, 목표 시간이 영상 길이를 초과하면 모듈로 연산
-                if (videoDuration > 0 && targetVideoTime >= videoDuration) {
-                    targetVideoTime = targetVideoTime % videoDuration;
-                }
+            if (
+                !Number.isFinite(currentVideoTime) ||
+                Math.abs(currentVideoTime - targetVideoTime) > VIDEO_SYNC_SEEK_THRESHOLD_SECONDS
+            ) {
+                player.seekTo(targetVideoTime, true);
             }
 
-            if (targetVideoTime >= 0) {
-                const currentVideoTime = player.getCurrentTime();
-                if (Math.abs(currentVideoTime - targetVideoTime) > 0.5) {
-                    player.seekTo(targetVideoTime, true);
+            const playerState = player.getPlayerState();
+            if (!isPlaying || syncState.shouldHoldAtStart) {
+                if (playerState === 1 || playerState === 3) {
+                    player.pauseVideo();
                 }
+            } else if (playerState !== 1 && playerState !== 3) {
+                player.playVideo();
             }
-        }, 500);
+        };
+
+        syncVideo();
+        const syncInterval = setInterval(syncVideo, VIDEO_SYNC_INTERVAL_MS);
 
         return () => clearInterval(syncInterval);
     }, [isPlayerReady, videoInfo, firstLyricTime, trackOffsetMs, isPlaying]);
