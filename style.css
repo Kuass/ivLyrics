@@ -12271,7 +12271,25 @@ html.is-lp-view-exit::view-transition-new(root) {
   justify-content: flex-end;
   gap: 4px;
   padding-bottom: 8px;
+  min-width: 0;
   max-width: 50vw;
+}
+
+.fullscreen-tv-title-container,
+.fullscreen-tv-artist-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.fullscreen-tv-title-container {
+  gap: 2px;
+}
+
+.fullscreen-tv-artist-container {
+  gap: 1px;
 }
 
 /* TV Mode Title */
@@ -12294,6 +12312,15 @@ html.is-lp-view-exit::view-transition-new(root) {
     opacity var(--iv-motion-duration-medium) var(--iv-motion-ease-standard);
 }
 
+.fullscreen-tv-title-secondary {
+  max-width: 100%;
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+  -webkit-line-clamp: 1;
+}
+
 /* TV Mode Artist */
 .fullscreen-tv-artist {
   font-weight: 500;
@@ -12309,6 +12336,15 @@ html.is-lp-view-exit::view-transition-new(root) {
   transition:
     transform var(--iv-motion-duration-slow) var(--iv-motion-ease-emphasis),
     opacity var(--iv-motion-duration-medium) var(--iv-motion-ease-standard);
+}
+
+.fullscreen-tv-artist-secondary {
+  max-width: 100%;
+  color: rgba(255, 255, 255, 0.66);
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* TV Mode Album Name */

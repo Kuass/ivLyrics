@@ -2827,6 +2827,65 @@ const FullscreenOverlay = (() => {
         const leftPlayerControlsClass = `${leftControlsClass} left-controls-player`;
         const leftProgressOnlyClass = `${leftControlsClass} left-controls-progress-only`;
 
+        const resolveTvMetadataLines = (mode, originalValue, translatedValue, romanizedValue) => {
+            const values = {
+                original: getNonEmptyString(originalValue),
+                translated: getNonEmptyString(translatedValue),
+                romanized: getNonEmptyString(romanizedValue)
+            };
+            const requestedKinds = (() => {
+                switch (mode) {
+                    case "translated":
+                        return [values.translated ? "translated" : "original"];
+                    case "romanized":
+                        return [values.romanized ? "romanized" : "original"];
+                    case "original-translated":
+                        return ["original", "translated"];
+                    case "original-romanized":
+                        return ["original", "romanized"];
+                    case "all":
+                        return ["original", "translated", "romanized"];
+                    default:
+                        return ["original"];
+                }
+            })();
+            const seen = new Set();
+
+            return requestedKinds.reduce((lines, kind) => {
+                const value = values[kind];
+                if (!value || seen.has(value)) return lines;
+                seen.add(value);
+                lines.push({ kind, value });
+                return lines;
+            }, []);
+        };
+
+        const renderTvMetadataLines = ({
+            type,
+            original,
+            translated,
+            romanized,
+            fontSize
+        }) => {
+            const mode = CONFIG?.visual?.["translate-metadata-mode"] || "translated";
+            const applyTrim = (text) => trimTitleEnabled ? trimTitle(text) : text;
+            const lines = resolveTvMetadataLines(
+                mode,
+                applyTrim(original),
+                applyTrim(translated),
+                applyTrim(romanized)
+            );
+            const secondaryScale = type === "title" ? 0.6 : 0.8;
+
+            return lines.map((line, index) => react.createElement("div", {
+                key: `${type}-${line.kind}`,
+                className: `fullscreen-tv-${type}${index > 0 ? ` fullscreen-tv-${type}-secondary` : ""}`,
+                style: {
+                    fontSize: `${index === 0 ? fontSize : Math.round(fontSize * secondaryScale)}px`
+                }
+            }, line.value));
+        };
+
         // In TV mode, hide the left panel (album/info shown at bottom-left instead)
         const hideLeftPanelForTvMode = tvModeEnabled;
         const PresentationSwitcher = VinylMode?.PresentationSwitcher;
@@ -2905,67 +2964,29 @@ const FullscreenOverlay = (() => {
                     ),
                     // Track info (Title, Artist, Album)
                     react.createElement("div", { className: "fullscreen-tv-track-info" },
-                        // Title (based on display mode - TV mode shows single line with best available)
+                        // Title (honors the same metadata display mode as normal fullscreen)
                         react.createElement("div", {
-                            ...createNavigationProps(currentTrackUri, "fullscreen-tv-title"),
-                            style: { fontSize: `${Math.round(tvAlbumSize * 0.26)}px` }
+                            ...createNavigationProps(currentTrackUri, "fullscreen-tv-title-container")
                         },
-                            (() => {
-                                const mode = CONFIG?.visual?.["translate-metadata-mode"] || "translated";
-                                const originalTitle = title || Spicetify.Player.data?.item?.metadata?.title;
-                                const translatedTitle = translatedMetadata?.translated?.title;
-                                const romanizedTitle = translatedMetadata?.romanized?.title;
-                                const applyTrim = (text) => trimTitleEnabled ? trimTitle(text) : text;
-
-                                let result;
-                                switch (mode) {
-                                    case "translated":
-                                    case "original-translated":
-                                    case "all":
-                                        // 번역이 있으면 번역, 없으면 원어
-                                        result = translatedTitle || originalTitle;
-                                        break;
-                                    case "romanized":
-                                    case "original-romanized":
-                                        // 발음이 있으면 발음, 없으면 원어
-                                        result = romanizedTitle || originalTitle;
-                                        break;
-                                    default:
-                                        result = originalTitle;
-                                }
-                                return applyTrim(result);
-                            })()
+                            renderTvMetadataLines({
+                                type: "title",
+                                original: title || Spicetify.Player.data?.item?.metadata?.title,
+                                translated: translatedMetadata?.translated?.title,
+                                romanized: translatedMetadata?.romanized?.title,
+                                fontSize: Math.round(tvAlbumSize * 0.26)
+                            })
                         ),
-                        // Artist (based on display mode - TV mode shows single line with best available)
+                        // Artist (honors the same metadata display mode as normal fullscreen)
                         react.createElement("div", {
-                            ...createNavigationProps(currentArtistUri, "fullscreen-tv-artist"),
-                            style: { fontSize: `${Math.round(tvAlbumSize * 0.16)}px` }
+                            ...createNavigationProps(currentArtistUri, "fullscreen-tv-artist-container")
                         },
-                            (() => {
-                                const mode = CONFIG?.visual?.["translate-metadata-mode"] || "translated";
-                                const originalArtist = artist || Spicetify.Player.data?.item?.metadata?.artist_name;
-                                const translatedArtist = translatedMetadata?.translated?.artist;
-                                const romanizedArtist = translatedMetadata?.romanized?.artist;
-                                const applyTrim = (text) => trimTitleEnabled ? trimTitle(text) : text;
-
-                                let result;
-                                switch (mode) {
-                                    case "translated":
-                                    case "original-translated":
-                                    case "all":
-                                        // 번역이 있으면 번역, 없으면 원어
-                                        result = translatedArtist || originalArtist;
-                                        break;
-                                    case "romanized":
-                                    case "original-romanized":
-                                        // 발음이 있으면 발음, 없으면 원어
-                                        result = romanizedArtist || originalArtist;
-                                        break;
-                                    default:
-                                        result = originalArtist;
-                                }
-                                return applyTrim(result);
-                            })()
+                            renderTvMetadataLines({
+                                type: "artist",
+                                original: artist || Spicetify.Player.data?.item?.metadata?.artist_name,
+                                translated: translatedMetadata?.translated?.artist,
+                                romanized: translatedMetadata?.romanized?.artist,
+                                fontSize: Math.round(tvAlbumSize * 0.16)
+                            })
                         ),
                         // Album name (from context)
                         tvShowAlbumName && react.createElement("div", createNavigationProps(currentAlbumUri, "fullscreen-tv-album-name"),
