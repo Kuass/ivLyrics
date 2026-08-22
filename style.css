@@ -3246,6 +3246,13 @@ div.lyrics-tabBar-headerItemLink {
   overflow: hidden;
 }
 
+/* Spotify renders TooltipWrapper popovers in a body-level Tippy portal.
+ * Keep that portal above the ivLyrics fullscreen layer without changing
+ * tooltip stacking anywhere else in Spotify. */
+body:has(#lyrics-fullscreen-container) [data-tippy-root] {
+  z-index: calc(var(--iv-layer-fullscreen) + 8) !important;
+}
+
 /* 전체화면에서 배경 요소 오버플로우 방지 */
 #lyrics-fullscreen-container #ivLyrics-gradient-background {
   position: absolute;
