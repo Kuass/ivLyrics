@@ -4328,6 +4328,26 @@ const shouldWrapKaraokeByWord = (text) => {
 	return /\S\s+\S/u.test(normalizedText);
 };
 
+// 라틴 문자가 지배적인 긴 텍스트(영어 등)를 Text Run 경로로 전환하여
+// 글자별 span 대신 세그먼트(단어) 단위 span으로 렌더링합니다.
+// 이를 통해 DOM 요소 수가 50~80개에서 10~15개로 줄어 레이아웃 비용이 대폭 감소합니다.
+const KARAOKE_LATIN_TEXT_RUN_MIN_GRAPHEMES = 20;
+const KARAOKE_LATIN_TEXT_RUN_MIN_RATIO = 0.4;
+const KARAOKE_LATIN_CHAR_REGEX = /[A-Za-z\u00C0-\u02AF\u0370-\u052F\u1E00-\u1EFF\u0400-\u04FF]/u;
+
+const shouldUseKaraokeTextRunForLatin = (text) => {
+	const normalizedText = typeof text === "string" ? text : "";
+	if (!normalizedText) return false;
+	// CJK 문자가 포함된 경우에는 기존 char 경로 유지 (일본어/중국어/한국어 글자별 fill 보존)
+	if (/[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\uAC00-\uD7AF]/u.test(normalizedText)) {
+		return false;
+	}
+	const nonWhitespaceChars = normalizedText.replace(/\s/gu, "");
+	if (nonWhitespaceChars.length < KARAOKE_LATIN_TEXT_RUN_MIN_GRAPHEMES) return false;
+	const latinCount = Array.from(nonWhitespaceChars).filter(ch => KARAOKE_LATIN_CHAR_REGEX.test(ch)).length;
+	return latinCount / nonWhitespaceChars.length >= KARAOKE_LATIN_TEXT_RUN_MIN_RATIO;
+};
+
 const clampKaraokeFillCurveValue = (value, fallback = 0) => {
 	const numberValue = Number(value);
 	if (!Number.isFinite(numberValue)) {
@@ -7087,7 +7107,7 @@ const KaraokeLine = react.memo(({ line, position, isActive, isEffectFocused = is
 			),
 			wrapByWord: shouldWrapKaraokeByWord(rawLineText),
 			textDirection: detectedTextDirection,
-			useTextRun: shouldUseKaraokeTextRun(rawLineText),
+			useTextRun: shouldUseKaraokeTextRun(rawLineText) || shouldUseKaraokeTextRunForLatin(rawLineText),
 			preserveInlineStyles: !KARAOKE_JOINING_SCRIPT_REGEX.test(rawLineText),
 		};
 	}, [line, furiganaEnabled, furiganaReady, furiganaMapOverride, wordTimed, lyricsLocale]);

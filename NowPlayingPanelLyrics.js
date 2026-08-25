@@ -1414,6 +1414,7 @@ p.ivlyrics-panel-line-text {
   white-space: normal !important;
   max-width: 100% !important;
   overflow-wrap: anywhere !important;
+  contain: style layout !important;
 }
 
 /* 노래방 단어 */
@@ -1426,6 +1427,7 @@ p.ivlyrics-panel-line-text {
   max-width: 100% !important;
   white-space: normal !important;
   overflow-wrap: anywhere !important;
+  contain: style layout !important;
 }
 
 .ivlyrics-panel-karaoke-text-run-segment {
@@ -1441,6 +1443,7 @@ p.ivlyrics-panel-line-text {
   unicode-bidi: isolate !important;
   -webkit-box-decoration-break: clone !important;
   box-decoration-break: clone !important;
+  contain: style layout !important;
 }
 
 .ivlyrics-panel-karaoke-text-run-space {
@@ -1947,6 +1950,23 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
     const shouldWrapKaraokeByWord = (text) => {
         const normalizedText = typeof text === "string" ? text : "";
         return /\S\s+\S/u.test(normalizedText);
+    };
+
+    // 라틴 문자가 지배적인 긴 텍스트(영어 등)를 Text Run 경로로 전환
+    const PANEL_KARAOKE_LATIN_TEXT_RUN_MIN_GRAPHEMES = 20;
+    const PANEL_KARAOKE_LATIN_TEXT_RUN_MIN_RATIO = 0.4;
+    const PANEL_KARAOKE_LATIN_CHAR_REGEX = /[A-Za-z\u00C0-\u02AF\u0370-\u052F\u1E00-\u1EFF\u0400-\u04FF]/u;
+
+    const shouldUseKaraokeTextRunForLatin = (text) => {
+        const normalizedText = typeof text === "string" ? text : "";
+        if (!normalizedText) return false;
+        if (/[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\uAC00-\uD7AF]/u.test(normalizedText)) {
+            return false;
+        }
+        const nonWhitespaceChars = normalizedText.replace(/\s/gu, "");
+        if (nonWhitespaceChars.length < PANEL_KARAOKE_LATIN_TEXT_RUN_MIN_GRAPHEMES) return false;
+        const latinCount = Array.from(nonWhitespaceChars).filter(ch => PANEL_KARAOKE_LATIN_CHAR_REGEX.test(ch)).length;
+        return latinCount / nonWhitespaceChars.length >= PANEL_KARAOKE_LATIN_TEXT_RUN_MIN_RATIO;
     };
 
     const getKaraokeSyllablesText = (syllables) => (
@@ -3408,7 +3428,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const renderKaraokeSyllables = (items, keyPrefix, className) => {
             const joinedText = getKaraokeSyllablesText(items);
 
-            if (shouldUseKaraokeTextRun(joinedText)) {
+            if (shouldUseKaraokeTextRun(joinedText) || shouldUseKaraokeTextRunForLatin(joinedText)) {
                 const textDirection = getKaraokeTextDirection(joinedText);
 				const preserveInlineStyles = !KARAOKE_JOINING_SCRIPT_REGEX.test(joinedText);
                 const segments = buildKaraokeTextRunSegments(items, preserveInlineStyles);
