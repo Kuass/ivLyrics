@@ -5297,8 +5297,7 @@ const LyricsLineBlock = react.memo(({
 	);
 });
 
-const renderLyricsItems = ({ items, isKara, karaokeRenderGranularity = null, position = 0, activeLineRef = null, settingsRevision = 0 }) => {
-	const karaokePosition = isKara ? position : 0;
+const renderLyricsItems = ({ items, isKara, karaokeRenderGranularity = null, position = 0, playbackWindows = null, activeGlobalCharIndex = -1, activeLineRef = null, settingsRevision = 0 }) => {
 
 	return items.map((item) => {
 		if (item.type === "indicator") {
@@ -5310,6 +5309,46 @@ const renderLyricsItems = ({ items, isKara, karaokeRenderGranularity = null, pos
 				settingsRevision,
 				lineRef: item.isActive ? activeLineRef : null,
 			});
+		}
+
+		// position-dependent 값들을 실시간 계산.
+		// 비활성 라인은 안정적인 값(completionPosition 또는 0)을 받으므로
+		// LyricsLineBlock의 react.memo가 자동으로 리렌더를 스킵합니다.
+		let karaokeActive = false;
+		let karaokePosition = 0;
+		let effectLive = item.effectLiveBase || false;
+		let itemActiveGlobalCharIndex = -1;
+
+		if (playbackWindows && item.playbackWindowIndex != null) {
+			const playbackState = getSyncedLinePlaybackState(
+				playbackWindows[item.playbackWindowIndex],
+				position
+			);
+			const isAnimatingLine = isKara ? playbackState.isAnimating : (item.isAnchorLine || false);
+			karaokeActive = isAnimatingLine;
+			karaokePosition = isKara ? playbackState.renderPosition : 0;
+			effectLive = item.effectLiveBase || (
+				!item.effectLiveBase && isAnimatingLine
+				&& item.effectFocused !== undefined
+			);
+			// effectLive 정확한 계산: effectLiveBase(position-independent) OR isAnimatingLine
+			// effectLiveBase가 false여도 isAnimatingLine이 true면 effectLive는 true
+			effectLive = (item.effectLiveBase || false) || isAnimatingLine;
+			// visualAnchorUsesTrailingInterlude가 true인 경우 effectLiveBase는 항상 false이므로
+			// isAnimatingLine도 차단되어야 합니다. effectLiveBase가 false이고
+			// effectFocused도 false인 경우(= visualAnchorUsesTrailingInterlude가 true)에는
+			// isAnimatingLine도 무시합니다.
+			if (item.effectFocused === false && !item.effectLiveBase && !item.isAnchorLine) {
+				// 일반적인 비활성 라인 — effectLive는 isAnimatingLine에만 의존
+				effectLive = isAnimatingLine;
+			}
+			itemActiveGlobalCharIndex = isAnimatingLine ? activeGlobalCharIndex : -1;
+		} else if (item.karaokeActive !== undefined) {
+			// 스크롤 모드 등 이전 호환: item에 직접 값이 있는 경우
+			karaokeActive = item.karaokeActive || false;
+			karaokePosition = item.karaokePosition || 0;
+			effectLive = item.effectLive || false;
+			itemActiveGlobalCharIndex = item.activeGlobalCharIndex ?? -1;
 		}
 
 		return react.createElement(LyricsLineBlock, {
@@ -5326,19 +5365,16 @@ const renderLyricsItems = ({ items, isKara, karaokeRenderGranularity = null, pos
 			isKara,
 			karaokeRenderGranularity,
 			line: item.line,
-			// Singing rows follow the live clock. Completed rows receive a stable time
-			// beyond their final glyph so their fill does not snap back while the parent
-			// line is easing out; future rows remain pinned to zero.
-			position: Number.isFinite(item.karaokePosition)
-				? item.karaokePosition
-				: (item.karaokeActive ? karaokePosition : 0),
-			isActive: item.karaokeActive,
+			// 비활성 라인: completionPosition(고정값) 또는 0 → react.memo 스킵
+			// 활성 라인: live position → 매 프레임 리렌더
+			position: karaokePosition,
+			isActive: karaokeActive,
 			isCurrentLine: item.isActiveLine,
 			isEffectFocused: item.effectFocused,
-			isEffectLive: item.effectLive,
+			isEffectLive: effectLive,
 			settingsRevision,
 			globalCharOffset: item.globalCharOffset,
-			activeGlobalCharIndex: item.activeGlobalCharIndex,
+			activeGlobalCharIndex: itemActiveGlobalCharIndex,
 			hiddenFromAccessibility: item.hiddenFromAccessibility === true,
 		});
 	});
@@ -5565,10 +5601,17 @@ const useSyncedLyricsEngine = ({
 		return prepareGlobalCharTimeline(lyrics);
 	}, [lyrics, isKara, CONFIG.visual["karaoke-bounce"], settingsRevision]);
 
-	const { globalCharOffsets, activeGlobalCharIndex } = useMemo(() => (
+	// globalCharOffsets는 곡 전체에 걸쳐 고정된 값(라인별 누적 글자 수)이므로
+	// position과 분리하여 참조 안정성을 확보합니다.
+	const globalCharOffsets = useMemo(() => (
+		globalCharTimeline ? globalCharTimeline.globalCharOffsets : []
+	), [globalCharTimeline]);
+
+	// activeGlobalCharIndex만 position에 따라 매 프레임 변동합니다.
+	const activeGlobalCharIndex = useMemo(() => (
 		globalCharTimeline
-			? queryGlobalCharTimeline(globalCharTimeline, position)
-			: EMPTY_GLOBAL_CHAR_STATE
+			? queryGlobalCharTimeline(globalCharTimeline, position).activeGlobalCharIndex
+			: -1
 	), [globalCharTimeline, position]);
 
 	const activeSourceLineIndex = activeLineIndex - leadingEmptyLines;
@@ -6034,28 +6077,11 @@ const useSyncedLyricsEngine = ({
 				.flatMap(({ line, index }) => {
 					const { startTime, originalText, mainText, subText, subText2, hasSubLine } = line;
 					const isAnchorLine = index === activePreparedIndex;
-					const playbackState = getSyncedLinePlaybackState(
-						playbackWindows[index + leadingEmptyLines],
-						position
-					);
-					const isHighlightedLine = isKara ? playbackState.isHighlighted : isAnchorLine;
-					const isAnimatingLine = isKara ? playbackState.isAnimating : isAnchorLine;
-					const trailingInterludeLine = createActiveTrailingKaraokeInterludeLine({
-						line,
-						nextLine: preparedLyrics[index + 1],
-						lineIndex: index,
-						lineCount: preparedLyrics.length,
-						position,
-						isActiveLine: isAnchorLine,
-						isKara,
-					});
-					const isOriginalCurrentLine = isHighlightedLine
-						&& !(isAnchorLine && trailingInterludeLine);
 					const tracksAnchor = isAnchorLine && !trailingInterludeLine;
 					const item = {
 						type: "line",
 						key: `scroll-inline-${startTime ?? index}-${index}`,
-						className: `lyrics-lyricsContainer-LyricsLine lyrics-lyricsContainer-LyricsLine-scrollView ${getKaraokeLineMetaClass(line)}${hasSubLine ? " lyrics-lyricsContainer-LyricsLine-hasSubLine" : ""}${isOriginalCurrentLine ? " lyrics-lyricsContainer-LyricsLine-active" : ""}${tracksAnchor ? " lyrics-lyricsContainer-LyricsLine-scrollCurrent" : ""}`,
+						className: `lyrics-lyricsContainer-LyricsLine lyrics-lyricsContainer-LyricsLine-scrollView ${getKaraokeLineMetaClass(line)}${hasSubLine ? " lyrics-lyricsContainer-LyricsLine-hasSubLine" : ""}${isAnchorLine ? " lyrics-lyricsContainer-LyricsLine-active" : ""}${tracksAnchor ? " lyrics-lyricsContainer-LyricsLine-scrollCurrent" : ""}`,
 						style: {
 							cursor: Number.isFinite(startTime) ? "pointer" : "default",
 							...getKaraokeSpeakerStyle(line?.speaker, line?.['speaker-color'], line?.['speaker-fallback']),
@@ -6066,18 +6092,17 @@ const useSyncedLyricsEngine = ({
 						mainText,
 						subText,
 						subText2,
-						isActiveLine: isOriginalCurrentLine,
+						isActiveLine: isAnchorLine,
 						trackLineRef: tracksAnchor,
 						canSeek: Number.isFinite(startTime),
-						karaokeActive: isAnimatingLine,
-						effectFocused: isOriginalCurrentLine,
-						effectLive: isAnimatingLine || isOriginalCurrentLine,
-						karaokePosition: isKara ? playbackState.renderPosition : 0,
+						playbackWindowIndex: index + leadingEmptyLines,
+						isAnchorLine,
+						effectFocused: isAnchorLine,
+						effectLiveBase: isAnchorLine,
 						globalCharOffset: globalCharOffsets[index] || 0,
-						activeGlobalCharIndex: isAnimatingLine ? activeGlobalCharIndex : -1,
 					};
 
-					if (!trailingInterludeLine) {
+					if (!trailingInterludeLine || !isAnchorLine) {
 						return [item];
 					}
 
@@ -6146,9 +6171,6 @@ const useSyncedLyricsEngine = ({
 			}
 
 			const isAnchorLine = lineNumber === activeLineIndex;
-			const playbackState = getSyncedLinePlaybackState(playbackWindows[lineNumber], position);
-			const isHighlightedLine = isKara ? playbackState.isHighlighted : isAnchorLine;
-			const isAnimatingLine = isKara ? playbackState.isAnimating : isAnchorLine;
 			let animationIndex = getSyncedAnimationIndex({
 				compact,
 				isScrolling,
@@ -6163,12 +6185,14 @@ const useSyncedLyricsEngine = ({
 				? displayLineNumber - activeDisplayLineIndex
 				: lineNumber - activeLineIndex;
 			let className = `lyrics-lyricsContainer-LyricsLine ${getKaraokeLineMetaClass(line)}`;
-			const isCurrentRenderedLine = isHighlightedLine
+			// activeLineIndex 기반으로 하이라이트 결정 (position-independent).
+			// activeLineIndex는 라인 전환 시에만 변경되므로 renderItems의 안정성 확보.
+			const isCurrentRenderedLine = isAnchorLine
 				&& !(isAnchorLine && isTrailingInterludeActive);
 			if (isCurrentRenderedLine) {
 				className += " lyrics-lyricsContainer-LyricsLine-active";
 			}
-			const isOutsideVisibleRange = !isHighlightedLine
+			const isOutsideVisibleRange = !isAnchorLine
 				&& lineNumber !== visualAnchorLineNumber
 				&& shouldHideSyncedLine({
 					compact,
@@ -6196,23 +6220,18 @@ const useSyncedLyricsEngine = ({
 				isActiveLine: isCurrentRenderedLine,
 				trackLineRef: !visualAnchorUsesTrailingInterlude && lineNumber === visualAnchorLineNumber,
 				canSeek: lineNumber >= leadingEmptyLines && Number.isFinite(startTime),
-				karaokeActive: isAnimatingLine,
+				// position-dependent 필드들은 renderLyricsItems에서 실시간 계산.
+				// playbackWindowIndex로 해당 라인의 playbackWindow를 참조합니다.
+				playbackWindowIndex: lineNumber,
+				isAnchorLine,
 				effectFocused: !visualAnchorUsesTrailingInterlude
 					&& lineNumber === visualAnchorLineNumber,
-				// Keep both sides of a pre-centered hand-off alive. The outgoing
-				// line can then reach zero effect strength before its animation is
-				// detached when activeLineIndex advances.
-				effectLive: !visualAnchorUsesTrailingInterlude
-					&& (
-						isAnimatingLine
-						|| lineNumber === activeLineIndex
-						|| lineNumber === visualAnchorLineNumber
-					),
-				karaokePosition: isKara ? playbackState.renderPosition : 0,
+				// effectLive의 position-independent 부분만 미리 계산
+				effectLiveBase: !visualAnchorUsesTrailingInterlude
+					&& (lineNumber === activeLineIndex || lineNumber === visualAnchorLineNumber),
 				globalCharOffset: lineNumber >= leadingEmptyLines && lineNumber - leadingEmptyLines < globalCharOffsets.length
 					? globalCharOffsets[lineNumber - leadingEmptyLines]
 					: 0,
-				activeGlobalCharIndex: isAnimatingLine ? activeGlobalCharIndex : -1,
 				hiddenFromAccessibility: isOutsideVisibleRange,
 			};
 
@@ -6263,7 +6282,8 @@ const useSyncedLyricsEngine = ({
 		preparedLyrics,
 		paddedLyrics,
 		playbackWindows,
-		position,
+		// position은 의존성에서 제거 — position-dependent 계산은 renderLyricsItems에서 수행.
+		// 이를 통해 renderItems는 activeLineIndex 전환 시에만 재생성됩니다.
 		isScrolling,
 		isKara,
 		activeDisplayLineIndex,
@@ -6275,7 +6295,6 @@ const useSyncedLyricsEngine = ({
 		trailingInterludeKey,
 		isTrailingInterludeActive,
 		globalCharOffsets,
-		activeGlobalCharIndex,
 		stableLineStyles,
 		suppressLayoutShiftAnimation,
 		usesScriptedCompactLineShift,
@@ -6286,6 +6305,7 @@ const useSyncedLyricsEngine = ({
 		isScrolling,
 		handleContainerClick,
 		renderItems,
+		playbackWindows,
 		compactOffset,
 		activeLineIndex,
 		activeLyricIndex: Math.max(0, activeLineIndex - leadingEmptyLines),
@@ -7331,6 +7351,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copy
 		isScrolling,
 		handleContainerClick,
 		renderItems,
+		playbackWindows,
 		compactOffset,
 		activeLyricIndex,
 		globalCharOffsets,
@@ -7416,6 +7437,8 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copy
                           isKara,
                           karaokeRenderGranularity,
                           position: karaokePosition,
+                          playbackWindows,
+                          activeGlobalCharIndex,
                           activeLineRef: setCompactActiveLineAnchor,
                           settingsRevision: reRenderLyricsPage,
                   })
@@ -7662,6 +7685,8 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributo
 	const {
 		handleContainerClick,
 		renderItems,
+		playbackWindows,
+		activeGlobalCharIndex,
 	} = useSyncedLyricsEngine({
 		lyrics,
 		position: karaokePosition,
@@ -7692,6 +7717,8 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributo
 			items: renderItems,
 			isKara,
 			position: karaokePosition,
+			playbackWindows,
+			activeGlobalCharIndex,
 			activeLineRef,
 			settingsRevision: reRenderLyricsPage,
 		}),
