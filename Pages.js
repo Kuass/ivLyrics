@@ -4164,13 +4164,29 @@ const getActiveLineAnchorCenter = (activeLine) => {
 
 const getCompactLineDocumentTop = (element) => getCachedLineLayoutMetrics(element).offsetTop;
 
-const getCompactSyncedOffset = (container, activeLine, isScrolling, predictedLine = null) => {
+const getCompactSyncedOffset = (container, activeLine, isScrolling, predictedLine = null, allowMeasure = false) => {
 	if (!container || isScrolling) {
 		return 0;
 	}
 
 	const targetLine = predictedLine || activeLine;
 	if (!targetLine) {
+		return Number.isFinite(container?._ivCompactOffset) ? container._ivCompactOffset : 0;
+	}
+
+	if (allowMeasure) {
+		rememberCompactContainerLayout(container);
+		rememberCompactLineLayout(targetLine);
+	}
+
+	const cachedMetrics = getCachedLineLayoutMetrics(targetLine);
+	const containerHeight = getCachedContainerHeight(container);
+	if (cachedMetrics.height > 0 && containerHeight > 0) {
+		const anchorRatio = getLyricsAnchorRatio(container);
+		return containerHeight * anchorRatio - (cachedMetrics.offsetTop + cachedMetrics.height / 2);
+	}
+
+	if (!allowMeasure) {
 		return Number.isFinite(container?._ivCompactOffset) ? container._ivCompactOffset : 0;
 	}
 
@@ -5805,10 +5821,7 @@ const useSyncedLyricsEngine = ({
 		const predictedLine = visualAnchorUsesTrailingInterlude
 			? activeLine
 			: (container.querySelector?.(".lyrics-lyricsContainer-LyricsLine[data-visual-anchor=\"true\"]") || activeLine);
-		if (!allowMeasure) {
-			return;
-		}
-		const nextOffset = getCompactSyncedOffset(container, activeLine, isScrolling, predictedLine);
+		const nextOffset = getCompactSyncedOffset(container, activeLine, isScrolling, predictedLine, allowMeasure);
 		applyCompactOffset(nextOffset);
 	}, [applyCompactOffset, compact, containerRef, activeLineRef, isScrolling, visualAnchorUsesTrailingInterlude]);
 
@@ -5864,6 +5877,21 @@ const useSyncedLyricsEngine = ({
 			? Math.max(visualIndex - CONFIG.visual["lines-before"], 0)
 			: 0;
 		const hasTrailingInterlude = !!trailingInterludeLine;
+		const duration = suppressLayoutShiftAnimation
+			? "0s"
+			: "var(--iv-lyrics-centering-duration, 300ms)";
+		const predictedLine = compact
+			? (lineRoot.querySelector(`[data-line-number="${visualLineIndex}"]`)
+				|| lineRoot.querySelector(".lyrics-lyricsContainer-LyricsLine[data-visual-anchor=\"true\"]")
+				|| activeLineRef.current)
+			: activeLineRef.current;
+		// Measure the destination line now and apply --offset in the same turn as
+		// --position-index. Splitting those writes is what caused the small bump,
+		// freeze, then teleport.
+		const nextOffset = compact
+			? getCompactSyncedOffset(container, activeLineRef.current, false, predictedLine, true)
+			: 0;
+		const offsetValue = `${nextOffset}px`;
 		lineRoot.querySelectorAll(":scope > .lyrics-lyricsContainer-LyricsLine").forEach((lineEl, visibleIndex) => {
 			const lineNumber = Number(lineEl.dataset.lineNumber);
 			const sourceIndex = Number.isFinite(lineNumber) ? lineNumber : visibleIndex;
@@ -5878,39 +5906,33 @@ const useSyncedLyricsEngine = ({
 			if (hasTrailingInterlude && Number.isFinite(lineNumber) && lineNumber <= activeLineIndex) {
 				animationIndex -= 1;
 			}
-			if (lineEl.style.getPropertyValue("--position-index") !== String(animationIndex)) {
-				lineEl.style.setProperty("--position-index", String(animationIndex));
+			const positionValue = String(animationIndex);
+			if (lineEl.style.getPropertyValue("--position-index") !== positionValue) {
+				lineEl.style.setProperty("--position-index", positionValue);
 				lineEl.style.setProperty("--animation-index", String(Math.abs(animationIndex) + 1));
 				lineEl.style.setProperty("--blur-index", String(Math.min(Math.abs(animationIndex), 3)));
 			}
-			const duration = isScrolling || suppressLayoutShiftAnimation
-				? "0s"
-				: "var(--iv-lyrics-centering-duration, 300ms)";
+			if (lineEl.style.getPropertyValue("--offset") !== offsetValue) {
+				lineEl.style.setProperty("--offset", offsetValue);
+			}
 			if (lineEl.style.getPropertyValue("--line-shift-duration") !== duration) {
 				lineEl.style.setProperty("--line-shift-duration", duration);
 			}
 		});
+		if (compact) {
+			applyCompactOffset(nextOffset);
+		}
 		return undefined;
-	}, [compact, isScrolling, visualLineIndex, visualDisplayLineIndex, activeLineIndex, trailingInterludeKey, containerRef]);
+	}, [compact, isScrolling, visualLineIndex, visualDisplayLineIndex, activeLineIndex, trailingInterludeKey, suppressLayoutShiftAnimation, containerRef, activeLineRef, applyCompactOffset]);
 
 	useEffect(() => {
 		if (!compact || isScrolling) {
 			return undefined;
 		}
-
 		const container = containerRef.current;
-		if (!container) {
+		if (!container || typeof ResizeObserver === "undefined") {
 			return undefined;
 		}
-
-		const delay = visualLineIndex === activeLineIndex ? 0 : LYRICS_CENTERING_DURATION_MS + 16;
-		const timeoutId = setTimeout(() => syncCompactOffset(true), delay);
-		const cancelRecenter = () => clearTimeout(timeoutId);
-
-		if (typeof ResizeObserver === "undefined") {
-			return undefined;
-		}
-
 		const raf = typeof requestAnimationFrame === "function"
 			? requestAnimationFrame
 			: (callback) => setTimeout(callback, 0);
@@ -5919,9 +5941,6 @@ const useSyncedLyricsEngine = ({
 			: clearTimeout;
 		let frameId = null;
 		const scheduleOffsetSync = () => {
-			if (visualLineIndex !== activeLineIndex) {
-				return;
-			}
 			if (frameId !== null) {
 				cancelRaf(frameId);
 			}
@@ -5930,17 +5949,15 @@ const useSyncedLyricsEngine = ({
 				syncCompactOffset(true);
 			});
 		};
-
 		const observer = new ResizeObserver(scheduleOffsetSync);
 		observer.observe(container);
 		return () => {
-			if (typeof cancelRecenter === "function") cancelRecenter();
 			observer.disconnect();
 			if (frameId !== null) {
 				cancelRaf(frameId);
 			}
 		};
-	}, [compact, isScrolling, visualLineIndex, trailingInterludeKey, lyricsId, preparedLyrics, settingsRevision, syncCompactOffset]);
+	}, [compact, isScrolling, lyricsId, preparedLyrics, settingsRevision, syncCompactOffset]);
 
 	useEffect(() => {
 		const actualIndex = Math.max(0, activeLineIndex - leadingEmptyLines);
