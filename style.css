@@ -11,6 +11,18 @@
 
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css");
 
+@property --offset {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+@property --position-index {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 :root {
   --iv-motion-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
   --iv-motion-ease-emphasis: cubic-bezier(0.2, 0.9, 0.2, 1);
@@ -1711,6 +1723,10 @@ body.ivlyrics-page-active .main-topBar-container {
   filter: blur(calc(var(--blur-index) * 1.5px));
 }
 
+.lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active {
+  filter: none;
+}
+
 /* 하이라이트 모드: 현재 가사만 밝게, 나머지는 희미하게 */
 .lyrics-lyricsContainer-LyricsContainer.highlight-mode-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine,
 .lyrics-lyricsContainer-LyricsContainer.highlight-mode-enabled .lyrics-lyricsContainer-SyncedScrollView .lyrics-lyricsContainer-LyricsLine {
@@ -1725,7 +1741,7 @@ body.ivlyrics-page-active .main-topBar-container {
 .lyrics-lyricsContainer-LyricsContainer.highlight-mode-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active,
 .lyrics-lyricsContainer-LyricsContainer.highlight-mode-enabled .lyrics-lyricsContainer-SyncedScrollView .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active {
   opacity: 1 !important;
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3), 0 3px 10px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.7);
 }
 
 /* 하이라이트 모드: Unsynced 가사에도 적용 */
@@ -1736,7 +1752,7 @@ body.ivlyrics-page-active .main-topBar-container {
 
 .lyrics-lyricsContainer-LyricsContainer.highlight-mode-enabled .lyrics-lyricsContainer-UnsyncedLyricsPage .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active {
   opacity: 1 !important;
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3), 0 3px 10px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.7);
 }
 
 /* 하이라이트 모드 + 호버 효과: 마우스 올리면 밝게 */
@@ -1752,7 +1768,7 @@ body.ivlyrics-page-active .main-topBar-container {
 .lyrics-lyricsContainer-UnsyncedLyricsPage .lyrics-lyricsContainer-LyricsLine {
   color: var(--lyrics-color-inactive);
   opacity: 0.5;
-  filter: blur(0px);
+  filter: none;
   transform: translateY(0);
   transition:
     color var(--iv-motion-duration-fast) var(--iv-motion-ease-standard),
@@ -1814,11 +1830,6 @@ body.ivlyrics-page-active .main-topBar-container {
   overflow: visible;
 }
 
-.lyrics-lyricsContainer-LyricsLine-active > p,
-.lyrics-lyricsContainer-LyricsLine-active .lyrics-lyricsContainer-LyricsLine-phonetic,
-.lyrics-lyricsContainer-LyricsLine-active .lyrics-lyricsContainer-LyricsLine-translation {
-  transform: translateY(-2px);
-}
 
 .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active {
   transform: translateY(calc(var(--position-index) * var(--lyrics-line-height) + var(--offset)));
@@ -2855,7 +2866,10 @@ div.lyrics-tabBar-headerItemLink {
 
 /* pending 상태에서는 bounce가 없으므로 transform을 제거하여 레이어 생성 방지.
    브라우저가 불필요한 합성 레이어를 만들지 않아 메모리와 GPU 비용이 줄어듭니다. */
-.lyrics-karaoke-text-run-segment--pending:not(.is-bouncing) {
+.lyrics-karaoke-text-run-segment--pending:not(.is-bouncing),
+.lyrics-karaoke-text-run-segment--done:not(.is-bouncing),
+.lyrics-karaoke-char--pending:not(.is-bouncing),
+.lyrics-karaoke-char--done:not(.is-bouncing) {
   transform: none;
 }
 
