@@ -126,11 +126,6 @@ const VinylActiveLyricRenderer = (() => {
                 window.addEventListener("resize", scheduleMeasure);
             }
 
-            if (typeof window.MutationObserver === "function") {
-                mutationObserver = new window.MutationObserver(scheduleMeasure);
-                mutationObserver.observe(root, { childList: true, characterData: true, subtree: true });
-            }
-
             motionPreference?.addEventListener?.("change", scheduleMeasure);
             document.fonts?.ready?.then(scheduleMeasure).catch(() => undefined);
             document.fonts?.addEventListener?.("loadingdone", scheduleMeasure);
@@ -140,7 +135,6 @@ const VinylActiveLyricRenderer = (() => {
                 if (measureFrame !== null) window.cancelAnimationFrame(measureFrame);
                 clearScrollEntries();
                 resizeObserver?.disconnect();
-                mutationObserver?.disconnect();
                 if (!resizeObserver) window.removeEventListener("resize", scheduleMeasure);
                 motionPreference?.removeEventListener?.("change", scheduleMeasure);
                 document.fonts?.removeEventListener?.("loadingdone", scheduleMeasure);
@@ -230,10 +224,14 @@ const VinylActiveLyricRenderer = (() => {
             () => isKara && Array.isArray(lyrics) ? prepareGlobalCharTimeline(lyrics) : null,
             [lyrics, isKara]
         );
-        const { globalCharOffsets, activeGlobalCharIndex } = useMemo(
+        const globalCharOffsets = useMemo(
+            () => globalCharTimeline ? globalCharTimeline.globalCharOffsets : [],
+            [globalCharTimeline]
+        );
+        const activeGlobalCharIndex = useMemo(
             () => globalCharTimeline
-                ? queryGlobalCharTimeline(globalCharTimeline, renderPosition)
-                : EMPTY_GLOBAL_CHAR_STATE,
+                ? queryGlobalCharTimeline(globalCharTimeline, renderPosition).activeGlobalCharIndex
+                : -1,
             [globalCharTimeline, renderPosition]
         );
 

@@ -9594,8 +9594,13 @@ class LyricsContainer extends react.Component {
 
     // Listen for lyric index changes from Pages.js
     this.handleLyricIndexChange = (event) => {
-      if (event.detail && typeof event.detail.index === 'number') {
-        this.setState({ currentLyricIndex: event.detail.index });
+      const nextIndex = event.detail?.index;
+      if (typeof nextIndex === 'number' && this.state.currentLyricIndex !== nextIndex) {
+        if (this.state.isFullscreen || this.state.learningModeActive) {
+          this.setState({ currentLyricIndex: nextIndex });
+        } else {
+          this.state.currentLyricIndex = nextIndex;
+        }
       }
     };
     window.addEventListener("ivLyrics:lyric-index-changed", this.handleLyricIndexChange);

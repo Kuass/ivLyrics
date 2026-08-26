@@ -1691,20 +1691,12 @@ body.ivlyrics-page-active .main-topBar-container {
   transform: translateY(calc(var(--position-index) * var(--lyrics-line-height) + var(--offset)));
   transform-origin: var(--lyrics-align-text);
   color: var(--lyrics-color-inactive);
-  transition-timing-function:
-    var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1)),
-    cubic-bezier(0.16, 1, 0.3, 1),
-    cubic-bezier(0.16, 1, 0.3, 1);
-  transition-duration:
-    var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms)),
-    300ms,
-    360ms;
-  transition-delay: var(--line-shift-delay, 0s), 0s, 0s;
-  /* Skip `filter` here: blur snaps to new value when --blur-index changes instead of
-     transitioning across every visible line in parallel (huge GPU spike during scroll). */
-  transition-property: transform, color, opacity;
+  transition: transform var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms))
+      var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1))
+      var(--line-shift-delay, 0s);
   opacity: 1;
-  will-change: auto;
+  will-change: transform;
+  contain: paint;
 }
 
 /* Only currently visible auto-follow rows receive compositor layers. Hidden
@@ -1713,10 +1705,6 @@ body.ivlyrics-page-active .main-topBar-container {
   .lyrics-lyricsContainer-SyncedLyrics
   > .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-paddingLine) {
   will-change: transform;
-}
-
-.lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active) {
-  letter-spacing: -0.005em;
 }
 
 .lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine {
@@ -1802,27 +1790,16 @@ body.ivlyrics-page-active .main-topBar-container {
   color: var(--lyrics-color-active);
   opacity: 1;
   filter: none !important;
-  transition:
-    transform var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms))
+  transition: transform var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms))
       var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1))
-      var(--line-shift-delay, 0s),
-    color 0.3s var(--iv-motion-ease-standard),
-    opacity 0.4s var(--iv-motion-ease-standard),
-    text-shadow 0.4s var(--iv-motion-ease-standard);
+      var(--line-shift-delay, 0s);
 }
 
 .lyrics-lyricsContainer-LyricsLine > p,
 .lyrics-lyricsContainer-LyricsLine-phonetic,
 .lyrics-lyricsContainer-LyricsLine-translation,
 .lyrics-karaoke-line {
-  transition:
-    transform var(--iv-lyrics-centering-duration, 300ms)
-      var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1)),
-    opacity var(--iv-motion-duration-medium) var(--iv-motion-ease-standard),
-    letter-spacing var(--iv-motion-duration-medium) var(--iv-motion-ease-standard),
-    text-shadow var(--iv-motion-duration-medium) var(--iv-motion-ease-standard),
-    --ivlyrics-effect-strength var(--iv-lyrics-centering-duration, 300ms)
-      var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1));
+  transition: none;
 }
 
 .lyrics-lyricsContainer-LyricsLine > p:has(.lyrics-karaoke-stack),
@@ -2202,34 +2179,19 @@ div.lyrics-tabBar-headerItemLink {
 .lyrics-lyricsContainer-SyncedLyricsPage.is-karaoke
   .lyrics-lyricsContainer-SyncedLyrics:has(.lyrics-karaoke-part.active-vocal-row)
   > .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-paddingLine) {
-  transition-property: transform, color, opacity;
-  transition-duration:
-    var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms)),
-    300ms,
-    360ms !important;
-  transition-timing-function:
-    var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1)),
-    cubic-bezier(0.16, 1, 0.3, 1),
-    cubic-bezier(0.16, 1, 0.3, 1) !important;
-  transition-delay: var(--line-shift-delay, 0s), 0s, 0s !important;
+  transition-property: transform;
+  transition-duration: var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms)) !important;
+  transition-timing-function: var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1)) !important;
+  transition-delay: var(--line-shift-delay, 0s) !important;
 }
 
 .lyrics-lyricsContainer-SyncedLyricsPage:not(.scrolling-active)
   .lyrics-lyricsContainer-SyncedLyrics
   > .lyrics-lyricsContainer-LyricsLine-paddingLine {
-  transition-property: transform, color, opacity !important;
-  transition-duration:
-    var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms)),
-    300ms,
-    420ms !important;
-  transition-timing-function:
-    var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1)),
-    cubic-bezier(0.16, 1, 0.3, 1),
-    cubic-bezier(0.16, 1, 0.3, 1) !important;
-  transition-delay:
-    var(--line-shift-delay, 0s),
-    0s,
-    0s !important;
+  transition-property: transform !important;
+  transition-duration: var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms)) !important;
+  transition-timing-function: var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1)) !important;
+  transition-delay: var(--line-shift-delay, 0s) !important;
 }
 
 .lyrics-karaoke-part {
@@ -4677,7 +4639,7 @@ body:has(#lyrics-fullscreen-container) [data-tippy-root] {
 .lyrics-lyricsContainer-LyricsLine-active .lyrics-lyricsContainer-LyricsLine-culturalNote {
   color: var(--lyrics-color-active);
   opacity: var(--lyrics-cultural-note-opacity, 0.6);
-  transform: translateY(-2px);
+  transform: none;
 }
 
 /* Legacy support: .lyrics-lyricsContainer-LyricsLine-sub uses translation style */
