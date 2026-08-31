@@ -118,6 +118,24 @@
         return uri.startsWith("spotify:track:") ? uri.split(":")[2] : null;
     };
 
+    const shouldWaitForPanelTrackMetadata = (
+        currentUri,
+        previousTrackUri,
+        attempt,
+        maxAttempts = 6
+    ) => attempt < maxAttempts && (
+        !currentUri || (previousTrackUri && currentUri === previousTrackUri)
+    );
+
+    const isIvLyricsRouteActive = (pathname, hasVisiblePage = false) => {
+        const normalizedPathname = typeof pathname === "string" ? pathname : "";
+        if (normalizedPathname) {
+            return normalizedPathname === "/ivLyrics"
+                || normalizedPathname.startsWith("/ivLyrics/");
+        }
+        return Boolean(hasVisiblePage);
+    };
+
     const getSavedPanelLocalLyrics = (uri) => {
         if (!uri) return null;
         try {
@@ -1810,9 +1828,18 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
 
     const isIvLyricsPageActive = () => {
         const pathname = getCurrentPathname();
-        return pathname === '/ivLyrics'
-            || pathname.startsWith('/ivLyrics/')
-            || document.querySelector('[data-testid="ivlyrics-page"]') !== null;
+        const pageElement = document.querySelector('[data-testid="ivlyrics-page"]');
+        const hasVisiblePage = Boolean(
+            pageElement
+            && !pageElement.hidden
+            && pageElement.getAttribute('aria-hidden') !== 'true'
+            && pageElement.getClientRects().length > 0
+        );
+        // Spotify can keep the previous custom-app DOM mounted after navigating
+        // home. A non-empty History pathname is authoritative; using the stale
+        // hidden node as an OR condition removes the panel until another track
+        // change happens to rebuild that part of the UI.
+        return isIvLyricsRouteActive(pathname, hasVisiblePage);
     };
 
     const scheduleInsertPanelLyrics = (delay = 100) => {
@@ -4007,13 +4034,19 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
 
                     // karaoke (노래방) → synced → unsynced 순서로 선택
                     const karaokeModeEnabled = getVisualSetting('karaoke-mode-enabled', true) !== false;
-                    const selectedKaraoke = karaokeModeEnabled ? result.karaoke : null;
-                    let lyricsData = selectedKaraoke || result.synced || result.unsynced || [];
-                    const isKaraoke = !!selectedKaraoke;
-                    const nextKaraokeSource = selectedKaraoke ? (result.karaokeSource || null) : null;
-                    const lyricsType = selectedKaraoke
+                    const hasLyricsContent = window.ivLyricsDataUtils?.hasLyricsContent
+                        || ((candidate) => Array.isArray(candidate) && candidate.length > 0);
+                    const firstLyricsContent = window.ivLyricsDataUtils?.firstLyricsContent
+                        || ((...candidates) => candidates.find(hasLyricsContent) || null);
+                    const selectedKaraoke = karaokeModeEnabled && hasLyricsContent(result.karaoke)
+                        ? result.karaoke
+                        : null;
+                    let lyricsData = firstLyricsContent(selectedKaraoke, result.synced, result.unsynced) || [];
+                    const isKaraoke = hasLyricsContent(selectedKaraoke);
+                    const nextKaraokeSource = isKaraoke ? (result.karaokeSource || null) : null;
+                    const lyricsType = isKaraoke
                         ? 'karaoke'
-                        : (result.synced ? 'synced' : 'unsynced');
+                        : (hasLyricsContent(result.synced) ? 'synced' : 'unsynced');
 
                     if (lyricsData.length > 0) {
                         // endTime 계산 (없으면 다음 라인의 startTime 사용)
@@ -4351,8 +4384,9 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         useEffect(() => {
             // 곡 변경 시 가사 로드
             const handleSongChange = () => {
-                // 곡 변경 이벤트 발생 시점에 트랙 URI 캡처
-                const capturedUri = Spicetify.Player.data?.item?.uri;
+                const previousTrackUri = lastTrackUri.current
+                    || currentLyricsState.trackUri
+                    || null;
 
                 // 이전 가사 상태 초기화 (새 곡 전환 중임을 표시)
                 loadSeqRef.current += 1;
@@ -4368,17 +4402,27 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 currentLyricsState.lyrics = [];
                 currentLyricsState.currentIndex = 0;
 
-                loadTrackOffset(capturedUri);
-
-                // 약간의 딜레이 후 로드 (트랙 정보가 완전히 업데이트될 때까지 대기)
-                // 캡처한 URI를 전달하여 딜레이 중 곡이 변경되면 무시
                 if (songChangeTimerRef.current) {
                     clearTimeout(songChangeTimerRef.current);
                 }
-                songChangeTimerRef.current = setTimeout(() => {
-                    songChangeTimerRef.current = null;
-                    loadLyricsFromExtension(true, capturedUri);
-                }, 300);
+
+                // songchange can fire before Player.data swaps to the new item.
+                // Poll briefly for a different, non-empty URI; otherwise the old
+                // track can be reloaded and no later event arrives to fill the panel.
+                const scheduleTrackLoad = (attempt = 0) => {
+                    songChangeTimerRef.current = setTimeout(() => {
+                        songChangeTimerRef.current = null;
+                        const currentUri = Spicetify.Player.data?.item?.uri || null;
+                        if (shouldWaitForPanelTrackMetadata(currentUri, previousTrackUri, attempt)) {
+                            scheduleTrackLoad(attempt + 1);
+                            return;
+                        }
+
+                        loadTrackOffset(currentUri);
+                        loadLyricsFromExtension(true, currentUri);
+                    }, attempt === 0 ? 300 : 150);
+                };
+                scheduleTrackLoad();
             };
 
             // 설정 변경 리스너
