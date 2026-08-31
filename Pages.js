@@ -2152,9 +2152,16 @@ const safeRenderText = (value) => {
 };
 
 // Unified function to handle lyrics display mode logic
-const getLyricsDisplayMode = (isKara, line, text, originalText, text2) => {
+const getLyricsDisplayMode = (
+	isKara,
+	line,
+	text,
+	originalText,
+	text2,
+	{ preserveOriginalMain = false } = {}
+) => {
 	const displayMode = CONFIG.visual["translate:display-mode"];
-	const showTranslatedBelow = displayMode === "below";
+	const showTranslatedBelow = displayMode === "below" || preserveOriginalMain;
 	const replaceOriginal = displayMode === "replace";
 
 	let mainText, subText, subText2;
@@ -2712,7 +2719,13 @@ const buildLyricDisplayState = (isKara, line, text, originalText, text2) => {
 		line,
 		text,
 		originalText,
-		text2
+		text2,
+		{
+			// Karaoke already preserves its source glyphs as the main line. Keep
+			// line-synced rendering consistent so a global "replace" preference
+			// cannot promote a translation into the timed lyric body.
+			preserveOriginalMain: !isKara,
+		}
 	);
 
 	return {
@@ -8115,7 +8128,7 @@ const LyricsPageRenderer = react.memo(({
 			};
 		}
 
-		if (mode === unsyncedMode && hasLyricsContent(unsynced)) {
+		if (mode === unsyncedMode && hasLyricsContent(unsyncedLyrics)) {
 			return {
 				component: UnsyncedLyricsPage,
 				props: {

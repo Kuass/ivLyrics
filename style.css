@@ -1699,6 +1699,15 @@ body.ivlyrics-page-active .main-topBar-container {
   contain: paint;
 }
 
+/* Line-synced lyrics render as one font run instead of the padded karaoke
+   glyph layers. Let ascenders, descenders, outlines and shadows paint slightly
+   past the containment edge without changing row height or centering. */
+.lyrics-lyricsContainer-SyncedLyricsPage:not(.is-karaoke)
+  .lyrics-lyricsContainer-SyncedLyrics
+  > .lyrics-lyricsContainer-LyricsLine {
+  overflow-clip-margin: 0.24em;
+}
+
 /* Only currently visible auto-follow rows receive compositor layers. Hidden
    rows stay mounted for smooth hand-offs but do not need one layer each. */
 .lyrics-lyricsContainer-SyncedLyricsPage:not(.scrolling-active)
