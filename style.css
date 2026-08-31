@@ -12721,6 +12721,18 @@ html.is-lp-view-exit::view-transition-new(root) {
   text-transform: uppercase;
 }
 
+.ivlyrics-sync-creator-shell .sync-creator-range-style-tape {
+  letter-spacing: 0 !important;
+  word-spacing: 0 !important;
+}
+
+.ivlyrics-sync-creator-shell .sync-creator-range-style-char {
+  letter-spacing: 0 !important;
+  line-height: inherit;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 .ivlyrics-sync-creator-shell .sync-creator-range-effect-picker .sync-creator-effect-strip {
   display: grid !important;
   grid-template-columns: repeat(4, minmax(0, 1fr));
