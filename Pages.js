@@ -5352,12 +5352,13 @@ const areLyricsLineWrappersEqual = (prev, next) => (
 	&& prev.isCurrentLine === next.isCurrentLine
 	&& prev.hiddenFromAccessibility === next.hiddenFromAccessibility
 	&& prev.isVisualAnchor === next.isVisualAnchor
+	&& prev.isVirtualTrailingInterlude === next.isVirtualTrailingInterlude
 	&& prev.lineNumber === next.lineNumber
 	&& prev.lineRef === next.lineRef
 	&& prev.children === next.children
 );
 
-const LyricsLineBlock = react.memo(({ className, style, lineRef, dir, seekTime, isCurrentLine, hiddenFromAccessibility, isVisualAnchor, lineNumber, children }) => {
+const LyricsLineBlock = react.memo(({ className, style, lineRef, dir, seekTime, isCurrentLine, hiddenFromAccessibility, isVisualAnchor, isVirtualTrailingInterlude, lineNumber, children }) => {
 	const wrapperRef = useRef(null);
 	const assignLineRef = useCallback((node) => {
 		wrapperRef.current = node;
@@ -5394,6 +5395,7 @@ const LyricsLineBlock = react.memo(({ className, style, lineRef, dir, seekTime, 
 			ref: assignLineRef,
 			"aria-hidden": hiddenFromAccessibility ? true : undefined,
 			"data-visual-anchor": isVisualAnchor ? "true" : undefined,
+			"data-virtual-trailing-interlude": isVirtualTrailingInterlude ? "true" : undefined,
 			"data-line-number": Number.isFinite(lineNumber) ? lineNumber : undefined,
 			onClick: !hiddenFromAccessibility && Number.isFinite(seekTime) ? handleClick : null,
 			...(!hiddenFromAccessibility && Number.isFinite(seekTime) ? {
@@ -5417,6 +5419,7 @@ const SyncedLyricsLine = react.memo((props) => {
 		isCurrentLine = false,
 		hiddenFromAccessibility = false,
 		isVisualAnchor = false,
+		isVirtualTrailingInterlude = false,
 		lineNumber = null,
 	} = props;
 	const mainLine = props.line || (typeof props.mainText === "object" ? props.mainText : {
@@ -5440,6 +5443,7 @@ const SyncedLyricsLine = react.memo((props) => {
 			isCurrentLine,
 			hiddenFromAccessibility,
 			isVisualAnchor,
+			isVirtualTrailingInterlude,
 			lineNumber,
 		},
 		react.createElement(LyricsLineContent, props)
@@ -5524,9 +5528,10 @@ const renderLyricsItems = ({ items, isKara, karaokeRenderGranularity = null, pos
 			settingsRevision,
 			globalCharOffset: item.globalCharOffset,
 			activeGlobalCharIndex: itemActiveGlobalCharIndex,
-			hiddenFromAccessibility: item.hiddenFromAccessibility === true,
-                        isVisualAnchor: item.isVisualAnchor === true || item.trackLineRef === true,
-                        lineNumber: Number.isFinite(item.line?.lineNumber) ? item.line.lineNumber : item.playbackWindowIndex,
+				hiddenFromAccessibility: item.hiddenFromAccessibility === true,
+				isVisualAnchor: item.isVisualAnchor === true || item.trackLineRef === true,
+				isVirtualTrailingInterlude: item.line?.isVirtualTrailingInterlude === true,
+				lineNumber: Number.isFinite(item.line?.lineNumber) ? item.line.lineNumber : item.playbackWindowIndex,
 		});
 	});
 };
@@ -5763,13 +5768,13 @@ const useSyncedLyricsEngine = ({
 				nextLine: preparedLyrics[activeSourceLineIndex + 1],
 				lineIndex: activeSourceLineIndex,
 				lineCount: preparedLyrics.length,
-				position: paddedLyrics[activeLineIndex]?.startTime || 0,
+				position,
 				isActiveLine: true,
 				isKara,
 				activationAdvanceMs: 0,
 			})
 			: null
-	), [activeSourceLineIndex, activeLineIndex, preparedLyrics, paddedLyrics, isKara]);
+	), [activeSourceLineIndex, preparedLyrics, position, isKara]);
 	const isTrailingInterludeActive = !!trailingInterludeLine
 		&& trailingInterludeLine.isPrecentered !== true;
 	const trailingInterludeKey = trailingInterludeLine
@@ -5893,18 +5898,24 @@ const useSyncedLyricsEngine = ({
 			: 0;
 		const offsetValue = `${nextOffset}px`;
 		lineRoot.querySelectorAll(":scope > .lyrics-lyricsContainer-LyricsLine").forEach((lineEl, visibleIndex) => {
+			const isVirtualTrailingInterlude = lineEl.dataset.virtualTrailingInterlude === "true";
 			const lineNumber = Number(lineEl.dataset.lineNumber);
 			const sourceIndex = Number.isFinite(lineNumber) ? lineNumber : visibleIndex;
 			const compactVisibleIndex = sourceIndex - windowStart;
-			let animationIndex = getSyncedAnimationIndex({
-				compact,
-				isScrolling,
-				activeLineIndex: visualIndex,
-				lineNumber: sourceIndex,
-				visibleIndex: compactVisibleIndex,
-			});
-			if (hasTrailingInterlude && Number.isFinite(lineNumber) && lineNumber <= activeLineIndex) {
-				animationIndex -= 1;
+			let animationIndex;
+			if (isVirtualTrailingInterlude) {
+				animationIndex = visualAnchorUsesTrailingInterlude ? 0 : -1;
+			} else {
+				animationIndex = getSyncedAnimationIndex({
+					compact,
+					isScrolling,
+					activeLineIndex: visualIndex,
+					lineNumber: sourceIndex,
+					visibleIndex: compactVisibleIndex,
+				});
+				if (hasTrailingInterlude && Number.isFinite(lineNumber) && lineNumber <= activeLineIndex) {
+					animationIndex -= 1;
+				}
 			}
 			const positionValue = String(animationIndex);
 			if (lineEl.style.getPropertyValue("--position-index") !== positionValue) {
@@ -8048,10 +8059,18 @@ const LyricsPageRenderer = react.memo(({
 	onCloseMarketplace = null,
 	reRenderLyricsPage = null,
 }) => {
-	const sharedLyrics = Array.isArray(currentLyrics) ? currentLyrics : [];
-	const karaokeLyrics = Array.isArray(currentLyrics)
+	const hasLyricsContent = window.ivLyricsDataUtils?.hasLyricsContent
+		|| ((lyrics) => Array.isArray(lyrics) && lyrics.length > 0);
+	const hasCurrentLyrics = hasLyricsContent(currentLyrics);
+	const karaokeLyrics = hasCurrentLyrics
 		? currentLyrics
-		: (Array.isArray(karaoke) ? karaoke : []);
+		: (hasLyricsContent(karaoke) ? karaoke : []);
+	const syncedLyrics = hasCurrentLyrics
+		? currentLyrics
+		: (hasLyricsContent(synced) ? synced : []);
+	const unsyncedLyrics = hasCurrentLyrics
+		? currentLyrics
+		: (hasLyricsContent(unsynced) ? unsynced : []);
 
 	const renderDescriptor = useMemo(() => {
 		if (showMarketplace && typeof MarketplacePage !== "undefined") {
@@ -8063,7 +8082,7 @@ const LyricsPageRenderer = react.memo(({
 			};
 		}
 
-		if ((mode === karaokeMode || mode === wordMode) && karaoke) {
+		if ((mode === karaokeMode || mode === wordMode) && hasLyricsContent(karaoke)) {
 			return {
 				component: SyncedLyricsPage,
 				props: {
@@ -8080,14 +8099,14 @@ const LyricsPageRenderer = react.memo(({
 			};
 		}
 
-		if (mode === syncedMode && synced) {
+		if (mode === syncedMode && hasLyricsContent(synced)) {
 			return {
 				component: CONFIG.visual["synced-compact"]
 					? SyncedLyricsPage
 					: SyncedExpandedLyricsPage,
 				props: {
 					trackUri,
-					lyrics: sharedLyrics,
+					lyrics: syncedLyrics,
 					provider,
 					contributors,
 					copyright,
@@ -8096,12 +8115,12 @@ const LyricsPageRenderer = react.memo(({
 			};
 		}
 
-		if (mode === unsyncedMode && unsynced) {
+		if (mode === unsyncedMode && hasLyricsContent(unsynced)) {
 			return {
 				component: UnsyncedLyricsPage,
 				props: {
 					trackUri,
-					lyrics: sharedLyrics,
+					lyrics: unsyncedLyrics,
 					provider,
 					contributors,
 					copyright,
@@ -8124,7 +8143,8 @@ const LyricsPageRenderer = react.memo(({
 		synced,
 		unsynced,
 		karaokeLyrics,
-		sharedLyrics,
+		syncedLyrics,
+		unsyncedLyrics,
 		trackUri,
 		provider,
 		contributors,

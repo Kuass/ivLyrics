@@ -2117,6 +2117,7 @@ div.lyrics-tabBar-headerItemLink {
   max-width: 100%;
   --ivlyrics-effect-strength: 0;
   --karaoke-glyph-bleed-x: 0.16em;
+  --karaoke-glyph-bleed-y: 0.22em;
   letter-spacing: var(--lyrics-original-letter-spacing, 0);
   line-height: 1.38;
   color: var(--lyrics-color-inactive);
@@ -18122,7 +18123,7 @@ html.is-lp-view-exit::view-transition-new(root) {
 .lyrics-karaoke-text-run-segment::before {
   content: attr(data-outline-text) / "";
   position: absolute;
-  inset-block: 0;
+  inset-block: calc(var(--karaoke-glyph-bleed-y, 0.22em) * -1);
   inset-inline: var(--karaoke-glyph-bleed-x, 0.16em);
   z-index: -1;
   color: transparent;
@@ -18143,6 +18144,11 @@ html.is-lp-view-exit::view-transition-new(root) {
      positions, word spacing and wrapping stay exactly unchanged. */
   padding-inline: var(--karaoke-glyph-bleed-x, 0.16em);
   margin-inline: calc(var(--karaoke-glyph-bleed-x, 0.16em) * -1);
+  /* Bounce/float transforms and tall combining marks can paint outside the
+     font's normal inline box. Expand and cancel only the paint box so the top
+     and bottom of a glyph are not clipped without changing line geometry. */
+  padding-block: var(--karaoke-glyph-bleed-y, 0.22em);
+  margin-block: calc(var(--karaoke-glyph-bleed-y, 0.22em) * -1);
   overflow: visible;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
