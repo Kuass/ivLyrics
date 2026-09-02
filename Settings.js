@@ -8598,33 +8598,6 @@ const ConfigModal = ({
     margin-bottom: 20px;
 }
 
-#${APP_NAME}-config-container .fullscreen-presentation-picker {
-    margin-bottom: 8px;
-}
-
-#${APP_NAME}-config-container .fullscreen-presentation-picker-heading {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    margin: 0 0 12px;
-}
-
-#${APP_NAME}-config-container .fullscreen-presentation-picker-heading strong {
-    color: var(--text-primary);
-    font-size: 14px;
-    font-weight: 700;
-}
-
-#${APP_NAME}-config-container .fullscreen-presentation-picker-heading span {
-    color: var(--text-secondary);
-    font-size: 12px;
-    line-height: 1.5;
-}
-
-#${APP_NAME}-config-container .fullscreen-presentation-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 #${APP_NAME}-config-container .settings-choice-card {
     display: flex;
     align-items: flex-start;
@@ -11850,8 +11823,7 @@ const ConfigModal = ({
         line-height: 1.5;
     }
 
-    #${APP_NAME}-config-container .settings-card-grid,
-    #${APP_NAME}-config-container .settings-card-grid.fullscreen-presentation-grid {
+    #${APP_NAME}-config-container .settings-card-grid {
         grid-template-columns: 1fr;
     }
 
