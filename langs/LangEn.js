@@ -199,6 +199,10 @@ window.LANG_EN = {
       "label": "Video Background",
       "desc": "Use a YouTube video as the background (Beta)"
     },
+    "videoBackgroundFullscreenOnly": {
+      "label": "Video background only in fullscreen",
+      "desc": "Play the YouTube background only while the fullscreen view is open; the lyrics page uses the blur gradient instead."
+    },
     "videoHelper": {
       "label": "Use Helper Program",
       "desc": "Download and play YouTube videos locally. Allows viewing videos without logging in.",

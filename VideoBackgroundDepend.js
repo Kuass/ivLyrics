@@ -45,24 +45,15 @@
         delete window[MODULE_KEY];
     };
 
+    // Activated by VideoBackground.js only while a YouTube player is mounted, so the
+    // global fetch/XHR/DOM patches do not tax the rest of Spotify (fork change).
     window.VideoBackgroundDepend = {
-        restore: restoreAll
+        restore: restoreAll,
+        activate: () => initialize(),
+        deactivate: restoreAll,
+        isActive: () => moduleState.initialized === true
     };
 
-    // Blocks YouTube iframe ads loaded inside Spicetify by sanitizing requests and patching the player API.
-    const waitForSpicetify = () => {
-        if (!window.Spicetify || !Spicetify.Player || !document.body) {
-            if (!moduleState.waitTimer) {
-                moduleState.waitTimer = setTimeout(() => {
-                    moduleState.waitTimer = null;
-                    waitForSpicetify();
-                }, 250);
-            }
-            return;
-        }
-        moduleState.waitTimer = null;
-        initialize();
-    };
 
     const logPrefix = "[ivLyrics VBD]";
 
@@ -1044,6 +1035,4 @@
         patchYouTubePlayer();
         window.__ivLyricsDebugLog?.(`${logPrefix} initialized`);
     };
-
-    waitForSpicetify();
 })();

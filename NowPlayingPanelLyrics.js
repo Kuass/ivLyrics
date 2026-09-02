@@ -1969,6 +1969,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         if (!nativeLyricsPending.has(uri)) {
             hasSpotifyNativeLyrics(uri).then((hasLyrics) => {
                 if (Spicetify.Player?.data?.item?.uri !== uri) return;
+                syncObserverToNativeLyrics(hasLyrics);
                 if (hasLyrics) {
                     removePanelLyrics();
                 } else {
@@ -5654,12 +5655,36 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             }
         });
 
-        // body 전체 감시 (패널이 동적으로 생성됨)
-        panelObserver.observe(document.body, {
+        // 우측 사이드바가 있으면 그 안만 감시하고, 없을 때만 body 전체를 감시한다 (fork)
+        const observerRoot = document.querySelector('.Root__right-sidebar') || document.body;
+        panelObserver.observe(observerRoot, {
             childList: true,
             subtree: true
         });
+        panelObserver.__ivLyricsRoot = observerRoot;
         moduleState.panelObserver = panelObserver;
+    };
+
+    // 감시 대상 노드가 교체되었으면 다시 연결한다.
+    const ensureObserverRoot = () => {
+        if (!panelObserver) return;
+        const root = panelObserver.__ivLyricsRoot;
+        const sidebar = document.querySelector('.Root__right-sidebar');
+        if (!root || !root.isConnected || (root === document.body && sidebar)) {
+            setupObserver();
+        }
+    };
+
+    // Spotify가 직접 가사를 보여 주는 동안은 감시를 멈추고, 아니면 다시 켠다.
+    const syncObserverToNativeLyrics = (hasNativeLyrics) => {
+        if (!getStorageValue(STORAGE_KEY, DEFAULT_ENABLED)) return;
+        if (hasNativeLyrics) {
+            teardownObserver();
+        } else if (!panelObserver) {
+            setupObserver();
+        } else {
+            ensureObserverRoot();
+        }
     };
 
     const teardownObserver = () => {
@@ -5688,6 +5713,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 const changedUri = currentLyricsState.trackUri;
                 hasSpotifyNativeLyrics(changedUri).then((hasLyrics) => {
                     if (Spicetify.Player?.data?.item?.uri !== changedUri) return;
+                    syncObserverToNativeLyrics(hasLyrics);
                     if (hasLyrics) {
                         removePanelLyrics();
                     } else if (!isIvLyricsPageActive()) {

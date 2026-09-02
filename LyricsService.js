@@ -1430,7 +1430,7 @@
     const LyricsCache = {
         DB_NAME: 'ivLyricsCache',
         DB_VERSION: 7,
-        MAX_TOTAL_BYTES: 10 * 1024 * 1024 * 1024,
+        MAX_TOTAL_BYTES: 1 * 1024 * 1024 * 1024, // fork: 1 GiB instead of 10 GiB
 
         EXPIRY: {
             lyrics: 365,

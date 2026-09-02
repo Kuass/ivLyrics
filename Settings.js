@@ -16248,6 +16248,12 @@ const ConfigModal = ({
               info: I18n.t("settings.videoBackground.desc"),
               type: ConfigSlider,
             },
+            {
+              desc: I18n.t("settings.videoBackgroundFullscreenOnly.label") || "Video background only in fullscreen",
+              key: "video-background-fullscreen-only",
+              info: I18n.t("settings.videoBackgroundFullscreenOnly.desc") || "Play the YouTube background only while the fullscreen view is open",
+              type: ConfigSlider,
+            },
           ],
           onChange: handlePerformanceSettingChange,
         }),

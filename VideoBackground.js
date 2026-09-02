@@ -384,6 +384,15 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         }
     }, [externalVideoInfo, reportVideoBackgroundStatus]);
 
+    // YouTube 광고 차단 패치는 플레이어가 살아 있는 동안만 켠다 (fork)
+    useEffect(() => {
+        if (useHelper) return undefined;
+        window.VideoBackgroundDepend?.activate?.();
+        return () => {
+            window.VideoBackgroundDepend?.deactivate?.();
+        };
+    }, [useHelper]);
+
     // Load YouTube IFrame API (헬퍼 모드가 아닐 때만)
     useEffect(() => {
         if (useHelper) return;

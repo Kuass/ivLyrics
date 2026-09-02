@@ -199,6 +199,10 @@ window.LANG_KO = {
       "label": "동영상 배경",
       "desc": "YouTube 동영상을 배경으로 사용합니다 (베타)"
     },
+    "videoBackgroundFullscreenOnly": {
+      "label": "전체 화면에서만 동영상 배경",
+      "desc": "전체 화면 보기가 열려 있을 때만 YouTube 배경을 재생합니다. 가사 페이지에서는 블러 그라데이션 배경을 씁니다."
+    },
     "videoHelper": {
       "label": "헬퍼 프로그램 사용",
       "desc": "YouTube 영상을 로컬에서 다운로드하여 재생합니다. 로그인 없이 영상을 볼 수 있습니다.",

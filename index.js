@@ -281,8 +281,14 @@ const initializeFuriganaConverter = () => {
     .catch((err) => { });
 };
 
-// Load Kuromoji library for furigana conversion
-if (typeof window.kuromoji === "undefined") {
+// Load Kuromoji library for furigana conversion.
+// Fork: loaded on demand (furigana enabled) instead of on every page load.
+window.ivLyricsEnsureKuromoji = () => {
+  if (typeof window.kuromoji !== "undefined") {
+    initializeFuriganaConverter();
+    return;
+  }
+  if (document.getElementById("ivlyrics-kuromoji-script")) return;
   const kuromojiScriptUrls = [
     "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js",
     "https://unpkg.com/kuromoji@0.1.2/build/kuromoji.js",
@@ -292,6 +298,7 @@ if (typeof window.kuromoji === "undefined") {
     if (index >= kuromojiScriptUrls.length) return;
 
     const kuromojiScript = document.createElement("script");
+    kuromojiScript.id = "ivlyrics-kuromoji-script";
     kuromojiScript.src = kuromojiScriptUrls[index];
     kuromojiScript.async = false; // Load synchronously to ensure it's available
     kuromojiScript.onload = initializeFuriganaConverter;
@@ -303,8 +310,9 @@ if (typeof window.kuromoji === "undefined") {
   };
 
   loadKuromojiScript();
-} else {
-  initializeFuriganaConverter();
+};
+if (localStorage.getItem("ivLyrics:visual:furigana-enabled") === "true") {
+  window.ivLyricsEnsureKuromoji();
 }
 
 /** @type {React} */
@@ -2529,6 +2537,10 @@ const CONFIG = {
       "ivLyrics:visual:solid-background",
       false
     ),
+    "video-background-fullscreen-only": StorageManager.get(
+      "ivLyrics:visual:video-background-fullscreen-only",
+      true
+    ),
     "video-background": StorageManager.get(
       "ivLyrics:visual:video-background",
       false
@@ -3599,8 +3611,12 @@ const Prefetcher = {
       try {
         // 영상 배경 프리페치는 가사 유무와 무관하게 독립적으로 시작
         const prefetchPromises = [];
+        const videoPrefetchAllowed =
+          CONFIG.visual["video-background-fullscreen-only"] !== true ||
+          window.lyricContainer?.state?.isFullscreen === true;
         if (
           CONFIG.visual["video-background"] &&
+          videoPrefetchAllowed &&
           CONFIG.visual["prefetch-video-enabled"] !== false &&
           CONFIG.visual["community-video-random"] !== true
         ) {
@@ -9164,6 +9180,10 @@ class LyricsContainer extends react.Component {
         this.reloadLyrics?.(false);
       } else if (event.detail?.name === "pseudo-karaoke-render-advance") {
         this.forceUpdate?.();
+      } else if (event.detail?.name === "video-background-fullscreen-only") {
+        this.forceUpdate?.();
+      } else if (event.detail?.name === "furigana-enabled" && event.detail?.value) {
+        window.ivLyricsEnsureKuromoji?.();
       }
     };
     window.addEventListener("ivLyrics", this.handleConfigChange);
@@ -9434,7 +9454,14 @@ class LyricsContainer extends react.Component {
       !!document.getElementById("ivLyrics-sync-creator-overlay");
     const isSyncCreatorActive =
       this.state.isSyncCreatorActive === true && isSyncCreatorOverlayPresent;
-    const effectiveBackgroundMode = this.getEffectiveBackgroundMode(this.state.trackBackgroundOverride);
+    const rawEffectiveBackgroundMode = this.getEffectiveBackgroundMode(this.state.trackBackgroundOverride);
+    // Fork: the YouTube background is limited to fullscreen unless the user turns that off.
+    const videoBackgroundAllowedHere =
+      this.state.isFullscreen || CONFIG.visual["video-background-fullscreen-only"] !== true;
+    const effectiveBackgroundMode =
+      rawEffectiveBackgroundMode === "video-background" && !videoBackgroundAllowedHere
+        ? "blur-gradient-background"
+        : rawEffectiveBackgroundMode;
     const baseLyricsStyleVariables = {
       "--lyrics-color-active": CONFIG.visual["active-color"],
       "--lyrics-color-inactive": CONFIG.visual["inactive-color"],
