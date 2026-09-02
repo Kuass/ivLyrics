@@ -1075,10 +1075,8 @@ const IVLYRICS_BACKGROUND_MODE_IDS = [
 const IVLYRICS_BACKGROUND_FLAG_IDS = IVLYRICS_BACKGROUND_MODE_IDS.filter(
   (modeId) => modeId !== "none"
 );
-const IVLYRICS_FULLSCREEN_PRESENTATION_IDS = Object.freeze([
-  "standard",
-  "video",
-]);
+// This fork keeps a single fullscreen presentation; the LP/video focus modes were removed.
+const IVLYRICS_FULLSCREEN_PRESENTATION_IDS = Object.freeze(["standard"]);
 const IVLYRICS_FULLSCREEN_PRESENTATION_STORAGE_KEY =
   "ivLyrics:visual:fullscreen-presentation";
 
@@ -1089,10 +1087,6 @@ function normalizeIvLyricsFullscreenPresentation(value, fallback = "standard") {
     : fallback;
 }
 
-function normalizeIvLyricsDefaultFullscreenPresentation(value) {
-  const normalized = normalizeIvLyricsFullscreenPresentation(value, "video");
-  return normalized === "standard" ? "video" : normalized;
-}
 
 function getRememberedIvLyricsFullscreenPresentation() {
   try {
@@ -2949,10 +2943,6 @@ const CONFIG = {
     "fullscreen-album-radius":
       StorageManager.getItem("ivLyrics:visual:fullscreen-album-radius") ||
       "12",
-    "fullscreen-focus-presentation":
-      normalizeIvLyricsDefaultFullscreenPresentation(
-        StorageManager.getItem("ivLyrics:visual:fullscreen-focus-presentation")
-      ),
     "fullscreen-video-stage-original-font-family":
       getOrSeedVideoStageTypographySetting("original-font-family"),
     "fullscreen-video-stage-phonetic-font-family":
@@ -9174,11 +9164,6 @@ class LyricsContainer extends react.Component {
         this.reloadLyrics?.(false);
       } else if (event.detail?.name === "pseudo-karaoke-render-advance") {
         this.forceUpdate?.();
-      } else if (
-        event.detail?.type === "fullscreen-presentation"
-        && this.state.isFullscreen
-      ) {
-        this.setFullscreenPresentation(event.detail.value);
       }
     };
     window.addEventListener("ivLyrics", this.handleConfigChange);
@@ -10206,10 +10191,6 @@ class LyricsContainer extends react.Component {
         lyricsSettingsRevision: this.reRenderLyricsPage,
         translatedMetadata: this.state.translatedMetadata,
         trackUri: this.state.uri,
-        presentationMode: fullscreenPresentation,
-        onPresentationModeChange: (nextPresentation) => {
-          this.setFullscreenPresentation(nextPresentation);
-        },
         onExitFullscreen: this.toggleFullscreen
       }),
       // Tab bar for mode switching

@@ -9475,7 +9475,6 @@
         _pendingLyricsSend: null,
         _lyricsSendActive: false,
 
-        // 포트 설정 (localStorage에 저장)
         handleConnectionRecovery() {
             // 가사 요청 자체가 연결을 복구한 경우 현재 큐가 성공 상태를 기록하므로
             // 여기서 같은 payload를 다시 예약하지 않는다.

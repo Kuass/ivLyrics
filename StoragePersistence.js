@@ -17,7 +17,6 @@
     "ivLyrics:lyrics:",
   ];
   const MANAGED_KEYS = new Set([
-    "ivLyrics:setup-completed",
     "ivLyrics:settings-ui-theme",
     "ivLyrics:settings-presets",
     "ivLyrics:storage-keys",
@@ -256,14 +255,13 @@
       console.warn("[ivLyrics] Settings recovery database is unavailable.", error);
     }
 
-    const localSettings = collectLocalSettings();
-    const hasCompletedSetup = localSettings["ivLyrics:setup-completed"] === "true";
     let restoredCount = 0;
 
+    // The setup wizard that used to mark "setup-completed" is gone from this fork,
+    // so a newer IndexedDB snapshot always wins over an older synchronous record.
     if (
       indexedRecord &&
-      (!moduleState.record || indexedRecord.revision > moduleState.record.revision) &&
-      (!hadSynchronousRecord || !hasCompletedSetup)
+      (!moduleState.record || indexedRecord.revision > moduleState.record.revision)
     ) {
       moduleState.record = indexedRecord;
       restoredCount = restoreMissingSettings(indexedRecord.settings);
