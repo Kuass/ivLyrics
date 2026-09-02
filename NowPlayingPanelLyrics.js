@@ -3409,17 +3409,19 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         }, [segment, text, isLinePast, isLineActive, gradientDirection]);
 
         if (!text) return null;
+        // Declared before the space branch: the non-space render path below also uses them
+        // (upstream 6.6.3 declared them inside the branch, which threw a ReferenceError).
+        const segmentSpeakerPresentation = getPanelSpeakerPresentation(
+            segment?.styleSpeaker,
+            segment?.styleSpeakerColor,
+            segment?.styleSpeakerFallback
+        );
+        const segmentSpeakerStyle = getPanelSpeakerStyle(
+            segment?.styleSpeaker,
+            segment?.styleSpeakerColor,
+            segment?.styleSpeakerFallback
+        );
         if (segment?.type === "space") {
-		const segmentSpeakerPresentation = getPanelSpeakerPresentation(
-			segment.styleSpeaker,
-			segment.styleSpeakerColor,
-			segment.styleSpeakerFallback
-		);
-		const segmentSpeakerStyle = getPanelSpeakerStyle(
-			segment.styleSpeaker,
-			segment.styleSpeakerColor,
-			segment.styleSpeakerFallback
-		);
 		return react.createElement("span", {
                 key: "text-run-space-" + idx,
                 className: "ivlyrics-panel-karaoke-text-run-space"

@@ -9804,7 +9804,8 @@
                 const stored = window.ivLyricsStoragePersistence
                     ? window.ivLyricsStoragePersistence.getItem('ivLyrics:visual:lyrics-helper-enabled')
                     : Spicetify.LocalStorage.get('ivLyrics:visual:lyrics-helper-enabled');
-                return stored !== 'false';
+                // Off unless the user turned it on (matches the CONFIG default in index.js).
+                return stored === 'true';
             },
             set(value) {
                 if (window.ivLyricsStoragePersistence) {
