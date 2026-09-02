@@ -27,7 +27,7 @@
 
 - 우측 "지금 재생 중" 패널 가사는 Spotify가 그 곡의 가사를 직접 보여 주지 않을 때만 표시됩니다. 설정의 "패널 가사" 탭에 있는 "Spotify 기본 가사가 없을 때만 표시"로 끌 수 있습니다.
 - 동영상 배경은 전체 화면에서만 재생됩니다. 가사 페이지에서는 앨범 색을 뽑은 블러 그라데이션 배경을 쓰고, 다음 곡 영상 미리 받기도 전체 화면일 때만 합니다. 설정의 "동영상 배경" 아래 "전체 화면에서만 동영상 배경"으로 끌 수 있습니다.
-- 앱 안의 업데이트 알림은 이 저장소의 `custom` 브랜치를 기준으로 표시되고, 갱신은 `ivlyrics update`로 합니다.
+- 앱 안의 업데이트 알림은 이 저장소의 `main` 브랜치를 기준으로 표시되고, 갱신은 `ivlyrics update`로 합니다.
 
 성능을 위해 손본 부분입니다. Spotify 전체 메모리는 약 1GB이고 그중 약 850MB는 ivLyrics를 빼도 남는 Spotify 자체의 몫이므로, 여기서 줄인 것은 ivLyrics가 더 쓰는 부분입니다.
 
@@ -52,7 +52,7 @@ ivLyrics의 설정은 Spotify 화면(xpui)의 localStorage에 저장되고, Spot
 ## 설치
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Kuass/ivLyrics/custom/scripts/ivlyrics | bash -s install
+curl -fsSL https://raw.githubusercontent.com/Kuass/ivLyrics/main/scripts/ivlyrics | bash -s install
 ```
 
 설치가 끝나면 `~/.config/spicetify/ivLyrics/bin/ivlyrics`에 명령이 놓이고, `~/.local/bin`이 있으면 그곳에도 링크가 생깁니다. 설치 과정에서 Spotify가 한 번 재시작됩니다.
@@ -63,7 +63,7 @@ curl -fsSL https://raw.githubusercontent.com/Kuass/ivLyrics/custom/scripts/ivlyr
 ivlyrics update
 ```
 
-앱 안의 업데이트 알림은 이 저장소의 `custom` 브랜치를 기준으로 표시되며, 알림의 버튼은 이 문서로 연결됩니다. 실제 갱신은 위 명령으로 합니다.
+앱 안의 업데이트 알림은 이 저장소의 `main` 브랜치를 기준으로 표시되며, 알림의 버튼은 이 문서로 연결됩니다. 실제 갱신은 위 명령으로 합니다.
 
 ## 명령어
 

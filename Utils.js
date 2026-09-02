@@ -1,6 +1,6 @@
 // Fork settings: where update checks look for the latest version.
 const FORK_REPO = "Kuass/ivLyrics";
-const FORK_BRANCH = "custom";
+const FORK_BRANCH = "main";
 
 // ============================================
 // Utils.js - 유틸리티 함수들
