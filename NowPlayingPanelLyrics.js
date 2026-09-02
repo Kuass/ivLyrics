@@ -5655,8 +5655,10 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             }
         });
 
-        // 우측 사이드바가 있으면 그 안만 감시하고, 없을 때만 body 전체를 감시한다 (fork)
-        const observerRoot = document.querySelector('.Root__right-sidebar') || document.body;
+        // 우측 사이드바의 부모 컨테이너만 감시한다. 사이드바 자체는 열고 닫을 때 교체될 수 있어
+        // 그 부모를 잡고, 없을 때만 body 전체를 감시한다 (fork)
+        const sidebar = document.querySelector('.Root__right-sidebar');
+        const observerRoot = sidebar?.parentElement || document.body;
         panelObserver.observe(observerRoot, {
             childList: true,
             subtree: true
@@ -5669,8 +5671,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
     const ensureObserverRoot = () => {
         if (!panelObserver) return;
         const root = panelObserver.__ivLyricsRoot;
-        const sidebar = document.querySelector('.Root__right-sidebar');
-        if (!root || !root.isConnected || (root === document.body && sidebar)) {
+        const sidebarParent = document.querySelector('.Root__right-sidebar')?.parentElement;
+        if (!root || !root.isConnected || (root === document.body && sidebarParent)) {
             setupObserver();
         }
     };
@@ -5708,6 +5710,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             currentLyricsState.lyrics = [];
             currentLyricsState.currentIndex = 0;
             currentLyricsState.trackUri = Spicetify.Player.data?.item?.uri;
+            // 감시 대상이 교체되었으면 설정과 무관하게 다시 연결한다 (fork)
+            ensureObserverRoot();
             // 곡이 바뀌면 Spotify 기본 가사 유무를 다시 판정한다 (fork)
             if (isOnlyWhenSpotifyMissingEnabled() && currentLyricsState.trackUri) {
                 const changedUri = currentLyricsState.trackUri;

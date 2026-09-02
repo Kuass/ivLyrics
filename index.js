@@ -6584,10 +6584,20 @@ class LyricsContainer extends react.Component {
   }
 
   getEffectiveBackgroundMode(override = this.trackBackgroundOverride) {
-    return (
+    const mode =
       getIvLyricsTrackBackgroundMode(override) ||
-      getIvLyricsGlobalBackgroundMode(CONFIG.visual)
-    );
+      getIvLyricsGlobalBackgroundMode(CONFIG.visual);
+    // Fork: the YouTube background is limited to fullscreen unless the user turns that off;
+    // outside fullscreen the lyrics page uses the blur gradient instead. This is the single
+    // source of truth so colour extraction and rendering agree.
+    if (
+      mode === "video-background" &&
+      !this.state?.isFullscreen &&
+      CONFIG.visual["video-background-fullscreen-only"] === true
+    ) {
+      return "blur-gradient-background";
+    }
+    return mode;
   }
 
   async selectBackgroundForCurrentTrack(mode) {
@@ -9165,6 +9175,17 @@ class LyricsContainer extends react.Component {
         justEnteredFullscreen: isEnabled, // 전체화면 진입 시 true로 설정하여 축소 아이콘 대신 메뉴 아이콘 표시
         isFloatingMenuOpen: isEnabled ? this.state.isFloatingMenuOpen : false,
         isFloatingMenuClosing: false,
+      }, () => {
+        // Fork: leaving fullscreen can switch the video background to the blur gradient,
+        // whose colours were not fetched while the video was showing.
+        if (
+          !isEnabled &&
+          !this.state.dynamicColors &&
+          this.getEffectiveBackgroundMode() === "blur-gradient-background"
+        ) {
+          const uri = Spicetify.Player.data?.item?.uri;
+          if (uri) this.fetchColors(uri);
+        }
       });
     };
     this.mousetrap.reset();
@@ -9454,14 +9475,7 @@ class LyricsContainer extends react.Component {
       !!document.getElementById("ivLyrics-sync-creator-overlay");
     const isSyncCreatorActive =
       this.state.isSyncCreatorActive === true && isSyncCreatorOverlayPresent;
-    const rawEffectiveBackgroundMode = this.getEffectiveBackgroundMode(this.state.trackBackgroundOverride);
-    // Fork: the YouTube background is limited to fullscreen unless the user turns that off.
-    const videoBackgroundAllowedHere =
-      this.state.isFullscreen || CONFIG.visual["video-background-fullscreen-only"] !== true;
-    const effectiveBackgroundMode =
-      rawEffectiveBackgroundMode === "video-background" && !videoBackgroundAllowedHere
-        ? "blur-gradient-background"
-        : rawEffectiveBackgroundMode;
+    const effectiveBackgroundMode = this.getEffectiveBackgroundMode(this.state.trackBackgroundOverride);
     const baseLyricsStyleVariables = {
       "--lyrics-color-active": CONFIG.visual["active-color"],
       "--lyrics-color-inactive": CONFIG.visual["inactive-color"],
