@@ -43,7 +43,7 @@
     const AUTH_BASE_URL = 'https://enter.pollinations.ai';
 
     // Publishable Pollinations App Key (pk_...) for BYOP.
-    // Keep this empty for marketplace/user-added builds; it can be configured in the addon settings.
+    // Can be overridden in the addon settings.
     const DEFAULT_CLIENT_ID = 'pk_r7hWynUBrOgSV9SJ';
     const DEFAULT_AUTH_SCOPE = 'generate';
     const FIXED_MODEL = 'openai';

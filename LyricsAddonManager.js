@@ -479,7 +479,6 @@
             this._initPromise = null;
             this._events = new Map();
             this._onceEvents = new Map();
-            this._marketplaceAddons = new Set(); // 마켓플레이스에서 설치된 에드온 추적
             this._activeLyricsSearchProgress = new Map();
         }
 
@@ -750,7 +749,6 @@
             if (this._addons.has(addonId)) {
                 const addon = this._addons.get(addonId);
                 this._addons.delete(addonId);
-                this._marketplaceAddons.delete(addonId);
                 window.__ivLyricsDebugLog?.(`[LyricsAddonManager] Unregistered addon: ${addonId}`);
 
                 // 이벤트 발생
@@ -759,23 +757,6 @@
                 return true;
             }
             return false;
-        }
-
-        /**
-         * 마켓플레이스 에드온으로 표시
-         * @param {string} addonId - Addon ID
-         */
-        markAsMarketplaceAddon(addonId) {
-            this._marketplaceAddons.add(addonId);
-        }
-
-        /**
-         * 마켓플레이스 에드온 여부 확인
-         * @param {string} addonId - Addon ID
-         * @returns {boolean}
-         */
-        isMarketplaceAddon(addonId) {
-            return this._marketplaceAddons.has(addonId);
         }
 
         /**

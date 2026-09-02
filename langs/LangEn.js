@@ -49,7 +49,7 @@ window.LANG_EN = {
         "providers": "Source",
         "system": "Ops"
       },
-      "generalDesc": "Language, desktop overlay, and core workspace defaults.",
+      "generalDesc": "Language and core workspace defaults.",
       "appearanceDesc": "Backgrounds, typography, motion, and screen composition.",
       "performanceDesc": "Frame rate, motion, and visual cost controls.",
       "lyricsDesc": "Sync behavior, translation, karaoke, and lyric processing.",
@@ -1223,6 +1223,10 @@ window.LANG_EN = {
       "enabled": {
         "label": "Enable Panel Lyrics",
         "desc": "Display current lyrics in the Now Playing panel"
+      },
+      "onlyWhenSpotifyMissing": {
+        "label": "Only when Spotify has no lyrics",
+        "desc": "Hide the ivLyrics panel lyrics when Spotify already shows its own lyrics for the track, and use them only as a fallback."
       },
       "fontScale": {
         "label": "Global Font Scale",

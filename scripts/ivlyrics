@@ -1,0 +1,629 @@
+#!/usr/bin/env bash
+# ivlyrics - install, update, and protect the ivLyrics fork on macOS.
+#
+# Why this exists:
+#   Spotify keeps the web storage of its UI (localStorage / IndexedDB) under
+#   ~/Library/Caches/com.spotify.client/Browser. Anything that clears that
+#   cache (Spotify's own "Clear cache", cleanup tools, a corrupted profile)
+#   deletes every ivLyrics setting. No Spotify API lets an extension write
+#   outside that folder, so protection has to come from the outside:
+#     1. relocate "Local Storage" and "IndexedDB" to Application Support and
+#        symlink them back (a cache wipe removes the link, not the data);
+#     2. keep rolling snapshots with a launchd agent;
+#     3. update with a graceful Spotify quit instead of pkill.
+set -euo pipefail
+
+readonly SCRIPT_VERSION="1.0.0"
+readonly REPO="${IVLYRICS_REPO:-Kuass/ivLyrics}"
+readonly DEFAULT_REF="${IVLYRICS_REF:-custom}"
+readonly APP_NAME="ivLyrics"
+
+readonly SPICETIFY_CONFIG_DIR="${HOME}/.config/spicetify"
+readonly APP_DIR="${SPICETIFY_CONFIG_DIR}/CustomApps/${APP_NAME}"
+readonly STATE_DIR="${SPICETIFY_CONFIG_DIR}/${APP_NAME}"
+readonly BIN_DIR="${STATE_DIR}/bin"
+readonly BACKUP_ROOT="${STATE_DIR}/storage-backups"
+readonly LOG_FILE="${STATE_DIR}/ivlyrics.log"
+
+readonly SPOTIFY_CACHE_PROFILE="${HOME}/Library/Caches/com.spotify.client/Browser"
+readonly SAFE_PROFILE="${HOME}/Library/Application Support/Spotify/xpui-profile"
+readonly PROTECTED_ITEMS=("Local Storage" "IndexedDB")
+
+readonly LAUNCH_AGENT_LABEL="com.kuass.ivlyrics.guard"
+readonly LAUNCH_AGENT_PLIST="${HOME}/Library/LaunchAgents/${LAUNCH_AGENT_LABEL}.plist"
+readonly GUARD_INTERVAL_SECONDS=3600
+readonly KEEP_SNAPSHOTS=14
+readonly QUIT_TIMEOUT_SECONDS=25
+
+QUIET=false
+REF="${DEFAULT_REF}"
+WORK_TMP=""
+RELAUNCH_SPOTIFY=false
+HOLDING_LOCK=false
+readonly LOCK_DIR="${STATE_DIR}/.lock"
+
+cleanup_work_tmp() {
+  if [ -n "${WORK_TMP}" ] && [ -d "${WORK_TMP}" ]; then
+    rm -rf "${WORK_TMP}"
+  fi
+}
+
+release_lock() {
+  if [ "${HOLDING_LOCK}" = true ]; then
+    rm -rf "${LOCK_DIR}"
+    HOLDING_LOCK=false
+  fi
+}
+
+on_exit() {
+  # Runs on every exit path, including die(): never leave Spotify closed.
+  cleanup_work_tmp
+  release_lock
+  if [ "${RELAUNCH_SPOTIFY}" = true ]; then
+    spotify_launch || true
+  fi
+}
+trap on_exit EXIT
+
+acquire_lock() {
+  # mkdir is atomic; macOS has no flock. Stale locks from dead processes are reclaimed.
+  mkdir -p "${STATE_DIR}"
+  if ! mkdir "${LOCK_DIR}" 2>/dev/null; then
+    local owner
+    owner="$(cat "${LOCK_DIR}/pid" 2>/dev/null || true)"
+    if [ -n "${owner}" ] && kill -0 "${owner}" 2>/dev/null; then
+      return 1
+    fi
+    rm -rf "${LOCK_DIR}"
+    mkdir "${LOCK_DIR}" 2>/dev/null || return 1
+  fi
+  printf '%s\n' "$$" > "${LOCK_DIR}/pid"
+  HOLDING_LOCK=true
+}
+
+# ---------------------------------------------------------------- output ----
+log() {
+  mkdir -p "${STATE_DIR}"
+  printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "${LOG_FILE}"
+  if [ "${QUIET}" = false ]; then
+    printf '%s\n' "$*" >&2
+  fi
+}
+
+warn() {
+  mkdir -p "${STATE_DIR}"
+  printf '[%s] WARN %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "${LOG_FILE}"
+  printf 'warning: %s\n' "$*" >&2
+}
+
+die() {
+  mkdir -p "${STATE_DIR}"
+  printf '[%s] ERROR %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "${LOG_FILE}"
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+notify() {
+  if command -v osascript >/dev/null 2>&1; then
+    osascript -e "display notification \"$1\" with title \"ivLyrics\"" >/dev/null 2>&1 || true
+  fi
+}
+
+require_macos() {
+  if [ "$(uname -s)" != "Darwin" ]; then
+    die "this tool only supports macOS (Spotify profile paths differ elsewhere)."
+  fi
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || die "'$1' is required but not installed."
+}
+
+# --------------------------------------------------------------- spotify ----
+spotify_is_running() {
+  pgrep -x Spotify >/dev/null 2>&1
+}
+
+spotify_launch_flags() {
+  if command -v spicetify >/dev/null 2>&1; then
+    spicetify config spotify_launch_flags 2>/dev/null | tr -d '\r' || true
+  fi
+}
+
+spotify_quit() {
+  if ! spotify_is_running; then
+    return 0
+  fi
+  RELAUNCH_SPOTIFY=true
+  log "Quitting Spotify gracefully so its storage is flushed to disk."
+  osascript -e 'quit app "Spotify"' >/dev/null 2>&1 || true
+  local waited=0
+  while spotify_is_running && [ "${waited}" -lt "${QUIT_TIMEOUT_SECONDS}" ]; do
+    sleep 1
+    waited=$((waited + 1))
+  done
+  if spotify_is_running; then
+    warn "Spotify did not quit in ${QUIT_TIMEOUT_SECONDS}s; terminating it."
+    pkill -x Spotify 2>/dev/null || true
+    sleep 2
+  fi
+}
+
+spotify_launch_now_if_owed() {
+  # Success path: relaunch immediately so the user is not left waiting for exit.
+  if [ "${RELAUNCH_SPOTIFY}" = true ]; then
+    RELAUNCH_SPOTIFY=false
+    spotify_launch
+  fi
+}
+
+spotify_launch() {
+  local flags
+  flags="$(spotify_launch_flags)"
+  # IVLYRICS_SPOTIFY_ARGS lets a developer add flags such as --remote-debugging-port=9222.
+  flags="${flags} ${IVLYRICS_SPOTIFY_ARGS:-}"
+  flags="${flags# }"
+  if [ -n "${flags}" ]; then
+    # shellcheck disable=SC2086
+    open -a Spotify --args ${flags}
+  else
+    open -a Spotify
+  fi
+  log "Spotify launched."
+}
+
+# --------------------------------------------------------------- storage ----
+item_is_relocated() {
+  local name="$1"
+  [ -L "${SPOTIFY_CACHE_PROFILE}/${name}" ] \
+    && [ "$(readlink "${SPOTIFY_CACHE_PROFILE}/${name}")" = "${SAFE_PROFILE}/${name}" ]
+}
+
+protection_state() {
+  local relocated=0
+  local name
+  for name in "${PROTECTED_ITEMS[@]}"; do
+    if item_is_relocated "${name}"; then
+      relocated=$((relocated + 1))
+    fi
+  done
+  local relocated_data=0
+  for name in "${PROTECTED_ITEMS[@]}"; do
+    if [ -d "${SAFE_PROFILE}/${name}" ]; then
+      relocated_data=$((relocated_data + 1))
+    fi
+  done
+  if [ "${relocated}" -eq "${#PROTECTED_ITEMS[@]}" ]; then
+    printf 'protected'
+  elif [ "${relocated}" -eq 0 ] && [ "${relocated_data}" -eq 0 ]; then
+    printf 'unprotected'
+  else
+    printf 'broken'
+  fi
+}
+
+snapshot_source_dir() {
+  # Read through the symlink when protected, otherwise the live cache profile.
+  local name="$1"
+  if item_is_relocated "${name}"; then
+    printf '%s/%s' "${SAFE_PROFILE}" "${name}"
+  else
+    printf '%s/%s' "${SPOTIFY_CACHE_PROFILE}" "${name}"
+  fi
+}
+
+cmd_backup() {
+  require_command rsync
+  local stamp
+  stamp="$(date '+%Y%m%d-%H%M%S')"
+  local target="${BACKUP_ROOT}/${stamp}"
+  local suffix=1
+  while [ -e "${target}" ]; do
+    suffix=$((suffix + 1))
+    target="${BACKUP_ROOT}/${stamp}-${suffix}"
+  done
+  local copied=0
+  local name source
+  mkdir -p "${target}"
+  for name in "${PROTECTED_ITEMS[@]}"; do
+    source="$(snapshot_source_dir "${name}")"
+    if [ -d "${source}" ]; then
+      rsync -a "${source}/" "${target}/${name}/"
+      copied=$((copied + 1))
+    fi
+  done
+  if [ "${copied}" -eq 0 ]; then
+    rmdir "${target}" 2>/dev/null || true
+    warn "nothing to back up: Spotify storage not found at ${SPOTIFY_CACHE_PROFILE}"
+    return 1
+  fi
+  if spotify_is_running; then
+    printf 'spotify-running\n' > "${target}/.taken-while-running"
+  fi
+  ln -sfn "${target}" "${BACKUP_ROOT}/latest"
+  prune_snapshots
+  log "Snapshot saved: ${target} ($(du -sh "${target}" | cut -f1))"
+}
+
+prune_snapshots() {
+  local snapshots
+  snapshots="$(list_snapshots | sort)"
+  local count
+  count="$(printf '%s\n' "${snapshots}" | grep -c . || true)"
+  if [ "${count}" -le "${KEEP_SNAPSHOTS}" ]; then
+    return 0
+  fi
+  printf '%s\n' "${snapshots}" | head -n "$((count - KEEP_SNAPSHOTS))" | while IFS= read -r old; do
+    [ -n "${old}" ] && rm -rf "${old}"
+  done
+}
+
+list_snapshots() {
+  [ -d "${BACKUP_ROOT}" ] || return 0
+  find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -name '[0-9]*' | sort -r
+}
+
+cmd_restore() {
+  require_command rsync
+  local snapshot="${1:-}"
+  if [ -z "${snapshot}" ]; then
+    snapshot="$(list_snapshots | head -n 1)"
+  elif [ ! -d "${snapshot}" ] && [ -d "${BACKUP_ROOT}/${snapshot}" ]; then
+    snapshot="${BACKUP_ROOT}/${snapshot}"
+  fi
+  [ -n "${snapshot}" ] && [ -d "${snapshot}" ] || die "no snapshot found. Run 'ivlyrics backup' first or pass a snapshot path."
+
+  spotify_quit
+  heal_links
+  cmd_backup || true
+
+  local name target
+  for name in "${PROTECTED_ITEMS[@]}"; do
+    if [ -d "${snapshot}/${name}" ]; then
+      target="$(snapshot_source_dir "${name}")"
+      mkdir -p "${target}"
+      rsync -a --delete "${snapshot}/${name}/" "${target}/"
+      log "Restored ${name} from ${snapshot}"
+    fi
+  done
+  spotify_launch_now_if_owed
+}
+
+move_item_to_safe_profile() {
+  local name="$1"
+  local live="${SPOTIFY_CACHE_PROFILE}/${name}"
+  local safe="${SAFE_PROFILE}/${name}"
+  mkdir -p "${SAFE_PROFILE}"
+  if [ -e "${live}" ] && [ ! -L "${live}" ] && [ ! -d "${live}" ]; then
+    die "${live} exists but is not a directory or symlink; refusing to touch it."
+  fi
+  if [ -L "${live}" ]; then
+    rm -f "${live}"
+  elif [ -d "${live}" ]; then
+    if [ -d "${safe}" ]; then
+      # Both exist: keep the relocated copy, park the fresh one for inspection.
+      local parked
+      parked="${SAFE_PROFILE}/${name}.replaced-$(date '+%Y%m%d-%H%M%S')"
+      mv "${live}" "${parked}"
+      log "Fresh ${name} parked at ${parked} (relocated data kept)."
+    else
+      mv "${live}" "${safe}"
+      log "Moved ${name} to ${safe}"
+    fi
+  fi
+  mkdir -p "${safe}"
+  ln -s "${safe}" "${live}"
+}
+
+heal_links() {
+  # Re-create symlinks that a cache wipe removed. Only meaningful once protected.
+  [ "$(protection_state)" != "unprotected" ] || return 0
+  mkdir -p "${SPOTIFY_CACHE_PROFILE}"
+  local name
+  for name in "${PROTECTED_ITEMS[@]}"; do
+    if ! item_is_relocated "${name}"; then
+      move_item_to_safe_profile "${name}"
+      log "Re-linked ${name} -> ${SAFE_PROFILE}/${name}"
+    fi
+  done
+}
+
+cmd_protect() {
+  require_macos
+  spotify_quit
+  mkdir -p "${SPOTIFY_CACHE_PROFILE}"
+  local name
+  for name in "${PROTECTED_ITEMS[@]}"; do
+    move_item_to_safe_profile "${name}"
+  done
+  install_guard_agent
+  cmd_backup || true
+  log "Protection enabled. Settings now live in: ${SAFE_PROFILE}"
+  spotify_launch_now_if_owed
+}
+
+cmd_unprotect() {
+  require_macos
+  spotify_quit
+  remove_guard_agent
+  local name live safe
+  for name in "${PROTECTED_ITEMS[@]}"; do
+    live="${SPOTIFY_CACHE_PROFILE}/${name}"
+    safe="${SAFE_PROFILE}/${name}"
+    if [ -L "${live}" ]; then
+      rm -f "${live}"
+    fi
+    if [ -d "${safe}" ] && [ ! -e "${live}" ]; then
+      mv "${safe}" "${live}"
+      log "Moved ${name} back to ${live}"
+    fi
+  done
+  rmdir "${SAFE_PROFILE}" 2>/dev/null || true
+  log "Protection disabled."
+  spotify_launch_now_if_owed
+}
+
+# ---------------------------------------------------------- launchd guard ----
+install_guard_agent() {
+  mkdir -p "${BIN_DIR}" "${HOME}/Library/LaunchAgents"
+  cp "$(script_path)" "${BIN_DIR}/ivlyrics"
+  chmod +x "${BIN_DIR}/ivlyrics"
+  cat > "${LAUNCH_AGENT_PLIST}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>${LAUNCH_AGENT_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${BIN_DIR}/ivlyrics</string>
+    <string>guard</string>
+    <string>--quiet</string>
+  </array>
+  <key>StartInterval</key><integer>${GUARD_INTERVAL_SECONDS}</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>${STATE_DIR}/guard.out.log</string>
+  <key>StandardErrorPath</key><string>${STATE_DIR}/guard.err.log</string>
+</dict>
+</plist>
+PLIST
+  launchctl bootout "gui/$(id -u)" "${LAUNCH_AGENT_PLIST}" >/dev/null 2>&1 || true
+  if launchctl bootstrap "gui/$(id -u)" "${LAUNCH_AGENT_PLIST}"; then
+    log "Hourly guard installed (${LAUNCH_AGENT_PLIST})."
+  else
+    warn "launchd agent could not be loaded now; it will load at next login (${LAUNCH_AGENT_PLIST})."
+  fi
+}
+
+remove_guard_agent() {
+  if [ -f "${LAUNCH_AGENT_PLIST}" ]; then
+    launchctl bootout "gui/$(id -u)" "${LAUNCH_AGENT_PLIST}" >/dev/null 2>&1 || true
+    rm -f "${LAUNCH_AGENT_PLIST}"
+    log "Guard agent removed."
+  fi
+}
+
+cmd_guard() {
+  # Runs hourly from launchd: heal links when Spotify is closed, always snapshot.
+  local state
+  state="$(protection_state)"
+  if [ "${state}" = "broken" ]; then
+    if spotify_is_running; then
+      warn "storage links were reset while Spotify is running; will heal on next quit."
+      notify_once_per_day "ivLyrics storage links were reset. Quit Spotify once so they can be repaired."
+    else
+      heal_links
+      notify "ivLyrics storage links repaired."
+    fi
+  fi
+  cmd_backup || true
+}
+
+notify_once_per_day() {
+  local marker
+  marker="${STATE_DIR}/.notified-$(date '+%Y%m%d')"
+  if [ ! -f "${marker}" ]; then
+    notify "$1"
+    touch "${marker}"
+  fi
+}
+
+# ---------------------------------------------------------- install/update ----
+script_path() {
+  if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+    printf '%s' "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  elif [ -f "${BIN_DIR}/ivlyrics" ]; then
+    printf '%s' "${BIN_DIR}/ivlyrics"
+  else
+    printf '%s' "${APP_DIR}/scripts/ivlyrics"
+  fi
+}
+
+download_source() {
+  # Downloads and extracts into WORK_TMP (owned by the caller), prints the source directory.
+  require_command curl
+  require_command tar
+  local ref="$1"
+  local url="https://codeload.github.com/${REPO}/tar.gz/${ref}"
+  log "Downloading ${REPO}@${ref}"
+  if ! curl -fsSL --connect-timeout 20 "${url}" -o "${WORK_TMP}/src.tar.gz"; then
+    die "download failed: ${url}"
+  fi
+  tar -xzf "${WORK_TMP}/src.tar.gz" -C "${WORK_TMP}"
+  local extracted
+  extracted="$(find "${WORK_TMP}" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  [ -n "${extracted}" ] && [ -f "${extracted}/manifest.json" ] && [ -f "${extracted}/index.js" ] \
+    || die "downloaded archive does not look like ivLyrics (manifest.json/index.js missing)."
+  printf '%s' "${extracted}"
+}
+
+installed_version() {
+  if [ -f "${APP_DIR}/version.txt" ]; then
+    tr -d '\r\n' < "${APP_DIR}/version.txt"
+  fi
+}
+
+sync_app_dir() {
+  require_command rsync
+  local source="$1"
+  mkdir -p "${APP_DIR}"
+  rsync -a --delete \
+    --exclude '.git' --exclude '.github' --exclude '.gitignore' \
+    --exclude 'tests' --exclude '*.md' --exclude 'preview_readme_*.png' \
+    "${source}/" "${APP_DIR}/"
+  mkdir -p "${BIN_DIR}"
+  if [ -f "${APP_DIR}/scripts/ivlyrics" ]; then
+    cp "${APP_DIR}/scripts/ivlyrics" "${BIN_DIR}/ivlyrics"
+    chmod +x "${BIN_DIR}/ivlyrics"
+  fi
+  if [ -d "${HOME}/.local/bin" ] && [ ! -e "${HOME}/.local/bin/ivlyrics" ]; then
+    ln -s "${BIN_DIR}/ivlyrics" "${HOME}/.local/bin/ivlyrics"
+  fi
+}
+
+apply_spicetify() {
+  require_command spicetify
+  local apps
+  apps="$(spicetify config custom_apps 2>/dev/null | tr -d '\r' || true)"
+  case "|${apps}|" in
+    *"|${APP_NAME}|"*) ;;
+    *) spicetify config custom_apps "${APP_NAME}" >/dev/null ;;
+  esac
+  log "Running spicetify apply"
+  spicetify apply -n >/dev/null 2>&1 || spicetify apply -n
+}
+
+cmd_update() {
+  require_macos
+  require_command spicetify
+  local previous
+  previous="$(installed_version)"
+  WORK_TMP="$(mktemp -d "${TMPDIR:-/tmp}/ivlyrics.XXXXXX")"
+  local source
+  source="$(download_source "${REF}")"
+
+  spotify_quit
+  if [ "$(protection_state)" != "unprotected" ]; then
+    heal_links
+  fi
+  cmd_backup || true
+  sync_app_dir "${source}"
+  cleanup_work_tmp
+  apply_spicetify
+  local current
+  current="$(installed_version)"
+  log "${APP_NAME} ${previous:-none} -> ${current} installed at ${APP_DIR}"
+  if [ "${1:-}" != "--defer-launch" ]; then
+    spotify_launch_now_if_owed
+  fi
+}
+
+cmd_install() {
+  require_macos
+  require_command spicetify
+  cmd_update --defer-launch
+  if [ "$(protection_state)" != "protected" ]; then
+    cmd_protect
+  fi
+  spotify_launch_now_if_owed
+  log "Done. Command available at ${BIN_DIR}/ivlyrics"
+}
+
+cmd_uninstall() {
+  require_macos
+  spotify_quit
+  remove_guard_agent
+  if command -v spicetify >/dev/null 2>&1; then
+    local apps remaining
+    apps="$(spicetify config custom_apps 2>/dev/null | tr -d '\r' || true)"
+    remaining="$(printf '%s' "${apps}" | tr '|' '\n' | grep -vx "${APP_NAME}" | paste -sd '|' - || true)"
+    spicetify config custom_apps "${remaining}" >/dev/null 2>&1 || true
+    spicetify apply -n >/dev/null 2>&1 || true
+  fi
+  rm -rf "${APP_DIR}"
+  rm -f "${HOME}/.local/bin/ivlyrics"
+  log "${APP_NAME} removed. Settings storage and snapshots were kept under ${SAFE_PROFILE} and ${BACKUP_ROOT}."
+  log "Run 'ivlyrics unprotect' first if you also want the storage moved back."
+  spotify_launch_now_if_owed
+}
+
+cmd_status() {
+  printf 'ivlyrics %s\n' "${SCRIPT_VERSION}"
+  printf 'app dir      : %s (version %s)\n' "${APP_DIR}" "$(installed_version || printf 'not installed')"
+  printf 'source       : %s@%s\n' "${REPO}" "${REF}"
+  printf 'spotify      : %s\n' "$(spotify_is_running && printf 'running' || printf 'not running')"
+  printf 'protection   : %s\n' "$(protection_state)"
+  printf 'safe profile : %s\n' "${SAFE_PROFILE}"
+  local latest
+  latest="$(list_snapshots | head -n 1)"
+  printf 'snapshots    : %s (latest: %s)\n' "$(list_snapshots | grep -c . || true)" "${latest:-none}"
+  if [ -f "${LAUNCH_AGENT_PLIST}" ]; then
+    printf 'guard agent  : installed (every %ss)\n' "${GUARD_INTERVAL_SECONDS}"
+  else
+    printf 'guard agent  : not installed\n'
+  fi
+}
+
+usage() {
+  cat <<USAGE
+ivlyrics ${SCRIPT_VERSION} - ivLyrics fork manager for macOS
+
+Usage: ivlyrics <command> [options]
+
+Commands:
+  install            Install/update the app, then enable settings protection
+  update             Update the app from ${REPO} (graceful Spotify quit, snapshot first)
+  protect            Move Spotify web storage out of ~/Library/Caches and add hourly snapshots
+  unprotect          Undo 'protect' (moves storage back, removes the launchd agent)
+  backup             Take a snapshot of the settings storage now
+  restore [snapshot] Restore the latest (or given) snapshot into Spotify
+  guard              Used by launchd: repair links when possible, then snapshot
+  status             Show install, protection, and snapshot state
+  uninstall          Remove the app and the guard agent (keeps your data)
+
+Options:
+  --ref <name>       Branch or tag to install/update from (default: ${DEFAULT_REF})
+  --quiet            Only log to ${LOG_FILE}
+USAGE
+}
+
+main() {
+  local command="${1:-}"
+  shift || true
+  local positional=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --ref) REF="${2:-}"; [ -n "${REF}" ] || die "--ref needs a value"; shift 2 ;;
+      --ref=*) REF="${1#--ref=}"; shift ;;
+      --quiet) QUIET=true; shift ;;
+      -h|--help) usage; exit 0 ;;
+      *) positional+=("$1"); shift ;;
+    esac
+  done
+  case "${command}" in
+    install|update|protect|unprotect|backup|restore|guard|uninstall)
+      if ! acquire_lock; then
+        if [ "${command}" = "guard" ]; then
+          exit 0
+        fi
+        die "another ivlyrics command is running (lock: ${LOCK_DIR})."
+      fi
+      ;;
+  esac
+  case "${command}" in
+    install)   cmd_install ;;
+    update)    cmd_update ;;
+    protect)   cmd_protect ;;
+    unprotect) cmd_unprotect ;;
+    backup)    cmd_backup ;;
+    restore)   cmd_restore "${positional[0]:-}" ;;
+    guard)     cmd_guard ;;
+    status)    cmd_status ;;
+    uninstall) cmd_uninstall ;;
+    ""|help|-h|--help) usage ;;
+    *) usage; die "unknown command: ${command}" ;;
+  esac
+}
+
+main "$@"

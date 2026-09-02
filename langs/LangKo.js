@@ -49,7 +49,7 @@ window.LANG_KO = {
         "providers": "소스",
         "system": "관리"
       },
-      "generalDesc": "언어, 데스크톱 오버레이, 기본 동작을 정리합니다.",
+      "generalDesc": "언어와 기본 동작을 정리합니다.",
       "appearanceDesc": "배경, 타이포그래피, 모션, 레이아웃을 조정합니다.",
       "performanceDesc": "프레임, 모션, GPU 비용이 큰 효과를 조정합니다.",
       "lyricsDesc": "싱크, 번역, 가사 처리 흐름을 설정합니다.",
@@ -1223,6 +1223,10 @@ window.LANG_KO = {
       "enabled": {
         "label": "패널 가사 활성화",
         "desc": "지금 재생 중 패널에 현재 가사를 표시합니다"
+      },
+      "onlyWhenSpotifyMissing": {
+        "label": "Spotify 기본 가사가 없을 때만 표시",
+        "desc": "Spotify가 이 곡의 가사를 직접 제공하면 ivLyrics 패널 가사를 숨기고, 없을 때만 대신 표시합니다."
       },
       "fontScale": {
         "label": "전체 글꼴 크기 배율",

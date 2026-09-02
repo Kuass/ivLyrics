@@ -13,8 +13,7 @@
         storageHandler: null,
         focusHandler: null,
         visibilityHandler: null,
-        settingsShortcutHandler: null,
-        fullscreenPresentationShortcutHandler: null
+        settingsShortcutHandler: null
     });
 
     if (moduleState.initialized) {
@@ -28,21 +27,6 @@
     // 전체화면 모드 내에서 작동하는 단축키 설정 키
     const TOGGLE_TV_MODE_KEY = "ivLyrics:visual:toggle-tv-mode-key";
     const DEFAULT_TOGGLE_TV_KEY = "t";
-
-    const FULLSCREEN_PRESENTATION_SHORTCUTS = Object.freeze({
-        "1": "standard",
-        "2": "compact-vinyl",
-        "3": "vinyl",
-        "4": "video",
-        Digit1: "standard",
-        Digit2: "compact-vinyl",
-        Digit3: "vinyl",
-        Digit4: "video",
-        Numpad1: "standard",
-        Numpad2: "compact-vinyl",
-        Numpad3: "vinyl",
-        Numpad4: "video"
-    });
 
     const getStoredValue = (key) => window.ivLyricsStoragePersistence
         ? window.ivLyricsStoragePersistence.getItem(key)
@@ -221,7 +205,6 @@
             + '.community-video-overlay, '
             + '.ivlyrics-cache-edit-overlay, '
             + '.notice-modal-overlay, '
-            + '.ivlyrics-marketplace-confirm-overlay, '
             + '.confirm-dialog-overlay, '
             + '.ivLyrics-update-banner, '
             + '.ivlyrics-study-panel'
@@ -251,45 +234,6 @@
         event.preventDefault();
         event.stopImmediatePropagation?.();
         window.ivLyricsOpenConfig();
-    };
-
-    const handleFullscreenPresentationShortcut = (event) => {
-        const nextPresentation = FULLSCREEN_PRESENTATION_SHORTCUTS[event.code]
-            || FULLSCREEN_PRESENTATION_SHORTCUTS[String(event.key || '')];
-        if (
-            !nextPresentation
-            || event.defaultPrevented
-            || event.repeat
-            || event.isComposing
-            || event.metaKey
-            || event.ctrlKey
-            || event.altKey
-            || event.shiftKey
-            || isInputFocused(event.target)
-            || hasOpenIvLyricsDialog()
-            || !isInFullscreenMode()
-        ) {
-            return;
-        }
-
-        event.preventDefault();
-        event.stopImmediatePropagation?.();
-
-        try {
-            if (getStoredValue("ivLyrics:visual:fullscreen-tv-mode") === "true") {
-                toggleTvMode();
-            }
-        } catch (error) {
-            console.debug("[ivLyrics] Failed to leave TV mode for presentation shortcut:", error);
-        }
-
-        window.dispatchEvent(new CustomEvent("ivLyrics", {
-            detail: {
-                type: "fullscreen-presentation",
-                value: nextPresentation,
-                source: "keyboard"
-            }
-        }));
     };
 
     // 단축키 바인딩 업데이트
@@ -411,13 +355,6 @@
 
         moduleState.settingsShortcutHandler = handleSettingsShortcut;
         document.addEventListener('keydown', moduleState.settingsShortcutHandler, true);
-
-        moduleState.fullscreenPresentationShortcutHandler = handleFullscreenPresentationShortcut;
-        document.addEventListener(
-            'keydown',
-            moduleState.fullscreenPresentationShortcutHandler,
-            true
-        );
 
         // 페이지 이동 감지하여 orphaned fullscreen container 정리
         // Spicetify History 이벤트 리스너 등록

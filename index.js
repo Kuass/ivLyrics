@@ -307,33 +307,6 @@ if (typeof window.kuromoji === "undefined") {
   initializeFuriganaConverter();
 }
 
-// === ivLyrics-overlay 전송 모듈 ===
-// LyricsService Extension에서 제공하는 OverlaySender를 사용
-// 이 파일에 있던 OverlaySender는 Extension으로 이동됨 (어떤 페이지에서든 작동)
-
-// Extension에서 이미 OverlaySender가 로드되어 있으면 그것을 사용
-// OverlaySender는 window.OverlaySender로 전역 접근 가능
-if (!window.OverlaySender) {
-  console.warn("[ivLyrics] OverlaySender not found from Extension, waiting...");
-  if (!window.__ivLyricsOverlaySenderWaitTimer) {
-    window.__ivLyricsOverlaySenderWaitTimer = setInterval(() => {
-      if (window.OverlaySender) {
-        clearInterval(window.__ivLyricsOverlaySenderWaitTimer);
-        window.__ivLyricsOverlaySenderWaitTimer = null;
-        ivLyricsDebug("[ivLyrics] OverlaySender loaded from Extension");
-      }
-    }, 100);
-
-    setTimeout(() => {
-      if (window.__ivLyricsOverlaySenderWaitTimer) {
-        clearInterval(window.__ivLyricsOverlaySenderWaitTimer);
-        window.__ivLyricsOverlaySenderWaitTimer = null;
-      }
-    }, 5000);
-  }
-}
-
-// 하위 호환성을 위해 OverlaySender 별칭 생성
 /** @type {React} */
 const react = Spicetify.React;
 const { useState, useEffect, useCallback, useMemo, useRef } = react;
@@ -880,7 +853,7 @@ const formatUpdateVersion = (version) => {
 
 // Update notification dialog
 const UpdateBanner = ({ updateInfo, onDismiss }) => {
-  const updatePageUrl = "https://lyrics.ivl.is/update";
+  const updatePageUrl = `https://github.com/${FORK_REPO}/tree/${FORK_BRANCH}#업데이트`;
   const modalRef = react.useRef(null);
   const previouslyFocusedRef = react.useRef(document.activeElement);
   const onDismissRef = react.useRef(onDismiss);
@@ -1104,8 +1077,6 @@ const IVLYRICS_BACKGROUND_FLAG_IDS = IVLYRICS_BACKGROUND_MODE_IDS.filter(
 );
 const IVLYRICS_FULLSCREEN_PRESENTATION_IDS = Object.freeze([
   "standard",
-  "vinyl",
-  "compact-vinyl",
   "video",
 ]);
 const IVLYRICS_FULLSCREEN_PRESENTATION_STORAGE_KEY =
@@ -1119,8 +1090,8 @@ function normalizeIvLyricsFullscreenPresentation(value, fallback = "standard") {
 }
 
 function normalizeIvLyricsDefaultFullscreenPresentation(value) {
-  const normalized = normalizeIvLyricsFullscreenPresentation(value, "vinyl");
-  return normalized === "standard" ? "vinyl" : normalized;
+  const normalized = normalizeIvLyricsFullscreenPresentation(value, "video");
+  return normalized === "standard" ? "video" : normalized;
 }
 
 function getRememberedIvLyricsFullscreenPresentation() {
@@ -1877,31 +1848,9 @@ const PRIVATE_OR_TRANSIENT_STORAGE_KEYS = new Set([
   `${APP_NAME}:user-hash`,
   `${APP_NAME}:client-id`,
   `${APP_NAME}:auth-token`,
-  `${APP_NAME}:discord-login-pending`,
   `${APP_NAME}:return-to-settings`,
   `${APP_NAME}:restore-route-after-reload`,
-  `${APP_NAME}:cloud-save-device-id`,
 ]);
-const CLOUD_SYNC_EXCLUDED_STORAGE_KEYS = new Set([
-  TRACK_SYNC_OFFSETS_STORAGE_KEY,
-  `${APP_NAME}:settings-presets`,
-]);
-const CLOUD_SYNC_FORBIDDEN_KEY_PATTERN = /(apikey|token|password|secret|credential|clientid|userhash)/i;
-const CLOUD_SYNC_SAFE_TOKEN_LIMIT_PATTERN = /max(?:output)?tokens?/gi;
-const isCloudSyncCredentialLikeKey = (key) => {
-  if (typeof key !== "string") return false;
-  const normalized = key.toLowerCase().replace(/[^a-z0-9]+/g, "");
-  const credentialCandidate = normalized.replace(CLOUD_SYNC_SAFE_TOKEN_LIMIT_PATTERN, "");
-  return CLOUD_SYNC_FORBIDDEN_KEY_PATTERN.test(credentialCandidate);
-};
-const isCloudSyncSettingKey = (key) => (
-  typeof key === "string" &&
-  key.startsWith(CURRENT_STORAGE_PREFIX) &&
-  !CLOUD_SYNC_EXCLUDED_STORAGE_KEYS.has(key) &&
-  !OBSOLETE_LEGACY_STORAGE_KEYS.has(key) &&
-  !PRIVATE_OR_TRANSIENT_STORAGE_KEYS.has(key) &&
-  !isCloudSyncCredentialLikeKey(key)
-);
 const OBSOLETE_LEGACY_STORAGE_KEYS = new Set([
   `${APP_NAME}:provider:lrclib:on`,
   `${APP_NAME}:provider:ivlyrics:on`,
@@ -2221,32 +2170,6 @@ const StorageManager = {
 
     return config;
   },
-  async exportCloudConfig() {
-    const config = {};
-    const exportKeys = new Set(StorageKeys);
-    try {
-      Object.keys(SettingsPersistence?.getSnapshot?.() || {}).forEach((key) => {
-        exportKeys.add(key);
-      });
-    } catch (error) {
-      console.warn("[ivLyrics] Failed to read the cloud settings snapshot.", error);
-    }
-
-    exportKeys.forEach((key) => {
-      if (!isCloudSyncSettingKey(key)) return;
-      const value = readPersistentSetting(key);
-      if (value !== null) config[key] = value;
-    });
-    return config;
-  },
-  async importCloudConfig(config) {
-    const normalized = normalizeImportedConfig(config);
-    Object.entries(normalized).forEach(([key, value]) => {
-      if (!isCloudSyncSettingKey(key)) return;
-      StorageManager.setItem(key, value);
-      saveStorageKeys(key);
-    });
-  },
   async importConfig(config) {
     const importedConfig = normalizeImportedConfig(config);
 
@@ -2441,39 +2364,6 @@ const rememberLyricsRenderModeLock = (mode) => {
   return normalizedMode;
 };
 
-const VINYL_TYPOGRAPHY_DEFAULT_SCALE = 0.7;
-const getOrSeedVinylTypographySetting = (
-  vinylSettingName,
-  baseSettingName,
-  baseFallback,
-  { numeric = false, scale = 1 } = {}
-) => {
-  const vinylStorageKey = `${APP_NAME}:visual:fullscreen-vinyl-${vinylSettingName}`;
-  const baseStorageKey = `${APP_NAME}:visual:${baseSettingName}`;
-  const normalize = (value) => {
-    if (value === null || value === undefined || value === "") return null;
-    if (!numeric) {
-      const text = String(value).trim();
-      return text || null;
-    }
-    const number = Number(value);
-    return Number.isFinite(number) ? number : null;
-  };
-
-  const storedVinylValue = normalize(StorageManager.getItem(vinylStorageKey));
-  if (storedVinylValue !== null) return storedVinylValue;
-
-  const baseValue = normalize(StorageManager.getItem(baseStorageKey));
-  const normalizedFallback = normalize(baseFallback);
-  const sourceValue = baseValue !== null ? baseValue : normalizedFallback;
-  const seededValue = numeric && scale !== 1
-    ? Math.round(sourceValue * scale)
-    : sourceValue;
-
-  StorageManager.setItem(vinylStorageKey, seededValue);
-  return seededValue;
-};
-
 const getOrSeedVideoStageTypographySetting = (
   settingName,
   fallback = "Pretendard Variable"
@@ -2484,12 +2374,8 @@ const getOrSeedVideoStageTypographySetting = (
   ).trim();
   if (storedVideoStageValue) return storedVideoStageValue;
 
-  const inheritedVinylValue = String(
-    StorageManager.getItem(`${APP_NAME}:visual:fullscreen-vinyl-${settingName}`) ||
-      fallback
-  ).trim() || fallback;
-  StorageManager.setItem(videoStageStorageKey, inheritedVinylValue);
-  return inheritedVinylValue;
+  StorageManager.setItem(videoStageStorageKey, fallback);
+  return fallback;
 };
 
 const CONFIG = {
@@ -2507,6 +2393,10 @@ const CONFIG = {
     ),
     "panel-lyrics-enabled": StorageManager.get(
       "ivLyrics:visual:panel-lyrics-enabled",
+      true
+    ),
+    "panel-lyrics-only-when-spotify-missing": StorageManager.get(
+      "ivLyrics:visual:panel-lyrics-only-when-spotify-missing",
       true
     ),
     "panel-font-scale":
@@ -2711,9 +2601,6 @@ const CONFIG = {
     "cultural-annotations-font-family":
       StorageManager.getItem("ivLyrics:visual:cultural-annotations-font-family") ||
       "Pretendard Variable",
-    "cultural-annotations-vinyl-font-family":
-      StorageManager.getItem("ivLyrics:visual:cultural-annotations-vinyl-font-family") ||
-      "Pretendard Variable",
     "original-outline-width":
       StorageManager.getItem("ivLyrics:visual:original-outline-width") || "0",
     "original-outline-color":
@@ -2734,10 +2621,6 @@ const CONFIG = {
       StorageManager.getItem("ivLyrics:visual:cultural-annotations-outline-width") || "0",
     "cultural-annotations-outline-color":
       StorageManager.getItem("ivLyrics:visual:cultural-annotations-outline-color") || "#000000",
-    "cultural-annotations-vinyl-outline-width":
-      StorageManager.getItem("ivLyrics:visual:cultural-annotations-vinyl-outline-width") || "0",
-    "cultural-annotations-vinyl-outline-color":
-      StorageManager.getItem("ivLyrics:visual:cultural-annotations-vinyl-outline-color") || "#000000",
     "original-font-weight":
       StorageManager.getItem("ivLyrics:visual:original-font-weight") ||
       "600",
@@ -2755,12 +2638,6 @@ const CONFIG = {
     "cultural-annotations-font-size":
       StorageManager.getItem("ivLyrics:visual:cultural-annotations-font-size") ||
       "14",
-    "cultural-annotations-vinyl-font-weight":
-      StorageManager.getItem("ivLyrics:visual:cultural-annotations-vinyl-font-weight") ||
-      "300",
-    "cultural-annotations-vinyl-font-size":
-      StorageManager.getItem("ivLyrics:visual:cultural-annotations-vinyl-font-size") ||
-      "12",
     "translation-spacing":
       StorageManager.getItem("ivLyrics:visual:translation-spacing") || "0",
     "phonetic-font-weight":
@@ -2806,8 +2683,6 @@ const CONFIG = {
       StorageManager.getItem("ivLyrics:visual:translation-opacity") || "85",
     "cultural-annotations-opacity":
       StorageManager.getItem("ivLyrics:visual:cultural-annotations-opacity") || "60",
-    "cultural-annotations-vinyl-opacity":
-      StorageManager.getItem("ivLyrics:visual:cultural-annotations-vinyl-opacity") || "60",
     "translate:translated-lyrics-source":
       StorageManager.getItem(
         "ivLyrics:visual:translate:translated-lyrics-source"
@@ -3074,169 +2949,10 @@ const CONFIG = {
     "fullscreen-album-radius":
       StorageManager.getItem("ivLyrics:visual:fullscreen-album-radius") ||
       "12",
-    // Fullscreen vinyl mode
-    "fullscreen-vinyl-album-size":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-album-size")) ||
-      100,
-    "fullscreen-vinyl-record-size":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-record-size")) ||
-      100,
-    "fullscreen-vinyl-background-blur":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-background-blur")) ||
-      0,
-    "fullscreen-vinyl-animations": StorageManager.get(
-      "ivLyrics:visual:fullscreen-vinyl-animations",
-      true
-    ),
-    "fullscreen-vinyl-center-rotation": StorageManager.get(
-      "ivLyrics:visual:fullscreen-vinyl-center-rotation",
-      true
-    ),
-    "fullscreen-vinyl-lyrics-enabled": StorageManager.get(
-      "ivLyrics:visual:fullscreen-vinyl-lyrics-enabled",
-      true
-    ),
     "fullscreen-focus-presentation":
       normalizeIvLyricsDefaultFullscreenPresentation(
         StorageManager.getItem("ivLyrics:visual:fullscreen-focus-presentation")
       ),
-    "fullscreen-vinyl-tonearm-style":
-      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-tonearm-style") ||
-      "s",
-    "fullscreen-vinyl-tonearm-finish":
-      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-tonearm-finish") ||
-      "white",
-    "fullscreen-vinyl-tonearm-size":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-tonearm-size")) ||
-      100,
-    "fullscreen-vinyl-original-font-family":
-      getOrSeedVinylTypographySetting(
-        "original-font-family",
-        "original-font-family",
-        "Pretendard Variable"
-      ),
-    "fullscreen-vinyl-original-font-size":
-      getOrSeedVinylTypographySetting(
-        "original-font-size",
-        "original-font-size",
-        44,
-        { numeric: true, scale: VINYL_TYPOGRAPHY_DEFAULT_SCALE }
-      ),
-    "fullscreen-vinyl-original-font-weight":
-      getOrSeedVinylTypographySetting(
-        "original-font-weight",
-        "original-font-weight",
-        600,
-        { numeric: true }
-      ),
-    "fullscreen-vinyl-original-opacity":
-      getOrSeedVinylTypographySetting(
-        "original-opacity",
-        "original-opacity",
-        95,
-        { numeric: true }
-      ),
-    "fullscreen-vinyl-original-letter-spacing":
-      getOrSeedVinylTypographySetting(
-        "original-letter-spacing",
-        "original-letter-spacing",
-        0,
-        { numeric: true }
-      ),
-    "fullscreen-vinyl-original-outline-width":
-      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-outline-width") || "0",
-    "fullscreen-vinyl-original-outline-color":
-      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-original-outline-color") || "#000000",
-    "fullscreen-vinyl-phonetic-font-family":
-      getOrSeedVinylTypographySetting(
-        "phonetic-font-family",
-        "phonetic-font-family",
-        "Pretendard Variable"
-      ),
-    "fullscreen-vinyl-phonetic-font-size":
-      getOrSeedVinylTypographySetting(
-        "phonetic-font-size",
-        "phonetic-font-size",
-        16,
-        { numeric: true, scale: VINYL_TYPOGRAPHY_DEFAULT_SCALE }
-      ),
-    "fullscreen-vinyl-phonetic-font-weight":
-      getOrSeedVinylTypographySetting(
-        "phonetic-font-weight",
-        "phonetic-font-weight",
-        100,
-        { numeric: true }
-      ),
-    "fullscreen-vinyl-phonetic-opacity":
-      getOrSeedVinylTypographySetting(
-        "phonetic-opacity",
-        "phonetic-opacity",
-        70,
-        { numeric: true }
-      ),
-    "fullscreen-vinyl-phonetic-spacing":
-      getOrSeedVinylTypographySetting(
-        "phonetic-spacing",
-        "phonetic-spacing",
-        -1,
-        { numeric: true }
-      ),
-    "fullscreen-vinyl-phonetic-letter-spacing":
-      getOrSeedVinylTypographySetting(
-        "phonetic-letter-spacing",
-        "phonetic-letter-spacing",
-        0,
-        { numeric: true }
-      ),
-    "fullscreen-vinyl-phonetic-outline-width":
-      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-outline-width") || "0",
-    "fullscreen-vinyl-phonetic-outline-color":
-      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-phonetic-outline-color") || "#000000",
-    "fullscreen-vinyl-translation-font-family":
-      getOrSeedVinylTypographySetting(
-        "translation-font-family",
-        "translation-font-family",
-        "Pretendard Variable"
-      ),
-    "fullscreen-vinyl-translation-font-size":
-      getOrSeedVinylTypographySetting(
-        "translation-font-size",
-        "translation-font-size",
-        22,
-        { numeric: true, scale: VINYL_TYPOGRAPHY_DEFAULT_SCALE }
-      ),
-    "fullscreen-vinyl-translation-font-weight":
-      getOrSeedVinylTypographySetting(
-        "translation-font-weight",
-        "translation-font-weight",
-        300,
-        { numeric: true }
-      ),
-    "fullscreen-vinyl-translation-opacity":
-      getOrSeedVinylTypographySetting(
-        "translation-opacity",
-        "translation-opacity",
-        85,
-        { numeric: true }
-      ),
-    "fullscreen-vinyl-translation-spacing":
-      getOrSeedVinylTypographySetting(
-        "translation-spacing",
-        "translation-spacing",
-        0,
-        { numeric: true }
-      ),
-    "fullscreen-vinyl-translation-letter-spacing":
-      getOrSeedVinylTypographySetting(
-        "translation-letter-spacing",
-        "translation-letter-spacing",
-        0,
-        { numeric: true }
-      ),
-    "fullscreen-vinyl-translation-outline-width":
-      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-outline-width") || "0",
-    "fullscreen-vinyl-translation-outline-color":
-      StorageManager.getItem("ivLyrics:visual:fullscreen-vinyl-translation-outline-color") || "#000000",
     "fullscreen-video-stage-original-font-family":
       getOrSeedVideoStageTypographySetting("original-font-family"),
     "fullscreen-video-stage-phonetic-font-family":
@@ -3244,11 +2960,7 @@ const CONFIG = {
     "fullscreen-video-stage-translation-font-family":
       getOrSeedVideoStageTypographySetting("translation-font-family"),
     "fullscreen-video-stage-cultural-font-family":
-      getOrSeedVideoStageTypographySetting(
-        "cultural-font-family",
-        StorageManager.getItem("ivLyrics:visual:cultural-annotations-vinyl-font-family") ||
-          "Pretendard Variable"
-      ),
+      getOrSeedVideoStageTypographySetting("cultural-font-family"),
     "fullscreen-video-stage-lyric-background-color":
       StorageManager.getItem("ivLyrics:visual:fullscreen-video-stage-lyric-background-color") ||
       "#000000",
@@ -3424,12 +3136,6 @@ CONFIG.visual["cultural-annotations-font-weight"] = Number.parseInt(
 CONFIG.visual["cultural-annotations-font-size"] = Number.parseInt(
   CONFIG.visual["cultural-annotations-font-size"]
 );
-CONFIG.visual["cultural-annotations-vinyl-font-weight"] = Number.parseInt(
-  CONFIG.visual["cultural-annotations-vinyl-font-weight"]
-);
-CONFIG.visual["cultural-annotations-vinyl-font-size"] = Number.parseInt(
-  CONFIG.visual["cultural-annotations-vinyl-font-size"]
-);
 CONFIG.visual["text-shadow-opacity"] = Number.parseInt(
   CONFIG.visual["text-shadow-opacity"]
 );
@@ -3444,9 +3150,6 @@ CONFIG.visual["translation-opacity"] = Number.parseInt(
 );
 CONFIG.visual["cultural-annotations-opacity"] = Number.parseInt(
   CONFIG.visual["cultural-annotations-opacity"]
-);
-CONFIG.visual["cultural-annotations-vinyl-opacity"] = Number.parseInt(
-  CONFIG.visual["cultural-annotations-vinyl-opacity"]
 );
 CONFIG.visual["background-brightness"] = Number.parseInt(
   CONFIG.visual["background-brightness"]
@@ -3957,11 +3660,6 @@ const Prefetcher = {
     const prefetchPromise = (async () => {
       try {
         ivLyricsDebug(`[Prefetcher] Fetching lyrics for: ${trackInfo.title}`);
-
-        // 마켓플레이스 에드온 로드 대기
-        if (window.MarketplaceManager?.readyPromise) {
-          await window.MarketplaceManager.readyPromise;
-        }
 
         // LyricsService Extension을 통해 가사 로드 (LyricsAddonManager 사용)
         const resp = await window.LyricsService.getLyricsFromProviders(trackInfo);
@@ -4847,7 +4545,6 @@ class LyricsContainer extends react.Component {
       lockedMode: getRememberedLyricsRenderModeLock(),
       mode: -1,
       isLoading: false,
-      showMarketplace: false,
       versionIndex: 0,
       versionIndex2: 0,
       isFullscreen: false,
@@ -5969,11 +5666,6 @@ class LyricsContainer extends react.Component {
       if (this.currentTrackUri === uri && result) {
         completed = true;
         this.setState({ translatedMetadata: result });
-
-        // 오버레이로 번역된 메타데이터 전송
-        if (window.OverlaySender?.sendTranslatedMetadata) {
-          window.OverlaySender.sendTranslatedMetadata(result);
-        }
       }
     } catch (error) {
       console.warn('[ivLyrics] Metadata translation failed:', error);
@@ -6251,55 +5943,6 @@ class LyricsContainer extends react.Component {
     this.clearGenerationRequestLoading("cultural-annotations", token, options);
   }
 
-  publishLyricsPresentation(lyrics, context = {}) {
-    const publisher = window.ivLyricsPresentationPublisher;
-    if (!publisher?.publishLyricsReady) {
-      throw new Error("LyricsPresentationPublisher is not loaded");
-    }
-
-    const {
-      uri = this.state.uri,
-      provider = this.state.provider || null,
-      karaokeSource = this.state.karaokeSource || null,
-      mode = this.getCurrentMode(),
-      lyricsType = getLyricsModeTypeKey(mode),
-      displayMode1 = null,
-      displayMode2 = null,
-      detectedLanguage = null,
-      translationTargetLanguage = this.getTranslationTargetLanguage(),
-      pronunciationNotation = getCurrentLyricsPronunciationNotation(),
-      translationSourceLyrics = null,
-      translationSourceText,
-      presentationComplete = true,
-    } = context;
-
-    const payload = {
-      trackInfo: {
-        uri,
-        title: this.state.title,
-        artist: this.state.artist,
-      },
-      lyrics,
-      provider,
-      karaokeSource,
-      lyricsType,
-      displayMode1,
-      displayMode2,
-      detectedLanguage,
-      translationTargetLanguage,
-      pronunciationNotation,
-      presentationComplete,
-    };
-
-    if (translationSourceText !== undefined) {
-      payload.translationSourceText = translationSourceText;
-    } else if (Array.isArray(translationSourceLyrics)) {
-      payload.translationSourceText = getNonSectionLyricsText(translationSourceLyrics);
-    }
-
-    return publisher.publishLyricsReady(payload);
-  }
-
   applyStreamingTranslation({
     uri,
     presentationSeq = null,
@@ -6348,15 +5991,6 @@ class LyricsContainer extends react.Component {
 
       this.setState({
         currentLyrics: finalLyrics,
-      });
-
-      this.publishLyricsPresentation(finalLyrics, {
-        uri: payload.uri,
-        displayMode1: payload.displayMode1,
-        displayMode2: payload.displayMode2,
-        detectedLanguage: this.provideLanguageCode(payload.lyrics),
-        translationSourceLyrics: payload.lyrics,
-        presentationComplete: false,
       });
     }, 50);
   }
@@ -6885,7 +6519,7 @@ class LyricsContainer extends react.Component {
 
       // 이전 완성 스냅샷이 새 결과를 가로채지 않도록 표시 캐시만 비운다.
       this.invalidateSharedLyricsPresentation(currentUri);
-      // lyricsSource를 다시 호출하여 기존 로직으로 화면 및 오버레이 업데이트
+      // lyricsSource를 다시 호출하여 기존 로직으로 화면 업데이트
       this.lyricsSource(this.state, currentMode);
       Toast.success(regenerationToastSuccess);
     } catch (error) {
@@ -7358,14 +6992,6 @@ class LyricsContainer extends react.Component {
           isCached: false,
         });
 
-        // 마켓플레이스 에드온 로드 대기
-        if (window.MarketplaceManager?.readyPromise) {
-          await window.MarketplaceManager.readyPromise;
-          if (!isLatestLyricsRequest()) {
-            return;
-          }
-        }
-
         // LyricsService Extension을 통해 가사 로드 (LyricsAddonManager 사용)
         const resp = await window.LyricsService.getLyricsFromProviders(
           info,
@@ -7582,13 +7208,6 @@ class LyricsContainer extends react.Component {
       if (lyricsState.isLoading) return;
       if (!isActivePresentation()) return;
       this.setState({ currentLyrics: [] });
-      // 오버레이에 가사 없음 상태 전송 (트랙 정보 업데이트용)
-      this.publishLyricsPresentation([], {
-        uri: lyricsState.uri,
-        provider: lyricsState.provider || null,
-        karaokeSource: lyricsState.karaokeSource || null,
-        mode,
-      });
       return;
     }
 
@@ -7658,18 +7277,6 @@ class LyricsContainer extends react.Component {
     this.displayMode2 = displayMode2;
 
     const { uri } = lyricsState; // Capture the URI for this specific request
-    const publishCurrentPresentation = (displayLyrics, presentationComplete) =>
-      this.publishLyricsPresentation(displayLyrics, {
-        uri,
-        provider: lyricsState.provider || null,
-        karaokeSource: lyricsState.karaokeSource || null,
-        mode,
-        displayMode1,
-        displayMode2,
-        detectedLanguage: originalLanguage || null,
-        translationSourceLyrics: lyrics,
-        presentationComplete,
-      });
 
     this.requestCulturalAnnotations({
       lyricsState,
@@ -7704,7 +7311,6 @@ class LyricsContainer extends react.Component {
         uri
       );
       this.setState({ currentLyrics: sharedDisplayLyrics });
-      publishCurrentPresentation(sharedDisplayLyrics, true);
       return;
     }
 
@@ -7761,8 +7367,6 @@ class LyricsContainer extends react.Component {
       this.setState({
         currentLyrics: finalLyrics,
       });
-      // 🔹 ivLyrics-overlay 앱으로 원문 가사 전송 (번역 모드 미사용)
-      publishCurrentPresentation(finalLyrics, true);
       return;
     }
 
@@ -7780,9 +7384,6 @@ class LyricsContainer extends react.Component {
       this.setState({
         currentLyrics: originalLyrics,
       });
-      // 🔹 ivLyrics-overlay 앱으로 원문 가사 먼저 전송 (번역 로딩 전)
-      // 발음/번역 생성이 오래 걸리더라도 오버레이는 원문을 즉시 표시해야 한다.
-      publishCurrentPresentation(originalLyrics, false);
     }
 
     // Progressive loading: keep results per track so Mode 1 does not disappear when Mode 2 finishes
@@ -7861,12 +7462,6 @@ class LyricsContainer extends react.Component {
       this.setState({
         currentLyrics: finalLyrics,
       });
-
-      // 🔹 ivLyrics-overlay 앱으로 가사 전송
-      publishCurrentPresentation(
-        finalLyrics,
-        (!mode1Active || !!lyricsMode1) && (!mode2Active || !!lyricsMode2)
-      );
     };
 
     // 스마트 로딩 전략: 두 모드 모두 활성화된 경우 둘 다 완료될 때까지 기다림
@@ -7963,8 +7558,7 @@ class LyricsContainer extends react.Component {
           // 실패해도 계속 진행
         });
 
-      // 두 번역이 모두 실패/무결과로 끝나면 원문 가사라도 오버레이에 전송
-      // (그렇지 않으면 lyrics-ready가 한 번도 발생하지 않아 오버레이가 빈 채로 남는다)
+      // 두 번역이 모두 실패/무결과로 끝나면 원문 가사라도 표시한다
       Promise.allSettled([promise1, promise2]).then(() => {
         if (!isActivePresentation() || !this._dmResults?.[currentUri]) {
           return;
@@ -9226,15 +8820,6 @@ class LyricsContainer extends react.Component {
       fileInput: null,
     };
 
-    // Check for first-run setup wizard
-    if (typeof isSetupNeeded === "function" && isSetupNeeded()) {
-      setTimeout(() => {
-        if (typeof openSetupWizard === "function") {
-          openSetupWizard();
-        }
-      }, 500); // Small delay to ensure all components are loaded
-    }
-
     // Check for updates when app starts
     if (!window.__ivLyricsUpdateCheckStarted && !window.__ivLyricsUpdateCheckTimer) {
       window.__ivLyricsUpdateCheckPending = true;
@@ -9609,7 +9194,7 @@ class LyricsContainer extends react.Component {
     this.handleLyricIndexChange = (event) => {
       const nextIndex = event.detail?.index;
       if (typeof nextIndex === 'number' && this.state.currentLyricIndex !== nextIndex) {
-        if (this.state.isFullscreen || this.state.learningModeActive) {
+        if (this.state.isFullscreen) {
           this.setState({ currentLyricIndex: nextIndex });
         } else {
           this.state.currentLyricIndex = nextIndex;
@@ -10000,8 +9585,6 @@ class LyricsContainer extends react.Component {
       backgroundStyle.filter = `brightness(${brightness})`;
     }
 
-    const vinylTrackAccent = this.state.colors.background || "";
-
     this.styleVariables = {
       ...this.styleVariables,
       ...getLyricsTypographyStyleVariables(CONFIG.visual),
@@ -10018,9 +9601,6 @@ class LyricsContainer extends react.Component {
       "--iv-lyrics-centering-ease": "cubic-bezier(0.20, 0.70, 0.42, 0.96)",
       "--iv-motion-distance-sm": this.shouldReduceMotion() ? "0px" : "10px",
       "--iv-motion-distance-md": this.shouldReduceMotion() ? "0px" : "18px",
-      ...(vinylTrackAccent ? {
-        "--iv-vinyl-track-accent": vinylTrackAccent,
-      } : {}),
     };
     if (isSyncCreatorActive) {
       this.styleVariables = {
@@ -10215,8 +9795,6 @@ class LyricsContainer extends react.Component {
 		syncTypeBreakdown: this.state.syncTypeBreakdown,
         copyright: this.state.copyright,
         isLoading: this.state.isLoading,
-        showMarketplace: this.state.showMarketplace,
-        onCloseMarketplace: () => this.setState({ showMarketplace: false }),
         reRenderLyricsPage: this.reRenderLyricsPage,
       })
       : (() => {
@@ -10279,13 +9857,11 @@ class LyricsContainer extends react.Component {
       this.state.isFullscreen &&
       this.state.fullscreenLyricsHidden &&
       hasLyrics &&
-      !this.state.showMarketplace &&
       !isSyncCreatorActive;
     const shouldUseFullscreenNoLyricsLayout =
       shouldHideFullscreenLyrics ||
       (!hasLyrics && centerWhenNoLyrics);
     const shouldReduceMotion = this.shouldReduceMotion();
-    const isFullscreenMarketplace = this.state.isFullscreen && this.state.showMarketplace;
     const isFullscreenPageUi = this.state.isFullscreen && this.fullscreenUsesPageUi === true;
     const shouldRenderFloatingMenu =
       !this.state.isFullscreen ||
@@ -10308,8 +9884,7 @@ class LyricsContainer extends react.Component {
       )
       : "standard";
     const isFocusedFullscreenPresentation =
-      fullscreenPresentation === "vinyl"
-      || fullscreenPresentation === "video";
+      fullscreenPresentation === "video";
     const isVideoStagePresentation =
       fullscreenPresentation === "video";
     const floatingToolbarStyle = this.state.isFullscreen
@@ -10435,9 +10010,6 @@ class LyricsContainer extends react.Component {
       if (CONFIG.visual["fullscreen-tv-mode"] === true) {
         fullscreenClasses += " tv-mode-active";
       }
-      if (this.state.showMarketplace) {
-        fullscreenClasses += " marketplace-active";
-      }
       if (isFullscreenPageUi) {
         fullscreenClasses += " fullscreen-page-ui";
       }
@@ -10498,8 +10070,7 @@ class LyricsContainer extends react.Component {
       })
       .filter(Boolean);
     const generationStatusStack = generationStatuses.length > 0 &&
-      !isSyncCreatorActive &&
-      !isFullscreenMarketplace
+      !isSyncCreatorActive
       ? react.createElement(
         "div",
         {
@@ -10571,7 +10142,6 @@ class LyricsContainer extends react.Component {
       (isKaraokeRenderMode(mode) && Array.isArray(this.state.karaoke) && this.state.karaoke.length > 0) ||
       (mode === SYNCED && Array.isArray(this.state.synced) && this.state.synced.length > 0);
     const canAdjustTrackSync = hasTrackSyncLyrics &&
-      !this.state.showMarketplace &&
       !shouldHideFullscreenLyrics &&
       !isSyncCreatorActive &&
       Boolean(renderTrackUri);
@@ -10608,7 +10178,7 @@ class LyricsContainer extends react.Component {
         },
       },
       // Left panel for fullscreen mode
-      this.state.isFullscreen && !this.state.showMarketplace && !isSyncCreatorActive && window.FullscreenOverlay && react.createElement(window.FullscreenOverlay, {
+      this.state.isFullscreen && !isSyncCreatorActive && window.FullscreenOverlay && react.createElement(window.FullscreenOverlay, {
         coverUrl: this.state.coverUrl,
         title: this.state.title,
         artist: this.state.artist,
@@ -10636,8 +10206,6 @@ class LyricsContainer extends react.Component {
         lyricsSettingsRevision: this.reRenderLyricsPage,
         translatedMetadata: this.state.translatedMetadata,
         trackUri: this.state.uri,
-        trackAccent: vinylTrackAccent,
-        trackAccentUri: this.state.colorsUri || "",
         presentationMode: fullscreenPresentation,
         onPresentationModeChange: (nextPresentation) => {
           this.setFullscreenPresentation(nextPresentation);
@@ -10683,7 +10251,7 @@ class LyricsContainer extends react.Component {
       generationStatusStack,
       trackSyncAdjustPill,
       // ===== 플로팅 바 (일반 모드: 전체 표시, 전체화면: 메뉴 토글 방식) =====
-      !isFullscreenMarketplace && !isSyncCreatorActive && react.createElement(
+      !isSyncCreatorActive && react.createElement(
         "div",
         {
           className: "lyrics-config-button-container lyrics-fluent-floating-toolbar" +
@@ -10706,9 +10274,7 @@ class LyricsContainer extends react.Component {
                   "#ivLyrics-sync-creator-overlay",
                   ".ivlyrics-fluent-overlay",
                   ".community-video-overlay",
-                  "#ivLyrics-share-image-overlay",
                   ".ivlyrics-cache-edit-overlay",
-                  ".lyrics-creator-profile-overlay",
                 ].join(","));
 
                 if (!el.contains(target) && !isExternalMenuSurface && (this.state.isFloatingMenuOpen || this.state.isFloatingMenuClosing)) {
@@ -10785,10 +10351,6 @@ class LyricsContainer extends react.Component {
                 this.state.isTranslationLoading ||
                 this.state.isPhoneticLoading ||
                 this.state.isCulturalAnnotationsLoading,
-            }),
-            window.IvLyricsLearningMode?.StudyButton &&
-            react.createElement(window.IvLyricsLearningMode.StudyButton, {
-              disabled: !hasLyrics || this.state.isLoading,
             })
           ),
           react.createElement(
@@ -10828,17 +10390,6 @@ class LyricsContainer extends react.Component {
                 }
               },
             }),
-            react.createElement(ShareImageButton, {
-              lyrics: this.state.currentLyrics || [],
-              trackInfo: {
-                name: Spicetify.Player.data?.item?.name || Spicetify.Player.data?.item?.metadata?.title || '',
-                artist: Spicetify.Player.data?.item?.artists?.map(a => a.name).join(', ') || Spicetify.Player.data?.item?.metadata?.artist_name || '',
-                cover: Spicetify.Player.data?.item?.metadata?.image_xlarge_url ||
-                  Spicetify.Player.data?.item?.metadata?.image_large_url ||
-                  Spicetify.Player.data?.item?.metadata?.image_url ||
-                  Spicetify.Player.data?.item?.album?.images?.[0]?.url || '',
-              },
-            }),
             hasLyrics && react.createElement(
               Spicetify.ReactComponent.TooltipWrapper,
               {
@@ -10866,27 +10417,6 @@ class LyricsContainer extends react.Component {
               className: "lyrics-floating-menu-group",
               "data-group": "app",
             },
-            react.createElement(
-              Spicetify.ReactComponent.TooltipWrapper,
-              { label: I18n.t("marketplace.title"), showDelay: 0 },
-              react.createElement(
-                "button",
-                {
-                  className: `lyrics-config-button lyrics-marketplace-button${this.state.showMarketplace ? " active" : ""}`,
-                  type: "button",
-                  "aria-label": I18n.t("marketplace.title"),
-                  onClick: () => {
-                    this.clearFloatingMenuCloseTimer();
-                    this.setState((prevState) => ({
-                      showMarketplace: !prevState.showMarketplace,
-                      isFloatingMenuOpen: false,
-                      isFloatingMenuClosing: false,
-                    }));
-                  },
-                },
-                renderFloatingToolbarIcon("marketplace")
-              )
-            ),
             react.createElement(SettingsMenu),
             (() => !document.getElementById("fad-ivLyrics-container"))() && react.createElement(
               Spicetify.ReactComponent.TooltipWrapper,
@@ -10953,18 +10483,7 @@ class LyricsContainer extends react.Component {
         )
       ),
       cacheEditModal,
-      !shouldHideFullscreenLyrics && activeLyricsPage,
-      !this.state.showMarketplace &&
-      !shouldHideFullscreenLyrics &&
-      window.IvLyricsLearningMode?.StudyPanel &&
-      react.createElement(window.IvLyricsLearningMode.StudyPanel, {
-        trackUri: this.state.uri,
-        title: this.state.title,
-        artist: this.state.artist,
-        provider: this.state.provider,
-        lyrics: this.state.currentLyrics || [],
-        activeLineIndex: this.state.currentLyricIndex || 0,
-      })
+      !shouldHideFullscreenLyrics && activeLyricsPage
     );
 
     const dom = ensureReactDOM();
@@ -11059,11 +10578,7 @@ class LyricsContainer extends react.Component {
   addFonts(CONFIG.visual["phonetic-font-family"]);
   addFonts(CONFIG.visual["translation-font-family"]);
   addFonts(CONFIG.visual["cultural-annotations-font-family"]);
-  addFonts(CONFIG.visual["cultural-annotations-vinyl-font-family"]);
   addFonts(CONFIG.visual["instrumental-break-label-font-family"]);
-  addFonts(CONFIG.visual["fullscreen-vinyl-original-font-family"]);
-  addFonts(CONFIG.visual["fullscreen-vinyl-phonetic-font-family"]);
-  addFonts(CONFIG.visual["fullscreen-vinyl-translation-font-family"]);
   addFonts(CONFIG.visual["fullscreen-video-stage-original-font-family"]);
   addFonts(CONFIG.visual["fullscreen-video-stage-phonetic-font-family"]);
   addFonts(CONFIG.visual["fullscreen-video-stage-translation-font-family"]);
@@ -11099,7 +10614,6 @@ class LyricsContainer extends react.Component {
       initialized: false,
       unlisten: null,
       lastRouteKey: null,
-      lastLoginToken: null,
     });
 
   // 현재 URL의 파라미터를 확인
@@ -11121,19 +10635,6 @@ class LyricsContainer extends react.Component {
         if (alertMessage) {
           Toast.show(decodeURIComponent(alertMessage), false, 3000);
         }
-
-        // 다른 파라미터들도 처리 가능
-        // 예: action, data 등
-        const action = searchParams.get('action');
-        if (action === 'discord-auth') {
-          const loginToken = searchParams.get('loginToken');
-          if (loginToken && moduleState.lastLoginToken !== loginToken) {
-            moduleState.lastLoginToken = loginToken;
-            if (typeof Utils !== 'undefined' && Utils.handleDiscordAuthCallback) {
-              Utils.handleDiscordAuthCallback(loginToken);
-            }
-          }
-        }
       }
     } catch (error) {
       console.error('[ivLyrics] URL Scheme error:', error);
@@ -11153,19 +10654,6 @@ class LyricsContainer extends react.Component {
     moduleState.unlisten = Spicetify.Platform.History.listen(() => {
       checkURLParams();
     });
-  }
-})();
-
-// 공지사항 시스템 초기화
-(function initNoticeSystem() {
-  // 앱이 완전히 로드된 후 공지사항 확인
-  if (!window.__ivLyricsNoticeInitTimer) {
-    window.__ivLyricsNoticeInitTimer = setTimeout(() => {
-      window.__ivLyricsNoticeInitTimer = null;
-      if (typeof window.showNoticeIfNeeded === 'function') {
-        window.showNoticeIfNeeded();
-      }
-    }, 3000); // 3초 후 실행 (앱 로드 완료 대기)
   }
 })();
 

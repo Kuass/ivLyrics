@@ -11,7 +11,7 @@ import urllib.request
 from pathlib import Path
 
 
-REPOSITORY = "ivLis-Studio/ivLyrics"
+REPOSITORY = "Kuass/ivLyrics"
 TEMPLATE_PATH = Path(".github/release-notes-template.md")
 
 

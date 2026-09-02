@@ -4046,28 +4046,6 @@
             const durationMs = trackMetadata.durationMs;
             const spotifyProfile = await getCurrentSpotifyProfile();
 
-            if (typeof Utils !== "undefined" && Utils.requireDiscordAuth) {
-                await Utils.requireDiscordAuth(I18n.t('syncCreator.loginRequired'));
-            } else {
-                const profileResponse = await fetch(`${API_BASE}/user/profile?userHash=${encodeURIComponent(userHash)}`, {
-                    cache: 'no-store',
-                    headers: {
-                        "Cache-Control": "no-cache, no-store, must-revalidate",
-                        Pragma: "no-cache",
-                        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-                    },
-                });
-                const profile = await profileResponse.json();
-
-                if (!profileResponse.ok) {
-                    throw new Error(profile.error || I18n.t('settingsAdvanced.aboutTab.account.loadFailed'));
-                }
-
-                if (!profile?.authenticated || !profile?.linked || !profile?.account) {
-                    throw new Error(I18n.t('syncCreator.loginRequired'));
-                }
-            }
-
             const submitAuthToken = typeof Utils !== "undefined" && Utils.getAuthToken
                 ? Utils.getAuthToken()
                 : authToken;
@@ -7466,7 +7444,6 @@
     const sendLyricsToConsumers = ({
         trackInfo,
         lyrics,
-        sendToOverlay = true,
         forceResend = false,
         sendReason = 'normal',
         presentationContext = null
@@ -7487,9 +7464,6 @@
             }
         };
 
-        if (sendToOverlay) {
-            queueSend(window.OverlaySender);
-        }
         queueSend(window.lyricsHelperSender);
         return Promise.allSettled(sends);
     };
@@ -7606,7 +7580,6 @@
                     uri: trackInfo.uri
                 },
                 lyrics,
-                sendToOverlay: options.sendToOverlay !== false,
                 forceResend: options.forceResend === true,
                 sendReason: options.sendReason || 'shared-snapshot',
                 presentationContext: {
@@ -7889,7 +7862,6 @@
          * @param {Object} options - 옵션
          * @param {string} options.displayMode1 - 첫 번째 표시 모드 (발음 등)
          * @param {string} options.displayMode2 - 두 번째 표시 모드 (번역 등)
-         * @param {boolean} options.sendToOverlay - 오버레이로 전송 여부 (기본: true)
          * @param {boolean} options.skipTranslation - 다른 표시 경로가 번역 중일 때 원문만 전송
          * @param {string[]} options.providerOrder - provider 순서
          * @returns {Promise<Object>} - { lyrics, provider, error }
@@ -7898,7 +7870,6 @@
             const {
                 displayMode1 = null,
                 displayMode2 = null,
-                sendToOverlay = true,
                 skipTranslation = false
             } = options;
 
@@ -7911,7 +7882,6 @@
                     await sendLyricsToConsumers({
                         trackInfo: { uri: info.uri, title: info.title, artist: info.artist },
                         lyrics: [],
-                        sendToOverlay,
                         forceResend: true
                     });
 
@@ -7935,7 +7905,6 @@
                     await sendLyricsToConsumers({
                         trackInfo: { uri: info.uri, title: info.title, artist: info.artist },
                         lyrics: [],
-                        sendToOverlay,
                         forceResend: true
                     });
                     return { lyrics: [], provider, error: "No lyrics" };
@@ -8022,7 +7991,6 @@
                     void sendLyricsToConsumers({
                         trackInfo: { uri: info.uri, title: info.title, artist: info.artist },
                         lyrics,
-                        sendToOverlay,
                         sendReason: 'translation-pending',
                         presentationContext: overlayPresentationContext
                     });
@@ -8173,7 +8141,6 @@
                 await sendLyricsToConsumers({
                     trackInfo: { uri: info.uri, title: info.title, artist: info.artist },
                     lyrics,
-                    sendToOverlay,
                     forceResend: true,
                     sendReason,
                     presentationContext: finalPresentationContext
@@ -9151,26 +9118,13 @@
     window.Translator = Translator;
 
     // ============================================
-    // OverlaySender - 오버레이 앱에 데이터 전송
+    // LyricsSenderBase / lyricsHelperSender - 로컬 helper 앱에 가사 전송
     // Extension으로 이동하여 어떤 페이지에서든 작동
     // ============================================
 
-    // 현재 곡 조회와 곡 변경 수명주기는 OverlayService.js가 담당한다.
-    // sender 내부의 연결 복구/설정 변경 경로는 이 얇은 위임 함수를 통해
-    // 별도 extension에 동기화를 요청한다.
-    const scheduleSenderBootstrap = (delay = 1200, previousUri = null) => {
-        window.ivLyricsOverlayService?.schedule?.(delay, previousUri);
-    };
-
-    // Rust helper/overlay의 입력 형식은 정수 밀리초와 문자열만 허용한다.
-    // pseudo-karaoke의 소수 타임스탬프나 객체형 보조 가사가 들어오면 422가 나므로
-    // 두 sender가 같은 경계 정규화를 사용한다.
-    const normalizeOverlayProgressTiming = (position, duration) => {
-        const normalize = window.ivLyricsOverlayProtocol?.normalizeProgressTiming;
-        if (typeof normalize === 'function') {
-            return normalize(position, duration);
-        }
-
+    // Rust helper의 입력 형식은 정수 밀리초와 문자열만 허용한다.
+    // pseudo-karaoke의 소수 타임스탬프나 객체형 보조 가사가 들어오면 422가 난다.
+    const normalizeSenderProgressTiming = (position, duration) => {
         const toUnsignedMilliseconds = (value) => {
             const numeric = Number(value);
             if (!Number.isFinite(numeric)) return 0;
@@ -9490,8 +9444,8 @@
 
     const LYRICS_SEND_RETRY_DELAYS = [250, 750];
 
-    const OverlaySender = {
-        DEFAULT_PORT: 15000,
+    // lyricsHelperSender의 프로토타입. 공용 전송/큐/오프셋 로직만 가진다.
+    const LyricsSenderBase = {
         progressInterval: null,
         lastSentUri: null,
         lastSentLyrics: null,
@@ -9522,78 +9476,6 @@
         _lyricsSendActive: false,
 
         // 포트 설정 (localStorage에 저장)
-        get port() {
-            const savedPort = window.ivLyricsStoragePersistence
-                ? window.ivLyricsStoragePersistence.getItem('ivLyrics:overlay-port')
-                : Spicetify.LocalStorage.get('ivLyrics:overlay-port');
-            return savedPort ? parseInt(savedPort, 10) : this.DEFAULT_PORT;
-        },
-        set port(value) {
-            const portNum = parseInt(value, 10);
-            if (portNum >= 1024 && portNum <= 65535) {
-                if (window.ivLyricsStoragePersistence) {
-                    window.ivLyricsStoragePersistence.setItem('ivLyrics:overlay-port', portNum.toString());
-                } else {
-                    Spicetify.LocalStorage.set('ivLyrics:overlay-port', portNum.toString());
-                }
-                this.isConnected = false;
-                this.checkConnection();
-            }
-        },
-
-        // 설정 (localStorage에 저장)
-        get enabled() {
-            const stored = window.ivLyricsStoragePersistence
-                ? window.ivLyricsStoragePersistence.getItem('ivLyrics:overlay-enabled')
-                : Spicetify.LocalStorage.get('ivLyrics:overlay-enabled');
-            return stored !== 'false';
-        },
-        set enabled(value) {
-            if (window.ivLyricsStoragePersistence) {
-                window.ivLyricsStoragePersistence.setItem('ivLyrics:overlay-enabled', value ? 'true' : 'false');
-            } else {
-                Spicetify.LocalStorage.set('ivLyrics:overlay-enabled', value ? 'true' : 'false');
-            }
-            this.syncRuntimeState();
-        },
-
-        setSettingsOpen(isOpen) {
-            clearSettingsPolling(this);
-            this._isSettingsOpen = Boolean(isOpen);
-
-            if (this._isSettingsOpen) {
-                helperDebug('[OverlaySender] 설정창 열림 - 연결 확인 폴링 시작');
-                this.checkConnection();
-                this._settingsTimer = setInterval(() => {
-                    if (!this.isConnected) {
-                        this.checkConnection();
-                    }
-                }, 5000);
-            } else {
-                helperDebug('[OverlaySender] 설정창 닫힘 - 연결 확인 폴링 종료');
-            }
-        },
-
-        get isConnected() {
-            return this._isConnected;
-        },
-        set isConnected(value) {
-            const wasConnected = this._isConnected;
-            this._isConnected = value;
-
-            window.dispatchEvent(new CustomEvent('ivLyrics:overlay-connection', {
-                detail: { connected: value }
-            }));
-
-            if (value && !wasConnected) {
-                helperDebug('[OverlaySender] 오버레이 연결됨 ✓');
-                this.handleConnectionRecovery();
-            }
-            else if (!value && wasConnected) {
-                helperDebug('[OverlaySender] 오버레이 연결 끊김');
-            }
-        },
-
         handleConnectionRecovery() {
             // 가사 요청 자체가 연결을 복구한 경우 현재 큐가 성공 상태를 기록하므로
             // 여기서 같은 payload를 다시 예약하지 않는다.
@@ -9621,39 +9503,6 @@
             }
 
             setTimeout(() => this.resendWithNewOffset('reconnect'), 100);
-            scheduleSenderBootstrap(150);
-        },
-
-        async checkConnection() {
-            if (!this.enabled) return false;
-
-            try {
-                const response = await fetch(`http://localhost:${this.port}/progress`, {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ position: 0, isPlaying: false }),
-                    signal: AbortSignal.timeout(1000)
-                });
-                this.isConnected = response.ok;
-                return this.isConnected;
-            } catch (e) {
-                this.isConnected = false;
-                return false;
-            }
-        },
-
-        openOverlayApp() {
-            try {
-                window.open('ivLyrics://overlay', '_blank');
-                setTimeout(() => this.checkConnection(), 2000);
-            } catch (e) {
-                console.error('[OverlaySender] 앱 열기 실패:', e);
-            }
-        },
-
-        getDownloadUrl() {
-            return 'https://ivlis.kr/ivLyrics/extensions/#overlay';
         },
 
         async sendToEndpoint(endpoint, data) {
@@ -9879,167 +9728,13 @@
             }
         },
 
-        async sendLyrics(
-            trackInfo,
-            lyrics,
-            forceResend = false,
-            sendReason = 'normal',
-            presentationContext = null
-        ) {
-            if (!trackInfo || !lyrics || !Array.isArray(lyrics)) return;
-            if (!this.enabled) return;
-            if (this.isStaleTrackSend(trackInfo)) {
-                helperDebug('[OverlaySender] 이전 곡 가사 전송 차단:', trackInfo.uri);
-                return;
-            }
-
-            const currentReqId = ++this._reqId;
-            const effectivePresentationContext = presentationContext
-                || (
-                    this._lastTrackInfo?.uri === trackInfo.uri
-                    && ['explicit', 'offset-event', 'reconnect'].includes(sendReason)
-                    ? this._lastPresentationContext
-                    : null
-                );
-            const presentationKey = getOverlayPresentationKey(
-                trackInfo,
-                lyrics,
-                effectivePresentationContext
-            );
-            const supplementVisibility = getOverlaySupplementVisibility(effectivePresentationContext);
-            const preserved = this._lastTrackInfo?.uri === trackInfo.uri
-                && this._lastPresentationKey === presentationKey
-                ? preserveOverlayAuxiliaryLyrics(this._lastLyrics, lyrics, supplementVisibility)
-                : {
-                    lyrics,
-                    preservedPronunciationCount: 0,
-                    preservedTranslationCount: 0
-                };
-            const lyricsToSend = preserved.lyrics;
-
-            if (
-                preserved.preservedPronunciationCount > 0
-                || preserved.preservedTranslationCount > 0
-            ) {
-                helperDebug('[OverlaySender] 최신 발음/번역 보존:', {
-                    pronunciation: preserved.preservedPronunciationCount,
-                    translation: preserved.preservedTranslationCount,
-                    reason: sendReason
-                });
-            }
-
-            this._lastTrackInfo = trackInfo;
-            this._lastLyrics = lyricsToSend;
-            this._lastPresentationContext = effectivePresentationContext;
-            this._lastPresentationKey = presentationKey;
-
-            const offset = await this.getSyncOffset(trackInfo.uri);
-
-            if (currentReqId < this._lastReqId) {
-                helperDebug(`[OverlaySender] 오래된 요청 무시됨 (#${currentReqId} < #${this._lastReqId})`);
-                return;
-            }
-            this._lastReqId = currentReqId;
-
-            if (!this.enabled || this.isStaleTrackSend(trackInfo)) {
-                helperDebug('[OverlaySender] 이전 곡 가사 전송 차단 (오프셋 계산 후):', trackInfo.uri);
-                return;
-            }
-
-            const lyricsHash = JSON.stringify(lyricsToSend);
-
-            if (!forceResend &&
-                this.lastSentUri === trackInfo.uri &&
-                this.lastSentLyrics === lyricsHash &&
-                this.lastSentOffset === offset) {
-                return;
-            }
-
-            const deliveryKey = JSON.stringify([trackInfo.uri, lyricsHash, offset]);
-            const isReconnectCycle = sendReason === 'reconnect';
-            let deliveryGeneration = this._deliveryGeneration;
-            if (!isReconnectCycle || this._deliveryKey !== deliveryKey) {
-                deliveryGeneration = ++this._deliveryGeneration;
-                this._deliveryKey = deliveryKey;
-                this._terminalDeliveryFailure = null;
-            }
-
-            this.lastSentUri = trackInfo.uri;
-            this.lastSentLyrics = lyricsHash;
-            this.lastSentOffset = offset;
-
-            // 앨범 이미지 URL 처리 개선
-            let albumArt = null;
-            try {
-                const imageUrl = Spicetify.Player.data?.item?.metadata?.image_xlarge_url
-                    || Spicetify.Player.data?.item?.metadata?.image_url
-                    || Spicetify.Player.data?.item?.metadata?.image_large_url;
-                albumArt = resolveSpotifyImageUrl(imageUrl);
-            } catch (e) { }
-
-            const mappedLines = mapLyricsForSender(lyricsToSend, offset, supplementVisibility);
-
-            // 현재 트랙 정보 가져오기 (Spicetify.Player.data에서 최신 정보 사용)
-            const originalTitle = trackInfo.title || Spicetify.Player.data?.item?.metadata?.title || '';
-            const originalArtist = trackInfo.artist || Spicetify.Player.data?.item?.metadata?.artist_name || '';
-            const currentAlbum = Spicetify.Player.data?.item?.metadata?.album_title || '';
-
-            // 번역된 메타데이터가 있으면 대체
-            const translatedMetadata = trackInfo.translatedMetadata || null;
-            const currentTitle = translatedMetadata?.translated?.title || originalTitle;
-            const currentArtist = translatedMetadata?.translated?.artist || originalArtist;
-
-            helperDebug('[OverlaySender] 가사 전송:', {
-                lines: mappedLines.length,
-                offset,
-                title: currentTitle,
-                artist: currentArtist,
-                translated: !!translatedMetadata
-            });
-
-            await this.queueLyricsSend('/lyrics', trackInfo.uri, {
-                trackUri: trackInfo.uri || null,
-                track: {
-                    title: currentTitle,
-                    artist: currentArtist,
-                    album: currentAlbum,
-                    albumArt: albumArt,
-                    duration: Spicetify.Player.getDuration() || 0
-                },
-                lyrics: mappedLines,
-                isSynced: lyricsToSend.some(l => l.startTime !== undefined && l.startTime !== null)
-            }, {
-                key: deliveryKey,
-                generation: deliveryGeneration,
-                isReconnectCycle
-            });
-        },
-
-        async resendWithNewOffset(sendReason = 'explicit', offsetUpdate = null) {
-            const trackUri = offsetUpdate?.trackUri;
-            const trackOffset = Number(offsetUpdate?.offset);
-            this._offsetCache = trackUri && Number.isFinite(trackOffset)
-                ? { [trackUri]: trackOffset }
-                : {};
-            if (this._lastTrackInfo && this._lastLyrics) {
-                helperDebug('[OverlaySender] 가사 재전송 (싱크 반영)');
-                await this.sendLyrics(
-                    this._lastTrackInfo,
-                    this._lastLyrics,
-                    true,
-                    sendReason,
-                    this._lastPresentationContext
-                );
-            }
-        },
-
         async sendTranslatedMetadata(translatedMetadata) {
             if (!this.enabled || !translatedMetadata) return;
             if (!this._lastTrackInfo || !this._lastLyrics) return;
 
             // 번역된 메타데이터를 포함하여 가사 재전송
             this._lastTrackInfo.translatedMetadata = translatedMetadata;
-            helperDebug('[OverlaySender] 번역된 메타데이터로 재전송');
+            helperDebug('[LyricsSenderBase] 번역된 메타데이터로 재전송');
             await this.sendLyrics(
                 this._lastTrackInfo,
                 this._lastLyrics,
@@ -10048,352 +9743,15 @@
                 this._lastPresentationContext
             );
         },
-
-        startProgressSync() {
-            if (this._worker) return;
-            if (!this.enabled) return;
-
-            const blob = new Blob([`
-              let interval = null;
-              self.onmessage = function(e) {
-                if (e.data === 'start') {
-                  if (interval) clearInterval(interval);
-                  interval = setInterval(() => {
-                    self.postMessage('tick');
-                  }, 250);
-                } else if (e.data === 'stop') {
-                  if (interval) clearInterval(interval);
-                  interval = null;
-                }
-              };
-            `], { type: 'application/javascript' });
-
-            this._worker = new Worker(URL.createObjectURL(blob));
-
-            this._worker.onmessage = async () => {
-                if (!this.enabled) return;
-                if (this._isSendingProgress) return;
-                if (!this.isConnected) return;
-
-                // 전역 딜레이 변경 체크
-                if (typeof window.CONFIG !== 'undefined' && window.CONFIG.visual) {
-                    if (this.lastConfigDelay === undefined) {
-                        this.lastConfigDelay = window.CONFIG.visual.delay;
-                    }
-                    if (this.lastConfigDelay !== window.CONFIG.visual.delay) {
-                        this.lastConfigDelay = window.CONFIG.visual.delay;
-                        this.resendWithNewOffset();
-                    }
-                }
-
-                this._isSendingProgress = true;
-                try {
-                    const playbackSnapshot = Utils.getPlayerPlaybackSnapshot();
-                    const progressTiming = normalizeOverlayProgressTiming(
-                        playbackSnapshot.position,
-                        playbackSnapshot.duration || Spicetify.Player.getDuration()
-                    );
-                    const { position, duration, remaining } = progressTiming;
-
-                    // 현재 트랙 정보 (트랙 변경 감지용)
-                    let currentTrack = null;
-                    const currentItem = Utils.resolveStablePlaybackTrack(null, playbackSnapshot);
-                    const currentUri = playbackSnapshot.uri || currentItem?.uri;
-                    if (currentUri && this._lastProgressUri !== currentUri) {
-                        this._lastProgressUri = currentUri;
-                        try {
-                            const imageUrl = currentItem?.metadata?.image_xlarge_url
-                                || currentItem?.metadata?.image_url
-                                || currentItem?.metadata?.image_large_url;
-                            let albumArt = null;
-                            albumArt = resolveSpotifyImageUrl(imageUrl);
-                            currentTrack = {
-                                title: currentItem?.metadata?.title || currentItem?.name || '',
-                                artist: currentItem?.metadata?.artist_name || '',
-                                album: currentItem?.metadata?.album_title || '',
-                                albumArt: albumArt
-                            };
-                        } catch (e) { }
-                    }
-
-                    let nextTrack = null;
-                    try {
-                        const queue = Spicetify.Queue;
-                        if (queue?.nextTracks?.length > 0) {
-                            const next = queue.nextTracks[0];
-                            if (next?.contextTrack?.metadata) {
-                                const imageUrl = next.contextTrack.metadata.image_url || next.contextTrack.metadata.image_xlarge_url;
-                                const albumArt = resolveSpotifyImageUrl(imageUrl);
-                                nextTrack = {
-                                    title: next.contextTrack.metadata.title || '',
-                                    artist: next.contextTrack.metadata.artist_name || '',
-                                    albumArt: albumArt
-                                };
-                            }
-                        }
-                    } catch (e) { }
-
-                    await this.sendToEndpoint('/progress', {
-                        trackUri: currentUri || null,
-                        position: position,
-                        isPlaying: getOverlayProgressIsPlaying(),
-                        duration: duration,
-                        remaining: remaining,
-                        currentTrack: currentTrack,
-                        nextTrack: nextTrack
-                    });
-                } finally {
-                    this._isSendingProgress = false;
-                }
-            };
-
-            this._worker.postMessage('start');
-        },
-
-        stopProgressSync() {
-            if (!this._worker) return;
-            cleanupWorker(this._worker);
-            this._worker = null;
-            this._isSendingProgress = false;
-            this._lastProgressUri = null;
-        },
-
-        setupOffsetListener() {
-            // 중복 호출 방지
-            if (this._offsetListenerSetup) return;
-            this._offsetListenerSetup = true;
-
-            // localStorage 변경 감지
-            this._storageListener = (e) => {
-                if (e.key && e.key.startsWith('lyrics-delay:')) {
-                    this.resendWithNewOffset();
-                }
-            };
-
-            // 커스텀 이벤트 리스너
-            this._delayChangedListener = () => {
-                this.resendWithNewOffset();
-            };
-
-            this._offsetChangedListener = (event) => {
-                this.resendWithNewOffset('offset-event', event.detail || null);
-            };
-
-            // ivLyrics 페이지에서 가사가 준비되면 오버레이로 전송
-            this._lyricsReadyListener = (e) => {
-                if (!this.enabled) return;
-                const detail = e.detail || {};
-                const { trackInfo, lyrics } = detail;
-                if (trackInfo) {
-                    helperDebug('[OverlaySender] 가사 준비 이벤트 수신:', {
-                        uri: trackInfo.uri,
-                        title: trackInfo.title,
-                        lines: lyrics?.length || 0
-                    });
-                    this.sendLyrics(trackInfo, lyrics || [], false, 'lyrics-ready', {
-                        provider: detail.provider,
-                        lyricsType: detail.lyricsType,
-                        displayMode1: detail.displayMode1,
-                        displayMode2: detail.displayMode2,
-                        translationSourceText: detail.translationSourceText,
-                        presentationComplete: detail.presentationComplete
-                    });
-                }
-            };
-
-            // 페이지 가시성 변경 감지
-            this._visibilityChangeListener = () => {
-                if (document.visibilityState === 'visible' && this.enabled) {
-                    helperDebug('[OverlaySender] 페이지 활성화 - 가사 재전송');
-                    setTimeout(() => this.resendWithNewOffset(), 200);
-                }
-            };
-
-            // 창 포커스 시
-            this._focusListener = () => {
-                if (this.enabled && this._lastTrackInfo) {
-                    helperDebug('[OverlaySender] 창 포커스 - 가사 재전송');
-                    setTimeout(() => this.resendWithNewOffset(), 300);
-                }
-            };
-
-            // 트랙 변경 감지
-            this._songChangeListener = () => {
-                const previousUri = this._lastTrackInfo?.uri || this.lastSentUri || null;
-                // 캐시 초기화
-                this.lastSentUri = null;
-                this.lastSentLyrics = null;
-                this.lastSentOffset = null;
-                this._lastSentDedupeToken = null;
-                this.lastDeliveredUri = null;
-                this._deliveryGeneration += 1;
-                this._deliveryKey = null;
-                this._terminalDeliveryFailure = null;
-                this._pendingLyricsSend = null;
-                this._offsetCache = {};
-                this._lastProgressUri = null;
-                this._lastTrackInfo = null;
-                this._lastLyrics = null;
-                this._lastPresentationContext = null;
-                this._lastPresentationKey = null;
-
-                // 오버레이 활성화 상태가 아니면 스킵
-                if (!this.enabled) return;
-                // 현재 곡 조회는 별도 OverlayService의 단일 songchange 리스너가 담당한다.
-                helperDebug('[OverlaySender] 곡 변경 - 전송 상태 초기화:', previousUri);
-            };
-
-            window.addEventListener('storage', this._storageListener);
-            window.addEventListener('ivLyrics:delay-changed', this._delayChangedListener);
-            window.addEventListener('ivLyrics:offset-changed', this._offsetChangedListener);
-            window.addEventListener('ivLyrics:global-offset-changed', this._offsetChangedListener);
-            window.addEventListener('ivLyrics:lyrics-ready', this._lyricsReadyListener);
-            document.addEventListener('visibilitychange', this._visibilityChangeListener);
-            window.addEventListener('focus', this._focusListener);
-            Spicetify.Player.addEventListener('songchange', this._songChangeListener);
-        },
-
-        teardownOffsetListener() {
-            if (!this._offsetListenerSetup) return;
-            this._offsetListenerSetup = false;
-
-            if (this._storageListener) {
-                window.removeEventListener('storage', this._storageListener);
-                this._storageListener = null;
-            }
-            if (this._delayChangedListener) {
-                window.removeEventListener('ivLyrics:delay-changed', this._delayChangedListener);
-                this._delayChangedListener = null;
-            }
-            if (this._offsetChangedListener) {
-                window.removeEventListener('ivLyrics:offset-changed', this._offsetChangedListener);
-                window.removeEventListener('ivLyrics:global-offset-changed', this._offsetChangedListener);
-                this._offsetChangedListener = null;
-            }
-            if (this._lyricsReadyListener) {
-                window.removeEventListener('ivLyrics:lyrics-ready', this._lyricsReadyListener);
-                this._lyricsReadyListener = null;
-            }
-            if (this._visibilityChangeListener) {
-                document.removeEventListener('visibilitychange', this._visibilityChangeListener);
-                this._visibilityChangeListener = null;
-            }
-            if (this._focusListener) {
-                window.removeEventListener('focus', this._focusListener);
-                this._focusListener = null;
-            }
-            if (this._songChangeListener && typeof Spicetify.Player?.removeEventListener === 'function') {
-                try {
-                    Spicetify.Player.removeEventListener('songchange', this._songChangeListener);
-                } catch (e) { }
-                this._songChangeListener = null;
-            }
-        },
-
-        scheduleConnectionCheck() {
-            if (this._connectionCheckTimer) {
-                clearTimeout(this._connectionCheckTimer);
-            }
-
-            if (!this.enabled) {
-                this._connectionCheckTimer = null;
-                return;
-            }
-
-            this._connectionCheckTimer = setTimeout(() => {
-                this._connectionCheckTimer = null;
-                this.checkConnection();
-            }, 1000);
-        },
-
-        syncRuntimeState() {
-            const enabled = !!this.enabled;
-            if (this._runtimeEnabledState === enabled) {
-                return;
-            }
-
-            this._runtimeEnabledState = enabled;
-            if (enabled) {
-                this.startProgressSync();
-                this.setupOffsetListener();
-                this.scheduleConnectionCheck();
-                scheduleSenderBootstrap();
-            } else {
-                this.stopProgressSync();
-                this.teardownOffsetListener();
-                clearSettingsPolling(this);
-                this.lastSentUri = null;
-                this.lastSentLyrics = null;
-                this.lastSentOffset = null;
-                this._lastSentDedupeToken = null;
-                this.lastDeliveredUri = null;
-                this._deliveryGeneration += 1;
-                this._deliveryKey = null;
-                this._terminalDeliveryFailure = null;
-                this._pendingLyricsSend = null;
-                this._lastTrackInfo = null;
-                this._lastLyrics = null;
-                this._offsetCache = {};
-                this.isConnected = false;
-            }
-        },
-
-        setupRuntimeListener() {
-            if (this._runtimeListenerSetup) return;
-            this._runtimeListenerSetup = true;
-
-            this._runtimeStorageListener = () => {
-                this.syncRuntimeState();
-            };
-            this._runtimeEventListener = () => {
-                this.syncRuntimeState();
-            };
-
-            window.addEventListener('storage', this._runtimeStorageListener);
-            window.addEventListener('ivLyrics', this._runtimeEventListener);
-        },
-
-        teardownRuntimeListener() {
-            if (!this._runtimeListenerSetup) return;
-            this._runtimeListenerSetup = false;
-
-            if (this._runtimeStorageListener) {
-                window.removeEventListener('storage', this._runtimeStorageListener);
-                this._runtimeStorageListener = null;
-            }
-            if (this._runtimeEventListener) {
-                window.removeEventListener('ivLyrics', this._runtimeEventListener);
-                this._runtimeEventListener = null;
-            }
-            if (this._connectionCheckTimer) {
-                clearTimeout(this._connectionCheckTimer);
-                this._connectionCheckTimer = null;
-            }
-        },
-
-        init() {
-            if (this._initialized) return;
-            this._initialized = true;
-            this.setupRuntimeListener();
-            this.syncRuntimeState();
-            helperDebug('[OverlaySender] Initialized in Extension');
-        },
-
-        destroy() {
-            this.stopProgressSync();
-            this.teardownOffsetListener();
-            this.teardownRuntimeListener();
-            clearSettingsPolling(this);
-        }
     };
 
-    const lyricsHelperSender = Object.create(OverlaySender, {
+    const lyricsHelperSender = Object.create(LyricsSenderBase, {
         DEFAULT_PORT: {
             value: 15123  // Helper 서버 포트 (video_server와 lyrics_server 통합)
         },
         // ⚠️ 상태 분리: Object.create로 만든 객체는 자기 소유 속성이 없으면
-        // 프로토타입(OverlaySender)의 가변 상태를 그대로 읽고, 상속된 메서드가
-        // OverlaySender의 워커를 죽이거나 window 리스너를 떼어내는 사고가 발생한다.
+        // 프로토타입(LyricsSenderBase)의 가변 상태를 그대로 읽고, 상속된 메서드가
+        // 프로토타입의 워커를 죽이거나 window 리스너를 떼어내는 사고가 발생한다.
         // (오버레이에 가사가 안 들어오던 원인) 반드시 전부 own property로 초기화한다.
         progressInterval: { value: null, writable: true },
         lastSentUri: { value: null, writable: true },
@@ -10839,7 +10197,7 @@
                     this._isSendingProgress = true;
                     try {
                         const playbackSnapshot = Utils.getPlayerPlaybackSnapshot();
-                        const progressTiming = normalizeOverlayProgressTiming(
+                        const progressTiming = normalizeSenderProgressTiming(
                             playbackSnapshot.position,
                             playbackSnapshot.duration || Spicetify.Player.getDuration()
                         );
@@ -10937,7 +10295,6 @@
                     this.startProgressSync();
                     this.setupOffsetListener();
                     this.scheduleConnectionCheck();
-                    scheduleSenderBootstrap();
                 } else {
                     this.stopProgressSync();
                     this.teardownOffsetListener();
@@ -11063,13 +10420,10 @@
     };
     window.addEventListener('ivLyrics:lyrics-ready', window.__ivLyricsSnapshotReadyListener);
 
-    // OverlayService extension이 초기화 중 sender를 즉시 찾을 수 있도록 먼저 등록한다.
-    window.OverlaySender = OverlaySender;
     window.lyricsHelperSender = lyricsHelperSender;
 
-    OverlaySender.init();
     lyricsHelperSender.init();
 
     serviceDebug("[LyricsService] LyricsService Extension initialized successfully!");
-    serviceDebug("[LyricsService] Available APIs: window.LyricsService, window.LyricsCache, window.ApiTracker, window.Translator, window.OverlaySender, window.lyricsHelperSender");
+    serviceDebug("[LyricsService] Available APIs: window.LyricsService, window.LyricsCache, window.ApiTracker, window.Translator, window.lyricsHelperSender");
 })();

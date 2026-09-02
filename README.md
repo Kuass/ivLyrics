@@ -1,149 +1,77 @@
-<img width="2208" height="512" alt="ko" src="https://github.com/ivLis-Studio/ivLyrics/blob/main/preview_readme_ko.png?raw=true" />
+# ivLyrics (Kuass fork)
 
----
+[ivLis-Studio/ivLyrics](https://github.com/ivLis-Studio/ivLyrics)를 개인 용도로 다듬은 포크입니다. Spicetify용 가사 앱이며, 번역과 발음 표기, 노래방 스타일 가사, 전체 화면 모드 같은 핵심 기능은 그대로 두고, 운영 서버에 묶인 부가 기능과 쓰지 않는 모드를 걷어냈습니다. 그리고 원본에서 겪었던 "업데이트하면 설정이 전부 사라지는" 문제를 앱 바깥에서 막아 주는 관리 도구를 함께 제공합니다.
 
-<p align="center">
-  <a href="README.md">한국어</a> |
-  <a href="README_EN.md">English</a>
-</p>
+> macOS 전용입니다. Spicetify가 이미 설치되어 있어야 합니다.
 
----
+## 원본과 달라진 점
 
-### ivLyrics - 당신의 언어로 즐기는, 그런 음악.
+제거한 기능입니다.
 
+- 공지 시스템, 마켓플레이스(애드온 스토어), 초기 설정 마법사
+- Discord 로그인과 후원자 등급 장식, 크리에이터 프로필, 유료 클라우드 설정 동기화
+- 학습 모드, LP 플레이어 모드, 가사 이미지 공유
+- 외부 오버레이 서비스(별도 헬퍼 앱 연동)
+- 한국어와 영어를 제외한 언어 팩
+- 원본의 설치 스크립트와 `ivlyrics-updater://` 프로토콜 핸들러
 
-Spicetify용 가사 확장 프로그램입니다. AI API를 활용하여 다양한 언어의 발음 표기와 번역을 지원합니다.
+유지한 기능입니다.
 
-버그 리포트 및 기능 제안은 GitHub Issues 또는 [Discord](https://discord.gg/2fu36fUzdE)를 통해 문의해주세요.
+- 가사 표시(동기화·비동기화·노래방), 번역과 발음 표기, 후리가나
+- 전체 화면 모드, 우측 "지금 재생 중" 패널 가사, 재생 막대 버튼, 전역 단축키
+- 모든 AI 번역 제공자(Bing, Google, Gemini, ChatGPT, Claude, Groq, OpenRouter, Perplexity, Pollinations, Paxsenix)와 가사 소스(LRCLIB, Spotify, LyricsPlus, Unison, Paxsenix, 커뮤니티 싱크 데이터)
+- 커뮤니티 뮤직비디오 배경, 곡 정보 리서치 리더, 싱크 데이터 제작기
+- 곡별 싱크 오프셋과 언어 오버라이드, 설정 내보내기·가져오기
 
-![preview](https://github.com/user-attachments/assets/0596a769-76aa-49c5-970c-85897fe8d260)
+## 설정이 사라지던 이유와 해결 방식
 
----
+ivLyrics의 설정은 Spotify 화면(xpui)의 localStorage에 저장되고, Spotify는 그 파일을 `~/Library/Caches/com.spotify.client/Browser/` 아래에 둡니다. 이 폴더는 이름 그대로 캐시라서 Spotify의 "캐시 지우기", 정리 도구, 프로필 손상 복구 같은 계기로 통째로 비워질 수 있고, 그때 설정과 IndexedDB 백업까지 한 번에 사라집니다. 확장 프로그램이 이 폴더 바깥에 데이터를 쓸 수 있는 Spotify API는 없기 때문에(prefs API는 정해진 키만 허용합니다), 보호는 앱 바깥의 도구가 맡습니다.
 
-> [!IMPORTANT]
-> ⚠️ 면책 조항 (Disclaimer)
->
-> **비공식 프로젝트 안내**
->
-> 본 프로젝트와 기여자는 Spotify, 또는 그 계열사 및 자회사와 어떠한 제휴, 권한 부여, 승인 또는 공식적인 연결 관계도 없음을 밝힙니다. **본 프로젝트는 데스크톱 경험 제공을 목적으로 자원봉사 팀이 개발한 독립적이고 비영리적인 비공식 확장 프로그램입니다.**
->
-> **상표권 안내**
->
-> "Spotify"라는 명칭을 포함하여 관련 명칭, 마크, 엠블럼 및 이미지는 해당 소유자의 등록 상표입니다. 이러한 상표의 사용은 식별 및 참조 목적으로만 사용되며, 상표권자와의 어떠한 연관성도 시사하지 않습니다. 본 프로젝트는 해당 상표권을 침해하거나 상표권자에게 피해를 줄 의도가 없음을 명시합니다.
->
-> **책임의 한계**
->
-> 본 애플리케이션(확장 프로그램)은 "있는 그대로(AS IS)" 제공되며, 사용 시 발생하는 위험은 전적으로 사용자의 책임입니다. 개발자 또는 기여자는 본 소프트웨어의 사용 또는 기타 거래와 관련하여 발생하는 청구, 손해 또는 법적 결과를 포함한 어떠한 책임도 지지 않습니다. 본 소프트웨어 사용으로 인한 모든 결과에 대한 책임은 전적으로 사용자에게 있습니다.
->
-> **저작권 및 약관 준수**
->
-> 본 프로젝트는 가사, 번역문, 영상 또는 기타 제3자 콘텐츠의 소유권을 주장하지 않으며, 해당 콘텐츠에 대한 라이선스를 부여하지도 않습니다. 사용자는 관련 저작권법, 플랫폼 정책, API 이용약관 및 현지 법령을 직접 확인하고 준수할 책임이 있으며, 본 프로젝트를 이용한 저장, 복제, 배포, 송신 또는 상업적 이용에 대한 책임은 전적으로 사용자에게 있습니다.
->
+`ivlyrics protect`는 다음 세 가지를 수행합니다.
 
+1. `Local Storage`와 `IndexedDB` 폴더를 `~/Library/Application Support/Spotify/xpui-profile/`로 옮기고, 원래 자리에는 심볼릭 링크를 둡니다. 캐시가 지워지면 링크만 사라지고 데이터는 남습니다.
+2. launchd 에이전트(`com.kuass.ivlyrics.guard`)가 매시간 링크가 끊겼는지 확인해 복구하고, `~/.config/spicetify/ivLyrics/storage-backups/`에 스냅샷을 14개까지 보관합니다.
+3. 업데이트는 Spotify를 강제 종료(`pkill`)하지 않고 정상 종료한 뒤 진행해서, 저장소가 디스크에 온전히 기록된 상태에서 파일을 바꿉니다.
 
-## 주요 기능
+## 설치
 
-### 가사 번역 및 발음 표기
-- Google Gemini API를 통한 실시간 가사 번역
-- 일본어, 한국어, 중국어 등 다양한 언어의 로마자 발음 표기 지원
-- 일본어 가사에 후리가나(ふりがな) 표시 기능
-
-### 사용자 인터페이스
-- 노래방 스타일 가사 표시 (단어별 하이라이트)
-- 전체 화면 모드 지원
-- 유튜브 뮤직비디오 배경 재생
-- 가사별 싱크 오프셋 조정
-- 커뮤니티 싱크 오프셋 공유 기능
-- 다양한 폰트, 색상, 레이아웃 커스터마이징
-
-### 지원 언어
-한국어, 영어, 일본어, 중국어(간체/번체), 스페인어, 프랑스어, 독일어, 체코어, 이탈리아어, 러시아어, 스웨덴어, 포르투갈어, 아랍어, 페르시아어, 힌디어, 벵골어, 태국어, 터키어, 베트남어, 인도네시아어, 말레이어
-
----
-
-## 가이드
-
-#### 자동 설치 (권장)
-
-Spicetify 설치 직후라면 PowerShell 또는 터미널을 재시작한 후 진행하세요.
-
-##### Windows
-```powershell
-iwr -useb https://raw.githubusercontent.com/ivLis-Studio/ivLyrics/main/updater/install.ps1 | iex
-```
-
-##### macOS / Linux
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ivLis-Studio/ivLyrics/main/updater/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Kuass/ivLyrics/custom/scripts/ivlyrics | bash -s install
 ```
 
-업데이트도 동일한 명령어로 가능합니다.
-자동 설치를 사용하면 Windows, macOS, Linux에서 `ivlyrics-updater://` 업데이트 도우미가 함께 등록되어 앱 안의 업데이트 버튼으로도 실행할 수 있습니다.
+설치가 끝나면 `~/.config/spicetify/ivLyrics/bin/ivlyrics`에 명령이 놓이고, `~/.local/bin`이 있으면 그곳에도 링크가 생깁니다. 설치 과정에서 Spotify가 한 번 재시작됩니다.
 
-#### 삭제 방법
+## 업데이트
 
-##### Windows
-```powershell
-iwr -useb https://raw.githubusercontent.com/ivLis-Studio/ivLyrics/main/updater/uninstall.ps1 | iex
-```
-
-##### macOS / Linux
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ivLis-Studio/ivLyrics/main/updater/uninstall.sh | bash
+ivlyrics update
 ```
 
-#### 수동 설치
+앱 안의 업데이트 알림은 이 저장소의 `custom` 브랜치를 기준으로 표시되며, 알림의 버튼은 이 문서로 연결됩니다. 실제 갱신은 위 명령으로 합니다.
 
-1. [GitHub Releases](https://github.com/ivLis-Studio/ivLyrics/releases)에서 최신 버전을 다운로드합니다.
-2. 압축을 해제하고 폴더 이름을 `ivLyrics`로 변경합니다.
-3. 해당 폴더를 Spicetify CustomApps 디렉토리에 복사합니다:
-   - Windows: `spicetify -c`로 출력되는 `config-xpui.ini` 파일과 같은 폴더의 `CustomApps` 디렉토리
-   - macOS/Linux: `~/.config/spicetify/CustomApps`
-4. 터미널에서 다음 명령어를 실행합니다:
-   ```
-   spicetify config custom_apps ivLyrics
-   spicetify apply
-   ```
+## 명령어
 
----
+| 명령 | 설명 |
+| --- | --- |
+| `ivlyrics install` | 앱을 설치하거나 갱신한 뒤 설정 보호까지 켭니다. |
+| `ivlyrics update [--ref <branch\|tag>]` | 스냅샷을 남기고 Spotify를 정상 종료한 뒤 앱을 갱신합니다. |
+| `ivlyrics protect` / `unprotect` | 설정 보호를 켜거나 끕니다. 끄면 폴더를 원래 자리로 되돌립니다. |
+| `ivlyrics backup` | 지금 상태를 스냅샷으로 남깁니다. |
+| `ivlyrics restore [snapshot]` | 최신(또는 지정한) 스냅샷을 되살립니다. 되살리기 전에 현재 상태도 스냅샷으로 남깁니다. |
+| `ivlyrics status` | 설치 버전, 보호 상태, 스냅샷 수, 에이전트 상태를 보여 줍니다. |
+| `ivlyrics uninstall` | 앱과 에이전트를 제거합니다. 설정 데이터와 스냅샷은 남겨 둡니다. |
 
-## 초기 설정
+로그는 `~/.config/spicetify/ivLyrics/ivlyrics.log`에 쌓입니다.
 
-1. 플레이어를 실행하고 좌측 메뉴에서 ivLyrics를 선택합니다.
-2. 우측 하단의 설정 버튼을 클릭합니다.
-3. 고급 탭에서 Gemini API 키를 입력합니다.
-   - API 키는 [Google AI Studio](https://aistudio.google.com/apikey?hl=ko)에서 무료로 발급받을 수 있습니다.
-4. 음악을 재생하고 가사 영역에 마우스를 올리면 나타나는 변환 버튼을 클릭하여 번역/발음 모드를 활성화합니다.
+## 설정이 비어 보일 때
 
----
+1. `ivlyrics status`로 보호 상태를 확인합니다. `broken`이면 Spotify를 종료한 뒤 `ivlyrics update`나 `ivlyrics guard`를 실행하면 링크가 복구됩니다.
+2. 그래도 비어 있으면 `ivlyrics restore`로 최신 스냅샷을 되살립니다.
 
-## 문제 해결
+## 개발
 
-### 초기화 방법
+저장소를 그대로 `~/.config/spicetify/CustomApps/ivLyrics`에 두지 않아도 됩니다. 수정 후에는 `ivlyrics update --ref <브랜치>`로 설치하거나, 로컬에서 `rsync`로 복사한 뒤 `spicetify apply`를 실행합니다. 단위 테스트는 `node --test tests/`로 실행합니다.
 
-설정이나 가사 표시에 문제가 있는 경우:
+## 크레딧과 라이선스
 
-1. 터미널에서 `spicetify enable-devtools` 명령어를 실행합니다.
-2. 창에서 우클릭 후 "Inspect Element" 또는 "개발자 도구"를 선택합니다.
-3. Application 탭 > Storage > "Clear site data"를 클릭합니다.
-4. 음악 프로그램을 클릭하고 Ctrl+Shift+R (macOS: Cmd+Shift+R)을 눌러 새로고침합니다.
-
-### 자주 발생하는 문제
-
-- **가사가 표시되지 않음**: 인터넷 연결을 확인하거나 다른 노래를 재생해보세요.
-- **번역이 작동하지 않음**: Gemini API 키가 올바르게 입력되었는지 확인하세요.
-- **Spicetify가 실행되지 않음**: `spicetify restore` 후 `spicetify apply`를 다시 실행하세요.
-
----
-
-## 후원
-
-개발을 지원해주시려면 커피 한 잔 사주세요.
-
-[<img width="400" height="200" alt="ivlisstudio-Sharable-Membership)-Horizontal" src="https://github.com/user-attachments/assets/130c5bf8-f8c3-493b-bbdb-b748e77babcd" />](https://buymeacoffee.com/ivlis)
-
-
-
-## 크레딧
-
-Original <a href="https://github.com/spicetify/cli/tree/main/CustomApps/lyrics-plus">Lyrics-Plus</a> Project by spicetify 
+원저작은 [ivLis STUDIO](https://github.com/ivLis-Studio)의 ivLyrics이며, 그 뿌리는 spicetify의 [Lyrics-Plus](https://github.com/spicetify/cli/tree/main/CustomApps/lyrics-plus)입니다. 이 포크는 원본과 같은 LGPL-2.1 라이선스를 따릅니다. 이 프로젝트는 Spotify와 아무 관계가 없는 비공식 확장 프로그램이며, 사용에 따른 책임은 사용자에게 있습니다.

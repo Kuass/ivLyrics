@@ -13,10 +13,6 @@ UTILS_RE = re.compile(
     rf'(?m)^(?P<prefix>[ \t]*currentVersion:[ \t]*")'
     rf'(?P<version>{VERSION_PATTERN})(?P<suffix>",[ \t]*)$'
 )
-NOTICE_RE = re.compile(
-    rf'(?m)(?P<prefix>window[.]ivLyricsVersion[ \t]*[|][|][ \t]*\n[ \t]*")'
-    rf'(?P<version>{VERSION_PATTERN})(?P<suffix>")'
-)
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -65,9 +61,6 @@ def read_state(root):
     state = {
         "version.txt": version_value,
         "Utils.js": extract_single(root / "Utils.js", UTILS_RE, "Utils.currentVersion"),
-        "NoticeSystem.js": extract_single(
-            root / "NoticeSystem.js", NOTICE_RE, "NoticeSystem fallback"
-        ),
     }
     if len(set(state.values())) != 1:
         details = ", ".join(f"{name}={value}" for name, value in state.items())
@@ -111,12 +104,6 @@ def prepare(root, target):
     if changed:
         (root / "version.txt").write_text(target, encoding="utf-8")
         replace_single(root / "Utils.js", UTILS_RE, target, "Utils.currentVersion")
-        replace_single(
-            root / "NoticeSystem.js",
-            NOTICE_RE,
-            target,
-            "NoticeSystem fallback",
-        )
 
     checked = read_state(root)
     if set(checked.values()) != {target}:

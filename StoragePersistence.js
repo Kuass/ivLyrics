@@ -15,15 +15,11 @@
     "ivLyrics:visual:",
     "ivLyrics:ai:",
     "ivLyrics:lyrics:",
-    "ivLyrics:marketplace:",
-    "ivLyrics:learningMode:",
   ];
   const MANAGED_KEYS = new Set([
     "ivLyrics:setup-completed",
     "ivLyrics:settings-ui-theme",
     "ivLyrics:settings-presets",
-    "ivLyrics:overlay-enabled",
-    "ivLyrics:overlay-port",
     "ivLyrics:storage-keys",
   ]);
 

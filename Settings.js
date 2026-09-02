@@ -157,1092 +157,6 @@ const ProviderSupportIconChip = ({ type, label }) =>
     title: label,
   }, react.createElement(SettingsOutlineIcon, { name: type, size: 14 }));
 
-// 데스크탑 오버레이 설정 컴포넌트
-const OverlaySettings = () => {
-  const [enabled, setEnabled] = useState(window.OverlaySender?.enabled ?? false);
-  const [isConnected, setIsConnected] = useState(window.OverlaySender?.isConnected ?? false);
-  const [checking, setChecking] = useState(false);
-  const [port, setPort] = useState(window.OverlaySender?.port ?? 15000);
-  const [portInput, setPortInput] = useState(String(window.OverlaySender?.port ?? 15000));
-
-  // 연결 상태 이벤트 리스너
-  useEffect(() => {
-    const handleConnection = (e) => {
-      setIsConnected(e.detail.connected);
-    };
-    window.addEventListener('ivLyrics:overlay-connection', handleConnection);
-
-    // 초기 연결 상태 확인
-    if (window.OverlaySender) {
-      setIsConnected(window.OverlaySender.isConnected);
-      setPort(window.OverlaySender.port);
-      setPortInput(String(window.OverlaySender.port));
-      // 연결 확인 폴링은 기능이 켜져 있을 때만 필요하다. 설정 모달이
-      // 열렸다는 이유만으로 비활성 오버레이를 계속 탐색하지 않는다.
-      window.OverlaySender.setSettingsOpen?.(enabled);
-    }
-
-    return () => {
-      window.removeEventListener('ivLyrics:overlay-connection', handleConnection);
-      // 설정창 닫힘 알림
-      window.OverlaySender?.setSettingsOpen?.(false);
-    };
-  }, [enabled]);
-
-  // 토글 핸들러
-  const handleToggle = () => {
-    const newValue = !enabled;
-    setEnabled(newValue);
-    if (window.OverlaySender) {
-      window.OverlaySender.enabled = newValue;
-      window.OverlaySender.setSettingsOpen?.(newValue);
-    }
-  };
-
-  // 포트 변경 핸들러
-  const handlePortChange = (e) => {
-    setPortInput(e.target.value);
-  };
-
-  // 포트 저장 핸들러
-  const handlePortSave = () => {
-    const newPort = parseInt(portInput, 10);
-    if (newPort >= 1024 && newPort <= 65535) {
-      setPort(newPort);
-      if (window.OverlaySender) {
-        window.OverlaySender.port = newPort;
-      }
-      Toast?.success?.(I18n.t("overlay.portSaved"));
-    } else {
-      setPortInput(String(port));
-      Toast?.error?.(I18n.t("overlay.portInvalid"));
-    }
-  };
-
-  // 연결 확인
-  const handleCheckConnection = async () => {
-    if (!window.OverlaySender) return;
-    setChecking(true);
-    await window.OverlaySender.checkConnection();
-    setIsConnected(window.OverlaySender.isConnected);
-    setChecking(false);
-  };
-
-  // 앱 열기
-  const handleOpenApp = () => {
-    window.OverlaySender?.openOverlayApp?.();
-  };
-
-  // 다운로드 URL
-  const handleDownload = () => {
-    const url = window.OverlaySender?.getDownloadUrl?.() || 'https://ivlis.kr/ivLyrics/extensions/#overlay';
-    window.open(url, '_blank');
-  };
-
-  // 상태 텍스트
-  const getStatusText = () => {
-    if (checking) return I18n.t("overlay.status.checking");
-    if (isConnected) return I18n.t("overlay.status.connected");
-    return I18n.t("overlay.status.disconnected");
-  };
-
-  const getStatusColor = () => {
-    if (checking) return "#fbbf24";
-    if (isConnected) return "#4ade80";
-    return "#ef4444";
-  };
-
-  return react.createElement(
-    "div",
-    { className: "option-list-wrapper" },
-    // Enable/Disable Row
-    react.createElement(
-      "div",
-      { className: "setting-row" },
-      react.createElement(
-        "div",
-        { className: "setting-row-content" },
-        react.createElement(
-          "div",
-          { className: "setting-row-left" },
-          react.createElement("div", { className: "setting-name" },
-            I18n.t("overlay.enabled.label"),
-            // Status Tag (Connected / Disconnected / Checking) only when enabled
-            enabled && react.createElement("span", {
-              style: {
-                marginLeft: "10px",
-                fontSize: "10px",
-                padding: "2px 8px",
-                borderRadius: "12px",
-                backgroundColor: isConnected ? "rgba(74, 222, 128, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                color: isConnected ? "#4ade80" : "#ef4444",
-                border: `1px solid ${isConnected ? "rgba(74, 222, 128, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
-                fontWeight: "600",
-                verticalAlign: "middle"
-              }
-            }, getStatusText())
-          ),
-          react.createElement("div", { className: "setting-description" },
-            I18n.t("overlay.enabled.desc")
-          )
-        ),
-        react.createElement(
-          "div",
-          { className: "setting-row-right", style: { display: "flex", alignItems: "center", gap: "10px" } },
-          // Download Button (Only if enabled AND disconnected)
-          enabled && !isConnected && react.createElement(
-            "button",
-            {
-              className: "btn",
-              onClick: handleDownload,
-              style: { fontSize: "11px", padding: "4px 8px", height: "auto" }
-            },
-            I18n.t("overlay.download")
-          ),
-          // Toggle Switch
-          react.createElement(
-            "button",
-            {
-              className: `switch-checkbox${enabled ? " active" : ""}`,
-              onClick: handleToggle,
-              "aria-checked": enabled,
-              role: "checkbox",
-            },
-            react.createElement("svg", {
-              width: 12,
-              height: 12,
-              viewBox: "0 0 16 16",
-              fill: "currentColor",
-              dangerouslySetInnerHTML: {
-                __html: enabled
-                  ? '<path fill-rule="evenodd" d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>'
-                  : '<path fill-rule="evenodd" d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"/>',
-              },
-            })
-          )
-        )
-      )
-    ),
-    // Port Setting Row (Only shown when enabled)
-    enabled && react.createElement(
-      "div",
-      { className: "setting-row" },
-      react.createElement(
-        "div",
-        { className: "setting-row-content" },
-        react.createElement(
-          "div",
-          { className: "setting-row-left" },
-          react.createElement("div", { className: "setting-name" },
-            I18n.t("overlay.port.label")
-          ),
-          react.createElement("div", { className: "setting-description" },
-            I18n.t("overlay.port.desc")
-          )
-        ),
-        react.createElement(
-          "div",
-          { className: "setting-row-right", style: { display: "flex", alignItems: "center", gap: "8px" } },
-          react.createElement("input", {
-            type: "number",
-            value: portInput,
-            onChange: handlePortChange,
-            onBlur: handlePortSave,
-            onKeyDown: (e) => { if (e.key === 'Enter') handlePortSave(); },
-            min: 1024,
-            max: 65535,
-            style: {
-              width: "80px",
-              padding: "6px 10px",
-              borderRadius: "6px",
-              border: "1px solid rgba(255,255,255,0.1)",
-              backgroundColor: "rgba(0,0,0,0.2)",
-              color: "var(--spice-text)",
-              fontSize: "13px",
-              textAlign: "center",
-              fontFamily: "monospace"
-            }
-          })
-        )
-      )
-    )
-  );
-};
-
-function getAboutAccountThemeTokens() {
-  const isLightTheme = getSettingsUiTheme() === "light";
-
-  return {
-    textPrimary: "var(--text-primary, #f6f8fb)",
-    textSecondary: "var(--text-secondary, rgba(246, 248, 251, 0.72))",
-    textTertiary: "var(--text-tertiary, rgba(246, 248, 251, 0.48))",
-    panelBackground: isLightTheme ? "rgba(15, 23, 42, 0.04)" : "rgba(255, 255, 255, 0.03)",
-    panelBorder: isLightTheme ? "rgba(15, 23, 42, 0.12)" : "rgba(255, 255, 255, 0.1)",
-    inputBackground: isLightTheme ? "rgba(255, 255, 255, 0.82)" : "rgba(0, 0, 0, 0.2)",
-    inputBorder: isLightTheme ? "rgba(15, 23, 42, 0.12)" : "rgba(255, 255, 255, 0.1)",
-    subtleButtonBackground: isLightTheme ? "rgba(15, 23, 42, 0.06)" : "rgba(255, 255, 255, 0.05)",
-    subtleButtonBackgroundHover: isLightTheme ? "rgba(15, 23, 42, 0.1)" : "rgba(255, 255, 255, 0.1)",
-    subtleButtonBorder: isLightTheme ? "rgba(15, 23, 42, 0.12)" : "rgba(255, 255, 255, 0.15)",
-    subtleButtonBorderHover: isLightTheme ? "rgba(15, 23, 42, 0.2)" : "rgba(255, 255, 255, 0.25)",
-    subtleButtonText: isLightTheme ? "rgba(15, 23, 42, 0.82)" : "rgba(255, 255, 255, 0.8)",
-    subtleButtonTextHover: "var(--text-primary, #f6f8fb)",
-    emptyText: isLightTheme ? "rgba(15, 23, 42, 0.46)" : "#888",
-    sectionDivider: isLightTheme ? "rgba(15, 23, 42, 0.1)" : "rgba(255, 255, 255, 0.1)",
-  };
-}
-
-const SettingsBackup = () => null;
-
-function getDiscordAccountCopy() {
-  const baseKey = "settingsAdvanced.aboutTab.account";
-  return {
-    provider: "Discord",
-    description:
-      I18n.t(`${baseKey}.description`) ||
-      "Connect your ivLyrics contributions and nickname with Discord.",
-    info:
-      I18n.t(`${baseKey}.info`) ||
-      "Sign in with Discord to manage your creator profile. Existing anonymous contributions are not transferred automatically without ownership verification.",
-    loginButton:
-      I18n.t(`${baseKey}.loginButton`) || "Sign In With Discord",
-    loggingIn:
-      I18n.t(`${baseKey}.loggingIn`) || "Opening browser...",
-    loading:
-      I18n.t(`${baseKey}.loading`) || "Loading Discord account information...",
-    linked:
-      I18n.t(`${baseKey}.linked`) || "Connected",
-    refresh:
-      I18n.t(`${baseKey}.refresh`) || "Refresh",
-    linkedAt:
-      I18n.t(`${baseKey}.linkedAt`) || "Linked",
-    lastLoginAt:
-      I18n.t(`${baseKey}.lastSync`) || "Last login",
-    switchAccount:
-      I18n.t(`${baseKey}.manageAccount`) || "Change Account",
-    startHint:
-      I18n.t(`${baseKey}.startHint`) || "Complete the Discord sign-in flow in your browser.",
-    failed:
-      I18n.t(`${baseKey}.failed`) || "Discord login failed.",
-    loadFailed:
-      I18n.t(`${baseKey}.loadFailed`) || "Failed to load account information.",
-    logout:
-      I18n.t(`${baseKey}.logout`) || "Log Out",
-    logoutFailed:
-      I18n.t(`${baseKey}.logoutFailed`) ||
-      "Failed to sign out from Discord.",
-    logoutSuccess:
-      I18n.t(`${baseKey}.logoutSuccess`) ||
-      "Signed out from Discord and created a new user hash.",
-  };
-}
-
-function formatEpochLabel(epochSeconds) {
-  if (!epochSeconds) return null;
-  return new Date(epochSeconds * 1000).toLocaleString();
-}
-
-// 닉네임 설정 컴포넌트
-const NicknameSection = ({ userHash }) => {
-  const [nickname, setNickname] = useState("");
-  const [inputNickname, setInputNickname] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const themeTokens = getAboutAccountThemeTokens();
-
-  const fetchNickname = async () => {
-    try {
-      if (Utils.isDiscordUserHash?.(userHash) && !Utils.getAuthToken?.()) {
-        setNickname("");
-        setInputNickname("");
-        return;
-      }
-
-      const res = await fetch(
-        `${Utils.getAccountApiBase()}/nickname?userHash=${encodeURIComponent(userHash)}`,
-        {
-          cache: "no-store",
-          headers: Utils.getApiHeaders({
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            Pragma: "no-cache",
-          }),
-        }
-      );
-      const data = await res.json();
-      if (data.nickname) {
-        setNickname(data.nickname);
-        setInputNickname(data.nickname);
-      } else {
-        setNickname("");
-        setInputNickname("");
-      }
-    } catch (e) {
-      console.error("Failed to fetch nickname:", e);
-    }
-  };
-
-  useEffect(() => {
-    fetchNickname();
-  }, [userHash]);
-
-  const handleSave = async () => {
-    if (!inputNickname.trim()) {
-      Toast.error(I18n.t("settingsAdvanced.aboutTab.account.nickname.enter"));
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const res = await fetch(`${Utils.getAccountApiBase()}/nickname`, {
-        method: "POST",
-        headers: Utils.getApiHeaders({
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({ userHash, nickname: inputNickname }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setNickname(data.nickname);
-        setInputNickname(data.nickname);
-        setEditing(false);
-        Toast.success(I18n.t("settingsAdvanced.aboutTab.account.nickname.changed"));
-        window.SyncDataService?.clearCache?.();
-      } else {
-        Toast.error(data.error || I18n.t("settingsAdvanced.aboutTab.account.nickname.failed"));
-      }
-    } catch (e) {
-      Toast.error(I18n.t("settingsAdvanced.aboutTab.account.nickname.error"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return react.createElement(
-    "div",
-    {
-      style: {
-        padding: "16px",
-        background: themeTokens.panelBackground,
-        borderRadius: "12px",
-        border: `1px solid ${themeTokens.panelBorder}`,
-        marginTop: "16px",
-        marginBottom: "16px",
-      },
-    },
-    react.createElement(
-      "div",
-      {
-        style: {
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "12px",
-        },
-      },
-      react.createElement(
-        "div",
-        { style: { minWidth: 0 } },
-        react.createElement(
-          "div",
-          { style: { fontSize: "12px", color: themeTokens.textTertiary, marginBottom: "4px" } },
-          I18n.t("settingsAdvanced.aboutTab.account.nickname.label")
-        ),
-        editing
-          ? react.createElement("input", {
-              type: "text",
-              value: inputNickname,
-              onChange: (e) => setInputNickname(e.target.value),
-              placeholder: I18n.t("settingsAdvanced.aboutTab.account.nickname.placeholder"),
-              autoFocus: true,
-              maxLength: 20,
-              style: {
-                background: themeTokens.inputBackground,
-                border: "1px solid #5865f2",
-                borderRadius: "6px",
-                color: themeTokens.textPrimary,
-                padding: "8px 10px",
-                fontSize: "14px",
-                width: "180px",
-                maxWidth: "100%",
-              },
-            })
-          : react.createElement(
-              "div",
-              { style: { fontSize: "16px", fontWeight: "600", color: themeTokens.textPrimary } },
-              nickname || I18n.t("settingsAdvanced.aboutTab.account.nickname.none")
-            )
-      ),
-      react.createElement(
-        "button",
-        {
-          onClick: editing ? handleSave : () => setEditing(true),
-          disabled: loading,
-          style: {
-            padding: "8px 12px",
-            borderRadius: "8px",
-            background: editing ? "#5865f2" : themeTokens.subtleButtonBackground,
-            color: editing ? "#fff" : themeTokens.subtleButtonText,
-            border: "none",
-            fontSize: "12px",
-            cursor: "pointer",
-            transition: "all 0.2s",
-            whiteSpace: "nowrap",
-          },
-        },
-        loading
-          ? I18n.t("settingsAdvanced.aboutTab.account.nickname.saving")
-          : editing
-            ? I18n.t("settingsAdvanced.aboutTab.account.nickname.save")
-            : I18n.t("settingsAdvanced.aboutTab.account.nickname.change")
-      )
-    )
-  );
-};
-
-function getCreatorPrivacyCopy() {
-  const baseKey = "settingsAdvanced.aboutTab.account.creatorPrivacy";
-  return {
-    title: I18n.t(`${baseKey}.title`) || "Private creator profile",
-    description:
-      I18n.t(`${baseKey}.description`) ||
-      "Private profiles remain in contributor lists, but your name, photo, and profile links are hidden.",
-    publicLabel: I18n.t(`${baseKey}.public`) || "Public",
-    privateLabel: I18n.t(`${baseKey}.private`) || "Private",
-    loading: I18n.t(`${baseKey}.loading`) || "Loading privacy setting...",
-    loadFailed:
-      I18n.t(`${baseKey}.loadFailed`) || "Failed to load creator profile privacy.",
-    saveFailed:
-      I18n.t(`${baseKey}.saveFailed`) || "Failed to update creator profile privacy.",
-    savedPublic:
-      I18n.t(`${baseKey}.savedPublic`) || "Your creator profile is now public.",
-    savedPrivate:
-      I18n.t(`${baseKey}.savedPrivate`) || "Your creator profile is now private.",
-  };
-}
-
-const CreatorPrivacySection = ({ userHash }) => {
-  const [isPrivate, setIsPrivate] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const themeTokens = getAboutAccountThemeTokens();
-  const copy = getCreatorPrivacyCopy();
-
-  const loadPrivacy = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await Utils.fetchSyncCreatorPrivacy();
-      setIsPrivate(data?.isPrivate === true || data?.profilePublic === false);
-    } catch (privacyError) {
-      console.error("Failed to load creator profile privacy:", privacyError);
-      setError(privacyError.message || copy.loadFailed);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadPrivacy();
-  }, [userHash]);
-
-  const handleToggle = async () => {
-    if (loading || saving) return;
-
-    const nextPrivate = !isPrivate;
-    try {
-      setSaving(true);
-      setError(null);
-      const data = await Utils.setSyncCreatorPrivacy(nextPrivate);
-      const savedPrivate = data?.isPrivate === true || data?.profilePublic === false;
-      setIsPrivate(savedPrivate);
-      window.SyncDataService?.clearCache?.();
-      window.dispatchEvent(
-        new CustomEvent("ivLyrics:creator-privacy-changed", {
-          detail: {
-            isPrivate: savedPrivate,
-            profilePublic: !savedPrivate,
-          },
-        })
-      );
-      Toast.success(savedPrivate ? copy.savedPrivate : copy.savedPublic);
-    } catch (privacyError) {
-      console.error("Failed to update creator profile privacy:", privacyError);
-      const message = privacyError.message || copy.saveFailed;
-      setError(message);
-      Toast.error(message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const disabled = loading || saving;
-  const statusLabel = loading ? copy.loading : (isPrivate ? copy.privateLabel : copy.publicLabel);
-
-  return react.createElement(
-    "div",
-    {
-      style: {
-        marginTop: "4px",
-        padding: "18px 2px 2px",
-        borderTop: `1px solid ${themeTokens.panelBorder}`,
-      },
-    },
-    react.createElement(
-      "div",
-      {
-        style: {
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "20px",
-        },
-      },
-      react.createElement(
-        "div",
-        { style: { minWidth: 0, flex: 1 } },
-        react.createElement(
-          "div",
-          {
-            style: {
-              color: themeTokens.textPrimary,
-              fontSize: "14px",
-              fontWeight: "700",
-              marginBottom: "5px",
-            },
-          },
-          copy.title
-        ),
-        react.createElement(
-          "p",
-          {
-            style: {
-              margin: 0,
-              color: themeTokens.textSecondary,
-              fontSize: "12px",
-              lineHeight: "1.55",
-              maxWidth: "620px",
-            },
-          },
-          copy.description
-        )
-      ),
-      react.createElement(
-        "div",
-        {
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            flexShrink: 0,
-          },
-        },
-        react.createElement(
-          "span",
-          {
-            style: {
-              color: error ? "#f87171" : themeTokens.textSecondary,
-              fontSize: "12px",
-              fontWeight: "700",
-              whiteSpace: "nowrap",
-            },
-          },
-          error || statusLabel
-        ),
-        react.createElement(
-          "button",
-          {
-            type: "button",
-            role: "switch",
-            "aria-checked": isPrivate,
-            "aria-label": copy.title,
-            disabled,
-            onClick: handleToggle,
-            style: {
-              width: "42px",
-              height: "24px",
-              padding: "2px",
-              borderRadius: "999px",
-              border: `1px solid ${isPrivate ? "rgba(34, 197, 94, 0.55)" : themeTokens.subtleButtonBorder}`,
-              background: isPrivate ? "rgba(34, 197, 94, 0.2)" : themeTokens.subtleButtonBackground,
-              cursor: disabled ? "wait" : "pointer",
-              opacity: disabled ? 0.55 : 1,
-              transition: "background 160ms ease, border-color 160ms ease, opacity 160ms ease",
-              flexShrink: 0,
-            },
-          },
-          react.createElement("span", {
-            "aria-hidden": "true",
-            style: {
-              display: "block",
-              width: "18px",
-              height: "18px",
-              borderRadius: "50%",
-              background: isPrivate ? "#22c55e" : themeTokens.textTertiary,
-              transform: isPrivate ? "translateX(18px)" : "translateX(0)",
-              transition: "transform 180ms cubic-bezier(.2,.8,.2,1), background 160ms ease",
-            },
-          })
-        )
-      )
-    )
-  );
-};
-
-const AccountSection = () => {
-  const [accountInfo, setAccountInfo] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [logoutLoading, setLogoutLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const themeTokens = getAboutAccountThemeTokens();
-  const copy = getDiscordAccountCopy();
-
-  const loadAccountInfo = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await Utils.fetchAccountProfile();
-      if (data.authenticated && data.linked && data.account) {
-        setAccountInfo(data.account);
-      } else {
-        setAccountInfo(null);
-      }
-    } catch (err) {
-      console.error("Failed to load Discord account info:", err);
-      setError(err.message || copy.loadFailed);
-      setAccountInfo(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadAccountInfo();
-
-    const handleAccountChanged = () => {
-      loadAccountInfo();
-    };
-    window.addEventListener("ivLyrics:account-changed", handleAccountChanged);
-
-    return () => {
-      window.removeEventListener("ivLyrics:account-changed", handleAccountChanged);
-    };
-  }, []);
-
-  const openLoginPage = async () => {
-    try {
-      setLoginLoading(true);
-      await Utils.startDiscordLogin();
-      Toast.success(copy.startHint);
-    } catch (err) {
-      Toast.error(err.message || copy.failed);
-    } finally {
-      setLoginLoading(false);
-    }
-  };
-
-  const handleRefresh = () => {
-    loadAccountInfo();
-  };
-
-  const handleLogout = async () => {
-    try {
-      setLogoutLoading(true);
-      await Utils.logoutDiscordSession();
-      const nextUserHash = Utils.resetUserHash();
-      setAccountInfo(null);
-      setError(null);
-      window.SyncDataService?.clearCache?.();
-      window.dispatchEvent(
-        new CustomEvent("ivLyrics:account-changed", {
-          detail: {
-            linked: false,
-            userHash: nextUserHash,
-          },
-        })
-      );
-      Toast.success(copy.logoutSuccess);
-      Utils.restoreAccountSettings({
-        initialTab: "about",
-        initialSettingKey: "about-account",
-      });
-    } catch (err) {
-      console.error("Failed to log out from Discord:", err);
-      Toast.error(err.message || copy.logoutFailed);
-    } finally {
-      setLogoutLoading(false);
-    }
-  };
-
-  if (loading) {
-    return react.createElement(
-      "div",
-      {
-        className: "info-card",
-        style: {
-          padding: "20px",
-          background: "linear-gradient(145deg, rgba(88, 101, 242, 0.1) 0%, rgba(46, 51, 122, 0.16) 100%)",
-          border: "1px solid rgba(88, 101, 242, 0.22)",
-          borderRadius: "0 0 12px 12px",
-          marginBottom: "24px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "110px",
-        },
-      },
-      react.createElement(
-        "span",
-        { style: { color: themeTokens.textSecondary, fontSize: "14px" } },
-        copy.loading
-      )
-    );
-  }
-
-  if (!accountInfo) {
-    return react.createElement(
-      "div",
-      {
-        className: "info-card",
-        style: {
-          padding: "20px",
-          background: "linear-gradient(145deg, rgba(88, 101, 242, 0.1) 0%, rgba(46, 51, 122, 0.16) 100%)",
-          border: "1px solid rgba(88, 101, 242, 0.22)",
-          borderRadius: "0 0 12px 12px",
-          backdropFilter: "blur(30px) saturate(150%)",
-          WebkitBackdropFilter: "blur(30px) saturate(150%)",
-          marginBottom: "24px",
-        },
-      },
-      react.createElement(
-        "div",
-        {
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: "16px",
-            marginBottom: "16px",
-          },
-        },
-        react.createElement(
-          "div",
-          {
-            style: {
-              width: "52px",
-              height: "52px",
-              borderRadius: "16px",
-              background: "linear-gradient(135deg, #5865f2 0%, #7983f5 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#fff",
-              flexShrink: 0,
-            },
-          },
-          react.createElement(
-            "svg",
-            {
-              width: "24",
-              height: "24",
-              viewBox: "0 0 24 24",
-              fill: "currentColor",
-            },
-            react.createElement("path", {
-              d: "M20.317 4.369A19.791 19.791 0 0 0 15.126 3c-.23.408-.499.957-.682 1.384a18.27 18.27 0 0 0-4.888 0A13.67 13.67 0 0 0 8.874 3a19.736 19.736 0 0 0-5.19 1.368C.533 9.067-.321 13.65.106 18.168a19.9 19.9 0 0 0 6.357 3.208c.513-.693.97-1.425 1.36-2.197-.748-.284-1.462-.634-2.134-1.04.178-.13.353-.267.522-.408 4.118 1.88 8.59 1.88 12.66 0 .17.141.344.278.523.408-.673.407-1.388.757-2.136 1.041.39.771.847 1.503 1.36 2.196a19.873 19.873 0 0 0 6.36-3.209c.5-5.238-.854-9.78-3.16-13.799ZM8.02 15.331c-1.24 0-2.26-1.131-2.26-2.525 0-1.394 1-2.525 2.26-2.525 1.26 0 2.279 1.15 2.26 2.525 0 1.394-1 2.525-2.26 2.525Zm7.96 0c-1.24 0-2.26-1.131-2.26-2.525 0-1.394 1-2.525 2.26-2.525 1.26 0 2.279 1.15 2.26 2.525 0 1.394-1 2.525-2.26 2.525Z",
-            })
-          )
-        ),
-        react.createElement(
-          "div",
-          { style: { flex: 1 } },
-          react.createElement(
-            "h3",
-            {
-              style: {
-                margin: "0 0 4px",
-                fontSize: "17px",
-                color: themeTokens.textPrimary,
-                fontWeight: "700",
-              },
-            },
-            copy.provider
-          ),
-          react.createElement(
-            "p",
-            {
-              style: {
-                margin: 0,
-                fontSize: "13px",
-                color: themeTokens.textSecondary,
-              },
-            },
-            copy.description
-          )
-        )
-      ),
-      react.createElement(
-        "p",
-        {
-          style: {
-            margin: "0 0 16px",
-            fontSize: "13px",
-            color: themeTokens.textSecondary,
-            lineHeight: "1.7",
-          },
-        },
-        copy.info
-      ),
-      error &&
-        react.createElement(
-          "p",
-          {
-            style: {
-              margin: "0 0 12px",
-              fontSize: "12px",
-              color: "#f87171",
-            },
-          },
-          error
-        ),
-      react.createElement(
-        "button",
-        {
-          onClick: openLoginPage,
-          disabled: loginLoading || logoutLoading,
-          style: {
-            width: "100%",
-            padding: "12px 20px",
-            background: "linear-gradient(135deg, #5865f2 0%, #7983f5 100%)",
-            border: "none",
-            borderRadius: "10px",
-            color: "#ffffff",
-            fontSize: "14px",
-            fontWeight: "700",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "8px",
-          },
-        },
-        loginLoading ? copy.loggingIn : copy.loginButton
-      )
-    );
-  }
-
-  return react.createElement(
-    "div",
-    {
-      className: "info-card",
-      style: {
-        padding: "20px",
-        background: "linear-gradient(145deg, rgba(88, 101, 242, 0.1) 0%, rgba(34, 197, 94, 0.08) 100%)",
-        border: "1px solid rgba(88, 101, 242, 0.22)",
-        borderRadius: "0 0 12px 12px",
-        backdropFilter: "blur(30px) saturate(150%)",
-        WebkitBackdropFilter: "blur(30px) saturate(150%)",
-        marginBottom: "24px",
-      },
-    },
-    react.createElement(
-      "div",
-      {
-        style: {
-          display: "flex",
-          alignItems: "center",
-          gap: "16px",
-          marginBottom: "16px",
-        },
-      },
-      react.createElement(
-        "div",
-        {
-          style: {
-            width: "52px",
-            height: "52px",
-            borderRadius: "50%",
-            background: accountInfo.profileImage
-              ? `url(${accountInfo.profileImage}) center/cover no-repeat`
-              : "linear-gradient(135deg, #5865f2 0%, #7983f5 100%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-            border: "2px solid rgba(88, 101, 242, 0.25)",
-            color: "#fff",
-            fontSize: "18px",
-            fontWeight: "700",
-          },
-        },
-        !accountInfo.profileImage && (accountInfo.displayName || "D").slice(0, 1).toUpperCase()
-      ),
-      react.createElement(
-        "div",
-        { style: { flex: 1, minWidth: 0 } },
-        react.createElement(
-          "div",
-          {
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              marginBottom: "4px",
-              flexWrap: "wrap",
-            },
-          },
-          react.createElement(
-            "h3",
-            {
-              style: {
-                margin: 0,
-                fontSize: "17px",
-                color: themeTokens.textPrimary,
-                fontWeight: "700",
-              },
-            },
-            accountInfo.displayName || accountInfo.username || copy.provider
-          ),
-          react.createElement(
-            "span",
-            {
-              style: {
-                fontSize: "10px",
-                padding: "3px 8px",
-                borderRadius: "999px",
-                backgroundColor: "rgba(34, 197, 94, 0.14)",
-                color: "#4ade80",
-                border: "1px solid rgba(34, 197, 94, 0.24)",
-                fontWeight: "700",
-              },
-            },
-            copy.linked
-          )
-        ),
-        react.createElement(
-          "p",
-          {
-            style: {
-              margin: 0,
-              fontSize: "13px",
-              color: themeTokens.textSecondary,
-            },
-          },
-          `@${accountInfo.username || "discord"}`
-        )
-      ),
-      react.createElement(
-        "button",
-        {
-          onClick: handleRefresh,
-          title: copy.refresh,
-          style: {
-            padding: "8px",
-            background: themeTokens.subtleButtonBackground,
-            border: `1px solid ${themeTokens.subtleButtonBorder}`,
-            borderRadius: "8px",
-            color: themeTokens.subtleButtonText,
-            cursor: "pointer",
-            transition: "all 0.2s",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          },
-        },
-        react.createElement(
-          "svg",
-          {
-            width: "16",
-            height: "16",
-            viewBox: "0 0 24 24",
-            fill: "none",
-            stroke: "currentColor",
-            strokeWidth: "2",
-          },
-          react.createElement("polyline", { points: "23 4 23 10 17 10" }),
-          react.createElement("path", { d: "M20.49 15a9 9 0 1 1-2.12-9.36L23 10" })
-        )
-      )
-    ),
-    react.createElement(
-      "div",
-      {
-        style: {
-          display: "flex",
-          gap: "16px",
-          fontSize: "12px",
-          color: themeTokens.textTertiary,
-          marginBottom: "16px",
-          flexWrap: "wrap",
-        },
-      },
-      accountInfo.linkedAt &&
-        react.createElement(
-          "span",
-          null,
-          `${copy.linkedAt}: ${formatEpochLabel(accountInfo.linkedAt)}`
-        ),
-      accountInfo.lastLoginAt &&
-        react.createElement(
-          "span",
-          null,
-          `${copy.lastLoginAt}: ${formatEpochLabel(accountInfo.lastLoginAt)}`
-        )
-    ),
-    react.createElement(
-      "div",
-      {
-        style: {
-          display: "flex",
-          gap: "10px",
-          marginBottom: "16px",
-          flexWrap: "wrap",
-        },
-      },
-      react.createElement(
-        "button",
-        {
-          onClick: openLoginPage,
-          disabled: loginLoading || logoutLoading,
-          style: {
-            flex: "1 1 220px",
-            padding: "10px 16px",
-            background: themeTokens.subtleButtonBackground,
-            border: `1px solid ${themeTokens.subtleButtonBorder}`,
-            borderRadius: "8px",
-            color: themeTokens.subtleButtonText,
-            fontSize: "13px",
-            fontWeight: "600",
-            cursor: "pointer",
-          },
-        },
-        loginLoading ? copy.loggingIn : copy.switchAccount
-      ),
-      react.createElement(
-        "button",
-        {
-          onClick: handleLogout,
-          disabled: loginLoading || logoutLoading,
-          style: {
-            flex: "1 1 160px",
-            padding: "10px 16px",
-            background: "rgba(239, 68, 68, 0.08)",
-            border: "1px solid rgba(239, 68, 68, 0.2)",
-            borderRadius: "8px",
-            color: "#f87171",
-            fontSize: "13px",
-            fontWeight: "600",
-            cursor: "pointer",
-          },
-        },
-        copy.logout
-      )
-    ),
-    react.createElement(NicknameSection, { userHash: Utils.getUserHash() }),
-    react.createElement(CreatorPrivacySection, { userHash: Utils.getUserHash() }),
-    react.createElement(SettingsBackup, { userHash: Utils.getUserHash() })
-  );
-};
-
 // AI Addon 개별 카드 컴포넌트 (아코디언 스타일 - LyricsProviderCard와 동일 스타일)
 const AddonSettingsCard = ({ addon, isEnabled, onToggle, isExpanded, onExpandToggle }) => {
   const SettingsUI = addon.getSettingsUI ? addon.getSettingsUI() : null;
@@ -1841,7 +755,6 @@ const AIProvidersTab = () => {
     return value === true || value === "true";
   });
   const [culturalDetailsExpanded, setCulturalDetailsExpanded] = useState(false);
-  const vinylModeLabel = I18n.t("vinyl.mode") || "LP";
 
   useEffect(() => {
     let retryTimer = null;
@@ -2144,43 +1057,6 @@ const AIProvidersTab = () => {
             unit: "%",
           },
           ...createTextOutlineSettingItems("cultural-annotations"),
-          {
-            desc: `${vinylModeLabel} · ${I18n.t("settings.culturalAnnotations.fontFamily.label")}`,
-            key: "cultural-annotations-vinyl-font-family",
-            info: `${vinylModeLabel}: ${I18n.t("settings.culturalAnnotations.fontFamily.desc")}`,
-            type: ConfigFontSelector,
-            defaultValue: CONFIG.visual["cultural-annotations-vinyl-font-family"] || "Pretendard Variable",
-          },
-          {
-            desc: `${vinylModeLabel} · ${I18n.t("settings.culturalAnnotations.fontSize.label")}`,
-            key: "cultural-annotations-vinyl-font-size",
-            info: `${vinylModeLabel}: ${I18n.t("settings.culturalAnnotations.fontSize.desc")}`,
-            type: ConfigSliderRange,
-            min: 10,
-            max: 32,
-            step: 1,
-            unit: "px",
-          },
-          {
-            desc: `${vinylModeLabel} · ${I18n.t("settings.culturalAnnotations.fontWeight.label")}`,
-            key: "cultural-annotations-vinyl-font-weight",
-            info: `${vinylModeLabel}: ${I18n.t("settings.culturalAnnotations.fontWeight.desc")}`,
-            type: ConfigFontWeightSlider,
-          },
-          {
-            desc: `${vinylModeLabel} · ${I18n.t("settings.culturalAnnotations.opacity.label")}`,
-            key: "cultural-annotations-vinyl-opacity",
-            info: `${vinylModeLabel}: ${I18n.t("settings.culturalAnnotations.opacity.desc")}`,
-            type: ConfigSliderRange,
-            min: 20,
-            max: 100,
-            step: 1,
-            unit: "%",
-          },
-          ...createTextOutlineSettingItems("cultural-annotations-vinyl", {
-            labelPrefix: `${vinylModeLabel} · `,
-            infoPrefix: `${vinylModeLabel}: `,
-          }),
         ],
           onChange: handleCulturalSettingChange,
         }))
@@ -2834,12 +1710,6 @@ const DebugInfoPanel = () => {
     }
   };
 
-  // Discord로 보내기 (클립보드 복사 후 Discord 링크 열기)
-  const handleSendToDiscord = async () => {
-    await handleCopy();
-    window.open("https://ivlis.kr/ivLyrics/discord.php", "_blank");
-  };
-
   // API 로그 항목 토글
   const toggleApiDetail = (logId) => {
     setShowApiDetails(prev => ({ ...prev, [logId]: !prev[logId] }));
@@ -3120,28 +1990,6 @@ const DebugInfoPanel = () => {
           }
         }),
         copied ? I18n.t("settingsAdvanced.debugTab.copied") : I18n.t("settingsAdvanced.debugTab.copyToClipboard")
-      ),
-      react.createElement(
-        "button",
-        {
-          onClick: handleSendToDiscord,
-          className: "btn btn-primary debug-action-btn",
-          style: {
-            background: "#5865F2",
-            border: "none",
-            color: "#ffffff",
-          }
-        },
-        react.createElement("svg", {
-          width: 16,
-          height: 16,
-          viewBox: "0 0 24 24",
-          fill: "currentColor",
-          dangerouslySetInnerHTML: {
-            __html: '<path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09c-.01-.02-.04-.03-.07-.03c-1.5.26-2.93.71-4.27 1.33c-.01 0-.02.01-.03.02c-2.72 4.07-3.47 8.03-3.1 11.95c0 .02.01.04.03.05c1.8 1.32 3.53 2.12 5.2 2.65c.03.01.06 0 .07-.02c.4-.55.76-1.13 1.07-1.74c.02-.04 0-.08-.04-.09c-.57-.22-1.11-.48-1.64-.78c-.04-.02-.04-.08-.01-.11c.11-.08.22-.17.33-.25c.02-.02.05-.02.07-.01c3.44 1.57 7.15 1.57 10.55 0c.02-.01.05-.01.07.01c.11.09.22.17.33.26c.04.03.04.09-.01.11c-.52.31-1.07.56-1.64.78c-.04.01-.05.05-.04.09c.32.61.68 1.19 1.07 1.74c.03.01.06.02.09.01c1.72-.53 3.45-1.33 5.25-2.65c.02-.01.03-.03.03-.05c.44-4.53-.73-8.46-3.1-11.95c-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12c0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12c0 1.17-.83 2.12-1.89 2.12z"/>'
-          }
-        }),
-        I18n.t("settingsAdvanced.debugTab.sendToDiscord")
       )
     )
   );
@@ -4211,260 +3059,6 @@ const ConfigSettingsPresets = () => {
               )
             )
       )
-    )
-  );
-};
-
-const getCloudSyncText = (key, fallback) =>
-  I18n.t(`settingsAdvanced.cloudSync.${key}`) || fallback;
-
-const formatCloudSyncText = (key, fallback, replacements = {}) => {
-  let value = getCloudSyncText(key, fallback);
-  Object.entries(replacements).forEach(([name, replacement]) => {
-    value = value.split(`{${name}}`).join(String(replacement));
-  });
-  return value;
-};
-
-const ConfigCloudSync = () => {
-  const [cloud, setCloud] = useState({ loading: false, exists: false, revision: 0, updatedAt: null });
-  const [busyAction, setBusyAction] = useState("");
-  const [supportChecking, setSupportChecking] = useState(false);
-  const [message, setMessage] = useState(() =>
-    getCloudSyncText("monthlyRequired", "Cloud sync is available to Monthly Supporters only."));
-  const [messageType, setMessageType] = useState("info");
-
-  const describeError = useCallback((error) => {
-    if (error?.code === "monthly_supporter_required") {
-      return getCloudSyncText("monthlyRequired", "Cloud sync is available to Monthly Supporters only.");
-    }
-    if (error?.code === "revision_conflict") {
-      return getCloudSyncText("conflict", "Cloud settings changed on another device. Refresh before uploading again.");
-    }
-    if (error?.status === 401 || error?.code === "discord_login_required") {
-      return getCloudSyncText("loginRequired", "Sign in with Discord to use cloud sync.");
-    }
-    return formatCloudSyncText("failed", "Cloud sync failed: {error}", {
-      error: error?.message || String(error || "Unknown error"),
-    });
-  }, []);
-
-  const handleCloudFailure = useCallback((error) => {
-    if (error?.code === "monthly_supporter_required") {
-      const discordId = Utils.getUserHash();
-      Utils.setCachedDiscordSupportTier(discordId, "none");
-    }
-    const messageText = describeError(error);
-    setMessage(messageText);
-    setMessageType("error");
-    Toast?.error?.(messageText);
-  }, [describeError]);
-
-  const ensureMonthlySupporter = useCallback(async () => {
-    const authToken = Utils.getAuthToken();
-    const discordId = Utils.getUserHash();
-    if (!authToken || !Utils.isDiscordUserHash(discordId)) {
-      const loginMessage = getCloudSyncText("loginRequired", "Sign in with Discord to use cloud sync.");
-      setMessage(loginMessage);
-      setMessageType("warning");
-      Toast?.error?.(loginMessage);
-      return false;
-    }
-
-    setSupportChecking(true);
-    setMessage(getCloudSyncText("checking", "Checking cloud settings…"));
-    setMessageType("info");
-    try {
-      const tier = await Utils.fetchDiscordSupportTier(discordId, { forceRefresh: true });
-      if (tier !== "monthly") {
-        const monthlyMessage = getCloudSyncText("monthlyRequired", "Cloud sync is available to Monthly Supporters only.");
-        setMessage(monthlyMessage);
-        setMessageType("warning");
-        Toast?.error?.(monthlyMessage);
-        return false;
-      }
-      return true;
-    } catch (error) {
-      const failureMessage = formatCloudSyncText("failed", "Cloud sync failed: {error}", {
-        error: error?.message || String(error || "Unknown error"),
-      });
-      setMessage(failureMessage);
-      setMessageType("error");
-      Toast?.error?.(failureMessage);
-      return false;
-    } finally {
-      setSupportChecking(false);
-    }
-  }, []);
-
-  const refresh = useCallback(async ({ quiet = false } = {}) => {
-    if (!await ensureMonthlySupporter()) return null;
-    if (!quiet) setCloud((current) => ({ ...current, loading: true }));
-    try {
-      const result = await Utils.fetchCloudSettings();
-      const next = {
-        loading: false,
-        exists: result.exists,
-        revision: result.revision,
-        updatedAt: result.data?.updatedAt || null,
-      };
-      setCloud(next);
-      if (!quiet) {
-        setMessage(result.exists
-          ? formatCloudSyncText("remoteFound", "Cloud revision {revision} is available.", { revision: result.revision })
-          : getCloudSyncText("empty", "No PC settings have been saved to the cloud yet."));
-        setMessageType("info");
-      }
-      return result;
-    } catch (error) {
-      setCloud((current) => ({ ...current, loading: false }));
-      handleCloudFailure(error);
-      return null;
-    }
-  }, [ensureMonthlySupporter, handleCloudFailure]);
-
-  const upload = useCallback(async () => {
-    setBusyAction("upload");
-    try {
-      const current = await refresh({ quiet: true });
-      if (!current) return;
-      const settings = await StorageManager.exportCloudConfig();
-      const saved = await Utils.saveCloudSettings(settings, current.revision);
-      setCloud({
-        loading: false,
-        exists: true,
-        revision: saved.revision,
-        updatedAt: saved.data?.updatedAt || null,
-      });
-      setMessage(formatCloudSyncText("uploaded", "PC settings uploaded as revision {revision}.", { revision: saved.revision }));
-      setMessageType("success");
-    } catch (error) {
-      handleCloudFailure(error);
-    } finally {
-      setBusyAction("");
-    }
-  }, [handleCloudFailure, refresh]);
-
-  const download = useCallback(async () => {
-    if (!await ensureMonthlySupporter()) return;
-    if (!window.confirm(getCloudSyncText("confirmDownload", "Apply cloud PC settings and reload ivLyrics?"))) return;
-    setBusyAction("download");
-    try {
-      const result = await Utils.fetchCloudSettings();
-      if (!result.exists || !result.data?.settings) {
-        setMessage(getCloudSyncText("empty", "No PC settings have been saved to the cloud yet."));
-        setMessageType("warning");
-        return;
-      }
-      await StorageManager.importCloudConfig(result.data.settings);
-      setMessage(getCloudSyncText("downloaded", "Cloud PC settings were applied. Reloading ivLyrics…"));
-      setMessageType("success");
-      queueReloadIntoIvLyrics({
-        reopenSettings: true,
-        initialTab: "advanced",
-        initialSettingKey: "cloud-sync",
-        delay: 700,
-      });
-    } catch (error) {
-      handleCloudFailure(error);
-    } finally {
-      setBusyAction("");
-    }
-  }, [ensureMonthlySupporter, handleCloudFailure]);
-
-  const remove = useCallback(async () => {
-    if (!window.confirm(getCloudSyncText("confirmDelete", "Permanently delete your cloud PC settings?"))) return;
-    setBusyAction("delete");
-    try {
-      await Utils.deleteCloudSettings();
-      setCloud({ loading: false, exists: false, revision: 0, updatedAt: null });
-      setMessage(getCloudSyncText("deleted", "Cloud PC settings were deleted."));
-      setMessageType("success");
-    } catch (error) {
-      handleCloudFailure(error);
-    } finally {
-      setBusyAction("");
-    }
-  }, [handleCloudFailure]);
-
-  const updatedLabel = cloud.updatedAt
-    ? formatCloudSyncText("updatedAt", "Updated {date}", {
-      date: formatSettingsPresetDate(Number(cloud.updatedAt) * 1000),
-    })
-    : getCloudSyncText("notSaved", "Not saved yet");
-  const disabled = Boolean(busyAction) || cloud.loading || supportChecking;
-  const deleteDisabled = disabled || !Utils.getAuthToken();
-
-  return react.createElement(
-    "div",
-    {
-      className: "setting-row",
-      "data-setting-key": "cloud-sync",
-      style: {
-        borderColor: "rgba(167, 139, 250, 0.42)",
-        background: "linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(236, 72, 153, 0.06))",
-        boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.025)",
-      },
-    },
-    react.createElement(
-      "div",
-      {
-        className: "setting-row-content",
-        style: { flexDirection: "column", alignItems: "stretch", gap: "14px" },
-      },
-      react.createElement(
-        "div",
-        { className: "setting-row-left" },
-        react.createElement("div", { className: "setting-name" }, getCloudSyncText("platform", "PC settings")),
-        react.createElement(
-          "div",
-          { className: "setting-description" },
-          `${updatedLabel}${cloud.exists ? ` · rev ${cloud.revision}` : ""}`
-        )
-      ),
-      react.createElement(
-        "div",
-        {
-          role: messageType === "warning" || messageType === "error" ? "alert" : "status",
-          "aria-live": messageType === "warning" || messageType === "error" ? "assertive" : "polite",
-          className: "setting-description",
-          style: {
-            padding: "10px 12px",
-            borderRadius: "8px",
-            border: `1px solid ${messageType === "error" ? "rgba(248,113,113,.42)" : messageType === "warning" ? "rgba(251,191,36,.42)" : messageType === "success" ? "rgba(74,222,128,.3)" : "rgba(255,255,255,.1)"}`,
-            background: messageType === "error" ? "rgba(127,29,29,.24)" : messageType === "warning" ? "rgba(120,53,15,.22)" : messageType === "success" ? "rgba(20,83,45,.18)" : "rgba(255,255,255,.04)",
-            color: messageType === "error" ? "#fecaca" : messageType === "warning" ? "#fde68a" : undefined,
-            fontWeight: messageType === "warning" || messageType === "error" ? "600" : undefined,
-          },
-        },
-        messageType === "warning" || messageType === "error"
-          ? react.createElement(
-            react.Fragment,
-            null,
-            react.createElement("span", { "aria-hidden": "true", style: { marginRight: "7px" } }, "⚠"),
-            cloud.loading ? getCloudSyncText("checking", "Checking cloud settings…") : message
-          )
-          : cloud.loading ? getCloudSyncText("checking", "Checking cloud settings…") : message
-      ),
-      react.createElement(
-        "div",
-        { style: { display: "flex", gap: "8px", flexWrap: "wrap" } },
-        react.createElement("button", { className: "btn", type: "button", disabled, onClick: upload },
-          busyAction === "upload" ? getCloudSyncText("uploading", "Uploading…") : getCloudSyncText("upload", "Upload current settings")),
-        react.createElement("button", { className: "btn", type: "button", disabled: disabled || !cloud.exists, onClick: download },
-          busyAction === "download" ? getCloudSyncText("downloading", "Applying…") : getCloudSyncText("download", "Apply cloud settings")),
-        react.createElement("button", { className: "btn", type: "button", disabled, onClick: () => refresh() },
-          getCloudSyncText("refresh", "Refresh")),
-        react.createElement("button", {
-          className: "btn",
-          type: "button",
-          disabled: deleteDisabled,
-          onClick: remove,
-          style: { background: "rgba(239,68,68,.14)", borderColor: "rgba(239,68,68,.28)", color: "#fca5a5" },
-        }, busyAction === "delete" ? getCloudSyncText("deleting", "Deleting…") : getCloudSyncText("delete", "Delete cloud data"))
-      ),
-      react.createElement("div", { className: "setting-description" },
-        getCloudSyncText("excluded", "API keys, account tokens, caches, presets, and per-track offsets stay on this device."))
     )
   );
 };
@@ -6486,146 +5080,6 @@ const SETTINGS_BACKGROUND_PRESETS = [
   },
 ];
 
-const FULLSCREEN_PRESENTATION_PRESETS = Object.freeze([
-  {
-    id: "compact-vinyl",
-    labelKey: "vinyl.presentation.compactLabel",
-    fallbackLabel: "Compact vinyl",
-    descriptionKey: "vinyl.presentation.compactDescription",
-    fallbackDescription:
-      "Keep the standard lyric layout and show a partially exposed record behind the album cover.",
-    icon:
-      '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/>',
-  },
-  {
-    id: "vinyl",
-    labelKey: "vinyl.presentation.vinylLabel",
-    fallbackLabel: "Full vinyl",
-    descriptionKey: "vinyl.presentation.vinylDescription",
-    fallbackDescription:
-      "Show the full record player with the focused lyric at the bottom.",
-    icon:
-      '<rect x="3" y="5" width="9" height="14" rx="2"/><circle cx="15" cy="12" r="6"/><circle cx="15" cy="12" r="1.5"/>',
-  },
-  {
-    id: "video",
-    labelKey: "vinyl.presentation.videoLabel",
-    fallbackLabel: "Video stage",
-    descriptionKey: "vinyl.presentation.videoDescription",
-    fallbackDescription:
-      "Show the synchronized YouTube video with the focused lyric at the bottom.",
-    icon:
-      '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/>',
-  },
-]);
-
-const normalizeFullscreenPresentationPreset = (value) => {
-  const normalized = String(value || "").trim();
-  return FULLSCREEN_PRESENTATION_PRESETS.some(
-    (preset) => preset.id === normalized
-  )
-    ? normalized
-    : "vinyl";
-};
-
-const FullscreenPresentationPicker = ({ defaultValue, onChange }) => {
-  const [selectedMode, setSelectedMode] = react.useState(() =>
-    normalizeFullscreenPresentationPreset(defaultValue)
-  );
-
-  const applyMode = (modeId) => {
-    const normalized = normalizeFullscreenPresentationPreset(modeId);
-    setSelectedMode(normalized);
-    onChange?.("fullscreen-focus-presentation", normalized);
-  };
-
-  return react.createElement(
-    "div",
-    {
-      className: "fullscreen-presentation-picker",
-      "data-setting-key": "fullscreen-focus-presentation",
-    },
-    react.createElement(
-      "div",
-      { className: "fullscreen-presentation-picker-heading" },
-      react.createElement(
-        "strong",
-        null,
-        getSettingsText(
-          "vinyl.presentation.settingsTitle",
-          "Focused lyric layout"
-        )
-      ),
-      react.createElement(
-        "span",
-        null,
-        getSettingsText(
-          "vinyl.presentation.settingsDescription",
-          "Choose the visual used when the album opens focused lyrics."
-        )
-      )
-    ),
-    react.createElement(
-      "div",
-      {
-        className: "settings-card-grid fullscreen-presentation-grid",
-        role: "radiogroup",
-        "aria-label": getSettingsText(
-          "vinyl.presentation.settingsTitle",
-          "Focused lyric layout"
-        ),
-      },
-      FULLSCREEN_PRESENTATION_PRESETS.map((preset) =>
-        react.createElement(
-          "button",
-          {
-            key: preset.id,
-            className: `settings-choice-card ${
-              selectedMode === preset.id ? "active" : ""
-            }`,
-            type: "button",
-            role: "radio",
-            "aria-checked": selectedMode === preset.id,
-            onClick: () => applyMode(preset.id),
-          },
-          react.createElement(
-            "div",
-            { className: "settings-choice-icon" },
-            react.createElement("svg", {
-              width: 20,
-              height: 20,
-              viewBox: "0 0 24 24",
-              fill: "none",
-              stroke: "currentColor",
-              strokeWidth: 1.7,
-              strokeLinecap: "round",
-              strokeLinejoin: "round",
-              dangerouslySetInnerHTML: { __html: preset.icon },
-            })
-          ),
-          react.createElement(
-            "div",
-            { className: "settings-choice-content" },
-            react.createElement(
-              "strong",
-              null,
-              getSettingsText(preset.labelKey, preset.fallbackLabel)
-            ),
-            react.createElement(
-              "span",
-              null,
-              getSettingsText(
-                preset.descriptionKey,
-                preset.fallbackDescription
-              )
-            )
-          )
-        )
-      )
-    )
-  );
-};
-
 const getCurrentSettingsBackgroundMode = () => {
   if (CONFIG.visual["video-background"]) return "video-background";
   if (CONFIG.visual["solid-background"]) return "solid-background";
@@ -6742,11 +5196,6 @@ const SETTINGS_SECTION_PARENT_BY_KEY = Object.freeze({
   "performance-background-work": "performance-rendering",
   "settings-presets": "export-import",
   "db-export-import": "export-import",
-  "vinyl-tonearm": "vinyl-mode",
-  "vinyl-typography": "vinyl-mode",
-  "vinyl-original-style": "vinyl-typography",
-  "vinyl-pronunciation-style": "vinyl-typography",
-  "vinyl-translation-style": "vinyl-typography",
   "fullscreen-ui": "fullscreen-style",
   "controller-style": "fullscreen-style",
   "auto-hide": "fullscreen-style",
@@ -7097,15 +5546,6 @@ const ConfigModal = ({
       desc: I18n.t("settings.backgroundBrightness.desc"),
       i18nKeys: ["tabs.appearance", "sections.visualEffects", "settings.backgroundBrightness.label", "settings.backgroundBrightness.desc"]
     },
-    // 일반 탭 - 데스크탑 오버레이
-    {
-      section: I18n.t("tabs.general"),
-      sectionKey: "general",
-      settingKey: "overlay-enabled",
-      name: I18n.t("overlay.enabled.label"),
-      desc: I18n.t("overlay.enabled.desc"),
-      i18nKeys: ["tabs.general", "overlay.enabled.label", "overlay.enabled.desc"]
-    },
     {
       section: I18n.t("tabs.appearance"),
       sectionKey: "appearance",
@@ -7307,14 +5747,6 @@ const ConfigModal = ({
     {
       section: I18n.t("tabs.advanced"),
       sectionKey: "advanced",
-      settingKey: "cloud-sync",
-      name: I18n.t("settingsAdvanced.cloudSync.title"),
-      desc: I18n.t("settingsAdvanced.cloudSync.monthlyRequired"),
-      i18nKeys: ["tabs.advanced", "settingsAdvanced.cloudSync.title", "settingsAdvanced.cloudSync.monthlyRequired"]
-    },
-    {
-      section: I18n.t("tabs.advanced"),
-      sectionKey: "advanced",
       settingKey: "export-import",
       name: I18n.t("settingsAdvanced.exportImport.title"),
       desc: I18n.t("settingsAdvanced.exportImport.subtitle"),
@@ -7353,25 +5785,6 @@ const ConfigModal = ({
       name: I18n.t("settingsAdvanced.fullscreenMode.title"),
       desc: I18n.t("settingsAdvanced.fullscreenMode.subtitle"),
       i18nKeys: ["tabs.fullscreen", "settingsAdvanced.fullscreenMode.title", "settingsAdvanced.fullscreenMode.subtitle"]
-    },
-    {
-      section: I18n.t("tabs.fullscreen"),
-      sectionKey: "fullscreen",
-      settingKey: "vinyl-mode",
-      name: I18n.t("vinyl.mode"),
-      desc: I18n.t("vinyl.settings.subtitle"),
-      i18nKeys: [
-        "tabs.fullscreen",
-        "vinyl.mode",
-        "vinyl.settings.subtitle",
-        "vinyl.presentation.settingsTitle",
-        "vinyl.presentation.settingsDescription",
-        "vinyl.presentation.vinylLabel",
-        "vinyl.presentation.compactLabel",
-        "vinyl.presentation.videoLabel",
-        "vinyl.settings.backgroundBlurLabel",
-        "vinyl.settings.backgroundBlurDesc"
-      ]
     },
     {
       section: I18n.t("tabs.fullscreen"),
@@ -7524,14 +5937,6 @@ const ConfigModal = ({
         "settings.aiProviders.retryCount.label",
         "settings.aiProviders.retryCount.description"
       ]
-    },
-    {
-      section: I18n.t("tabs.about"),
-      sectionKey: "about",
-      settingKey: "about-account",
-      name: I18n.t("settingsAdvanced.aboutTab.account.title"),
-      desc: I18n.t("settingsAdvanced.aboutTab.account.subtitle"),
-      i18nKeys: ["tabs.about", "settingsAdvanced.aboutTab.account.title", "settingsAdvanced.aboutTab.account.subtitle"]
     },
     {
       section: I18n.t("tabs.about"),
@@ -8245,7 +6650,7 @@ const ConfigModal = ({
 
         try {
           const response = await fetch(
-            "https://api.github.com/repos/ivLis-Studio/ivLyrics/releases/latest"
+            `https://api.github.com/repos/${FORK_REPO}/releases/latest`
           );
 
           if (!response.ok) {
@@ -8426,7 +6831,7 @@ const ConfigModal = ({
               type: "button",
               onClick: () =>
                 window.open(
-                  "https://github.com/ivLis-Studio/ivLyrics",
+                  `https://github.com/${FORK_REPO}`,
                   "_blank"
                 ),
               title: I18n.t("settingsAdvanced.aboutTab.visitGithub"),
@@ -8443,31 +6848,6 @@ const ConfigModal = ({
               },
             }),
             react.createElement("span", null, "GitHub")
-          ),
-          react.createElement(
-            "button",
-            {
-              className: "settings-discord-btn",
-              type: "button",
-              onClick: () =>
-                window.open(
-                  "https://ivlis.kr/ivLyrics/discord.php",
-                  "_blank"
-                ),
-              title: I18n.t("settingsAdvanced.aboutTab.joinDiscord"),
-              "aria-label": I18n.t("settingsAdvanced.aboutTab.joinDiscord"),
-            },
-            react.createElement("svg", {
-              width: 16,
-              height: 16,
-              viewBox: "0 0 24 24",
-              fill: "currentColor",
-              dangerouslySetInnerHTML: {
-                __html:
-                  '<path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09c-.01-.02-.04-.03-.07-.03c-1.5.26-2.93.71-4.27 1.33c-.01 0-.02.01-.03.02c-2.72 4.07-3.47 8.03-3.1 11.95c0 .02.01.04.03.05c1.8 1.32 3.53 2.12 5.2 2.65c.03.01.06 0 .07-.02c.4-.55.76-1.13 1.07-1.74c.02-.04 0-.08-.04-.09c-.57-.22-1.11-.48-1.64-.78c-.04-.02-.04-.08-.01-.11c.11-.08.22-.17.33-.25c.02-.02.05-.02.07-.01c3.44 1.57 7.15 1.57 10.55 0c.02-.01.05-.01.07.01c.11.09.22.17.33.26c.04.03.04.09-.01.11c-.52.31-1.07.56-1.64.78c-.04.01-.05.05-.04.09c.32.61.68 1.19 1.07 1.74c.03.01.06.02.09.01c1.72-.53 3.45-1.33 5.25-2.65c.02-.01.03-.03.03-.05c.44-4.53-.73-8.46-3.1-11.95c-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12c0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12c0 1.17-.83 2.12-1.89 2.12z"/>',
-              },
-            }),
-            react.createElement("span", null, "Discord")
           ),
           react.createElement(
             "button",
@@ -8542,7 +6922,7 @@ const ConfigModal = ({
       badge: getSettingsText("settingsUi.nav.badges.workspace", "Workspace"),
       description: getSettingsText(
         "settingsUi.nav.generalDesc",
-        "Language, translation target, and desktop overlay behavior"
+        "Language and translation target"
       ),
     },
     appearance: {
@@ -9528,18 +7908,6 @@ const ConfigModal = ({
     );
   };
 
-  const saveVinylSetting = (name, value) => {
-    CONFIG.visual[name] = value;
-    StorageManager.saveConfig(name, value);
-    if (name.endsWith("font-family")) loadGoogleFontFamily(value);
-    lyricContainerUpdate?.();
-    window.dispatchEvent(
-      new CustomEvent("ivLyrics", {
-        detail: { type: "config", name, value },
-      })
-    );
-  };
-
   return react.createElement(
     "div",
     {
@@ -9690,7 +8058,6 @@ const ConfigModal = ({
 
 #${APP_NAME}-config-container .settings-theme-btn,
 #${APP_NAME}-config-container .settings-github-btn,
-#${APP_NAME}-config-container .settings-discord-btn,
 #${APP_NAME}-config-container .settings-coffee-btn,
 #${APP_NAME}-config-container .settings-close-btn {
     display: inline-flex;
@@ -9712,7 +8079,6 @@ const ConfigModal = ({
 
 #${APP_NAME}-config-container .settings-theme-btn:hover,
 #${APP_NAME}-config-container .settings-github-btn:hover,
-#${APP_NAME}-config-container .settings-discord-btn:hover,
 #${APP_NAME}-config-container .settings-coffee-btn:hover,
 #${APP_NAME}-config-container .settings-close-btn:hover {
     background: var(--glass-bg-hover);
@@ -9729,7 +8095,6 @@ const ConfigModal = ({
 
 #${APP_NAME}-config-container .settings-theme-btn:active,
 #${APP_NAME}-config-container .settings-github-btn:active,
-#${APP_NAME}-config-container .settings-discord-btn:active,
 #${APP_NAME}-config-container .settings-coffee-btn:active,
 #${APP_NAME}-config-container .settings-close-btn:active {
     transform: scale(0.98);
@@ -12091,7 +10456,6 @@ const ConfigModal = ({
 
 #${APP_NAME}-config-container .settings-theme-btn,
 #${APP_NAME}-config-container .settings-github-btn,
-#${APP_NAME}-config-container .settings-discord-btn,
 #${APP_NAME}-config-container .settings-coffee-btn,
 #${APP_NAME}-config-container .settings-close-btn,
 #${APP_NAME}-config-container .settings-version,
@@ -12135,7 +10499,6 @@ const ConfigModal = ({
 
 #${APP_NAME}-config-container .settings-theme-btn:hover,
 #${APP_NAME}-config-container .settings-github-btn:hover,
-#${APP_NAME}-config-container .settings-discord-btn:hover,
 #${APP_NAME}-config-container .settings-coffee-btn:hover,
 #${APP_NAME}-config-container .settings-close-btn:hover,
 #${APP_NAME}-config-container .btn:hover:not(:disabled),
@@ -13494,7 +11857,6 @@ const ConfigModal = ({
 
     #${APP_NAME}-config-container .settings-theme-btn,
     #${APP_NAME}-config-container .settings-github-btn,
-    #${APP_NAME}-config-container .settings-discord-btn,
     #${APP_NAME}-config-container .settings-coffee-btn,
     #${APP_NAME}-config-container .settings-close-btn {
         min-height: 34px;
@@ -13616,7 +11978,6 @@ const ConfigModal = ({
 
 #${APP_NAME}-config-container .settings-theme-btn,
 #${APP_NAME}-config-container .settings-github-btn,
-#${APP_NAME}-config-container .settings-discord-btn,
 #${APP_NAME}-config-container .settings-coffee-btn,
 #${APP_NAME}-config-container .settings-close-btn {
     flex: 0 0 auto;
@@ -13636,7 +11997,6 @@ const ConfigModal = ({
 
 #${APP_NAME}-config-container .settings-theme-btn:hover,
 #${APP_NAME}-config-container .settings-github-btn:hover,
-#${APP_NAME}-config-container .settings-discord-btn:hover,
 #${APP_NAME}-config-container .settings-coffee-btn:hover,
 #${APP_NAME}-config-container .settings-close-btn:hover {
     background: var(--settings-glass-hover) !important;
@@ -14482,14 +12842,12 @@ const ConfigModal = ({
 
     #${APP_NAME}-config-container .settings-theme-btn span,
     #${APP_NAME}-config-container .settings-github-btn span,
-    #${APP_NAME}-config-container .settings-discord-btn span,
     #${APP_NAME}-config-container .settings-coffee-btn span {
         display: none;
     }
 
     #${APP_NAME}-config-container .settings-theme-btn,
     #${APP_NAME}-config-container .settings-github-btn,
-    #${APP_NAME}-config-container .settings-discord-btn,
     #${APP_NAME}-config-container .settings-coffee-btn,
     #${APP_NAME}-config-container .settings-close-btn {
         width: 36px;
@@ -15979,7 +14337,6 @@ const ConfigModal = ({
 
 #${APP_NAME}-config-container .settings-theme-btn,
 #${APP_NAME}-config-container .settings-github-btn,
-#${APP_NAME}-config-container .settings-discord-btn,
 #${APP_NAME}-config-container .settings-close-btn {
     width: 36px;
     min-width: 36px;
@@ -15993,8 +14350,7 @@ const ConfigModal = ({
 }
 
 #${APP_NAME}-config-container .settings-theme-btn span,
-#${APP_NAME}-config-container .settings-github-btn span,
-#${APP_NAME}-config-container .settings-discord-btn span {
+#${APP_NAME}-config-container .settings-github-btn span {
     display: none !important;
 }
 
@@ -16017,7 +14373,6 @@ const ConfigModal = ({
 
 #${APP_NAME}-config-container .settings-theme-btn:hover,
 #${APP_NAME}-config-container .settings-github-btn:hover,
-#${APP_NAME}-config-container .settings-discord-btn:hover,
 #${APP_NAME}-config-container .settings-close-btn:hover {
     border-color: var(--settings-border) !important;
     background: var(--settings-surface-1) !important;
@@ -16914,14 +15269,7 @@ const ConfigModal = ({
               initialTab: "general",
             });
           },
-        }),
-        // 데스크탑 오버레이 섹션
-        react.createElement(SectionTitle, {
-          title: I18n.t("sections.desktopOverlay"),
-          subtitle: I18n.t("sections.desktopOverlaySubtitle"),
-          sectionKey: "overlay-enabled",
-        }),
-        react.createElement(OverlaySettings)
+        })
       ),
       // 외관 탭 (시각 효과 + 타이포그래피)
       activeTab === "appearance" &&
@@ -18278,13 +16626,6 @@ const ConfigModal = ({
         }),
 
         react.createElement(SectionTitle, {
-          title: I18n.t("settingsAdvanced.cloudSync.title"),
-          subtitle: I18n.t("settingsAdvanced.cloudSync.monthlyRequired"),
-          sectionKey: "cloud-sync",
-        }),
-        react.createElement(ConfigCloudSync),
-
-        react.createElement(SectionTitle, {
           title: I18n.t("settingsAdvanced.exportImport.title"),
           subtitle: I18n.t("settingsAdvanced.exportImport.subtitle"),
           sectionKey: "export-import",
@@ -19080,13 +17421,6 @@ const ConfigModal = ({
               defaultValue: CONFIG.visual["fullscreen-page-ui-only"] ?? false,
             },
             {
-              desc: I18n.t("settingsAdvanced.fullscreenMode.hideOverlay.desc"),
-              info: I18n.t("settingsAdvanced.fullscreenMode.hideOverlay.info"),
-              key: "fullscreen-hide-overlay",
-              type: ConfigSlider,
-              defaultValue: CONFIG.visual["fullscreen-hide-overlay"] ?? true,
-            },
-            {
               desc: I18n.t("settingsAdvanced.fullscreenMode.tvMode.desc"),
               info: I18n.t("settingsAdvanced.fullscreenMode.tvMode.info"),
               key: "fullscreen-tv-mode",
@@ -19111,387 +17445,6 @@ const ConfigModal = ({
               })
             );
           },
-        }),
-
-        // ===== LP 모드 섹션 =====
-        react.createElement(SectionTitle, {
-          title: I18n.t("vinyl.mode"),
-          subtitle: I18n.t("vinyl.settings.subtitle"),
-          sectionKey: "vinyl-mode",
-        }),
-        react.createElement(FullscreenPresentationPicker, {
-          defaultValue:
-            CONFIG.visual["fullscreen-focus-presentation"] || "vinyl",
-          onChange: saveVinylSetting,
-        }),
-        react.createElement(OptionList, {
-          items: [
-            {
-              desc: I18n.t("vinyl.settings.albumSizeLabel"),
-              info: I18n.t("vinyl.settings.albumSizeDesc"),
-              key: "fullscreen-vinyl-album-size",
-              type: ConfigSliderRange,
-              min: 70,
-              max: 140,
-              step: 5,
-              unit: "%",
-              defaultValue: CONFIG.visual["fullscreen-vinyl-album-size"] ?? 100,
-            },
-            {
-              desc: I18n.t("vinyl.settings.recordSizeLabel"),
-              info: I18n.t("vinyl.settings.recordSizeDesc"),
-              key: "fullscreen-vinyl-record-size",
-              type: ConfigSliderRange,
-              min: 70,
-              max: 140,
-              step: 5,
-              unit: "%",
-              defaultValue: CONFIG.visual["fullscreen-vinyl-record-size"] ?? 100,
-            },
-            {
-              desc: I18n.t("vinyl.settings.backgroundBlurLabel"),
-              info: I18n.t("vinyl.settings.backgroundBlurDesc"),
-              key: "fullscreen-vinyl-background-blur",
-              type: ConfigSliderRange,
-              min: 0,
-              max: 100,
-              step: 5,
-              unit: "px",
-              defaultValue: CONFIG.visual["fullscreen-vinyl-background-blur"] ?? 0,
-            },
-            {
-              desc: I18n.t("vinyl.settings.animationsLabel"),
-              info: I18n.t("vinyl.settings.animationsDesc"),
-              key: "fullscreen-vinyl-animations",
-              type: ConfigSlider,
-              defaultValue: CONFIG.visual["fullscreen-vinyl-animations"] !== false,
-            },
-            {
-              desc: I18n.t("vinyl.settings.centerRotationLabel"),
-              info: I18n.t("vinyl.settings.centerRotationDesc"),
-              key: "fullscreen-vinyl-center-rotation",
-              type: ConfigSlider,
-              defaultValue: CONFIG.visual["fullscreen-vinyl-center-rotation"] !== false,
-            },
-            {
-              desc: I18n.t("vinyl.settings.lyricsLabel"),
-              info: I18n.t("vinyl.settings.lyricsDesc"),
-              key: "fullscreen-vinyl-lyrics-enabled",
-              type: ConfigSlider,
-              defaultValue: CONFIG.visual["fullscreen-vinyl-lyrics-enabled"] !== false,
-            },
-          ],
-          onChange: saveVinylSetting,
-        }),
-
-        react.createElement(SectionTitle, {
-          title: I18n.t("vinyl.settings.tonearmTitle"),
-          subtitle: I18n.t("vinyl.settings.tonearmSubtitle"),
-          sectionKey: "vinyl-tonearm",
-        }),
-        react.createElement(OptionList, {
-          items: [
-            {
-              desc: I18n.t("vinyl.settings.tonearmStyleLabel"),
-              info: I18n.t("vinyl.settings.tonearmStyleDesc"),
-              key: "fullscreen-vinyl-tonearm-style",
-              type: ConfigSelection,
-              options: {
-                s: I18n.t("vinyl.settings.tonearmStyleS"),
-                straight: I18n.t("vinyl.settings.tonearmStyleStraight"),
-                j: I18n.t("vinyl.settings.tonearmStyleJ"),
-                linear: I18n.t("vinyl.settings.tonearmStyleLinear"),
-              },
-              defaultValue: CONFIG.visual["fullscreen-vinyl-tonearm-style"] || "s",
-            },
-            {
-              desc: I18n.t("vinyl.settings.tonearmFinishLabel"),
-              info: I18n.t("vinyl.settings.tonearmFinishDesc"),
-              key: "fullscreen-vinyl-tonearm-finish",
-              type: ConfigSelection,
-              options: {
-                white: I18n.t("vinyl.settings.tonearmFinishWhite"),
-                silver: I18n.t("vinyl.settings.tonearmFinishSilver"),
-                black: I18n.t("vinyl.settings.tonearmFinishBlack"),
-              },
-              defaultValue: CONFIG.visual["fullscreen-vinyl-tonearm-finish"] || "white",
-            },
-            {
-              desc: I18n.t("vinyl.settings.tonearmSizeLabel"),
-              info: I18n.t("vinyl.settings.tonearmSizeDesc"),
-              key: "fullscreen-vinyl-tonearm-size",
-              type: ConfigSliderRange,
-              min: 80,
-              max: 120,
-              step: 5,
-              unit: "%",
-              defaultValue: CONFIG.visual["fullscreen-vinyl-tonearm-size"] ?? 100,
-            },
-          ],
-          onChange: saveVinylSetting,
-        }),
-
-        react.createElement(SectionTitle, {
-          title: I18n.t("sections.typography"),
-          subtitle: I18n.t("vinyl.settings.typographySubtitle"),
-          sectionKey: "vinyl-typography",
-        }),
-        react.createElement(SectionTitle, {
-          title: I18n.t("settingsAdvanced.originalStyle.title"),
-          subtitle: I18n.t("settingsAdvanced.originalStyle.subtitle"),
-          sectionKey: "vinyl-original-style",
-        }),
-        react.createElement(OptionList, {
-          items: [
-            {
-              desc: I18n.t("settingsAdvanced.originalStyle.fontFamily"),
-              info: I18n.t("settingsAdvanced.originalStyle.fontFamilyDesc"),
-              key: "fullscreen-vinyl-original-font-family",
-              type: ConfigFontSelector,
-              defaultValue: CONFIG.visual["fullscreen-vinyl-original-font-family"] || "Pretendard Variable",
-            },
-            {
-              desc: I18n.t("settingsAdvanced.originalStyle.fontSize.label"),
-              info: I18n.t("settingsAdvanced.originalStyle.fontSize.desc"),
-              key: "fullscreen-vinyl-original-font-size",
-              type: ConfigSliderRange,
-              min: 16,
-              max: 64,
-              step: 1,
-              unit: "px",
-            },
-            {
-              desc: I18n.t("settingsAdvanced.originalStyle.fontWeight.label"),
-              info: I18n.t("settingsAdvanced.originalStyle.fontWeight.desc"),
-              key: "fullscreen-vinyl-original-font-weight",
-              type: ConfigFontWeightSlider,
-            },
-            {
-              desc: I18n.t("settingsAdvanced.originalStyle.opacity.label"),
-              info: I18n.t("settingsAdvanced.originalStyle.opacity.desc"),
-              key: "fullscreen-vinyl-original-opacity",
-              type: ConfigSliderRange,
-              min: 20,
-              max: 100,
-              step: 5,
-              unit: "%",
-            },
-            {
-              desc: I18n.t("settingsAdvanced.originalStyle.letterSpacing.label"),
-              info: I18n.t("settingsAdvanced.originalStyle.letterSpacing.desc"),
-              key: "fullscreen-vinyl-original-letter-spacing",
-              type: ConfigSliderRange,
-              min: -5,
-              max: 20,
-              step: 0.5,
-              unit: "px",
-            },
-            ...createTextOutlineSettingItems("fullscreen-vinyl-original"),
-          ],
-          onChange: saveVinylSetting,
-        }),
-
-        react.createElement(SectionTitle, {
-          title: I18n.t("settingsAdvanced.pronunciationStyle.title"),
-          subtitle: I18n.t("settingsAdvanced.pronunciationStyle.subtitle"),
-          sectionKey: "vinyl-pronunciation-style",
-        }),
-        react.createElement(OptionList, {
-          items: [
-            {
-              desc: I18n.t("settingsAdvanced.originalStyle.fontFamily"),
-              info: I18n.t("settingsAdvanced.pronunciationStyle.fontFamilyDesc"),
-              key: "fullscreen-vinyl-phonetic-font-family",
-              type: ConfigFontSelector,
-              defaultValue: CONFIG.visual["fullscreen-vinyl-phonetic-font-family"] || "Pretendard Variable",
-            },
-            {
-              desc: I18n.t("settingsAdvanced.originalStyle.fontSize.label"),
-              info: I18n.t("settingsAdvanced.pronunciationStyle.fontSize.desc"),
-              key: "fullscreen-vinyl-phonetic-font-size",
-              type: ConfigSliderRange,
-              min: 10,
-              max: 40,
-              step: 1,
-              unit: "px",
-            },
-            {
-              desc: I18n.t("settingsAdvanced.originalStyle.fontWeight.label"),
-              info: I18n.t("settingsAdvanced.pronunciationStyle.fontWeight.desc"),
-              key: "fullscreen-vinyl-phonetic-font-weight",
-              type: ConfigFontWeightSlider,
-            },
-            {
-              desc: I18n.t("settingsAdvanced.originalStyle.opacity.label"),
-              info: I18n.t("settingsAdvanced.pronunciationStyle.opacity.desc"),
-              key: "fullscreen-vinyl-phonetic-opacity",
-              type: ConfigSliderRange,
-              min: 20,
-              max: 100,
-              step: 5,
-              unit: "%",
-            },
-            {
-              desc: I18n.t("settingsAdvanced.pronunciationStyle.gap.label"),
-              info: I18n.t("settingsAdvanced.pronunciationStyle.gap.desc"),
-              key: "fullscreen-vinyl-phonetic-spacing",
-              type: ConfigSliderRange,
-              min: -10,
-              max: 24,
-              step: 1,
-              unit: "px",
-            },
-            {
-              desc: I18n.t("settingsAdvanced.pronunciationStyle.letterSpacing.label"),
-              info: I18n.t("settingsAdvanced.pronunciationStyle.letterSpacing.desc"),
-              key: "fullscreen-vinyl-phonetic-letter-spacing",
-              type: ConfigSliderRange,
-              min: -5,
-              max: 20,
-              step: 0.5,
-              unit: "px",
-            },
-            ...createTextOutlineSettingItems("fullscreen-vinyl-phonetic"),
-          ],
-          onChange: saveVinylSetting,
-        }),
-
-        react.createElement(SectionTitle, {
-          title: I18n.t("settingsAdvanced.translationStyle.title"),
-          subtitle: I18n.t("settingsAdvanced.translationStyle.subtitle"),
-          sectionKey: "vinyl-translation-style",
-        }),
-        react.createElement(OptionList, {
-          items: [
-            {
-              desc: I18n.t("settingsAdvanced.originalStyle.fontFamily"),
-              info: I18n.t("settingsAdvanced.translationStyle.fontFamilyDesc"),
-              key: "fullscreen-vinyl-translation-font-family",
-              type: ConfigFontSelector,
-              defaultValue: CONFIG.visual["fullscreen-vinyl-translation-font-family"] || "Pretendard Variable",
-            },
-            {
-              desc: I18n.t("settingsAdvanced.originalStyle.fontSize.label"),
-              info: I18n.t("settingsAdvanced.translationStyle.fontSize.desc"),
-              key: "fullscreen-vinyl-translation-font-size",
-              type: ConfigSliderRange,
-              min: 10,
-              max: 44,
-              step: 1,
-              unit: "px",
-            },
-            {
-              desc: I18n.t("settingsAdvanced.originalStyle.fontWeight.label"),
-              info: I18n.t("settingsAdvanced.translationStyle.fontWeight.desc"),
-              key: "fullscreen-vinyl-translation-font-weight",
-              type: ConfigFontWeightSlider,
-            },
-            {
-              desc: I18n.t("settingsAdvanced.originalStyle.opacity.label"),
-              info: I18n.t("settingsAdvanced.translationStyle.opacity.desc"),
-              key: "fullscreen-vinyl-translation-opacity",
-              type: ConfigSliderRange,
-              min: 20,
-              max: 100,
-              step: 5,
-              unit: "%",
-            },
-            {
-              desc: I18n.t("settingsAdvanced.translationStyle.gap.label"),
-              info: I18n.t("settingsAdvanced.translationStyle.gap.desc"),
-              key: "fullscreen-vinyl-translation-spacing",
-              type: ConfigSliderRange,
-              min: -10,
-              max: 30,
-              step: 1,
-              unit: "px",
-            },
-            {
-              desc: I18n.t("settingsAdvanced.translationStyle.letterSpacing.label"),
-              info: I18n.t("settingsAdvanced.translationStyle.letterSpacing.desc"),
-              key: "fullscreen-vinyl-translation-letter-spacing",
-              type: ConfigSliderRange,
-              min: -5,
-              max: 20,
-              step: 0.5,
-              unit: "px",
-            },
-            ...createTextOutlineSettingItems("fullscreen-vinyl-translation"),
-          ],
-          onChange: saveVinylSetting,
-        }),
-
-        react.createElement(SectionTitle, {
-          title: I18n.t("vinyl.settings.videoStageTypographyTitle"),
-          subtitle: I18n.t("vinyl.settings.videoStageTypographySubtitle"),
-          sectionKey: "video-stage-typography",
-        }),
-        react.createElement(OptionList, {
-          items: [
-            {
-              desc: I18n.t("settingsAdvanced.originalStyle.fontFamily"),
-              info: I18n.t("settingsAdvanced.originalStyle.fontFamilyDesc"),
-              key: "fullscreen-video-stage-original-font-family",
-              type: ConfigFontSelector,
-              defaultValue:
-                CONFIG.visual["fullscreen-video-stage-original-font-family"] ||
-                CONFIG.visual["fullscreen-vinyl-original-font-family"] ||
-                "Pretendard Variable",
-            },
-            {
-              desc: I18n.t("settingsAdvanced.pronunciationStyle.title"),
-              info: I18n.t("settingsAdvanced.pronunciationStyle.fontFamilyDesc"),
-              key: "fullscreen-video-stage-phonetic-font-family",
-              type: ConfigFontSelector,
-              defaultValue:
-                CONFIG.visual["fullscreen-video-stage-phonetic-font-family"] ||
-                CONFIG.visual["fullscreen-vinyl-phonetic-font-family"] ||
-                "Pretendard Variable",
-            },
-            {
-              desc: I18n.t("settingsAdvanced.translationStyle.title"),
-              info: I18n.t("settingsAdvanced.translationStyle.fontFamilyDesc"),
-              key: "fullscreen-video-stage-translation-font-family",
-              type: ConfigFontSelector,
-              defaultValue:
-                CONFIG.visual["fullscreen-video-stage-translation-font-family"] ||
-                CONFIG.visual["fullscreen-vinyl-translation-font-family"] ||
-                "Pretendard Variable",
-            },
-            {
-              desc: I18n.t("settings.culturalAnnotations.fontFamily.label"),
-              info: I18n.t("settings.culturalAnnotations.fontFamily.desc"),
-              key: "fullscreen-video-stage-cultural-font-family",
-              type: ConfigFontSelector,
-              defaultValue:
-                CONFIG.visual["fullscreen-video-stage-cultural-font-family"] ||
-                CONFIG.visual["cultural-annotations-vinyl-font-family"] ||
-                "Pretendard Variable",
-            },
-            {
-              desc: I18n.t("vinyl.settings.videoStageBackgroundColorLabel"),
-              info: I18n.t("vinyl.settings.videoStageBackgroundColorDesc"),
-              key: "fullscreen-video-stage-lyric-background-color",
-              type: ConfigColorPicker,
-              defaultValue:
-                CONFIG.visual["fullscreen-video-stage-lyric-background-color"] ||
-                "#000000",
-            },
-            {
-              desc: I18n.t("vinyl.settings.videoStageBackgroundOpacityLabel"),
-              info: I18n.t("vinyl.settings.videoStageBackgroundOpacityDesc"),
-              key: "fullscreen-video-stage-lyric-background-opacity",
-              type: ConfigSliderRange,
-              min: 0,
-              max: 100,
-              step: 1,
-              unit: "%",
-              defaultValue:
-                CONFIG.visual["fullscreen-video-stage-lyric-background-opacity"] ??
-                46,
-            },
-          ],
-          onChange: saveVinylSetting,
         }),
 
         // ===== 일반 모드 레이아웃 섹션 =====
@@ -19993,6 +17946,12 @@ const ConfigModal = ({
               type: ConfigSlider,
             },
             {
+              desc: I18n.t("settingsAdvanced.nowPlayingPanel.onlyWhenSpotifyMissing.label") || "Only when Spotify has no lyrics",
+              key: "panel-lyrics-only-when-spotify-missing",
+              info: I18n.t("settingsAdvanced.nowPlayingPanel.onlyWhenSpotifyMissing.desc") || "Hide the ivLyrics panel lyrics when Spotify already shows its own lyrics for the track",
+              type: ConfigSlider,
+            },
+            {
               desc: I18n.t("settingsAdvanced.nowPlayingPanel.fontFamily.label") || "Font Family",
               key: "panel-lyrics-font-family",
               info: I18n.t("settingsAdvanced.nowPlayingPanel.fontFamily.desc") || "Font for panel lyrics",
@@ -20223,13 +18182,6 @@ const ConfigModal = ({
           className: `tab-content ${activeTab === "about" ? "active" : ""}`,
           "data-tab-id": "about",
         },
-        // Discord 계정 연동 섹션 (최상단)
-        react.createElement(SectionTitle, {
-          title: I18n.t("settingsAdvanced.aboutTab.account.title"),
-          subtitle: I18n.t("settingsAdvanced.aboutTab.account.subtitle"),
-          sectionKey: "about-account",
-        }),
-        react.createElement(AccountSection),
         react.createElement(SectionTitle, {
           title: I18n.t("settingsAdvanced.aboutTab.appInfo.title"),
           subtitle: I18n.t("settingsAdvanced.aboutTab.subtitle"),
@@ -20514,13 +18466,13 @@ const ConfigModal = ({
                       const safeUpdatePageInfo = escapeSettingsReleaseHtml(
                         I18n.t("settingsAdvanced.aboutTab.update.protocol.info")
                       );
-                      const updatePageHref = "https://lyrics.ivl.is/update";
+                      const updatePageHref = `https://github.com/${FORK_REPO}/tree/${FORK_BRANCH}#업데이트`;
                       const releaseNotesUrl = sanitizeSettingsReleaseUrl(
-                        `https://github.com/ivLis-Studio/ivLyrics/releases/tag/v${encodeURIComponent(String(updateInfo.latestVersion ?? ""))}`
+                        `https://github.com/${FORK_REPO}/releases/tag/v${encodeURIComponent(String(updateInfo.latestVersion ?? ""))}`
                       );
                       const releaseNotesHref = releaseNotesUrl
                         ? escapeSettingsReleaseAttribute(releaseNotesUrl)
-                        : "https://github.com/ivLis-Studio/ivLyrics/releases";
+                        : `https://github.com/${FORK_REPO}/releases`;
                       const releaseNotesLabel = escapeSettingsReleaseHtml(
                         I18n.t("update.releaseNotes")
                       );

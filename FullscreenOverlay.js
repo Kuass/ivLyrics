@@ -70,25 +70,6 @@ const FullscreenOverlay = (() => {
             console.warn("[Research] Failed to remember token consent:", error);
         }
     };
-    const FOCUSED_PRESENTATION_IDS = new Set([
-        "vinyl",
-        "compact-vinyl",
-        "video"
-    ]);
-    const normalizeFocusedPresentation = (value, fallback = "standard") => {
-        const normalized = String(value || "").trim();
-        return normalized === "standard" || FOCUSED_PRESENTATION_IDS.has(normalized)
-            ? normalized
-            : fallback;
-    };
-    const getDefaultFocusedPresentation = () => {
-        const normalized = normalizeFocusedPresentation(
-            CONFIG?.visual?.["fullscreen-focus-presentation"],
-            "vinyl"
-        );
-        return normalized === "standard" ? "vinyl" : normalized;
-    };
-
     const clampSeekPositionToLiveDuration = (value, duration) => {
         const safeDuration = Math.max(Number(duration) || 0, 0);
         const safeValue = Math.max(Number(value) || 0, 0);
@@ -2007,10 +1988,6 @@ const FullscreenOverlay = (() => {
         lyricsSettingsRevision = 0,
         translatedMetadata = null,
         trackUri = null,
-        trackAccent = "",
-        trackAccentUri = "",
-        presentationMode = "standard",
-        onPresentationModeChange = null,
         onExitFullscreen = null
     }) => {
         const [uiVisible, setUiVisible] = useState(true);
@@ -2020,7 +1997,6 @@ const FullscreenOverlay = (() => {
         const [tmiWebSearchFallback, setTmiWebSearchFallback] = useState(false);
         const [researchConsentAccepted, setResearchConsentAccepted] = useState(hasResearchTokenConsent);
         const [showResearchConsent, setShowResearchConsent] = useState(false);
-        const [lpModeClosing, setLpModeClosing] = useState(false);
         const [isPlaying, setIsPlaying] = useState(false);
         const [position, setPosition] = useState(0);
         const [duration, setDuration] = useState(0);
@@ -2043,59 +2019,6 @@ const FullscreenOverlay = (() => {
         const albumPressStartRef = useRef(null);
         const suppressAlbumClickRef = useRef(false);
         const suppressAlbumClickTimerRef = useRef(null);
-        const lpModeExitTimerRef = useRef(null);
-        const lpViewTransitionRef = useRef(null);
-        const normalizedPresentationMode = normalizeFocusedPresentation(
-            presentationMode
-        );
-        const presentationModeActive =
-            normalizedPresentationMode !== "standard";
-        const focusModeActive =
-            normalizedPresentationMode === "vinyl"
-            || normalizedPresentationMode === "video";
-        const compactPresentationActive =
-            normalizedPresentationMode === "compact-vinyl";
-
-        const runLpSharedTransition = useCallback((direction, updateMode) => {
-            const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-            const animationsEnabled = CONFIG?.visual?.["fullscreen-vinyl-animations"] !== false;
-            if (!animationsEnabled || reducedMotion || typeof document?.startViewTransition !== "function") return false;
-            if (lpViewTransitionRef.current) return true;
-
-            const root = document.documentElement;
-            const directionClass = "is-lp-view-" + direction;
-            root.classList.add("is-lp-view-transition", directionClass);
-            let committed = false;
-            let transition = null;
-            const cleanup = () => {
-                if (lpViewTransitionRef.current === transition) lpViewTransitionRef.current = null;
-                root.classList.remove("is-lp-view-transition", directionClass);
-            };
-
-            try {
-                transition = document.startViewTransition(() => {
-                    const reactDom = window.ivLyricsEnsureReactDOM?.()
-                        || window.Spicetify?.ReactDOM
-                        || window.ReactDOM;
-                    if (typeof reactDom?.flushSync === "function") {
-                        reactDom.flushSync(updateMode);
-                        committed = true;
-                        return undefined;
-                    }
-
-                    updateMode();
-                    committed = true;
-                    return new Promise((resolve) => window.requestAnimationFrame(resolve));
-                });
-                lpViewTransitionRef.current = transition;
-                Promise.resolve(transition.finished).catch(() => undefined).finally(cleanup);
-                return true;
-            } catch (_) {
-                cleanup();
-                if (!committed) updateMode();
-                return true;
-            }
-        }, []);
 
         const navigateSpotifyUri = useCallback((uri) => {
             const path = spotifyUriToPath(uri);
@@ -2166,7 +2089,6 @@ const FullscreenOverlay = (() => {
         const albumSize = Number(CONFIG?.visual?.["fullscreen-album-size"]) || 400;
         const albumRadiusValue = Number(CONFIG?.visual?.["fullscreen-album-radius"]);
         const albumRadius = isNaN(albumRadiusValue) ? 12 : albumRadiusValue;
-        const vinylAnimationsEnabled = CONFIG?.visual?.["fullscreen-vinyl-animations"] !== false;
         const titleSize = Number(CONFIG?.visual?.["fullscreen-title-size"]) || 48;
         const artistSize = Number(CONFIG?.visual?.["fullscreen-artist-size"]) || 24;
 
@@ -2417,85 +2339,20 @@ const FullscreenOverlay = (() => {
             beginResearch();
         }, [beginResearch]);
 
-        const handleAlbumModeClick = useCallback((event) => {
+        const handleAlbumClick = useCallback((event) => {
             event?.preventDefault?.();
             event?.stopPropagation?.();
 
-            // TV mode always uses the plain album artwork presentation.
-            if (tvModeEnabled) return;
-
+            // A click that follows a long-press / context-menu gesture must not
+            // be treated as a separate interaction.
             if (suppressAlbumClickRef.current) {
                 suppressAlbumClickRef.current = false;
                 if (suppressAlbumClickTimerRef.current) {
                     window.clearTimeout(suppressAlbumClickTimerRef.current);
                     suppressAlbumClickTimerRef.current = null;
                 }
-                return;
             }
-
-            if (presentationModeActive) {
-                if (lpModeClosing) return;
-                if (!vinylAnimationsEnabled) {
-                    setLpModeClosing(false);
-                    onPresentationModeChange?.("standard");
-                    return;
-                }
-                if (runLpSharedTransition("exit", () => {
-                    if (lpModeExitTimerRef.current) {
-                        window.clearTimeout(lpModeExitTimerRef.current);
-                        lpModeExitTimerRef.current = null;
-                    }
-                    setLpModeClosing(false);
-                    onPresentationModeChange?.("standard");
-                })) return;
-
-                setLpModeClosing(true);
-                lpModeExitTimerRef.current = window.setTimeout(() => {
-                    lpModeExitTimerRef.current = null;
-                    setLpModeClosing(false);
-                    onPresentationModeChange?.("standard");
-                }, 420);
-                return;
-            }
-
-            if (lpModeExitTimerRef.current) {
-                window.clearTimeout(lpModeExitTimerRef.current);
-                lpModeExitTimerRef.current = null;
-            }
-            setLpModeClosing(false);
-            const nextPresentation = getDefaultFocusedPresentation();
-            if (!vinylAnimationsEnabled) {
-                onPresentationModeChange?.(nextPresentation);
-                return;
-            }
-            if (runLpSharedTransition(
-                "enter",
-                () => onPresentationModeChange?.(nextPresentation)
-            )) return;
-            onPresentationModeChange?.(nextPresentation);
-        }, [
-            presentationModeActive,
-            lpModeClosing,
-            onPresentationModeChange,
-            runLpSharedTransition,
-            tvModeEnabled,
-            vinylAnimationsEnabled
-        ]);
-
-        const handlePresentationModeChange = useCallback((nextMode) => {
-            const normalized = normalizeFocusedPresentation(nextMode);
-            if (normalized === "standard") {
-                handleAlbumModeClick();
-                return;
-            }
-
-            if (lpModeExitTimerRef.current) {
-                window.clearTimeout(lpModeExitTimerRef.current);
-                lpModeExitTimerRef.current = null;
-            }
-            setLpModeClosing(false);
-            onPresentationModeChange?.(normalized);
-        }, [handleAlbumModeClick, onPresentationModeChange]);
+        }, []);
 
         const handleAlbumContextMenu = useCallback((event) => {
             event.preventDefault();
@@ -2535,16 +2392,10 @@ const FullscreenOverlay = (() => {
         }, [clearAlbumPressTimer]);
 
         const handleAlbumKeyDown = useCallback((event) => {
-            if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                handleAlbumModeClick(event);
-                return;
-            }
-
             if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
                 handleAlbumContextMenu(event);
             }
-        }, [handleAlbumContextMenu, handleAlbumModeClick]);
+        }, [handleAlbumContextMenu]);
 
         useEffect(() => () => {
             tmiRequestRef.current += 1;
@@ -2553,16 +2404,6 @@ const FullscreenOverlay = (() => {
             if (suppressAlbumClickTimerRef.current) {
                 window.clearTimeout(suppressAlbumClickTimerRef.current);
             }
-            if (lpModeExitTimerRef.current) {
-                window.clearTimeout(lpModeExitTimerRef.current);
-            }
-            lpViewTransitionRef.current?.skipTransition?.();
-            lpViewTransitionRef.current = null;
-            document.documentElement?.classList.remove(
-                "is-lp-view-transition",
-                "is-lp-view-enter",
-                "is-lp-view-exit"
-            );
         }, [clearAlbumPressTimer, restoreResearchPlaybackGuard]);
 
         // Handle Regenerate
@@ -2606,41 +2447,16 @@ const FullscreenOverlay = (() => {
             || currentPlayerItem?.album?.images?.[0]?.url
             || currentPlayerMetadata?.image_url
             || coverUrl;
-        const currentVinylTitle = currentPlayerMetadata?.title || title || "LP";
-        const currentVinylArtist = currentPlayerMetadata?.artist_name || artist || "";
-        const currentVinylAlbum = currentPlayerMetadata?.album_title || currentVinylTitle;
-        const liveVinylTrack = {
-            uri: currentTrackUri || `${currentVinylTitle}\u0000${currentVinylArtist}`,
-            coverUrl: currentCoverUrl,
-            title: currentVinylTitle,
-            artist: currentVinylArtist,
-            album: currentVinylAlbum,
-            accent: currentTrackUri && currentTrackUri === trackAccentUri
-                ? String(trackAccent || "").trim()
-                : ""
-        };
-
-        const albumActionCopy = {
-            click: I18n.t("vinyl.click"),
-            lpTitle: I18n.t("vinyl.mode"),
-            lpHint: presentationModeActive
-                ? I18n.t("vinyl.closeHint")
-                : I18n.t("vinyl.openHint"),
-            tmiGesture: I18n.t("vinyl.tmiGesture")
-        };
         const tmiTitle = I18n.t("tmi.title");
-        const vinylTmiHint = I18n.t("vinyl.tmiHint");
+        const tmiGesture = I18n.t("research.gesture");
+        const tmiHint = I18n.t("research.gestureHint");
         const tmiDisclaimer = I18n.t("tmi.disclaimer");
-        const albumInteractionLabel = [
-            tvModeEnabled ? null : albumActionCopy.lpHint,
-            vinylTmiHint,
-            tmiDisclaimer
-        ]
+        const albumInteractionLabel = [tmiHint, tmiDisclaimer]
             .filter(Boolean)
             .join(". ");
 
         const albumInteractionProps = {
-            onClick: handleAlbumModeClick,
+            onClick: handleAlbumClick,
             onContextMenu: handleAlbumContextMenu,
             onPointerDown: handleAlbumPointerDown,
             onPointerMove: handleAlbumPointerMove,
@@ -2652,7 +2468,7 @@ const FullscreenOverlay = (() => {
             role: "button",
             tabIndex: 0,
             "aria-label": albumInteractionLabel,
-            "aria-keyshortcuts": "Enter Space Shift+F10",
+            "aria-keyshortcuts": "Shift+F10",
             title: albumInteractionLabel
         };
 
@@ -2665,15 +2481,8 @@ const FullscreenOverlay = (() => {
                 react.createElement("div", { className: "album-mode-actions" },
                     react.createElement("div", { className: "album-mode-action is-primary" },
                         react.createElement("div", { className: "album-mode-action-header" },
-                            react.createElement("span", { className: "album-mode-action-title" }, albumActionCopy.lpTitle),
-                            react.createElement("span", { className: "album-mode-action-gesture" }, albumActionCopy.click)
-                        ),
-                        react.createElement("span", { className: "album-mode-action-description" }, albumActionCopy.lpHint)
-                    ),
-                    react.createElement("div", { className: "album-mode-action is-secondary" },
-                        react.createElement("div", { className: "album-mode-action-header" },
                             react.createElement("span", { className: "album-mode-action-title" }, tmiTitle),
-                            react.createElement("span", { className: "album-mode-action-gesture" }, albumActionCopy.tmiGesture)
+                            react.createElement("span", { className: "album-mode-action-gesture" }, tmiGesture)
                         ),
                         react.createElement("span", {
                             className: "album-mode-action-description album-mode-tmi-disclaimer"
@@ -2690,120 +2499,15 @@ const FullscreenOverlay = (() => {
 
         if (!isFullscreen) return null;
 
-        const VinylMode = window.ivLyricsVinylPlayerMode;
-        if (!tvModeEnabled && focusModeActive && !tmiMode && VinylMode) {
-            return react.createElement(react.Fragment, null,
-                react.createElement(VinylMode, {
-                track: liveVinylTrack,
-                albumRadius,
-                isClosing: lpModeClosing,
-                isPortraitLayout: isPortraitViewport,
-                presentationMode: normalizedPresentationMode,
-                controlsVisible: uiVisible,
-                onPresentationModeChange: handlePresentationModeChange,
-                isPlaying,
-                position,
-                duration,
-                interactionProps: albumInteractionProps,
-                activeLyric,
-                activeLyrics,
-                lyricsTrackUri: trackUri,
-                activeLineIndex: currentLyricIndex,
-                activeLyricsKaraoke,
-                karaokeSource,
-                lyricsSettingsRevision,
-                showStageControls: showControls,
-                showStageProgress: showProgress,
-                vinylSettings: {
-                    albumSize: CONFIG?.visual?.["fullscreen-vinyl-album-size"] ?? 100,
-                    recordSize: CONFIG?.visual?.["fullscreen-vinyl-record-size"] ?? 100,
-                    backgroundBlur: CONFIG?.visual?.["fullscreen-vinyl-background-blur"] ?? 0,
-                    animations: CONFIG?.visual?.["fullscreen-vinyl-animations"] !== false,
-                    centerRotation: CONFIG?.visual?.["fullscreen-vinyl-center-rotation"] !== false,
-                    lyricsEnabled: CONFIG?.visual?.["fullscreen-vinyl-lyrics-enabled"] !== false,
-                    tonearmStyle: CONFIG?.visual?.["fullscreen-vinyl-tonearm-style"] || "s",
-                    tonearmFinish: CONFIG?.visual?.["fullscreen-vinyl-tonearm-finish"] || "white",
-                    tonearmSize: CONFIG?.visual?.["fullscreen-vinyl-tonearm-size"] ?? 100,
-                    originalFontFamily: CONFIG?.visual?.["fullscreen-vinyl-original-font-family"] || "Pretendard Variable",
-                    originalFontSize: CONFIG?.visual?.["fullscreen-vinyl-original-font-size"] ?? 31,
-                    originalFontWeight: CONFIG?.visual?.["fullscreen-vinyl-original-font-weight"] ?? 600,
-                    originalOpacity: CONFIG?.visual?.["fullscreen-vinyl-original-opacity"] ?? 95,
-                    originalLetterSpacing: CONFIG?.visual?.["fullscreen-vinyl-original-letter-spacing"] ?? 0,
-                    originalOutlineWidth: CONFIG?.visual?.["fullscreen-vinyl-original-outline-width"] ?? 0,
-                    originalOutlineColor: CONFIG?.visual?.["fullscreen-vinyl-original-outline-color"] || "#000000",
-                    phoneticFontFamily: CONFIG?.visual?.["fullscreen-vinyl-phonetic-font-family"] || "Pretendard Variable",
-                    phoneticFontSize: CONFIG?.visual?.["fullscreen-vinyl-phonetic-font-size"] ?? 11,
-                    phoneticFontWeight: CONFIG?.visual?.["fullscreen-vinyl-phonetic-font-weight"] ?? 100,
-                    phoneticOpacity: CONFIG?.visual?.["fullscreen-vinyl-phonetic-opacity"] ?? 70,
-                    phoneticSpacing: CONFIG?.visual?.["fullscreen-vinyl-phonetic-spacing"] ?? -1,
-                    phoneticLetterSpacing: CONFIG?.visual?.["fullscreen-vinyl-phonetic-letter-spacing"] ?? 0,
-                    phoneticOutlineWidth: CONFIG?.visual?.["fullscreen-vinyl-phonetic-outline-width"] ?? 0,
-                    phoneticOutlineColor: CONFIG?.visual?.["fullscreen-vinyl-phonetic-outline-color"] || "#000000",
-                    translationFontFamily: CONFIG?.visual?.["fullscreen-vinyl-translation-font-family"] || "Pretendard Variable",
-                    translationFontSize: CONFIG?.visual?.["fullscreen-vinyl-translation-font-size"] ?? 15,
-                    translationFontWeight: CONFIG?.visual?.["fullscreen-vinyl-translation-font-weight"] ?? 300,
-                    translationOpacity: CONFIG?.visual?.["fullscreen-vinyl-translation-opacity"] ?? 85,
-                    translationSpacing: CONFIG?.visual?.["fullscreen-vinyl-translation-spacing"] ?? 0,
-                    translationLetterSpacing: CONFIG?.visual?.["fullscreen-vinyl-translation-letter-spacing"] ?? 0,
-                    translationOutlineWidth: CONFIG?.visual?.["fullscreen-vinyl-translation-outline-width"] ?? 0,
-                    translationOutlineColor: CONFIG?.visual?.["fullscreen-vinyl-translation-outline-color"] || "#000000",
-                    culturalFontFamily: CONFIG?.visual?.["cultural-annotations-vinyl-font-family"] || "Pretendard Variable",
-                    culturalFontSize: CONFIG?.visual?.["cultural-annotations-vinyl-font-size"] ?? 12,
-                    culturalFontWeight: CONFIG?.visual?.["cultural-annotations-vinyl-font-weight"] ?? 300,
-                    culturalOpacity: CONFIG?.visual?.["cultural-annotations-vinyl-opacity"] ?? 60,
-                    culturalOutlineWidth: CONFIG?.visual?.["cultural-annotations-vinyl-outline-width"] ?? 0,
-                    culturalOutlineColor: CONFIG?.visual?.["cultural-annotations-vinyl-outline-color"] || "#000000",
-                    videoStageOriginalFontFamily: CONFIG?.visual?.["fullscreen-video-stage-original-font-family"] || CONFIG?.visual?.["fullscreen-vinyl-original-font-family"] || "Pretendard Variable",
-                    videoStagePhoneticFontFamily: CONFIG?.visual?.["fullscreen-video-stage-phonetic-font-family"] || CONFIG?.visual?.["fullscreen-vinyl-phonetic-font-family"] || "Pretendard Variable",
-                    videoStageTranslationFontFamily: CONFIG?.visual?.["fullscreen-video-stage-translation-font-family"] || CONFIG?.visual?.["fullscreen-vinyl-translation-font-family"] || "Pretendard Variable",
-                    videoStageCulturalFontFamily: CONFIG?.visual?.["fullscreen-video-stage-cultural-font-family"] || CONFIG?.visual?.["cultural-annotations-vinyl-font-family"] || "Pretendard Variable",
-                    videoStageLyricBackgroundColor: CONFIG?.visual?.["fullscreen-video-stage-lyric-background-color"] || "#000000",
-                    videoStageLyricBackgroundOpacity: CONFIG?.visual?.["fullscreen-video-stage-lyric-background-opacity"] ?? 46
-                },
-                onPrevious: () => Spicetify.Player.back(),
-                onSeek: (nextPosition) => {
-                    window.Utils?.clearSafePlayerProgressCorrection?.();
-                    const liveDuration = Spicetify.Player.getDuration?.() || duration;
-                    const safePosition = clampSeekPositionToLiveDuration(nextPosition, liveDuration);
-                    Spicetify.Player.seek(Math.floor(safePosition));
-                },
-                onStopPlayback: () => {
-                    if (Spicetify.Player?.data?.isPaused === true) return;
-                    if (typeof Spicetify.Player?.pause === "function") Spicetify.Player.pause();
-                    else Spicetify.Player?.togglePlay?.();
-                },
-                onTogglePlayback: () => Spicetify.Player.togglePlay(),
-                    onNext: () => Spicetify.Player.next()
-                }),
-                renderResearchConsentDialog()
-            );
-        }
-
-        const CompactAlbumVinyl = VinylMode?.CompactAlbumVinyl;
         const renderAlbumVisual = ({
             coverClassName,
             coverStyle
-        }) => {
-            if (!tvModeEnabled && compactPresentationActive && CompactAlbumVinyl) {
-                return react.createElement(CompactAlbumVinyl, {
-                    track: liveVinylTrack,
-                    isPlaying,
-                    animationsEnabled: vinylAnimationsEnabled,
-                    centerRotationEnabled:
-                        CONFIG?.visual?.["fullscreen-vinyl-center-rotation"] !== false,
-                    albumRadius,
-                    coverClassName,
-                    coverStyle
-                });
-            }
-
-            return react.createElement("img", {
-                src: currentCoverUrl,
-                className: coverClassName,
-                style: coverStyle,
-                draggable: false
-            });
-        };
+        }) => react.createElement("img", {
+            src: currentCoverUrl,
+            className: coverClassName,
+            style: coverStyle,
+            draggable: false
+        });
 
         const isPortraitFullscreen = isFullscreen && isPortraitViewport && !tvModeEnabled;
         const isTwoColumn = CONFIG?.visual?.["fullscreen-two-column"] !== false;
@@ -2888,15 +2592,9 @@ const FullscreenOverlay = (() => {
 
         // In TV mode, hide the left panel (album/info shown at bottom-left instead)
         const hideLeftPanelForTvMode = tvModeEnabled;
-        const PresentationSwitcher = VinylMode?.PresentationSwitcher;
 
         return react.createElement(react.Fragment, null,
             renderResearchConsentDialog(),
-            !tvModeEnabled && !tmiMode && PresentationSwitcher && react.createElement(PresentationSwitcher, {
-                activeMode: normalizedPresentationMode,
-                visible: true,
-                onChange: handlePresentationModeChange
-            }),
             // TMI Overlay for TV Mode & Portrait Mode (rendered above everything when active)
             (tvModeEnabled || isPortraitFullscreen) && tmiMode && react.createElement("div", {
                 className: "fullscreen-tv-tmi-overlay"
@@ -3111,7 +2809,7 @@ const FullscreenOverlay = (() => {
                 (showAlbum || showInfo) && react.createElement("div", {
                     className: `portrait-overlay-top ${!uiVisible ? 'hidden' : ''} ${isLayoutReversed ? 'layout-reversed' : ''}`
                 },
-                    // 앨범 클릭은 LP 모드, 우클릭/롱프레스는 TMI
+                    // 앨범 우클릭/롱프레스는 TMI
                     showAlbum && react.createElement("div", {
                         ...albumInteractionProps,
                         className: "portrait-album-container clickable-album-container",

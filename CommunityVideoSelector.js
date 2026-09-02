@@ -915,18 +915,6 @@ const CommunityVideoSelector = ({
   }, [defaultStartTime]);
 
   const openSubmitForm = useCallback(async (video = null) => {
-    if (!isLocalVideoMode) {
-      try {
-        await Utils.requireDiscordAuth(
-          I18n.t("communityVideo.loginRequired"),
-          { checkingMessage: I18n.t("settingsAdvanced.aboutTab.account.checking") }
-        );
-      } catch (e) {
-        Utils.promptDiscordLoginRequired(e?.message || I18n.t("communityVideo.loginRequired"));
-        return;
-      }
-    }
-
     setEditingVideo(video);
     setSubmitUrl("");
     setSubmitStartTime(video?.startTime ?? getDefaultSubmitStartTime());
@@ -938,7 +926,7 @@ const CommunityVideoSelector = ({
     setFormPreviewVideoId(video?.youtubeVideoId || null);
     setIsLoadingTitle(false);
     setShowSubmitForm(true);
-  }, [defaultStartTime, isLocalVideoMode]);
+  }, [defaultStartTime]);
 
   // URL 변경 시 YouTube 제목 자동 가져오기
   useEffect(() => {

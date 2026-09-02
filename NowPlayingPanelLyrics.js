@@ -1906,6 +1906,79 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         return !["false", "0", "off", "no"].includes(String(value).trim().toLowerCase());
     };
 
+    // ============================================
+    // Spotify 기본 가사 우선 (fork)
+    // Spotify 패널이 이미 가사를 보여 주는 곡에서는 ivLyrics 패널 가사를 넣지 않는다.
+    // ============================================
+    const ONLY_WHEN_SPOTIFY_MISSING_KEY = "ivLyrics:visual:panel-lyrics-only-when-spotify-missing";
+    const DEFAULT_ONLY_WHEN_SPOTIFY_MISSING = true;
+    const SPOTIFY_LYRICS_API_BASE = 'https://spclient.wg.spotify.com/color-lyrics/v2/track/';
+    const NATIVE_LYRICS_CACHE_LIMIT = 200;
+    const nativeLyricsCache = new Map(); // trackUri -> boolean
+    const nativeLyricsPending = new Map(); // trackUri -> Promise<boolean>
+
+    const isOnlyWhenSpotifyMissingEnabled = () =>
+        getStorageValue(ONLY_WHEN_SPOTIFY_MISSING_KEY, DEFAULT_ONLY_WHEN_SPOTIFY_MISSING) === true;
+
+    const extractSpotifyTrackId = (uri) => {
+        if (typeof uri !== 'string') return null;
+        const match = uri.match(/^spotify:track:([A-Za-z0-9]+)$/);
+        return match ? match[1] : null;
+    };
+
+    const rememberNativeLyrics = (uri, hasLyrics) => {
+        if (nativeLyricsCache.size >= NATIVE_LYRICS_CACHE_LIMIT) {
+            const oldest = nativeLyricsCache.keys().next().value;
+            nativeLyricsCache.delete(oldest);
+        }
+        nativeLyricsCache.set(uri, hasLyrics);
+        return hasLyrics;
+    };
+
+    const hasSpotifyNativeLyrics = (uri) => {
+        if (nativeLyricsCache.has(uri)) return Promise.resolve(nativeLyricsCache.get(uri));
+        if (nativeLyricsPending.has(uri)) return nativeLyricsPending.get(uri);
+        const trackId = extractSpotifyTrackId(uri);
+        if (!trackId) return Promise.resolve(rememberNativeLyrics(uri, false));
+        const request = (async () => {
+            try {
+                const body = await Spicetify.CosmosAsync.get(
+                    `${SPOTIFY_LYRICS_API_BASE}${trackId}?format=json&vocalRemoval=false&market=from_token`
+                );
+                const lines = body?.lyrics?.lines;
+                return rememberNativeLyrics(uri, Array.isArray(lines) && lines.length > 0);
+            } catch (error) {
+                // 404는 Spotify에 가사가 없다는 뜻이고, 그 밖의 오류도 ivLyrics 패널로 대체한다.
+                return rememberNativeLyrics(uri, false);
+            } finally {
+                nativeLyricsPending.delete(uri);
+            }
+        })();
+        nativeLyricsPending.set(uri, request);
+        return request;
+    };
+
+    // 현재 곡에 대해 'native' | 'pending' | 'insert' 중 하나를 돌려준다.
+    const getNativeLyricsGateState = () => {
+        if (!isOnlyWhenSpotifyMissingEnabled()) return 'insert';
+        const uri = Spicetify.Player?.data?.item?.uri;
+        if (!uri) return 'insert';
+        if (nativeLyricsCache.has(uri)) {
+            return nativeLyricsCache.get(uri) ? 'native' : 'insert';
+        }
+        if (!nativeLyricsPending.has(uri)) {
+            hasSpotifyNativeLyrics(uri).then((hasLyrics) => {
+                if (Spicetify.Player?.data?.item?.uri !== uri) return;
+                if (hasLyrics) {
+                    removePanelLyrics();
+                } else {
+                    scheduleInsertPanelLyrics(0);
+                }
+            });
+        }
+        return 'pending';
+    };
+
     const setStorageValue = (key, value) => {
         try {
             localStorage.setItem(key, String(value));
@@ -5431,6 +5504,16 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             return;
         }
 
+        // Spotify가 이 곡의 가사를 직접 보여 주면 ivLyrics 패널 가사는 넣지 않음 (fork)
+        const nativeGate = getNativeLyricsGateState();
+        if (nativeGate === 'native') {
+            removePanelLyrics();
+            return;
+        }
+        if (nativeGate === 'pending') {
+            return;
+        }
+
         // ========================================
         // Starry Night 테마 감지 - Root__now-playing-bar에 삽입
         // ========================================
@@ -5598,6 +5681,18 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             currentLyricsState.lyrics = [];
             currentLyricsState.currentIndex = 0;
             currentLyricsState.trackUri = Spicetify.Player.data?.item?.uri;
+            // 곡이 바뀌면 Spotify 기본 가사 유무를 다시 판정한다 (fork)
+            if (isOnlyWhenSpotifyMissingEnabled() && currentLyricsState.trackUri) {
+                const changedUri = currentLyricsState.trackUri;
+                hasSpotifyNativeLyrics(changedUri).then((hasLyrics) => {
+                    if (Spicetify.Player?.data?.item?.uri !== changedUri) return;
+                    if (hasLyrics) {
+                        removePanelLyrics();
+                    } else if (!isIvLyricsPageActive()) {
+                        scheduleInsertPanelLyrics(100);
+                    }
+                });
+            }
         };
 
         Spicetify.Player.addEventListener('songchange', lyricsListener);
@@ -5784,6 +5879,13 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 startRuntime();
             } else {
                 stopRuntime();
+            }
+        }
+
+        if (event.detail?.name === 'panel-lyrics-only-when-spotify-missing') {
+            removePanelLyrics();
+            if (getStorageValue(STORAGE_KEY, DEFAULT_ENABLED)) {
+                scheduleInsertPanelLyrics(0);
             }
         }
 

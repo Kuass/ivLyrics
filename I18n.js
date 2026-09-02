@@ -26,8 +26,6 @@
         "tmi.errorQuotaHint": "research.errorQuotaHint",
         "tmi.viewInfo": "research.gestureHint",
         "tmi.clickForTMI": "research.title",
-        "vinyl.tmiHint": "research.gestureHint",
-        "vinyl.tmiGesture": "research.gesture",
         "settings.aiProviders.providerSelectionDesc": "research.providerDescription",
         "settings.aiProviders.tmiProvider": "research.title",
         "settings.aiProviders.supports.tmi": "research.title",

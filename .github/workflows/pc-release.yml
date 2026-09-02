@@ -67,13 +67,12 @@ jobs:
           set -euo pipefail
           python3 .github/scripts/set_release_version.py check "$RELEASE_VERSION"
           node --check Utils.js
-          node --check NoticeSystem.js
           python3 -m json.tool manifest.json >/dev/null
           git diff --check
 
           actual="$(git diff --name-only)"
           if [[ "$VERSION_CHANGED" == "true" ]]; then
-            expected=$'NoticeSystem.js\nUtils.js\nversion.txt'
+            expected=$'Utils.js\nversion.txt'
             if [[ "$actual" != "$expected" ]]; then
               echo "Unexpected release file changes:" >&2
               printf '%s\n' "$actual" >&2
@@ -145,7 +144,7 @@ jobs:
           if [[ "$VERSION_CHANGED" == "true" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add NoticeSystem.js Utils.js version.txt
+            git add Utils.js version.txt
             git commit \
               -m "$RELEASE_VERSION RELEASE" \
               -m "PC 버전 표기 세 곳을 $RELEASE_VERSION으로 동기화했습니다."
