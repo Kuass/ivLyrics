@@ -575,6 +575,36 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                     return;
                 }
 
+                // fork: 서버가 고른 영상이 팬 업로드일 수 있어 공식 채널 영상을 우선한다.
+                const applyPreferredVideo = async (info, cacheIsrc) => {
+                    if (!info?.youtubeVideoId) {
+                        setVideoInfo(info);
+                        return;
+                    }
+                    const preferOfficial =
+                        CONFIG?.visual?.["video-prefer-official-channel"] !== false;
+                    if (!preferOfficial || info.officialChecked || typeof Utils?.preferOfficialYouTubeVideo !== "function") {
+                        setVideoInfo(info);
+                        return;
+                    }
+                    let resolved = info;
+                    try {
+                        resolved = await Utils.preferOfficialYouTubeVideo(info, {
+                            trackName: spotifyData?.name || "",
+                            artists: spotifyData?.artists || [],
+                            durationSec: Math.round((Spicetify.Player?.data?.item?.duration?.milliseconds || 0) / 1000),
+                        });
+                    } catch (error) {
+                        console.warn("[VideoBackground] Official video preference failed:", error);
+                        resolved = info;
+                    }
+                    if (!isMounted) return;
+                    if (cacheIsrc && resolved?.youtubeVideoId) {
+                        LyricsCache.setYouTube(cacheIsrc, resolved).catch(() => { });
+                    }
+                    setVideoInfo(resolved);
+                };
+
                 // 3. 로컬 캐시 확인 (IndexedDB)
                 try {
                     const cachedYouTube = await LyricsCache.getYouTube(trackIsrc);
@@ -587,7 +617,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                                 hasCaption: cachedYouTube.captionStartTime != null
                             });
                         }
-                        setVideoInfo(cachedYouTube);
+                        await applyPreferredVideo(cachedYouTube, trackIsrc);
                         return;
                     }
                 } catch (error) {
@@ -653,7 +683,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                     if (resolvedCacheIsrc) {
                         LyricsCache.setYouTube(resolvedCacheIsrc, data.data).catch(() => { });
                     }
-                    setVideoInfo(data.data);
+                    await applyPreferredVideo(data.data, resolvedCacheIsrc);
                 } else {
                     // 실패 로깅
                     if (window.ApiTracker && logId) {
@@ -1267,7 +1297,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
 
         playerReadyDeadline = setTimeout(() => {
             failPlayerLifecycle(new Error("YouTube player readiness timed out."));
-        }, 15000);
+        }, 30000); // fork: 15초는 광고 차단·느린 네트워크에서 자주 조기 실패했다.
 
         // Double check cleanup
         if (playerRef.current) {

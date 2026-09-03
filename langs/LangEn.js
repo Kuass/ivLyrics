@@ -203,6 +203,10 @@ window.LANG_EN = {
       "label": "Video background only in fullscreen",
       "desc": "Play the YouTube background only while the fullscreen view is open; the lyrics page uses the blur gradient instead."
     },
+    "videoPreferOfficialChannel": {
+      "label": "Prefer the artist's official channel",
+      "desc": "Check the picked video's channel and switch to the artist's official music video when one exists. Sends the track title to YouTube and a public search instance."
+    },
     "videoHelper": {
       "label": "Use Helper Program",
       "desc": "Download and play YouTube videos locally. Allows viewing videos without logging in.",

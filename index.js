@@ -2541,6 +2541,10 @@ const CONFIG = {
       "ivLyrics:visual:video-background-fullscreen-only",
       true
     ),
+    "video-prefer-official-channel": StorageManager.get(
+      "ivLyrics:visual:video-prefer-official-channel",
+      true
+    ),
     "video-background": StorageManager.get(
       "ivLyrics:visual:video-background",
       false

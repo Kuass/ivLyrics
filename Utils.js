@@ -2455,6 +2455,176 @@ const Utils = {
   },
 
   /**
+   * 공식 채널 영상 우선 선택 (fork)
+   * 서버가 고른 영상은 제목만 "Official"이고 실제로는 팬 업로드인 경우가 있어서,
+   * oEmbed로 채널을 확인하고 필요하면 검색 결과에서 아티스트 공식 채널 영상을 고른다.
+   */
+  _officialVideoNormalize(value) {
+    return String(value || "")
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9가-힣]+/g, " ")
+      .trim();
+  },
+
+  async _fetchWithTimeout(url, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { signal: controller.signal, cache: "no-store" });
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+
+  /** oEmbed로 영상의 제목과 채널명을 확인한다. */
+  async getYouTubeVideoOwner(videoId, timeoutMs = 3500) {
+    if (!videoId) return null;
+    try {
+      const response = await this._fetchWithTimeout(
+        `https://www.youtube.com/oembed?format=json&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3D${encodeURIComponent(videoId)}`,
+        timeoutMs
+      );
+      if (!response.ok) return null;
+      const data = await response.json();
+      return { videoId, title: data.title || "", channel: data.author_name || "" };
+    } catch (error) {
+      return null;
+    }
+  },
+
+  /** 채널명이 아티스트의 공식 채널로 보이는지 판단한다. VEVO와 " - Topic" 채널도 공식으로 본다. */
+  isOfficialArtistChannel(channelName, artists = []) {
+    const channel = this._officialVideoNormalize(channelName);
+    if (!channel) return false;
+    return (artists || []).some((artist) => {
+      const name = this._officialVideoNormalize(artist);
+      if (!name || name.length < 2) return false;
+      const compact = name.replace(/ /g, "");
+      const channelCompact = channel.replace(/ /g, "");
+      return (
+        channel === name ||
+        channelCompact === compact ||
+        channelCompact === `${compact}vevo` ||
+        channelCompact === `${compact}official` ||
+        channelCompact === `${compact}topic` ||
+        channelCompact.startsWith(`${compact}vevo`) ||
+        (channelCompact.includes(compact) && /vevo|official|topic/.test(channelCompact))
+      );
+    });
+  },
+
+  /** CORS를 허용하는 Piped 인스턴스로 후보 영상을 검색한다. */
+  async searchYouTubeCandidates(query, timeoutMs = 4000) {
+    const instances = [
+      "https://api.piped.private.coffee",
+      "https://pipedapi.adminforge.de",
+      "https://pipedapi.kavin.rocks",
+    ];
+    for (const host of instances) {
+      try {
+        const response = await this._fetchWithTimeout(
+          `${host}/search?q=${encodeURIComponent(query)}&filter=videos`,
+          timeoutMs
+        );
+        if (!response.ok) continue;
+        const data = await response.json();
+        const items = Array.isArray(data?.items) ? data.items : [];
+        const candidates = items
+          .map((item) => ({
+            videoId: this.extractYouTubeVideoId(item?.url || ""),
+            title: item?.title || "",
+            channel: item?.uploaderName || "",
+            verified: item?.uploaderVerified === true,
+            duration: Number(item?.duration) || 0,
+          }))
+          .filter((item) => item.videoId);
+        if (candidates.length) return candidates;
+      } catch (error) {
+        // 다음 인스턴스로 넘어간다.
+      }
+    }
+    return [];
+  },
+
+  /** 후보 영상에 점수를 매긴다. 공식 채널의 뮤직비디오일수록 높다. */
+  scoreYouTubeCandidate(candidate, { trackName, artists = [], durationSec = 0 } = {}) {
+    const title = this._officialVideoNormalize(candidate.title);
+    const track = this._officialVideoNormalize(trackName);
+    if (!title || !track || !title.includes(track)) return -Infinity;
+
+    let score = 0;
+    const official = this.isOfficialArtistChannel(candidate.channel, artists);
+    if (official) score += 100;
+    if (candidate.verified) score += 30;
+    if (!official && !candidate.verified) score -= 60;
+
+    if (/official music video|official video|official mv/.test(title)) score += 60;
+    else if (/music video|mv\b/.test(title)) score += 20;
+    if (/official audio|visualizer|audio only/.test(title)) score -= 25;
+    if (/lyric|slowed|reverb|sped up|speed up|nightcore|cover|remix|karaoke|instrumental|reaction|amv|edit|8d|mashup|tiktok|loop|1 hour|hour loop|live/.test(title)) score -= 70;
+
+    if (durationSec > 0 && candidate.duration > 0) {
+      const ratio = candidate.duration / durationSec;
+      if (ratio >= 0.92 && ratio <= 1.08) score += 30;
+      else if (ratio >= 0.8 && ratio <= 1.25) score += 10;
+      else score -= 50;
+    }
+    return score;
+  },
+
+  /**
+   * 서버가 고른 영상이 공식 채널이 아니면, 검색해서 더 나은 공식 영상으로 바꾼다.
+   * 공식 영상을 못 찾으면 원래 영상을 그대로 돌려준다.
+   */
+  async preferOfficialYouTubeVideo(videoInfo, meta = {}) {
+    const videoId = videoInfo?.youtubeVideoId;
+    if (!videoId) return videoInfo;
+    const artists = (meta.artists || []).filter(Boolean);
+    const trackName = meta.trackName || "";
+    if (!artists.length || !trackName) return videoInfo;
+
+    const owner = await this.getYouTubeVideoOwner(videoId);
+    if (owner && this.isOfficialArtistChannel(owner.channel, artists)) {
+      return { ...videoInfo, officialChecked: true, youtubeTitle: owner.title || videoInfo.youtubeTitle };
+    }
+
+    const query = `${artists[0]} ${trackName} official music video`;
+    const candidates = await this.searchYouTubeCandidates(query);
+    if (!candidates.length) return { ...videoInfo, officialChecked: true };
+
+    const scored = candidates
+      .map((candidate) => ({ candidate, score: this.scoreYouTubeCandidate(candidate, { trackName, artists, durationSec: meta.durationSec || 0 }) }))
+      .filter((entry) => Number.isFinite(entry.score))
+      .sort((a, b) => b.score - a.score);
+
+    const best = scored[0];
+    // 공식 채널이 올린 영상일 때만 교체한다. 공식 오디오(정지 화면)만 있는 곡은 원래 영상을 유지한다.
+    if (
+      !best ||
+      best.score < 120 ||
+      !this.isOfficialArtistChannel(best.candidate.channel, artists) ||
+      best.candidate.videoId === videoId
+    ) {
+      return { ...videoInfo, officialChecked: true };
+    }
+
+    window.__ivLyricsDebugLog?.(
+      `[ivLyrics] Official video preferred: ${videoId} -> ${best.candidate.videoId} (${best.candidate.channel})`
+    );
+    return {
+      ...videoInfo,
+      youtubeVideoId: best.candidate.videoId,
+      youtubeTitle: best.candidate.title,
+      officialChecked: true,
+      officialChannel: best.candidate.channel,
+      captionStartTime: null,
+      skipSegments: [],
+    };
+  },
+
+  /**
    * YouTube 영상 제목 가져오기 (oEmbed API 사용)
    * @returns {Promise<string|null>} 영상 제목 또는 null (존재하지 않는 영상)
    */

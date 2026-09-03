@@ -16254,6 +16254,12 @@ const ConfigModal = ({
               info: I18n.t("settings.videoBackgroundFullscreenOnly.desc") || "Play the YouTube background only while the fullscreen view is open",
               type: ConfigSlider,
             },
+            {
+              desc: I18n.t("settings.videoPreferOfficialChannel.label") || "Prefer the artist's official channel",
+              key: "video-prefer-official-channel",
+              info: I18n.t("settings.videoPreferOfficialChannel.desc") || "Verify the video's channel and replace fan uploads with the official music video when one exists",
+              type: ConfigSlider,
+            },
           ],
           onChange: handlePerformanceSettingChange,
         }),
