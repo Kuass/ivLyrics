@@ -2515,6 +2515,34 @@ const Utils = {
     });
   },
 
+  /** 채널명에 아티스트 이름이 들어 있는지 본다. "ROSÉ and Bruno Mars" 같은 합작 채널을 잡는다. */
+  isArtistNamedChannel(channelName, artists = []) {
+    const channel = this._officialVideoNormalize(channelName).replace(/ /g, "");
+    if (!channel) return false;
+    return (artists || []).some((artist) => {
+      const name = this._officialVideoNormalize(artist).replace(/ /g, "");
+      return name.length >= 3 && channel.includes(name);
+    });
+  },
+
+  /** 제목이 공식 뮤직비디오를 가리키는지 본다. K-pop의 "Official MV", "M/V" 표기도 포함한다. */
+  hasOfficialVideoTitle(title) {
+    return /official music video|official video|official mv|official m v/.test(
+      this._officialVideoNormalize(title)
+    );
+  },
+
+  /** 제목이 어떤 형태로든 뮤직비디오를 가리키는지 본다. */
+  hasMusicVideoTitle(title) {
+    const normalized = this._officialVideoNormalize(title);
+    return (
+      this.hasOfficialVideoTitle(title) ||
+      /music video|뮤직비디오/.test(normalized) ||
+      /(^| )m v( |$)/.test(normalized) ||
+      /(^| )mv( |$)/.test(normalized)
+    );
+  },
+
   /** CORS를 허용하는 Piped 인스턴스로 후보 영상을 검색한다. */
   async searchYouTubeCandidates(query, timeoutMs = 4000) {
     const instances = [
@@ -2548,6 +2576,13 @@ const Utils = {
     return [];
   },
 
+  /** 정지 화면만 나오는 오디오 전용 업로드인지 판단한다. 배경 영상으로는 부적합하다. */
+  isAudioOnlyUpload(candidate) {
+    const title = this._officialVideoNormalize(candidate?.title);
+    const channel = this._officialVideoNormalize(candidate?.channel);
+    return /official audio|audio only|visualizer|lyric video/.test(title) || /topic$/.test(channel);
+  },
+
   /** 후보 영상에 점수를 매긴다. 공식 채널의 뮤직비디오일수록 높다. */
   scoreYouTubeCandidate(candidate, { trackName, artists = [], durationSec = 0 } = {}) {
     const title = this._officialVideoNormalize(candidate.title);
@@ -2556,19 +2591,31 @@ const Utils = {
 
     let score = 0;
     const official = this.isOfficialArtistChannel(candidate.channel, artists);
+    const artistNamed = this.isArtistNamedChannel(candidate.channel, artists);
     if (official) score += 100;
+    else if (artistNamed && candidate.verified) score += 60;
     if (candidate.verified) score += 30;
     if (!official && !candidate.verified) score -= 60;
 
-    if (/official music video|official video|official mv/.test(title)) score += 60;
-    else if (/music video|mv\b/.test(title)) score += 20;
+    if (this.hasOfficialVideoTitle(candidate.title)) {
+      score += 60;
+      // 소속사 채널(HYBE LABELS 등)은 이름이 아티스트와 달라서 제목 신호를 더 신뢰한다.
+      if (candidate.verified) score += 20;
+    } else if (/music video|mv\b/.test(title)) score += 20;
     if (/official audio|visualizer|audio only/.test(title)) score -= 25;
     if (/lyric|slowed|reverb|sped up|speed up|nightcore|cover|remix|karaoke|instrumental|reaction|amv|edit|8d|mashup|tiktok|loop|1 hour|hour loop|live/.test(title)) score -= 70;
+    // 같은 공식 채널의 파생 영상(안무 영상, 티저, 비하인드)보다 본편을 고른다.
+    if (/choreography|dance practice|performance|teaser|behind|making|b side|shorts|fancam|relay|trailer/.test(title)) score -= 50;
+    // 무대 영상·시상식·예능 클립은 뮤직비디오가 아니다.
+    if (/stage cam|stage mix|festival|awards|concert|episode|vlog|interview|inkigayo|music bank|music core|show champion|countdown|comeback show|live stage/.test(title)) score -= 80;
+    // 멤버별·특별 버전보다 본편을 고른다.
+    if (/(^| )(ver|version)( |$)/.test(title)) score -= 15;
 
     if (durationSec > 0 && candidate.duration > 0) {
+      // 뮤직비디오는 인트로와 아웃트로 때문에 음원보다 긴 경우가 많아 넉넉하게 본다.
       const ratio = candidate.duration / durationSec;
-      if (ratio >= 0.92 && ratio <= 1.08) score += 30;
-      else if (ratio >= 0.8 && ratio <= 1.25) score += 10;
+      if (ratio >= 0.9 && ratio <= 1.35) score += 20;
+      else if (ratio >= 0.75 && ratio <= 1.6) score += 0;
       else score -= 50;
     }
     return score;
@@ -2599,14 +2646,27 @@ const Utils = {
       .filter((entry) => Number.isFinite(entry.score))
       .sort((a, b) => b.score - a.score);
 
-    const best = scored[0];
-    // 공식 채널이 올린 영상일 때만 교체한다. 공식 오디오(정지 화면)만 있는 곡은 원래 영상을 유지한다.
-    if (
-      !best ||
-      best.score < 120 ||
-      !this.isOfficialArtistChannel(best.candidate.channel, artists) ||
-      best.candidate.videoId === videoId
-    ) {
+    // 공식 채널의 "영상"만 교체 대상으로 삼는다. 공식 오디오와 Topic 채널은
+    // 정지 화면이라 배경으로 쓰면 오히려 나빠지므로, 그런 곡은 원래 영상을 유지한다.
+    const normalizedArtists = artists.map((artist) => this._officialVideoNormalize(artist));
+    const isTrustworthy = (candidate) => {
+      if (this.isOfficialArtistChannel(candidate.channel, artists)) return true;
+      // 소속사·합작 채널: 인증 배지와 제목이 함께 공식임을 가리킬 때만 인정한다.
+      const title = this._officialVideoNormalize(candidate.title);
+      return (
+        candidate.verified &&
+        this.hasOfficialVideoTitle(candidate.title) &&
+        normalizedArtists.some((artist) => artist && title.includes(artist))
+      );
+    };
+    // 무대 영상이나 라이브 클립으로 바꾸지 않도록, 제목이 뮤직비디오를 가리킬 때만 교체한다.
+    const best = scored.find(
+      (entry) =>
+        !this.isAudioOnlyUpload(entry.candidate) &&
+        this.hasMusicVideoTitle(entry.candidate.title) &&
+        isTrustworthy(entry.candidate)
+    );
+    if (!best || best.score < 120 || best.candidate.videoId === videoId) {
       return { ...videoInfo, officialChecked: true };
     }
 
