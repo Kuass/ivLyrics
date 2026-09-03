@@ -2494,34 +2494,58 @@ const Utils = {
     }
   },
 
+  /**
+   * 정규화한 문자열에서 낱말 경계를 지켜 포함 여부를 본다.
+   * "genius official"이 "iu"를 품은 것처럼 보이는 오탐을 막는다.
+   */
+  containsNormalizedPhrase(haystack, needle) {
+    const target = this._officialVideoNormalize(haystack);
+    const phrase = this._officialVideoNormalize(needle);
+    if (!target || !phrase) return false;
+    const targetTokens = target.split(" ").filter(Boolean);
+    const phraseTokens = phrase.split(" ").filter(Boolean);
+    if (!phraseTokens.length) return false;
+    for (let i = 0; i + phraseTokens.length <= targetTokens.length; i += 1) {
+      if (phraseTokens.every((token, offset) => targetTokens[i + offset] === token)) {
+        return true;
+      }
+    }
+    return false;
+  },
+
   /** 채널명이 아티스트의 공식 채널로 보이는지 판단한다. VEVO와 " - Topic" 채널도 공식으로 본다. */
   isOfficialArtistChannel(channelName, artists = []) {
     const channel = this._officialVideoNormalize(channelName);
     if (!channel) return false;
+    const channelCompact = channel.replace(/ /g, "");
     return (artists || []).some((artist) => {
       const name = this._officialVideoNormalize(artist);
       if (!name || name.length < 2) return false;
       const compact = name.replace(/ /g, "");
-      const channelCompact = channel.replace(/ /g, "");
-      return (
+      if (
         channel === name ||
         channelCompact === compact ||
         channelCompact === `${compact}vevo` ||
         channelCompact === `${compact}official` ||
         channelCompact === `${compact}topic` ||
-        channelCompact.startsWith(`${compact}vevo`) ||
-        (channelCompact.includes(compact) && /vevo|official|topic/.test(channelCompact))
+        channelCompact.startsWith(`${compact}vevo`)
+      ) {
+        return true;
+      }
+      // "IU Official"처럼 아티스트 이름이 낱말로 들어 있고 공식 표시가 붙은 채널만 인정한다.
+      return (
+        this.containsNormalizedPhrase(channel, name) &&
+        /(^| )(vevo|official|topic)( |$)/.test(channel)
       );
     });
   },
 
   /** 채널명에 아티스트 이름이 들어 있는지 본다. "ROSÉ and Bruno Mars" 같은 합작 채널을 잡는다. */
   isArtistNamedChannel(channelName, artists = []) {
-    const channel = this._officialVideoNormalize(channelName).replace(/ /g, "");
-    if (!channel) return false;
+    if (!channelName) return false;
     return (artists || []).some((artist) => {
-      const name = this._officialVideoNormalize(artist).replace(/ /g, "");
-      return name.length >= 3 && channel.includes(name);
+      const name = this._officialVideoNormalize(artist);
+      return name.length >= 3 && this.containsNormalizedPhrase(channelName, name);
     });
   },
 
@@ -2550,30 +2574,32 @@ const Utils = {
       "https://pipedapi.adminforge.de",
       "https://pipedapi.kavin.rocks",
     ];
-    for (const host of instances) {
-      try {
-        const response = await this._fetchWithTimeout(
-          `${host}/search?q=${encodeURIComponent(query)}&filter=videos`,
-          timeoutMs
-        );
-        if (!response.ok) continue;
-        const data = await response.json();
-        const items = Array.isArray(data?.items) ? data.items : [];
-        const candidates = items
-          .map((item) => ({
-            videoId: this.extractYouTubeVideoId(item?.url || ""),
-            title: item?.title || "",
-            channel: item?.uploaderName || "",
-            verified: item?.uploaderVerified === true,
-            duration: Number(item?.duration) || 0,
-          }))
-          .filter((item) => item.videoId);
-        if (candidates.length) return candidates;
-      } catch (error) {
-        // 다음 인스턴스로 넘어간다.
-      }
+    // 인스턴스를 동시에 호출해서 가장 먼저 답한 결과를 쓴다. 하나가 죽어 있어도 기다리지 않는다.
+    const attempts = instances.map(async (host) => {
+      const response = await this._fetchWithTimeout(
+        `${host}/search?q=${encodeURIComponent(query)}&filter=videos`,
+        timeoutMs
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const items = Array.isArray(data?.items) ? data.items : [];
+      const candidates = items
+        .map((item) => ({
+          videoId: this.extractYouTubeVideoId(item?.url || ""),
+          title: item?.title || "",
+          channel: item?.uploaderName || "",
+          verified: item?.uploaderVerified === true,
+          duration: Number(item?.duration) || 0,
+        }))
+        .filter((item) => item.videoId);
+      if (!candidates.length) throw new Error("empty result");
+      return candidates;
+    });
+    try {
+      return await Promise.any(attempts);
+    } catch (error) {
+      return [];
     }
-    return [];
   },
 
   /** 정지 화면만 나오는 오디오 전용 업로드인지 판단한다. 배경 영상으로는 부적합하다. */
@@ -2587,7 +2613,8 @@ const Utils = {
   scoreYouTubeCandidate(candidate, { trackName, artists = [], durationSec = 0 } = {}) {
     const title = this._officialVideoNormalize(candidate.title);
     const track = this._officialVideoNormalize(trackName);
-    if (!title || !track || !title.includes(track)) return -Infinity;
+    if (!title || !track) return -Infinity;
+    if (!this.containsNormalizedPhrase(candidate.title, trackName)) return -Infinity;
 
     let score = 0;
     const official = this.isOfficialArtistChannel(candidate.channel, artists);
@@ -2681,6 +2708,10 @@ const Utils = {
       officialChannel: best.candidate.channel,
       captionStartTime: null,
       skipSegments: [],
+      // 교체한 영상은 커뮤니티 항목이 아니므로 관련 메타데이터를 지운다.
+      communityEntryId: null,
+      isAutoGenerated: false,
+      submitterName: null,
     };
   },
 

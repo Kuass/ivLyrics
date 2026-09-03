@@ -587,22 +587,28 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                         setVideoInfo(info);
                         return;
                     }
-                    let resolved = info;
-                    try {
-                        resolved = await Utils.preferOfficialYouTubeVideo(info, {
-                            trackName: spotifyData?.name || "",
-                            artists: spotifyData?.artists || [],
-                            durationSec: Math.round((Spicetify.Player?.data?.item?.duration?.milliseconds || 0) / 1000),
+                    // 먼저 서버가 준 영상을 그대로 띄우고, 공식 채널 확인은 뒤에서 돌린다.
+                    // 확인이 느려도 배경이 늦게 뜨지 않고, 더 나은 영상을 찾으면 그때 교체한다.
+                    setVideoInfo(info);
+                    const resolveTrackUri = trackUri;
+                    Utils.preferOfficialYouTubeVideo(info, {
+                        trackName: spotifyData?.name || "",
+                        artists: spotifyData?.artists || [],
+                        durationSec: Math.round((Spicetify.Player?.data?.item?.duration?.milliseconds || 0) / 1000),
+                    })
+                        .then((resolved) => {
+                            if (!isMounted || !resolved?.youtubeVideoId) return;
+                            if (resolveTrackUri !== trackUri) return;
+                            if (cacheIsrc) {
+                                LyricsCache.setYouTube(cacheIsrc, resolved).catch(() => { });
+                            }
+                            if (resolved.youtubeVideoId !== info.youtubeVideoId) {
+                                setVideoInfo(resolved);
+                            }
+                        })
+                        .catch((error) => {
+                            console.warn("[VideoBackground] Official video preference failed:", error);
                         });
-                    } catch (error) {
-                        console.warn("[VideoBackground] Official video preference failed:", error);
-                        resolved = info;
-                    }
-                    if (!isMounted) return;
-                    if (cacheIsrc && resolved?.youtubeVideoId) {
-                        LyricsCache.setYouTube(cacheIsrc, resolved).catch(() => { });
-                    }
-                    setVideoInfo(resolved);
                 };
 
                 // 3. 로컬 캐시 확인 (IndexedDB)
@@ -617,7 +623,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                                 hasCaption: cachedYouTube.captionStartTime != null
                             });
                         }
-                        await applyPreferredVideo(cachedYouTube, trackIsrc);
+                        applyPreferredVideo(cachedYouTube, trackIsrc);
                         return;
                     }
                 } catch (error) {
@@ -683,7 +689,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                     if (resolvedCacheIsrc) {
                         LyricsCache.setYouTube(resolvedCacheIsrc, data.data).catch(() => { });
                     }
-                    await applyPreferredVideo(data.data, resolvedCacheIsrc);
+                    applyPreferredVideo(data.data, resolvedCacheIsrc);
                 } else {
                     // 실패 로깅
                     if (window.ApiTracker && logId) {
