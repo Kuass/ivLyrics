@@ -94,14 +94,30 @@ Every AI feature runs only when at least one LLM provider is enabled, and each h
   **Track transitions**: the previous player is kept through the 0.5 s fade-out before disposal, the album-art fallback cross-fades over the previous image, and title and artist text animate in.
 - **제목 자동 축소**: 긴 제목은 글자 크기가 자동으로 줄어듭니다. 한글·한자·가나는 라틴 문자보다 넓게 계산하고, 설정 크기의 55% 아래로는 내려가지 않습니다.\
   **Title auto-fit**: long titles shrink automatically. CJK glyphs count as wider than Latin letters; the size never drops below 55 % of the configured value.
-- **가사 배치**: 전체 화면 스타일 설정에서 따로 조절하며, 가사 페이지의 배치는 그대로입니다.\
-  **Lyric layout**: adjusted in the fullscreen style settings; the lyrics page keeps its own layout.
+- **줄 전환**: 줄이 바뀔 때의 이동을 620ms의 완만한 곡선으로 늘리고, 색·불투명도·크기 변화도 같은 시간에 걸쳐 함께 바뀝니다. 노래방 모드의 줄 전환 애니메이션 설정이 꺼져 있어도 전체 화면에서는 이동을 애니메이션합니다.\
+  **Line transitions**: line movement takes 620 ms on a gentle curve, and color, opacity and scale changes animate over the same time. In fullscreen the movement is animated even when the karaoke line-transition setting is off.
+- **추천곡 숨기기**: Spotify가 추천곡을 재생할 때 재생 막대에 띄우는 "숨기기" 스위치를 전체 화면의 좋아요 버튼 옆에서 그대로 누를 수 있습니다. Spotify가 그 스위치를 보여 주는 곡에서만 나타나고, 상태도 Spotify 값을 따릅니다.\
+  **Hide recommended tracks**: the "Hide" switch Spotify shows in the playbar for recommended tracks can be pressed next to the fullscreen like button. It appears only when Spotify shows its own switch and mirrors its state.
+- **가사 배치**: 전체 화면 스타일 설정에서 따로 조절하며, 가사 페이지의 배치는 그대로입니다. 이전 줄은 불투명도를 낮추고 다음 줄은 현재 줄 색을 섞어, 다음 줄이 이전 줄보다 잘 보입니다.\
+  **Lyric layout**: adjusted in the fullscreen style settings; the lyrics page keeps its own layout. Past lines are dimmed and upcoming lines are blended toward the current color, so the next line reads more clearly than the previous one.
 
   | 설정 / Setting | 기본값 / Default | 설명 / Description |
   | --- | --- | --- |
-  | 지나간 가사 표시 줄 수 / Past lines kept on screen | 2 | 이미 부른 줄을 현재 줄 위에 남깁니다. / Already-sung lines stay above the current line. |
-  | 가사 줄 사이 추가 간격 / Extra space between lines | 12px | 글자 크기만큼 벌어지던 줄 간격을 대신합니다. / Replaces the font-size-wide gap between lines. |
+  | 지나간 가사 표시 줄 수 / Past lines kept on screen | 1 | 이미 부른 줄을 현재 줄 위에 남깁니다. / Already-sung lines stay above the current line. |
+  | 다음 가사 표시 줄 수 / Upcoming lines shown | 1 | 앞으로 부를 줄을 현재 줄 아래에 보여 줍니다. / Upcoming lines shown below the current line. |
+  | 다음 가사 선명도 / Visibility of upcoming lines | 45% | 다음 줄 색을 현재 줄 색과 이만큼 섞습니다. / Blends upcoming lines toward the current line's color. |
+  | 이전 가사 불투명도 / Opacity of past lines | 75% | 이미 부른 줄을 이 불투명도로 눌러 둡니다. / Already-sung lines are dimmed to this opacity. |
+  | 가사 줄 사이 추가 간격 / Extra space between lines | 28px | 글자 크기만큼 벌어지던 줄 간격을 대신합니다. / Replaces the font-size-wide gap between lines. |
   | 현재 줄에서 멀어질 때 축소 비율 / Shrink per line away from the current one | 8% | 한 줄 멀어질 때마다 그만큼 작게, 최대 세 줄까지 적용합니다. / Each line farther is scaled down by this much, up to three lines. |
+
+### 설정 창 / Settings window
+
+- **좁은 창 배치**: 원본은 창 너비 1100px과 900px 아래에서 한 열로 접으면서 사이드바를 220px 높이 상자로 줄여 메뉴가 잘렸습니다. 두 열 배치를 860px까지 유지하고, 접힌 뒤의 사이드바 높이를 화면의 42%(최대 380px)로 늘렸습니다.\
+  **Narrow-window layout**: upstream collapsed to one column below 1100 px and 900 px, shrinking the sidebar to a 220 px box that clipped the menu. The two-column layout now holds down to 860 px, and the collapsed sidebar grows to 42 % of the viewport (max 380 px).
+- **가독성**: 설정 창의 글자 크기와 두께를 한 단계 올리고 보조 텍스트의 대비를 높였습니다. 글꼴 순서는 Pretendard와 macOS 시스템 글꼴을 앞에 둡니다.\
+  **Legibility**: font sizes and weights are one step larger and secondary text has more contrast. Pretendard and the macOS system font come first in the font stack.
+- **원저자 후원 버튼**: 헤더의 후원 버튼을 "원저자 후원"으로 이름을 바꾸고 작게 줄였습니다.\
+  **Support the original author**: the header donate button is renamed and made smaller.
 
 ### 업데이트 알림 / Update notice
 
