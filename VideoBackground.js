@@ -1617,7 +1617,8 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         className: `ivlyrics-video-ambient color-gradient-bg${showAmbient ? " is-visible" : ""}`,
         style: {
             ...(ambientColorVars || {}),
-            filter: `brightness(${brightnessRatio}) saturate(2.5)`,
+            // 앨범 팔레트는 이미 선명한 색이므로 채도는 거의 손대지 않는다.
+            filter: `brightness(${brightnessRatio}) saturate(1.15)`,
         },
     },
         [1, 2, 3, 4, 5, 6].map((index) => react.createElement("div", {

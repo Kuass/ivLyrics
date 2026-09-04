@@ -932,6 +932,7 @@
     const CHARACTER_PRONUNCIATION_WORD_TEXT_RE = /[\p{L}\p{N}]/u;
     const CHARACTER_PRONUNCIATION_LETTER_RE = /\p{L}/u;
     const CHARACTER_PRONUNCIATION_LATIN_LETTER_RE = /\p{Script=Latin}/u;
+    const WRONG_SCRIPT_LINE_MAX_RATIO = 0.3;
 
     const getPronunciationScriptRule = (lang) => {
         const normalizedLang = String(lang || 'en').trim().replace(/_/g, '-').toLowerCase();
@@ -986,6 +987,34 @@ ${isWordMode ? '- In word mode, return each spoken word as one u item, never as 
 - For 爺ちゃん, combine small ゃ with the preceding ち reading and leave the ゃ slot empty when the target writing system does not need a separate mark.`;
     };
 
+    // LLM 응답의 흔한 실수(빈 줄 생략, 앞뒤 여분 줄, 한두 줄 비움)는 결과 전체를 버리고 다음 제공자로
+    // 넘어가는 대신 해당 줄만 고쳐 쓴다. 재시도마다 화면이 지워지고 다시 그려지는 일을 줄이기 위한 것이다.
+    // 줄 수가 맞지 않으면 앞뒤 빈 줄을 정리한다. 그래도 다르면, 모델이 빈 줄만 생략한 경우(응답에 빈 줄이
+    // 없고 내용 있는 줄 수가 원문과 같음)에만 원문의 빈 줄 자리를 다시 넣어 맞춘다. 그 밖의 불일치는
+    // 어느 줄이 합쳐지거나 지어낸 것인지 알 수 없으므로 null을 돌려 실패로 처리한다.
+    const repairLyricsResultLines = (lines, sourceLines) => {
+        if (lines.length === sourceLines.length) return lines;
+        const repaired = [...lines];
+        while (repaired.length > sourceLines.length && !repaired[repaired.length - 1].trim()) repaired.pop();
+        while (repaired.length > sourceLines.length && !repaired[0].trim()) repaired.shift();
+        if (repaired.length === sourceLines.length) return repaired;
+
+        const sourceContentCount = sourceLines.filter(line => line.trim()).length;
+        const outputHasBlankLines = repaired.some(line => !line.trim());
+        if (outputHasBlankLines || repaired.length !== sourceContentCount) return null;
+        // ponytail: 두 줄이 합쳐지고 다른 줄이 지어내져 줄 수가 우연히 맞으면 잡지 못한다. 줄 수가 정확히 맞는
+        // 응답도 같은 한계를 갖고 있으므로, 의미 비교가 필요해지면 원문·결과의 줄 길이 비율 검사를 추가한다.
+        window.__ivLyricsDebugLog?.(`[AIAddonManager] Reinserted ${sourceLines.length - repaired.length} blank line(s) the model skipped`);
+        let cursor = 0;
+        return sourceLines.map(source => (source.trim() ? repaired[cursor++] : ''));
+    };
+
+    // 내용이 있어야 할 자리가 비어 있으면 원문을 그대로 넣는다. 표시 단계에서 원문과 같은 결과는
+    // 숨겨지므로 그 줄만 번역·발음 없이 보이고, 나머지 줄은 살아남는다.
+    const fillMissingLyricsResultLines = (lines, sourceLines) => lines.map((line, index) => (
+        sourceLines[index].trim() && !line.trim() ? sourceLines[index] : line
+    ));
+
     const validateLyricsTranslationResult = (result, params, providerId) => {
         const field = params?.wantSmartPhonetic ? 'phonetic' : 'translation';
         const value = field === 'translation'
@@ -1000,19 +1029,19 @@ ${isWordMode ? '- In word mode, return each spoken word as one u item, never as 
         if (!lines) {
             throw new Error(`[AIAddonManager] Provider ${providerLabel} returned an invalid ${field} result`);
         }
-        if (lines.length !== sourceLines.length) {
+        const aligned = repairLyricsResultLines(lines, sourceLines);
+        if (!aligned) {
             throw new Error(`[AIAddonManager] Provider ${providerLabel} returned ${lines.length} lines; expected ${sourceLines.length}`);
         }
-        if (lines.every(line => !line.trim())) {
+        if (aligned.every(line => !line.trim())) {
             throw new Error(`[AIAddonManager] Provider ${providerLabel} returned an empty ${field} result`);
         }
 
-        const missingLineIndex = lines.findIndex((line, index) => sourceLines[index].trim() && !line.trim());
-        if (missingLineIndex >= 0) {
-            throw new Error(`[AIAddonManager] Provider ${providerLabel} returned an empty line at index ${missingLineIndex + 1}`);
-        }
-
-        return result;
+        const filled = fillMissingLyricsResultLines(aligned, sourceLines);
+        const changed = filled.some((line, index) => line !== lines[index]) || filled.length !== lines.length;
+        if (!changed) return result;
+        window.__ivLyricsDebugLog?.(`[AIAddonManager] Repaired ${field} lines from ${providerLabel} (${lines.length} → ${filled.length})`);
+        return { ...result, [field]: filled };
     };
 
     const validateLyricsPhoneticWritingSystem = (result, params, providerId) => {
@@ -1026,19 +1055,30 @@ ${isWordMode ? '- In word mode, return each spoken word as one u item, never as 
             : (typeof result?.phonetic === 'string'
                 ? result.phonetic.replace(/\r\n?/g, '\n').split('\n')
                 : []);
+        const sourceLines = String(params?.text ?? '').replace(/\r\n?/g, '\n').split('\n');
         const disallowedIpaScript = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Cyrillic}\p{Script=Arabic}\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Thai}]/u;
-        const invalidLine = lines.find((line) => Array.from(String(line || '')).some((character) => {
+        const isWrongScriptLine = (line) => Array.from(String(line || '')).some((character) => {
             if (notation === 'ipa') return disallowedIpaScript.test(character);
             return CHARACTER_PRONUNCIATION_LETTER_RE.test(character)
                 && !CHARACTER_PRONUNCIATION_LATIN_LETTER_RE.test(character);
-        }));
+        });
+        const invalidIndexes = lines
+            .map((line, index) => (isWrongScriptLine(line) ? index : -1))
+            .filter(index => index >= 0);
+        if (invalidIndexes.length === 0) return result;
 
-        if (invalidLine !== undefined) {
+        // 원문 문자가 남은 줄이 일부(30% 이하)면 그 줄만 원문으로 되돌려 발음 없이 보이게 하고 나머지는 살린다.
+        const contentLineCount = Math.max(1, lines.filter(line => String(line || '').trim()).length);
+        if (invalidIndexes.length > Math.max(1, Math.floor(contentLineCount * WRONG_SCRIPT_LINE_MAX_RATIO))) {
             throw new Error(
-                `[AIAddonManager] Provider ${String(providerId || 'unknown')} returned pronunciation in the wrong writing system for ${notation}: ${String(invalidLine).slice(0, 48)}`
+                `[AIAddonManager] Provider ${String(providerId || 'unknown')} returned pronunciation in the wrong writing system for ${notation}: ${String(lines[invalidIndexes[0]]).slice(0, 48)}`
             );
         }
-        return result;
+        window.__ivLyricsDebugLog?.(`[AIAddonManager] Dropped ${invalidIndexes.length} wrong-script pronunciation line(s) from ${String(providerId || 'unknown')}`);
+        const repaired = lines.map((line, index) => (
+            invalidIndexes.includes(index) ? (sourceLines[index] ?? '') : line
+        ));
+        return { ...result, phonetic: repaired };
     };
 
     // ============================================

@@ -1153,6 +1153,16 @@ function normalizeIvLyricsTrackBackgroundOverride(value) {
   return { mode };
 }
 
+// 영상 배경 대체 화면용: 앨범 팔레트에서 바탕색 하나와 블롭 색 둘을 고른다.
+function getAlbumAmbientColors(palette) {
+  if (!palette || typeof palette !== "object") return null;
+  const base = palette.DARK_VIBRANT || palette.DESATURATED || palette.VIBRANT_NON_ALARMING;
+  const blob1 = palette.VIBRANT || palette.VIBRANT_NON_ALARMING || palette.PROMINENT;
+  const blob2 = palette.LIGHT_VIBRANT || palette.PROMINENT || blob1;
+  if (!base || !blob1) return null;
+  return { minContrast: base, highContrast: blob1, overlayColor: blob2 };
+}
+
 // 블러 그라데이션 배경과 영상 배경의 대체 화면이 함께 쓰는 앨범 색상 CSS 변수.
 function buildAmbientGradientColorVars(dynamicColors) {
   // hex/rgb 문자열에서 RGB 값 추출
@@ -1186,7 +1196,9 @@ function shouldFetchIvLyricsBackgroundColors(mode) {
   return (
     mode === "colorful" ||
     mode === "gradient-background" ||
-    mode === "blur-gradient-background"
+    mode === "blur-gradient-background" ||
+    // 영상 배경도 대체 화면에 앨범 팔레트를 쓰므로, 곡 중간에 모드를 바꿔도 색을 새로 받는다.
+    mode === "video-background"
   );
 }
 
@@ -6297,6 +6309,8 @@ class LyricsContainer extends react.Component {
     let translationLoadingToken = null;
     let phoneticCompleted = false;
     let translationCompleted = false;
+    // 모든 제공자가 실패하면 스트리밍으로 보여 준 부분 결과를 요청 전 상태로 되돌린다.
+    let restoreProvisionalDisplay = null;
     const regenerationToastKind = needPhonetic && needTranslation
       ? "both"
       : needPhonetic
@@ -6443,6 +6457,20 @@ class LyricsContainer extends react.Component {
           displayMode2: mode2,
         });
       };
+      restoreProvisionalDisplay = () => {
+        streamedLyrics1 = initialStreamedLyrics1;
+        streamedLyrics2 = initialStreamedLyrics2;
+        pushStreamingUpdate();
+      };
+
+      // 재시도로 스트림이 다시 시작되면 이미 보여 준 줄을 지우지 않고, 새 줄이 도착할 때까지 남겨 둔다.
+      // 그래야 발음·번역이 깜빡이며 사라졌다 나타나는 일이 없다.
+      let stalePhoneticLines = [];
+      let staleTranslationLines = [];
+      const mergeWithStale = (streamed, stale) => Array.from(
+        { length: Math.max(streamed.length, stale.length) },
+        (_, index) => streamed[index] ?? stale[index] ?? ""
+      );
 
       const handlePhoneticStreamLine = needPhonetic
         ? (lineIndex, lineText) => {
@@ -6456,7 +6484,7 @@ class LyricsContainer extends react.Component {
           streamedPhoneticLines[lineIndex] =
             typeof lineText === "string" ? lineText : String(lineText ?? "");
 
-          const partialMapped = mapResultLinesToLyrics(streamedPhoneticLines, "phonetic");
+          const partialMapped = mapResultLinesToLyrics(mergeWithStale(streamedPhoneticLines, stalePhoneticLines), "phonetic");
           if (!partialMapped) {
             return;
           }
@@ -6472,10 +6500,8 @@ class LyricsContainer extends react.Component {
         : null;
       const handlePhoneticStreamReset = needPhonetic
         ? () => {
+          stalePhoneticLines = mergeWithStale(streamedPhoneticLines, stalePhoneticLines);
           streamedPhoneticLines.length = 0;
-          if (mode1 === "gemini_romaji") streamedLyrics1 = initialStreamedLyrics1;
-          if (mode2 === "gemini_romaji") streamedLyrics2 = initialStreamedLyrics2;
-          pushStreamingUpdate();
         }
         : null;
 
@@ -6490,8 +6516,9 @@ class LyricsContainer extends react.Component {
 
           streamedTranslationLines[lineIndex] =
             typeof lineText === "string" ? lineText : String(lineText ?? "");
+          const mergedTranslationLines = mergeWithStale(streamedTranslationLines, staleTranslationLines);
 
-          const partialMapped = mapResultLinesToLyrics(streamedTranslationLines, "translation");
+          const partialMapped = mapResultLinesToLyrics(mergedTranslationLines, "translation");
           if (!partialMapped) {
             return;
           }
@@ -6507,10 +6534,8 @@ class LyricsContainer extends react.Component {
         : null;
       const handleTranslationStreamReset = needTranslation
         ? () => {
+          staleTranslationLines = mergeWithStale(streamedTranslationLines, staleTranslationLines);
           streamedTranslationLines.length = 0;
-          if (mode1 === "gemini_ko") streamedLyrics1 = initialStreamedLyrics1;
-          if (mode2 === "gemini_ko") streamedLyrics2 = initialStreamedLyrics2;
-          pushStreamingUpdate();
         }
         : null;
 
@@ -6651,6 +6676,7 @@ class LyricsContainer extends react.Component {
       this.lyricsSource(this.state, currentMode);
       Toast.success(regenerationToastSuccess);
     } catch (error) {
+      restoreProvisionalDisplay?.();
       if (this.isCurrentLyricsUri(requestUri)) {
         Toast.error(`${regenerationToastFailure}: ${error.message}`);
       }
@@ -6865,6 +6891,17 @@ class LyricsContainer extends react.Component {
       }
     }
 
+    // 영상 배경의 대체 화면은 Spotify가 앨범 아트에서 뽑은 팔레트(VIBRANT 등)를 그대로 쓴다.
+    // 배경용 기본색(backgroundBase)은 어두운 톤이라 채도를 올리면 붉거나 탁하게 치우친다.
+    let albumPalette = null;
+    if (this.getEffectiveBackgroundMode() === "video-background") {
+      try {
+        albumPalette = (await Spicetify.colorExtractor?.(uri)) || null;
+      } catch (error) {
+        console.warn("[ivLyrics] Failed to extract the album palette:", error);
+      }
+    }
+
     if (this.currentTrackUri !== uri) {
       return;
     }
@@ -6876,6 +6913,7 @@ class LyricsContainer extends react.Component {
       },
       colorsUri: uri,
       dynamicColors,
+      albumPalette,
     });
   }
 
@@ -10377,7 +10415,9 @@ class LyricsContainer extends react.Component {
         videoScale: CONFIG.visual["video-scale"],
         externalVideoInfo: this.state.videoInfo,
         onLoadingChange: this.handleVideoBackgroundLoadingChange,
-        ambientColorVars: buildAmbientGradientColorVars(this.state.dynamicColors)
+        ambientColorVars: buildAmbientGradientColorVars(
+          getAlbumAmbientColors(this.state.albumPalette) || this.state.dynamicColors
+        )
       }),
       shouldRenderStaticBackground && react.createElement("div", {
         className: "lyrics-lyricsContainer-LyricsBackground",

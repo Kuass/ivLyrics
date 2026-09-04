@@ -76,6 +76,8 @@ Every AI feature runs only when at least one LLM provider is enabled, and each h
   **Translation context and user instructions**: the translation prompt includes the song title and artist so the model picks a register that fits the narrator and genre. Settings > AI providers > "Extra instructions for AI translation" is appended to every LLM request; changing it invalidates cached translations.
 - **언어 감지 AI 보조**: 규칙 기반 감지기가 확신하지 못한 곡(로마자 표기, 여러 언어 혼용, 스페인어와 포르투갈어처럼 비슷한 라틴 문자 언어)만 LLM 제공자에게 묻습니다. 답이 다르면 그 곡의 언어 오버라이드로 저장하므로 옵션 메뉴에서 바로 확인하고 고칠 수 있습니다. 설정: "언어 감지가 애매하면 AI에게 확인".\
   **AI-assisted language detection**: only songs the rule-based detector is unsure about (romanized lyrics, mixed languages, similar Latin-script languages) are sent to an LLM. A differing answer is stored as that track's language override, visible and editable in the options menu. Setting: "Ask AI when language detection is unsure".
+- **AI 결과 자동 복구**: 번역·발음 응답의 줄 수가 원문과 다르면 앞뒤 빈 줄을 정리하고 빠진 빈 줄을 다시 넣어 맞추며, 비어 있는 줄은 원문으로 채워 그 줄만 보조 표기 없이 보여 줍니다. 발음에 원문 문자가 남은 줄이 30% 이하이면 그 줄만 되돌리고 나머지는 살립니다. 스트림이 재시도로 다시 시작될 때 이미 보여 준 줄을 지우지 않고 새 줄이 덮어쓸 때까지 유지합니다. 이전에는 이런 오류 하나에도 결과 전체를 버리고 다음 제공자로 넘어가 화면이 깜빡였습니다.\
+  **AI result repair**: when a translation or pronunciation reply has a different line count, stray leading/trailing blank lines are dropped and skipped blank lines are reinserted; empty lines are filled with the original so only that line loses its supplement. Pronunciation lines that still contain source-script characters are reverted individually as long as they are at most 30 % of the lines. When a stream restarts on retry the lines already shown stay until new ones overwrite them. Previously any one of these errors discarded the whole result, moved to the next provider and made the screen flicker.
 - **화자 제안**: 싱크 데이터 제작기의 "AI 화자 제안" 버튼이 줄마다 화자 초안을 배정합니다. 결과는 기존 화자 편집 도구로 고칩니다.\
   **Speaker suggestion**: the "AI speaker suggestion" button in the sync data creator drafts a speaker for every line, editable with the existing tools.
 - **공식 영상 AI 판정**: 채널과 제목 규칙이 확답하지 못할 때만 검색 상위 후보의 제목·채널·길이를 보내 공식 뮤직비디오를 고르게 합니다. 오디오 전용 업로드는 후보에서 뺍니다. 설정: "애매한 공식 영상 판정은 AI에게".\
@@ -94,8 +96,8 @@ Every AI feature runs only when at least one LLM provider is enabled, and each h
 
 ### 전체 화면 / Fullscreen
 
-- **곡 전환**: 곡이 바뀌면 이전 영상이 검정으로 페이드아웃된 뒤 정리되고, 새 영상은 준비되는 대로 검정 위로 페이드인합니다. 영상이 없거나 불러오지 못한 곡, 그리고 재생을 멈춘 동안에는 앨범 아트 대신 앨범 색상으로 만든 블롭 그라데이션(블러 그라데이션 배경과 같은 모양)이 떠오릅니다. 제목과 아티스트 글자는 짧게 떠오르며 바뀝니다.\
-  **Track transitions**: on a track change the previous video fades to black before disposal and the new video fades in over black once it is ready. When a track has no video, the video fails to load, or playback is paused, an album-colour blob gradient (the same look as the blur-gradient background) fades in instead of album art. Title and artist text animate in.
+- **곡 전환**: 곡이 바뀌면 이전 영상이 검정으로 페이드아웃된 뒤 정리되고, 새 영상은 준비되는 대로 검정 위로 페이드인합니다. 영상이 없거나 불러오지 못한 곡, 그리고 재생을 멈춘 동안에는 앨범 아트 대신 Spotify가 앨범 아트에서 뽑은 팔레트(VIBRANT·DARK_VIBRANT·LIGHT_VIBRANT)로 만든 블롭 그라데이션(블러 그라데이션 배경과 같은 모양)이 떠오릅니다. 제목과 아티스트 글자는 짧게 떠오르며 바뀝니다.\
+  **Track transitions**: on a track change the previous video fades to black before disposal and the new video fades in over black once it is ready. When a track has no video, the video fails to load, or playback is paused, a blob gradient built from Spotify's album-art palette (VIBRANT, DARK_VIBRANT, LIGHT_VIBRANT; the same look as the blur-gradient background) fades in instead of album art. Title and artist text animate in.
 - **가사 로드 전환**: 가사가 아직 없을 때는 앨범 아트가 화면 가운데에 있다가, 가사가 로드되면 옆으로 밀리면서 가사 열이 아래에서 떠오릅니다. 두 열 배치를 유지한 채 왼쪽 패널만 이동시키므로 레이아웃이 한 번에 바뀌지 않습니다.\
   **Lyrics load transition**: while no lyrics are loaded the album art sits in the centre; once lyrics arrive it slides aside and the lyrics column rises in. The two-column grid is kept and only the left panel moves, so the layout never snaps.
 - **제목 자동 축소**: 긴 제목은 글자 크기가 자동으로 줄어듭니다. 한글·한자·가나는 라틴 문자보다 넓게 계산하고, 설정 크기의 55% 아래로는 내려가지 않습니다.\
@@ -220,6 +222,7 @@ Run unit tests with `node --test tests/`.
 | `tests/broken_sync_timing.test.mjs` | 깨진 타임스탬프 판별 / broken timestamp detection |
 | `tests/romanized_korean_fallback.test.mjs` | 로마자 표기 한국어 가사 판별 / romanized Korean lyrics detection |
 | `tests/inline_pronunciation.test.mjs` | 원문 조각·발음 짝짓기 / pronunciation chunk pairing |
+| `tests/ai_result_repair.test.mjs` | AI 응답 줄 수 복구 / AI reply line repair |
 | `tests/video_background_sync.test.mjs` | 영상 되감기 보정 / video seek correction |
 
 저장소를 `~/.config/spicetify/CustomApps/ivLyrics`에 두지 않아도 됩니다. 수정 후에는 `ivlyrics update --ref <branch>`로 설치하거나, `rsync`로 복사한 뒤 `spicetify apply`를 실행합니다.\
