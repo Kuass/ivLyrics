@@ -24,6 +24,22 @@ const FullscreenOverlay = (() => {
     };
 
     // Trim title helper - removes (Remaster), [feat. xxx], - Live Version, etc.
+    // 긴 제목은 글자 수에 맞춰 font-size를 줄인다. 한글·한자·가나는 라틴 문자보다 넓어 1.7자로 센다.
+    // 기준 폭까지는 설정한 크기를 그대로 쓰고, 그 뒤로는 완만히 줄어들다가 55%에서 멈춘다.
+    const FULLSCREEN_TITLE_COMFORTABLE_WIDTH = 18;
+    const FULLSCREEN_TITLE_MIN_SCALE = 0.55;
+    const WIDE_GLYPH_PATTERN = /[\u1100-\u11FF\u3040-\u30FF\u3130-\u318F\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF\uFF00-\uFFEF]/u;
+    const fitFullscreenTitleSize = (text, baseSize) => {
+        const width = Array.from(String(text || "")).reduce(
+            (sum, glyph) => sum + (WIDE_GLYPH_PATTERN.test(glyph) ? 1.7 : 1),
+            0
+        );
+        if (width <= FULLSCREEN_TITLE_COMFORTABLE_WIDTH) return baseSize;
+        const scale = Math.max(FULLSCREEN_TITLE_MIN_SCALE, Math.sqrt(FULLSCREEN_TITLE_COMFORTABLE_WIDTH / width));
+        return Math.round(baseSize * scale);
+    };
+    window.__ivLyricsFitFullscreenTitleSize = fitFullscreenTitleSize;
+
     const trimTitle = (title) => {
         if (!title) return title;
         const trimmed = title
@@ -3048,38 +3064,39 @@ const FullscreenOverlay = (() => {
 
                                     // Apply trimTitle if enabled
                                     const applyTrim = (text) => trimTitleEnabled ? trimTitle(text) : text;
+                                    const fitTitle = (text, scale = 1) => fitFullscreenTitleSize(text, Math.round(titleSize * scale));
 
                                     switch (mode) {
                                         case "translated":
                                             // 번역만 표시 (없으면 원어)
                                             elements.push(react.createElement("div", {
-                                                key: "title-main",
+                                                key: `title-main:${currentTrackUri || ""}`,
                                                 className: "lyrics-fullscreen-title",
-                                                style: { fontSize: `${titleSize}px` }
+                                                style: { fontSize: `${fitTitle(applyTrim(translatedTitle || originalTitle))}px` }
                                             }, applyTrim(translatedTitle || originalTitle)));
                                             break;
 
                                         case "romanized":
                                             // 발음만 표시 (없으면 원어)
                                             elements.push(react.createElement("div", {
-                                                key: "title-main",
+                                                key: `title-main:${currentTrackUri || ""}`,
                                                 className: "lyrics-fullscreen-title",
-                                                style: { fontSize: `${titleSize}px` }
+                                                style: { fontSize: `${fitTitle(applyTrim(romanizedTitle || originalTitle))}px` }
                                             }, applyTrim(romanizedTitle || originalTitle)));
                                             break;
 
                                         case "original-translated":
                                             // 원어 + 번역
                                             elements.push(react.createElement("div", {
-                                                key: "title-original",
+                                                key: `title-original:${currentTrackUri || ""}`,
                                                 className: "lyrics-fullscreen-title",
-                                                style: { fontSize: `${titleSize}px` }
+                                                style: { fontSize: `${fitTitle(applyTrim(originalTitle))}px` }
                                             }, applyTrim(originalTitle)));
                                             if (translatedTitle && translatedTitle !== originalTitle) {
                                                 elements.push(react.createElement("div", {
-                                                    key: "title-translated",
+                                                    key: `title-translated:${currentTrackUri || ""}`,
                                                     className: "lyrics-fullscreen-title-translated",
-                                                    style: { fontSize: `${Math.round(titleSize * 0.6)}px` }
+                                                    style: { fontSize: `${fitTitle(applyTrim(translatedTitle), 0.6)}px` }
                                                 }, applyTrim(translatedTitle)));
                                             }
                                             break;
@@ -3087,15 +3104,15 @@ const FullscreenOverlay = (() => {
                                         case "original-romanized":
                                             // 원어 + 발음
                                             elements.push(react.createElement("div", {
-                                                key: "title-original",
+                                                key: `title-original:${currentTrackUri || ""}`,
                                                 className: "lyrics-fullscreen-title",
-                                                style: { fontSize: `${titleSize}px` }
+                                                style: { fontSize: `${fitTitle(applyTrim(originalTitle))}px` }
                                             }, applyTrim(originalTitle)));
                                             if (romanizedTitle && romanizedTitle !== originalTitle) {
                                                 elements.push(react.createElement("div", {
-                                                    key: "title-romanized",
+                                                    key: `title-romanized:${currentTrackUri || ""}`,
                                                     className: "lyrics-fullscreen-title-romanized",
-                                                    style: { fontSize: `${Math.round(titleSize * 0.5)}px` }
+                                                    style: { fontSize: `${fitTitle(applyTrim(romanizedTitle), 0.5)}px` }
                                                 }, applyTrim(romanizedTitle)));
                                             }
                                             break;
@@ -3104,22 +3121,22 @@ const FullscreenOverlay = (() => {
                                         default:
                                             // 모두 표시 (원어 + 번역 + 발음)
                                             elements.push(react.createElement("div", {
-                                                key: "title-original",
+                                                key: `title-original:${currentTrackUri || ""}`,
                                                 className: "lyrics-fullscreen-title",
-                                                style: { fontSize: `${titleSize}px` }
+                                                style: { fontSize: `${fitTitle(applyTrim(originalTitle))}px` }
                                             }, applyTrim(originalTitle)));
                                             if (translatedTitle && translatedTitle !== originalTitle) {
                                                 elements.push(react.createElement("div", {
-                                                    key: "title-translated",
+                                                    key: `title-translated:${currentTrackUri || ""}`,
                                                     className: "lyrics-fullscreen-title-translated",
-                                                    style: { fontSize: `${Math.round(titleSize * 0.6)}px` }
+                                                    style: { fontSize: `${fitTitle(applyTrim(translatedTitle), 0.6)}px` }
                                                 }, applyTrim(translatedTitle)));
                                             }
                                             if (romanizedTitle && romanizedTitle !== originalTitle && romanizedTitle !== translatedTitle) {
                                                 elements.push(react.createElement("div", {
-                                                    key: "title-romanized",
+                                                    key: `title-romanized:${currentTrackUri || ""}`,
                                                     className: "lyrics-fullscreen-title-romanized",
-                                                    style: { fontSize: `${Math.round(titleSize * 0.5)}px` }
+                                                    style: { fontSize: `${fitTitle(applyTrim(romanizedTitle), 0.5)}px` }
                                                 }, applyTrim(romanizedTitle)));
                                             }
                                             break;
@@ -3143,7 +3160,7 @@ const FullscreenOverlay = (() => {
                                     switch (mode) {
                                         case "translated":
                                             elements.push(react.createElement("div", {
-                                                key: "artist-main",
+                                                key: `artist-main:${currentTrackUri || ""}`,
                                                 className: "lyrics-fullscreen-artist",
                                                 style: { fontSize: `${artistSize}px` }
                                             }, applyTrim(translatedArtist || originalArtist)));
@@ -3151,7 +3168,7 @@ const FullscreenOverlay = (() => {
 
                                         case "romanized":
                                             elements.push(react.createElement("div", {
-                                                key: "artist-main",
+                                                key: `artist-main:${currentTrackUri || ""}`,
                                                 className: "lyrics-fullscreen-artist",
                                                 style: { fontSize: `${artistSize}px` }
                                             }, applyTrim(romanizedArtist || originalArtist)));
@@ -3159,13 +3176,13 @@ const FullscreenOverlay = (() => {
 
                                         case "original-translated":
                                             elements.push(react.createElement("div", {
-                                                key: "artist-original",
+                                                key: `artist-original:${currentTrackUri || ""}`,
                                                 className: "lyrics-fullscreen-artist",
                                                 style: { fontSize: `${artistSize}px` }
                                             }, applyTrim(originalArtist)));
                                             if (translatedArtist && translatedArtist !== originalArtist) {
                                                 elements.push(react.createElement("div", {
-                                                    key: "artist-translated",
+                                                    key: `artist-translated:${currentTrackUri || ""}`,
                                                     className: "lyrics-fullscreen-artist-translated",
                                                     style: { fontSize: `${Math.round(artistSize * 0.8)}px` }
                                                 }, applyTrim(translatedArtist)));
@@ -3174,13 +3191,13 @@ const FullscreenOverlay = (() => {
 
                                         case "original-romanized":
                                             elements.push(react.createElement("div", {
-                                                key: "artist-original",
+                                                key: `artist-original:${currentTrackUri || ""}`,
                                                 className: "lyrics-fullscreen-artist",
                                                 style: { fontSize: `${artistSize}px` }
                                             }, applyTrim(originalArtist)));
                                             if (romanizedArtist && romanizedArtist !== originalArtist) {
                                                 elements.push(react.createElement("div", {
-                                                    key: "artist-romanized",
+                                                    key: `artist-romanized:${currentTrackUri || ""}`,
                                                     className: "lyrics-fullscreen-artist-romanized",
                                                     style: { fontSize: `${Math.round(artistSize * 0.8)}px` }
                                                 }, applyTrim(romanizedArtist)));
@@ -3190,13 +3207,13 @@ const FullscreenOverlay = (() => {
                                         case "all":
                                         default:
                                             elements.push(react.createElement("div", {
-                                                key: "artist-original",
+                                                key: `artist-original:${currentTrackUri || ""}`,
                                                 className: "lyrics-fullscreen-artist",
                                                 style: { fontSize: `${artistSize}px` }
                                             }, applyTrim(originalArtist)));
                                             if (translatedArtist && translatedArtist !== originalArtist) {
                                                 elements.push(react.createElement("div", {
-                                                    key: "artist-translated",
+                                                    key: `artist-translated:${currentTrackUri || ""}`,
                                                     className: "lyrics-fullscreen-artist-translated",
                                                     style: { fontSize: `${Math.round(artistSize * 0.8)}px` }
                                                 }, applyTrim(translatedArtist)));

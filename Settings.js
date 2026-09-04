@@ -130,7 +130,6 @@ const SETTINGS_OUTLINE_ICONS = Object.freeze({
   translate: "M4 5h8M8 3v2M6 5c0 4 2 7 6 9M11 5c-.4 3.4-2.2 6.2-5.5 8M14 21l3.5-9L21 21M15.5 18h4",
   metadata: "M4 4h7l9 9-7 7-9-9V4Zm4 4h.01",
   tmi: "M21 12a9 9 0 0 1-9 9H5l1.8-3.2A9 9 0 1 1 21 12Zm-9-1v5M12 7h.01",
-  lyricsStudy: "M4 5.5A3.5 3.5 0 0 1 7.5 2H12v17H7.5A3.5 3.5 0 0 0 4 22V5.5ZM20 5.5A3.5 3.5 0 0 0 16.5 2H12v17h4.5A3.5 3.5 0 0 1 20 22V5.5Z",
   characterPronunciation: "M5 9v6M9 6v12M13 9v6M17 4v16M21 8v8",
   culturalAnnotations: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-20c3 3 4.5 6.3 4.5 10S15 19 12 22M12 2C9 5 7.5 8.3 7.5 12S9 19 12 22M2 12h20",
 });
@@ -212,9 +211,6 @@ const AddonSettingsCard = ({ addon, isEnabled, onToggle, isExpanded, onExpandTog
     }
     if (addon.supports?.tmi) {
       badges.push(react.createElement(ProviderSupportIconChip, { key: "tmi", type: "tmi", label: I18n.t("settings.aiProviders.supports.tmi") || "Research" }));
-    }
-    if (addon.supports?.lyricsStudy) {
-      badges.push(react.createElement(ProviderSupportIconChip, { key: "lyricsStudy", type: "lyricsStudy", label: I18n.t("settings.aiProviders.supports.lyricsStudy") || "Lyrics study" }));
     }
     if (addon.supports?.characterPronunciation) {
       badges.push(react.createElement(ProviderSupportIconChip, { key: "characterPronunciation", type: "characterPronunciation", label: I18n.t("settings.aiProviders.supports.characterPronunciation") || "Pronunciation" }));
@@ -747,6 +743,15 @@ const AIProvidersTab = () => {
   const [translationStyle, setTranslationStyle] = useState(
     () => window.AIAddonManager?.getTranslationStyle?.() || "natural"
   );
+  const [translationInstruction, setTranslationInstruction] = useState(
+    () => window.AIAddonManager?.getTranslationInstruction?.() || ""
+  );
+  const translationInstructionMaxLength =
+    window.AIAddonManager?.TRANSLATION_INSTRUCTION_MAX_LENGTH || 600;
+  const commitTranslationInstruction = (value) => {
+    const saved = window.AIAddonManager?.setTranslationInstruction?.(value);
+    setTranslationInstruction(typeof saved === "string" ? saved : String(value || "").trim());
+  };
   const [providerRetryCount, setProviderRetryCount] = useState(
     () => window.AIAddonManager?.getProviderRetryCount?.() ?? 2
   );
@@ -759,6 +764,7 @@ const AIProvidersTab = () => {
   useEffect(() => {
     let retryTimer = null;
     let unsubscribeStyle = null;
+    let unsubscribeInstruction = null;
     let unsubscribeRetryCount = null;
     let disposed = false;
 
@@ -778,10 +784,14 @@ const AIProvidersTab = () => {
         });
         setEnabledProviders(enabled);
         setTranslationStyle(window.AIAddonManager.getTranslationStyle?.() || "natural");
+        setTranslationInstruction(window.AIAddonManager.getTranslationInstruction?.() || "");
         setProviderRetryCount(window.AIAddonManager.getProviderRetryCount?.() ?? 2);
 
         unsubscribeStyle = window.AIAddonManager.on?.("translation:style:changed", ({ style }) => {
           if (!disposed) setTranslationStyle(style || "natural");
+        });
+        unsubscribeInstruction = window.AIAddonManager.on?.("translation:instruction:changed", ({ instruction }) => {
+          if (!disposed) setTranslationInstruction(instruction || "");
         });
         unsubscribeRetryCount = window.AIAddonManager.on?.("provider:retry-count:changed", ({ retryCount }) => {
           if (!disposed) setProviderRetryCount(Number(retryCount) || 0);
@@ -796,6 +806,7 @@ const AIProvidersTab = () => {
       disposed = true;
       if (retryTimer) clearTimeout(retryTimer);
       if (typeof unsubscribeStyle === "function") unsubscribeStyle();
+      if (typeof unsubscribeInstruction === "function") unsubscribeInstruction();
       if (typeof unsubscribeRetryCount === "function") unsubscribeRetryCount();
     };
   }, [refreshKey]);
@@ -958,6 +969,30 @@ const AIProvidersTab = () => {
               )
             );
           })
+        ),
+        react.createElement("div", { className: "ai-translation-instruction" },
+          react.createElement("label", {
+            className: "ai-translation-style-title",
+            htmlFor: "ai-translation-instruction-input"
+          }, I18n.t("settings.aiProviders.translationInstruction.title") || "Extra instructions for AI translation"),
+          react.createElement("p", { className: "ai-translation-style-description" },
+            I18n.t("settings.aiProviders.translationInstruction.description")
+              || "Free-form preferences added to every AI translation request, such as tone, honorifics, or names to keep in the original script. Saved when you leave the field."
+          ),
+          react.createElement("textarea", {
+            id: "ai-translation-instruction-input",
+            className: "config-text-input",
+            rows: 3,
+            maxLength: translationInstructionMaxLength,
+            value: translationInstruction,
+            placeholder: I18n.t("settings.aiProviders.translationInstruction.placeholder")
+              || "e.g. Use casual speech. Keep member names in the original script. Do not soften profanity.",
+            onChange: (event) => setTranslationInstruction(event.target.value),
+            onBlur: (event) => commitTranslationInstruction(event.target.value),
+          }),
+          react.createElement("div", { className: "ai-translation-style-description" },
+            `${translationInstruction.length}/${translationInstructionMaxLength}`
+          )
         )
       ),
       react.createElement(OptionList, {
@@ -981,6 +1016,19 @@ const AIProvidersTab = () => {
             ?? (Number.isFinite(numericValue) ? numericValue : 2);
           setProviderRetryCount(nextValue);
         },
+      }),
+      react.createElement(OptionList, {
+        items: [
+          {
+            desc: I18n.t("settings.aiLanguageDetection.label") || "Ask AI when language detection is unsure",
+            key: "translate:ai-language-detection",
+            info: I18n.t("settings.aiLanguageDetection.desc")
+              || "When the built-in detector cannot tell the language (romanized lyrics, mixed languages, similar Latin-script languages), ask an enabled AI provider and save the answer as this track's language.",
+            type: ConfigSlider,
+            defaultValue: CONFIG.visual["translate:ai-language-detection"] !== false,
+          },
+        ],
+        onChange: handleCulturalSettingChange,
       }),
       react.createElement("div", {
         className: `cultural-annotation-group${culturalAnnotationsEnabled ? " is-enabled" : ""}${culturalDetailsExpanded ? " is-expanded" : ""}`,
@@ -10921,8 +10969,7 @@ const ConfigModal = ({
 
 #${APP_NAME}-config-container .lyrics-type-toggle-chip.type-synced.active,
 #${APP_NAME}-config-container .lyrics-type-toggle-chip.type-character.active,
-#${APP_NAME}-config-container .ai-addon-cap-chip.cap-translate.active,
-#${APP_NAME}-config-container .ai-addon-cap-chip.cap-lyricsStudy.active {
+#${APP_NAME}-config-container .ai-addon-cap-chip.cap-translate.active {
     color: var(--accent-primary);
 }
 
@@ -16260,6 +16307,12 @@ const ConfigModal = ({
               info: I18n.t("settings.videoPreferOfficialChannel.desc") || "Verify the video's channel and replace fan uploads with the official music video when one exists",
               type: ConfigSlider,
             },
+            {
+              desc: I18n.t("settings.videoOfficialAiJudge.label") || "Let AI settle ambiguous official-video matches",
+              key: "video-official-ai-judge",
+              info: I18n.t("settings.videoOfficialAiJudge.desc") || "When the channel and title rules cannot decide, send the top search results (title, channel, length) to an enabled AI provider to pick the official music video",
+              type: ConfigSlider,
+            },
           ],
           onChange: handlePerformanceSettingChange,
         }),
@@ -17674,6 +17727,36 @@ const ConfigModal = ({
               step: 10,
               unit: "px",
               defaultValue: CONFIG.visual["fullscreen-lyrics-right-padding"] || 0,
+            },
+            {
+              desc: I18n.t("settingsAdvanced.fullscreenStyle.linesBefore.desc") || "Past lines kept on screen",
+              info: I18n.t("settingsAdvanced.fullscreenStyle.linesBefore.info") || "How many already-sung lines stay visible above the current line in fullscreen.",
+              key: "fullscreen-lines-before",
+              type: ConfigSelection,
+              options: [0, 1, 2, 3, 4],
+              defaultValue: CONFIG.visual["fullscreen-lines-before"] ?? 2,
+            },
+            {
+              desc: I18n.t("settingsAdvanced.fullscreenStyle.lineGap.desc") || "Extra space between lines",
+              info: I18n.t("settingsAdvanced.fullscreenStyle.lineGap.info") || "Gap added between neighbouring lyric lines in fullscreen. The lyrics page keeps its own spacing.",
+              key: "fullscreen-line-gap",
+              type: ConfigSliderRange,
+              min: 0,
+              max: 60,
+              step: 2,
+              unit: "px",
+              defaultValue: CONFIG.visual["fullscreen-line-gap"] ?? 12,
+            },
+            {
+              desc: I18n.t("settingsAdvanced.fullscreenStyle.lineScale.desc") || "Shrink per line away from the current one",
+              info: I18n.t("settingsAdvanced.fullscreenStyle.lineScale.info") || "Each line before or after the current one is scaled down by this much more, up to three lines away. 0 keeps every line the same size.",
+              key: "fullscreen-line-scale-step",
+              type: ConfigSliderRange,
+              min: 0,
+              max: 20,
+              step: 1,
+              unit: "%",
+              defaultValue: CONFIG.visual["fullscreen-line-scale-step"] ?? 8,
             },
           ],
           onChange: (name, value) => {

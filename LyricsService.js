@@ -665,14 +665,49 @@
 
     const Utils = {
         _langDetectCache: new Map(),
+        // 규칙 기반 감지가 확신하지 못한 판정의 캐시 키. AI 보조 판정의 대상이 된다.
+        _uncertainLangDetectKeys: new Set(),
         _maxLangCacheSize: 500,
 
-        _cacheLanguageResult(cacheKey, result) {
+        _cacheLanguageResult(cacheKey, result, uncertain = false) {
             if (this._langDetectCache.size >= this._maxLangCacheSize) {
                 const firstKey = this._langDetectCache.keys().next().value;
                 this._langDetectCache.delete(firstKey);
+                this._uncertainLangDetectKeys.delete(firstKey);
             }
             this._langDetectCache.set(cacheKey, result);
+            if (uncertain) this._uncertainLangDetectKeys.add(cacheKey);
+            else this._uncertainLangDetectKeys.delete(cacheKey);
+        },
+
+        _languageDetectionKey(lyrics) {
+            if (!Array.isArray(lyrics) || lyrics.length === 0) return null;
+            const rawLyrics = lyrics.map((line) => {
+                if (!line) return "";
+                if (typeof line === "string") return line;
+                if (typeof line === "object") return line.$$typeof ? "" : String(line.originalText || line.text || "");
+                return String(line || "");
+            }).join(" ");
+            return rawLyrics.trim() ? getLyricsTextCacheHash(rawLyrics) : null;
+        },
+
+        /**
+         * 규칙 기반 판정과 함께 그 판정이 확신할 만한지도 돌려준다.
+         * 로마자 표기나 라틴 문자 언어처럼 문자 집합만으로 가르기 어려운 경우가 uncertain이다.
+         */
+        detectLanguageDetailed(lyrics) {
+            const language = this.detectLanguage(lyrics);
+            const key = this._languageDetectionKey(lyrics);
+            return { language, uncertain: key !== null && this._uncertainLangDetectKeys.has(key) };
+        },
+
+        /**
+         * AI 판정으로 얻은 언어를 같은 가사의 캐시에 덮어써서, 이후 동기 호출도 같은 답을 받게 한다.
+         */
+        overrideDetectedLanguage(lyrics, language) {
+            const key = this._languageDetectionKey(lyrics);
+            if (!key || !language) return;
+            this._cacheLanguageResult(key, language, false);
         },
 
         getSafePlayerProgress() {
@@ -829,6 +864,7 @@
             const normalizedLatinLyrics = rawLyrics.toLowerCase().normalize("NFC");
             const latinWords = normalizedLatinLyrics.match(latinWordRegex) || [];
 
+            let latinVerdictUncertain = false;
             const detectLatinLanguageByScore = () => {
                 if (latinWords.length < 4) {
                     if (/\b(aku cinta kamu|aku sayang kamu|cinta kamu)\b/u.test(normalizedLatinLyrics)) return "id";
@@ -1021,6 +1057,7 @@
                 // language that never scored at all -- the leader is a better
                 // answer than English whenever anything scored meaningfully.
                 if (bestScore >= minScore) {
+                    latinVerdictUncertain = true;
                     return bestLang;
                 }
                 return null;
@@ -1173,7 +1210,7 @@
             // ---- Latin scripts ----------------------------------------------
             const latinScoreLanguage = detectLatinLanguageByScore();
             if (latinScoreLanguage) {
-                this._cacheLanguageResult(cacheKey, latinScoreLanguage);
+                this._cacheLanguageResult(cacheKey, latinScoreLanguage, latinVerdictUncertain);
                 return latinScoreLanguage;
             }
 
@@ -1196,7 +1233,7 @@
 
             const [diacriticLanguage, diacriticScore] = diacriticCandidates[0];
             if (diacriticScore >= 4) {
-                this._cacheLanguageResult(cacheKey, diacriticLanguage);
+                this._cacheLanguageResult(cacheKey, diacriticLanguage, true);
                 return diacriticLanguage;
             }
 
@@ -1204,11 +1241,11 @@
             // than anything else, but only answer at all when there is enough
             // text to have been judged.
             if (latinMatch && latinMatch.length > 2) {
-                this._cacheLanguageResult(cacheKey, "en");
+                this._cacheLanguageResult(cacheKey, "en", true);
                 return "en";
             }
 
-            this._cacheLanguageResult(cacheKey, null);
+            this._cacheLanguageResult(cacheKey, null, true);
             return null;
         }
     };
@@ -7656,6 +7693,14 @@
             return Utils.detectLanguage(lyrics);
         },
 
+        detectLanguageDetailed(lyrics) {
+            return Utils.detectLanguageDetailed(lyrics);
+        },
+
+        overrideDetectedLanguage(lyrics, language) {
+            return Utils.overrideDetectedLanguage(lyrics, language);
+        },
+
         /**
          * 사용자 해시 가져오기 (없으면 생성)
          * Utils에서 이동됨
@@ -8760,11 +8805,17 @@
             const translationStyle = wantSmartPhonetic
                 ? null
                 : (window.AIAddonManager?.getTranslationStyle?.() || 'natural');
+            const translationInstruction = wantSmartPhonetic
+                ? ''
+                : (window.AIAddonManager?.getTranslationInstruction?.() || '');
+            const styledSourceHash = translationStyle !== 'natural'
+                ? `${sourceTextHash}:style=${translationStyle}`
+                : sourceTextHash;
             const sourceHash = wantSmartPhonetic
                 ? `${sourceTextHash}:phonetic-prompt=${PHONETIC_PROMPT_CACHE_VERSION}:notation=${resolvedPronunciationNotation}`
-                : (translationStyle !== 'natural'
-                    ? `${sourceTextHash}:style=${translationStyle}`
-                    : sourceTextHash);
+                : (translationInstruction
+                    ? `${styledSourceHash}:inst=${getLyricsTextCacheHash(translationInstruction)}`
+                    : styledSourceHash);
 
             let finalTrackId = trackId;
             if (!finalTrackId) {

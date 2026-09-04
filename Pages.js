@@ -3229,6 +3229,14 @@ const getSyncedLinePlaybackState = (window, position) => {
 	};
 };
 
+// 전체 화면에서는 지나간 줄을 더 남겨 두도록 별도 설정을 쓴다.
+const getSyncedLinesBefore = () => {
+	const fullscreen = window.lyricContainer?.state?.isFullscreen === true;
+	const value = fullscreen ? CONFIG.visual["fullscreen-lines-before"] : CONFIG.visual["lines-before"];
+	const parsed = Number(value);
+	return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const getSyncedAnimationIndex = ({ compact, isScrolling, activeLineIndex, lineNumber, visibleIndex }) => {
 	if (compact && isScrolling) {
 		return 0;
@@ -3236,11 +3244,11 @@ const getSyncedAnimationIndex = ({ compact, isScrolling, activeLineIndex, lineNu
 
 	const sourceIndex = compact && !isScrolling ? visibleIndex : lineNumber;
 
-	if (activeLineIndex <= CONFIG.visual["lines-before"]) {
+	if (activeLineIndex <= getSyncedLinesBefore()) {
 		return sourceIndex - activeLineIndex;
 	}
 
-	return sourceIndex - CONFIG.visual["lines-before"];
+	return sourceIndex - getSyncedLinesBefore();
 };
 
 const shouldHideSyncedLine = ({ compact, isScrolling, animationIndex }) => {
@@ -3249,7 +3257,7 @@ const shouldHideSyncedLine = ({ compact, isScrolling, animationIndex }) => {
 	}
 
 	return (
-		(animationIndex < 0 && -animationIndex > CONFIG.visual["lines-before"]) ||
+		(animationIndex < 0 && -animationIndex > getSyncedLinesBefore()) ||
 		animationIndex > CONFIG.visual["lines-after"]
 	);
 };
@@ -3783,7 +3791,7 @@ const useSyncedLyricsEngine = ({
 			return 0;
 		}
 
-		return Math.max(activeDisplayLineIndex - CONFIG.visual["lines-before"], 0);
+		return Math.max(activeDisplayLineIndex - getSyncedLinesBefore(), 0);
 	}, [compact, activeDisplayLineIndex]);
 
 	const linesToRender = useMemo(() => {
@@ -3935,7 +3943,7 @@ const useSyncedLyricsEngine = ({
 		}
 		const visualIndex = compact ? visualDisplayLineIndex : visualLineIndex;
 		const windowStart = compact
-			? Math.max(visualIndex - CONFIG.visual["lines-before"], 0)
+			? Math.max(visualIndex - getSyncedLinesBefore(), 0)
 			: 0;
 		const hasTrailingInterlude = !!trailingInterludeLine;
 		const duration = suppressLayoutShiftAnimation

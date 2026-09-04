@@ -2794,6 +2794,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const [styleRangeSpeakerFallback, setStyleRangeSpeakerFallback] = useState(SYNC_CREATOR_DEFAULT_CUSTOM_FALLBACK);
 	const [isStyleRangeEditorExpanded, setIsStyleRangeEditorExpanded] = useState(false);
 	const [multiVocalMode, setMultiVocalMode] = useState(false);
+	const [isSuggestingSpeakers, setIsSuggestingSpeakers] = useState(false);
 	const [pendingMultiVocalDecision, setPendingMultiVocalDecision] = useState(null);
 	const [syncData, setSyncData] = useState(null);
 	const [furiganaRevision, setFuriganaRevision] = useState(0);
@@ -6939,25 +6940,31 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		styleRangeSelection
 	]);
 
+	// value가 문자열이면 모든 줄에 같은 화자를, 함수(lineIndex => label)면 줄마다 다른 화자를 적용한다.
 	const applySongVocalSpeaker = useCallback((value, customMeta = {}) => {
-		const speakerMeta = resolveSyncCreatorBulkSpeakerMeta(
-			value,
-			customMeta.color,
-			customMeta.fallback
-		);
-		if (!speakerMeta || !lyricsLines.length) return;
+		const perLine = typeof value === 'function';
+		const uniformMeta = perLine
+			? null
+			: resolveSyncCreatorBulkSpeakerMeta(value, customMeta.color, customMeta.fallback);
+		if ((!perLine && !uniformMeta) || !lyricsLines.length) return;
+		const metaForIndex = (index) => uniformMeta
+			|| resolveSyncCreatorBulkSpeakerMeta(value(index), customMeta.color, customMeta.fallback);
 		claimSessionForLocalEditing();
-		const { speaker, color: speakerColor, fallback: speakerFallback } = speakerMeta;
-		const isCustomSpeaker = isSyncCreatorCustomSpeaker(speaker);
-		const rememberedCustomMeta = { color: speakerColor, fallback: speakerFallback };
 
 		const syncLinesByStart = new Map((Array.isArray(syncData?.lines) ? syncData.lines : []).map(line => [line.start, line]));
 		const nextLineMetaDrafts = {};
 		const nextParallelPartMetaDrafts = {};
+		const metaByStart = new Map();
 
 		lyricsLines.forEach((lineText, index) => {
 			const lineStart = lineCharOffsets[index];
 			if (!Number.isInteger(lineStart)) return;
+			const speakerMeta = metaForIndex(index);
+			if (!speakerMeta) return;
+			metaByStart.set(lineStart, speakerMeta);
+			const { speaker, color: speakerColor, fallback: speakerFallback } = speakerMeta;
+			const isCustomSpeaker = isSyncCreatorCustomSpeaker(speaker);
+			const rememberedCustomMeta = { color: speakerColor, fallback: speakerFallback };
 			nextLineMetaDrafts[lineStart] = {
 				...(lineMetaDrafts[lineStart] || {}),
 				speaker,
@@ -7014,6 +7021,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			return {
 				...prev,
 				lines: prev.lines.map(line => {
+					const speakerMeta = metaByStart.get(line.start);
+					if (!speakerMeta) return line;
 					const nextLine = applySyncCreatorSpeakerMeta({
 						...line,
 						parallel: line.parallel ? {
@@ -7027,7 +7036,12 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				})
 			};
 		});
-		Toast.success(I18n.t('syncCreator.bulkVocalApplied') || 'Applied the vocal speaker to the whole song.');
+		if (perLine) {
+			Toast.success(I18n.t('syncCreator.speakerSuggestApplied', { count: metaByStart.size })
+				|| `Applied AI-suggested speakers to ${metaByStart.size} lines.`);
+		} else {
+			Toast.success(I18n.t('syncCreator.bulkVocalApplied') || 'Applied the vocal speaker to the whole song.');
+		}
 	}, [
 		lyricsLines,
 		lineCharOffsets,
@@ -7040,6 +7054,28 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		getMergedLineIndexesForStart,
 		getParallelTemplateForLineData
 	]);
+	const handleSuggestSpeakers = useCallback(async () => {
+		if (isSuggestingSpeakers || !lyricsLines.length) return;
+		const manager = window.AIAddonManager;
+		if (typeof manager?.suggestLyricSpeakers !== 'function' || !manager.hasJsonProvider?.()) {
+			Toast.error(I18n.t('syncCreator.speakerSuggestNoProvider') || 'Speaker suggestion needs at least one enabled LLM provider.');
+			return;
+		}
+		setIsSuggestingSpeakers(true);
+		try {
+			const { speakers } = await manager.suggestLyricSpeakers({
+				title: trackName,
+				artist: artistName,
+				lines: lyricsLines
+			});
+			applySongVocalSpeaker((index) => speakers.get(index) || SYNC_CREATOR_DEFAULT_SPEAKER);
+		} catch (error) {
+			console.warn('[SyncDataCreator] Speaker suggestion failed:', error);
+			Toast.error(I18n.t('syncCreator.speakerSuggestFailed') || 'AI speaker suggestion failed.');
+		} finally {
+			setIsSuggestingSpeakers(false);
+		}
+	}, [isSuggestingSpeakers, lyricsLines, trackName, artistName, applySongVocalSpeaker]);
 	const requestSongVocalSpeaker = useCallback((value, customSeed = {}) => {
 		const speaker = normalizeSyncCreatorSpeaker(value);
 		if (!speaker) return;
@@ -10587,23 +10623,38 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		);
 	};
 
-	const renderBulkSpeakerControl = ({ compact = false, seedColor = '', seedFallback = '' } = {}) => lyricsLines.length > 0 && react.createElement('label', {
-		style: compact ? s.bulkVocalControl : s.bulkVocalPanelRow
-	},
-		react.createElement('span', { style: s.bulkVocalLabel }, I18n.t('syncCreator.bulkVocalLabel') || 'All vocals'),
-		react.createElement('select', {
-			style: compact ? s.select : { ...s.select, width: '100%' },
-			value: '',
-			onChange: (event) => requestSongVocalSpeaker(event.target.value, {
-				color: seedColor,
-				fallback: seedFallback
-			})
+	const renderBulkSpeakerControl = ({ compact = false, seedColor = '', seedFallback = '' } = {}) => lyricsLines.length > 0 && react.createElement(react.Fragment, null,
+		react.createElement('label', {
+			style: compact ? s.bulkVocalControl : s.bulkVocalPanelRow
 		},
-			[
-				react.createElement('option', { key: 'placeholder', value: '', disabled: true }, I18n.t('syncCreator.bulkVocalPlaceholder') || 'Set speaker...'),
-				...SYNC_CREATOR_BULK_SPEAKER_OPTIONS.map(value => react.createElement('option', { key: value, value }, value))
-			]
-		)
+			react.createElement('span', { style: s.bulkVocalLabel }, I18n.t('syncCreator.bulkVocalLabel') || 'All vocals'),
+			react.createElement('select', {
+				style: compact ? s.select : { ...s.select, width: '100%' },
+				value: '',
+				onChange: (event) => requestSongVocalSpeaker(event.target.value, {
+					color: seedColor,
+					fallback: seedFallback
+				})
+			},
+				[
+					react.createElement('option', { key: 'placeholder', value: '', disabled: true }, I18n.t('syncCreator.bulkVocalPlaceholder') || 'Set speaker...'),
+					...SYNC_CREATOR_BULK_SPEAKER_OPTIONS.map(value => react.createElement('option', { key: value, value }, value))
+				]
+			)
+		),
+		react.createElement('button', {
+			type: 'button',
+			style: {
+				...s.secondaryBtn,
+				...(compact ? {} : s.fullWidthButton),
+				opacity: isSuggestingSpeakers ? 0.6 : 1
+			},
+			onClick: handleSuggestSpeakers,
+			disabled: isSuggestingSpeakers,
+			title: I18n.t('syncCreator.speakerSuggestDesc') || 'Draft a speaker for every line from what the AI knows about this song.'
+		}, isSuggestingSpeakers
+			? (I18n.t('syncCreator.speakerSuggesting') || 'AI is assigning speakers...')
+			: (I18n.t('syncCreator.speakerSuggest') || 'AI speaker suggestion'))
 	);
 	const updateCurrentTextEffect = useCallback((value) => {
 		if (activeParallelPart) updateParallelPartMeta(activeParallelPart.id, 'kind', value);

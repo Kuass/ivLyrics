@@ -42,6 +42,26 @@ const getVideoSyncOffsetSeconds = (captionStartTime, lyricsStartTime, videoInfo)
 
 const VIDEO_SYNC_INTERVAL_MS = 250;
 const VIDEO_SYNC_SEEK_THRESHOLD_SECONDS = 0.5;
+// 큰 어긋남은 바로 seek하고, 작은 어긋남은 한 방향으로 1초 이상 이어질 때만 한 번 더 seek한다.
+// seek 직후 실제로 남은 오차를 보고 다음 seek 목표를 보정해서, 매 seek마다 생기는 지연을 없앤다.
+const VIDEO_SYNC_FINE_THRESHOLD_SECONDS = 0.15;
+const VIDEO_SYNC_FINE_SAMPLES = 4;
+const VIDEO_SYNC_MIN_SEEK_GAP_MS = 1500;
+const VIDEO_SYNC_FINE_SEEK_GAP_MS = 2500;
+const VIDEO_SYNC_FORCE_SEEK_SECONDS = 2;
+const VIDEO_SYNC_BIAS_LEARN_WINDOW_MS = [700, 1800];
+const VIDEO_SYNC_BIAS_LIMIT_SECONDS = 1.5;
+
+// 곡이 바뀔 때 이전 영상 iframe을 바로 없애지 않고, 컨테이너 opacity 전환(0.5초)이 끝난 뒤 정리한다.
+const VIDEO_RETIRE_DELAY_MS = 650;
+
+const createVideoSeekState = () => ({
+    lastSeekAt: 0,
+    lastSeekTarget: null,
+    biasLearned: true,
+    seekBias: 0,
+    fineDrift: [],
+});
 
 const resolveVideoSyncState = ({
     spotifyTime,
@@ -95,6 +115,8 @@ const syncYouTubePlayerTimeline = ({
     shouldHoldAtStart,
     shouldPlay,
     holdState,
+    seekState = null,
+    now = Date.now(),
 }) => {
     if (!player || !holdState) return;
 
@@ -121,12 +143,56 @@ const syncYouTubePlayerTimeline = ({
 
     holdState.primePending = false;
     const currentVideoTime = player.getCurrentTime();
-    if (
-        wasHoldingAtStart ||
-        !Number.isFinite(currentVideoTime) ||
-        Math.abs(currentVideoTime - targetVideoTime) > VIDEO_SYNC_SEEK_THRESHOLD_SECONDS
-    ) {
-        player.seekTo(targetVideoTime, true);
+    const drift = Number.isFinite(currentVideoTime) ? currentVideoTime - targetVideoTime : NaN;
+    const isPlayingState = playerState === 1 || playerState === 3;
+
+    if (!seekState) {
+        if (
+            wasHoldingAtStart ||
+            !Number.isFinite(currentVideoTime) ||
+            Math.abs(drift) > VIDEO_SYNC_SEEK_THRESHOLD_SECONDS
+        ) {
+            player.seekTo(targetVideoTime, true);
+        }
+    } else {
+        const sinceSeek = now - seekState.lastSeekAt;
+        // seek 직후 남은 오차로 다음 seek의 보정값을 배운다. 영상이 뒤처졌으면(음수) 더 앞으로 보낸다.
+        if (
+            !seekState.biasLearned &&
+            isPlayingState &&
+            Number.isFinite(drift) &&
+            sinceSeek >= VIDEO_SYNC_BIAS_LEARN_WINDOW_MS[0] &&
+            sinceSeek <= VIDEO_SYNC_BIAS_LEARN_WINDOW_MS[1]
+        ) {
+            seekState.biasLearned = true;
+            seekState.seekBias = Math.max(
+                -VIDEO_SYNC_BIAS_LIMIT_SECONDS,
+                Math.min(VIDEO_SYNC_BIAS_LIMIT_SECONDS, seekState.seekBias - drift * 0.5)
+            );
+        }
+
+        let shouldSeek = wasHoldingAtStart || !Number.isFinite(drift);
+        if (!shouldSeek && Math.abs(drift) > VIDEO_SYNC_SEEK_THRESHOLD_SECONDS) {
+            shouldSeek = sinceSeek >= VIDEO_SYNC_MIN_SEEK_GAP_MS || Math.abs(drift) > VIDEO_SYNC_FORCE_SEEK_SECONDS;
+        }
+        if (!shouldSeek && isPlayingState && Math.abs(drift) > VIDEO_SYNC_FINE_THRESHOLD_SECONDS) {
+            const samples = seekState.fineDrift.concat(drift).slice(-VIDEO_SYNC_FINE_SAMPLES);
+            seekState.fineDrift = samples;
+            const sameDirection = samples.length >= VIDEO_SYNC_FINE_SAMPLES
+                && samples.every((sample) => Math.sign(sample) === Math.sign(drift));
+            shouldSeek = sameDirection && sinceSeek >= VIDEO_SYNC_FINE_SEEK_GAP_MS;
+        } else if (!shouldSeek) {
+            seekState.fineDrift = [];
+        }
+
+        if (shouldSeek) {
+            const bias = isPlayingState || wasHoldingAtStart ? seekState.seekBias : 0;
+            player.seekTo(Math.max(0, targetVideoTime + bias), true);
+            seekState.lastSeekAt = now;
+            seekState.lastSeekTarget = targetVideoTime;
+            seekState.biasLearned = !isPlayingState && !wasHoldingAtStart;
+            seekState.fineDrift = [];
+        }
     }
 
     if (!shouldPlay) {
@@ -242,6 +308,45 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
     const [helperVideoUrl, setHelperVideoUrl] = useState(null);
     const containerRef = useRef(null);
     const playerRef = useRef(null); // Use ref to hold player instance for reliable cleanup
+    const retiringPlayerRef = useRef(null);
+    // 이전 곡의 플레이어를 페이드아웃 시간만큼 남겨 두고 정리한다. 즉시 파괴하면 배경이 검게 끊긴다.
+    const retireCurrentPlayer = useCallback(() => {
+        const player = playerRef.current;
+        if (!player) return;
+        playerRef.current = null;
+        let iframe = null;
+        try {
+            iframe = typeof player.getIframe === "function" ? player.getIframe() : null;
+        } catch (e) { }
+        const previous = retiringPlayerRef.current;
+        if (previous) {
+            clearTimeout(previous.timer);
+            previous.dispose();
+        }
+        const dispose = () => {
+            try {
+                player.destroy();
+            } catch (e) { }
+            try {
+                iframe?.remove?.();
+            } catch (e) { }
+            if (retiringPlayerRef.current?.player === player) {
+                retiringPlayerRef.current = null;
+            }
+        };
+        retiringPlayerRef.current = {
+            player,
+            iframe,
+            dispose,
+            timer: setTimeout(dispose, VIDEO_RETIRE_DELAY_MS),
+        };
+    }, []);
+    const disposeRetiringPlayer = useCallback(() => {
+        const retiring = retiringPlayerRef.current;
+        if (!retiring) return;
+        clearTimeout(retiring.timer);
+        retiring.dispose();
+    }, []);
     const videoRef = useRef(null); // HTML5 video element for helper mode
     const firstLyricTimeRef = useRef(firstLyricTime);
     const trackOffsetMsRef = useRef(trackOffsetMs);
@@ -252,6 +357,25 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         isHolding: false,
         primePending: false,
     });
+    const youtubeSeekStateRef = useRef(createVideoSeekState());
+    const readAlbumArtUrl = () =>
+        Spicetify.Player.data?.item?.metadata?.image_xlarge_url ||
+        Spicetify.Player.data?.item?.metadata?.image_large_url ||
+        Spicetify.Player.data?.item?.metadata?.image_url ||
+        null;
+    const [fallbackArt, setFallbackArt] = useState(() => ({ current: readAlbumArtUrl(), previous: null }));
+    useEffect(() => {
+        const nextUrl = readAlbumArtUrl();
+        let timer = null;
+        setFallbackArt((state) => {
+            if (state.current === nextUrl) return state;
+            return { current: nextUrl, previous: state.current };
+        });
+        timer = setTimeout(() => {
+            setFallbackArt((state) => (state.previous ? { ...state, previous: null } : state));
+        }, VIDEO_RETIRE_DELAY_MS);
+        return () => clearTimeout(timer);
+    }, [trackUri]);
     const brightnessValue = Math.min(Math.max(Number(brightness) || 0, 0), 100);
     const brightnessRatio = brightnessValue / 100;
     const blurValue = Math.min(Math.max(Number(blurAmount) || 0, 0), 80);
@@ -469,13 +593,8 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
             return undefined;
         }
 
-        // Cleanup previous player immediately when track changes
-        if (playerRef.current) {
-            try {
-                playerRef.current.destroy();
-            } catch (e) { }
-            playerRef.current = null;
-        }
+        // 곡이 바뀌면 이전 플레이어는 페이드아웃 뒤에 정리한다.
+        retireCurrentPlayer();
 
         const trackId = Utils.extractTrackId(trackUri);
         setVideoInfo(null);
@@ -583,8 +702,26 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                     }
                     const preferOfficial =
                         CONFIG?.visual?.["video-prefer-official-channel"] !== false;
-                    if (!preferOfficial || info.officialChecked || typeof Utils?.preferOfficialYouTubeVideo !== "function") {
+                    if (!preferOfficial || typeof Utils?.preferOfficialYouTubeVideo !== "function") {
                         setVideoInfo(info);
+                        return;
+                    }
+                    if (info.officialChecked) {
+                        setVideoInfo(info);
+                        // 이전 버전에서 확인만 끝낸 캐시는 자막 기준점이 비어 있다. 그것만 뒤에서 채운다.
+                        if (info.captionStartTime === null || info.captionStartTime === undefined) {
+                            const anchorTrackUri = trackUri;
+                            Utils.resolveYouTubeCaptionStartTime?.(info.youtubeVideoId, {
+                                lyricsStartSec: getLyricsStartTimeSeconds(firstLyricTime),
+                            }).then((captionStartTime) => {
+                                if (!isMounted || captionStartTime === null || anchorTrackUri !== trackUri) return;
+                                const anchored = { ...info, captionStartTime, isAutoGenerated: true, captionAnchorSource: "youtube-captions" };
+                                if (cacheIsrc) {
+                                    LyricsCache.setYouTube(cacheIsrc, anchored).catch(() => { });
+                                }
+                                setVideoInfo(anchored);
+                            }).catch(() => { });
+                        }
                         return;
                     }
                     // 먼저 서버가 준 영상을 그대로 띄우고, 공식 채널 확인은 뒤에서 돌린다.
@@ -595,6 +732,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                         trackName: spotifyData?.name || "",
                         artists: spotifyData?.artists || [],
                         durationSec: Math.round((Spicetify.Player?.data?.item?.duration?.milliseconds || 0) / 1000),
+                        lyricsStartSec: getLyricsStartTimeSeconds(firstLyricTime),
                     })
                         .then((resolved) => {
                             if (!isMounted || !resolved?.youtubeVideoId) return;
@@ -602,7 +740,10 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                             if (cacheIsrc) {
                                 LyricsCache.setYouTube(cacheIsrc, resolved).catch(() => { });
                             }
-                            if (resolved.youtubeVideoId !== info.youtubeVideoId) {
+                            if (
+                                resolved.youtubeVideoId !== info.youtubeVideoId ||
+                                resolved.captionStartTime !== info.captionStartTime
+                            ) {
                                 setVideoInfo(resolved);
                             }
                         })
@@ -711,14 +852,9 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         return () => {
             isMounted = false;
             // Cleanup on unmount or track change
-            if (playerRef.current) {
-                try {
-                    playerRef.current.destroy();
-                } catch (e) { }
-                playerRef.current = null;
-            }
+            retireCurrentPlayer();
         };
-    }, [trackUri, externalVideoInfo, reportVideoBackgroundStatus, showVideoBackgroundError, videoLoadRevision]);
+    }, [trackUri, externalVideoInfo, reportVideoBackgroundStatus, showVideoBackgroundError, videoLoadRevision, retireCurrentPlayer]);
 
     // Track-specific sync offset handling
     useEffect(() => {
@@ -939,7 +1075,8 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 abortDownloadRef.current = null;
             }
         };
-    }, [useHelper, videoInfo, reportVideoBackgroundStatus, showVideoBackgroundError]);
+    // 의도적으로 영상 id에만 반응한다. captionStartTime만 채워진 videoInfo 갱신은 플레이어를 다시 만들지 않는다.
+    }, [useHelper, videoInfo?.youtubeVideoId, reportVideoBackgroundStatus, showVideoBackgroundError]);
 
     // 헬퍼 모드: HTML5 video 재생 및 동기화
     useEffect(() => {
@@ -1283,6 +1420,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
             setIsPlayerReady(false);
             youtubeHoldStateRef.current.isHolding = false;
             youtubeHoldStateRef.current.primePending = false;
+            youtubeSeekStateRef.current = createVideoSeekState();
             showVideoBackgroundError(I18n.t("videoBackground.error"));
         };
         const markPlayerReady = (player) => {
@@ -1337,7 +1475,10 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
 
             // Better approach: Create a temporary div inside the container
             const playerDiv = document.createElement('div');
-            containerRef.current.innerHTML = ''; // Clear container
+            const retiringIframe = retiringPlayerRef.current?.iframe || null;
+            Array.from(containerRef.current.children).forEach((child) => {
+                if (child !== retiringIframe) child.remove();
+            });
             containerRef.current.appendChild(playerDiv);
 
             try {
@@ -1368,6 +1509,12 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                             }
                             event.target.mute();
                             event.target.playVideo();
+                            // 은퇴 중인 iframe과 겹쳐 놓기 위해 새 iframe을 컨테이너 전체에 절대 배치한다.
+                            try {
+                                const iframe = event.target.getIframe?.();
+                                if (iframe) iframe.style.cssText += ";position:absolute;top:0;left:0;width:100%;height:100%;";
+                            } catch (e) { }
+                            disposeRetiringPlayer();
                         },
                         onError: (event) => {
                             failPlayerLifecycle(new Error(`YouTube player error: ${event?.data ?? "unknown"}`));
@@ -1420,7 +1567,8 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
             youtubeHoldStateRef.current.primePending = false;
         };
 
-    }, [useHelper, videoInfo, reportVideoBackgroundStatus, showVideoBackgroundError]);
+    // 의도적으로 영상 id에만 반응한다. captionStartTime만 채워진 videoInfo 갱신은 플레이어를 다시 만들지 않는다.
+    }, [useHelper, videoInfo?.youtubeVideoId, reportVideoBackgroundStatus, showVideoBackgroundError]);
 
     // 일반 모드 (YouTube IFrame): Sync Logic
     useEffect(() => {
@@ -1466,6 +1614,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 shouldHoldAtStart: syncState.shouldHoldAtStart,
                 shouldPlay: isPlaying,
                 holdState: youtubeHoldStateRef.current,
+                seekState: youtubeSeekStateRef.current,
             });
         };
 
@@ -1476,28 +1625,33 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
     }, [isPlayerReady, videoInfo, firstLyricTime, trackOffsetMs, isPlaying]);
 
     // Render Album Art Background (Fallback)
+    // 앨범 아트 폴백은 이전 곡의 이미지를 아래에 남긴 채 새 이미지를 위에서 페이드인해서, 곡 전환이 한 번에 튀지 않게 한다.
     const renderFallback = () => {
-        const albumArtUrl =
-            Spicetify.Player.data?.item?.metadata?.image_xlarge_url ||
-            Spicetify.Player.data?.item?.metadata?.image_large_url ||
-            Spicetify.Player.data?.item?.metadata?.image_url;
-
-        return react.createElement("div", {
-            style: {
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                backgroundImage: albumArtUrl ? `url(${albumArtUrl})` : "none",
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                filter: `brightness(${brightnessRatio}) blur(${blurValue}px)`,
-                transform: "translateZ(0) scale(1.1)",
-                ...blurCompositeStyle,
-                zIndex: 0,
-            },
+        const layerStyle = (url) => ({
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundImage: url ? `url(${url})` : "none",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            filter: `brightness(${brightnessRatio}) blur(${blurValue}px)`,
+            transform: "translateZ(0) scale(1.1)",
+            ...blurCompositeStyle,
+            zIndex: 0,
         });
+        return react.createElement(react.Fragment, null,
+            fallbackArt.previous && react.createElement("div", {
+                key: `fallback-prev:${fallbackArt.previous}`,
+                style: layerStyle(fallbackArt.previous),
+            }),
+            react.createElement("div", {
+                key: `fallback:${fallbackArt.current || "none"}`,
+                className: fallbackArt.previous ? "ivlyrics-video-fallback-layer is-entering" : "ivlyrics-video-fallback-layer",
+                style: layerStyle(fallbackArt.current),
+            })
+        );
     };
 
     // 헬퍼 모드용 video 태그 스타일

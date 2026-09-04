@@ -64,7 +64,6 @@
         METADATA: 'metadata',      // 메타데이터 번역
         RESEARCH: 'research',      // 장문 음악 리서치
         TMI: 'tmi',                // 기존 Addon 설정 호환용 별칭
-        LYRICS_STUDY: 'lyricsStudy', // 가사 기반 학습 모드 생성
         CHARACTER_PRONUNCIATION: 'characterPronunciation', // 문자별 발음
         CULTURAL_ANNOTATIONS: 'culturalAnnotations' // 번역만으로 전달되지 않는 문화적 배경 설명
     };
@@ -76,6 +75,12 @@
     });
     const DEFAULT_TRANSLATION_STYLE = TRANSLATION_STYLES.NATURAL;
     const TRANSLATION_STYLE_STORAGE_KEY = `${STORAGE_PREFIX}translation-style`;
+    const TRANSLATION_INSTRUCTION_STORAGE_KEY = `${STORAGE_PREFIX}translation-instruction`;
+    const TRANSLATION_INSTRUCTION_MAX_LENGTH = 600;
+    const normalizeTranslationInstruction = (value) => String(value ?? '')
+        .replace(/\r\n?/g, '\n')
+        .trim()
+        .slice(0, TRANSLATION_INSTRUCTION_MAX_LENGTH);
     const VALID_TRANSLATION_STYLES = new Set(Object.values(TRANSLATION_STYLES));
     const DEFAULT_PROVIDER_RETRY_COUNT = 2;
     const MAX_PROVIDER_RETRY_COUNT = 5;
@@ -1401,118 +1406,62 @@ ${JSON.stringify(researchInput)}
         return buildResearchPrompt(params);
     }
 
-    function buildLyricsStudyPrompt({ title, artist, targetLang, sourceLang = 'auto', lines = [], category = 'lines', difficulty = 'normal', chunkIndex = 1, chunkTotal = 1 } = {}) {
-        const langInfo = getProviderPromptLanguageInfo(targetLang || 'ko');
-        const normalizedDifficulty = ['easy', 'normal', 'hard', 'native'].includes(String(difficulty || '').toLowerCase()) ? String(difficulty || '').toLowerCase() : 'normal';
-        const difficultyMap = {
-            easy: {
-                label: 'Easy',
-                guidance: 'Assume a beginner or lower-intermediate learner. Use short explanations, define common words, avoid jargon, and make quiz distractors clearly distinguishable.'
-            },
-            normal: {
-                label: 'Normal',
-                guidance: 'Assume an intermediate learner. Balance natural meaning, useful grammar, vocabulary nuance, and practical examples.'
-            },
-            hard: {
-                label: 'Hard',
-                guidance: 'Assume an advanced learner. Include finer nuance, grammar contrasts, register, collocation, and more challenging quiz distractors.'
-            },
-            native: {
-                label: 'Native-level',
-                guidance: 'Assume a near-native learner. Explain subtle tone, implication, idiom, literary compression, rhythm, and natural alternatives without simplifying too much.'
-            }
-        };
-        const difficultyInfo = difficultyMap[normalizedDifficulty] || difficultyMap.normal;
-        const pronunciationGuide = [
-            `Use one pronunciation style across every chunk: IPA-style phonetic transcription in Latin/IPA symbols.`,
-            `Wrap it in /.../ for phonemic pronunciation or [...] for close phonetic detail.`,
-            `Do not write pronunciation in the target language script, and do not use ad-hoc syllable romanization.`,
-            `For example, write "like ships in the night" as "/laɪk ʃɪps ɪn ðə naɪt/", not "라이크 쉽스 인 나이트" and not "lie-ku ships in nightu".`,
-            `For Japanese lyrics, keep kana/furigana only in "reading"; use IPA-style Latin/IPA symbols in "pronunciation".`
-        ].join(" ");
-        const payload = lines.map((line) => ({
-            index: Number(line.index),
-            text: String(line.text || '')
-        })).filter((line) => Number.isFinite(line.index) && line.text.trim());
-        const normalizedCategory = ['summary', 'lines', 'expressions', 'quiz'].includes(category) ? category : 'lines';
-        const categoryRules = {
-            summary: `Create only a compact learning-focused song summary. Explain the emotional situation, speaker attitude, and 2-3 language-learning takeaways. Do not create line notes, expressions, or quiz items.`,
-            lines: `Create line-level learning cards for every provided lyric line. Keep each explanation short but specific. Include reading and pronunciation when useful. Include 1-2 grammar/pattern notes for each line that has a reusable structure; each note must explain how the pattern works in this lyric.`,
-            expressions: `Create only 1-2 vocabulary expansion cards from words or short phrases that actually appear in the provided lyrics. Prefer practical items where learners benefit from alternatives, related words, or forms such as tense, base form, past participle, polite/casual form, particles, or collocations. Do not list many key phrases.`,
-            quiz: `Create only 2-4 choice-based quiz items from the provided lyrics. Mix formats using the type field: meaning, blank, usage, rewrite, and grammar. Include fill-in-the-blank items where the question contains ____ and the choices are candidate words or short phrases. Include practical transfer items that ask how a lyric expression would be used or rephrased in everyday conversation, work email, meeting, or other non-lyric context. Do not make every question a literal lyric translation. Distractors must be plausible. Each question must include a lineIndex and should show the actual lyric phrase instead of referring to a line number. Include reading and pronunciation if the question quotes a lyric.`
-        };
-        const outputShapes = {
-            summary: `{
-  "summary": "2-3 sentence learning-focused summary in ${langInfo.native}"
-}`,
-            lines: `{
-  "lines": [
-    {
-      "index": 0,
-      "reading": "hiragana/kana reading if the lyric is Japanese; otherwise optional reading aid",
-      "pronunciation": "IPA-style pronunciation if useful, e.g. /laɪk ʃɪps/; no local-script or ad-hoc romanization",
-      "translation": "natural meaning in ${langInfo.native}",
-      "explanation": "line-level explanation in ${langInfo.native}",
-      "grammar": [{ "pattern": "reusable structure or grammar point", "explanation": "how it works in this lyric in ${langInfo.native}", "note": "short nuance or usage note in ${langInfo.native}" }],
-      "vocabulary": [{ "term": "word", "reading": "hiragana/kana reading if Japanese", "pronunciation": "IPA-style pronunciation if useful", "meaning": "meaning in ${langInfo.native}", "note": "optional note in ${langInfo.native}" }]
-    }
-  ]
-}`,
-            expressions: `{
-  "keyExpressions": [
-    { "expression": "word or short phrase from the lyric", "reading": "hiragana/kana reading if Japanese", "pronunciation": "IPA-style pronunciation if useful", "meaning": "meaning in ${langInfo.native}", "note": "practical learner note in ${langInfo.native}", "alternatives": ["substitutable expression"], "forms": ["base/past/past participle or other useful forms"], "relatedWords": ["similar or related word"], "lineIndexes": [0] }
-  ]
-}`,
-            quiz: `{
-  "quiz": [
-    { "type": "meaning|blank|usage|rewrite|grammar", "question": "question in ${langInfo.native}; for blank type include ____ where the missing word/phrase goes", "choices": ["A", "B", "C", "D"], "answerIndex": 0, "explanation": "why in ${langInfo.native}", "lineIndex": 0, "reading": "optional", "pronunciation": "optional" }
-  ]
-}`
-        };
+    const SPEAKER_SUGGESTION_LABELS = Object.freeze([
+        'NORMAL',
+        ...Array.from({ length: 5 }, (_, index) => `MALE ${index + 1}`),
+        ...Array.from({ length: 5 }, (_, index) => `FEMALE ${index + 1}`),
+        ...Array.from({ length: 5 }, (_, index) => `DUET ${index + 1}`)
+    ]);
 
-        return `You are a language learning tutor inside a lyrics app. Build one category of a compact study pack from the provided song lyrics.
-
-Target explanation language: ${langInfo.name} (${langInfo.native})
-Detected/source language: ${sourceLang}
-Song: ${title || ''}
-Artist: ${artist || ''}
-Category: ${normalizedCategory}
-Difficulty: ${difficultyInfo.label}
-Difficulty guidance: ${difficultyInfo.guidance}
-Chunk: ${chunkIndex}/${chunkTotal}
+    function buildLanguageDetectionPrompt({ title, artist, lines = [] } = {}) {
+        const sample = (Array.isArray(lines) ? lines : [])
+            .map(line => String(line ?? '').trim())
+            .filter(Boolean)
+            .slice(0, 40)
+            .join('\n');
+        return {
+            systemPrompt: `You identify the language a song's lyrics are sung in.
 
 Rules:
-- Return ONLY valid JSON. No markdown, no code fences, no extra text.
-- Write every human-readable explanation, meaning, question, and quiz explanation in ${langInfo.native}.
-- Match the selected difficulty. Easy should be simpler and more scaffolded; hard/native-level should include deeper nuance and more demanding quiz distractors.
-- Keep original lyric fragments short. Do not quote long lyric passages.
-- Preserve original line indexes exactly.
-- Do not refer to "line 3", "3rd line", "N번째 줄", or similar labels. Show the actual lyric phrase when a specific lyric matters.
-- ${pronunciationGuide}
-- Add "pronunciation" only when it helps; when present, it must follow the pronunciation style above.
-- If the source lyric is Japanese or contains kanji, add "reading" as hiragana/kana reading. Do not put an explanation in "reading"; only the reading text.
-- Explain useful vocabulary, grammar, idioms, tone, and natural meaning.
-- Use the "grammar" array for reusable patterns, particles, verb forms, sentence endings, tense/aspect, omitted subjects, or word order. Do not leave grammar as only a label; include a concrete explanation tied to the lyric.
-- Avoid generic filler such as "this is poetic" unless you explain the exact language cue. Prefer one practical learner insight over broad textbook summaries.
-- When a word or phrase has nuance, explain the contrast with the literal meaning or a more common alternative.
-- For the expressions category, output expansion cards, not a long list of key phrases. Base each item on a lyric word or short phrase and include alternatives/forms/relatedWords only when useful.
-- For quiz items, vary answerIndex. Do not place every correct answer at choices[0].
-- For quiz items, vary the type field. Do not make all items meaning questions; use blank, usage, rewrite, and grammar when the lyric supports them.
-- For blank type, put ____ directly in the question and make choices short words or phrases that fit the blank.
-- For blank type, include enough context in the question itself because the full original lyric line may be hidden while the learner answers.
-- For quiz items, include some practical transfer questions when possible: how to say the idea naturally in everyday speech, how to soften it, or how to adapt it for workplace/formal writing.
-- Repeated lyric phrases should produce at most one quiz item across the whole pack. If the same sentence or chorus line appears again, skip it and choose a different lyric phrase.
-- If a line is too simple, keep its explanation short.
-- Generate only the requested category. Omit unrelated top-level keys.
+- Answer with the language of the sung lyrics, not the language of section markers or credits.
+- Romanized transcriptions (romaji, romanized Korean, romanized Hindi) count as the original language, not English.
+- When several languages are mixed, choose the one that carries most of the lines.
+- Use an ISO 639-1 code such as "ko", "ja", "en", "es", "pt", "fr", "de", "vi", "th", "id", "hi". Use "zh-hans" or "zh-hant" for Chinese.
+- Return only JSON: {"language": "<code>", "confidence": <0-1 number>}. No Markdown, no explanation.`,
+            userPrompt: `Song: ${String(title || '').trim() || 'unknown'}\nArtist: ${String(artist || '').trim() || 'unknown'}\n\n<lyrics>\n${sample}\n</lyrics>`
+        };
+    }
 
-Task:
-${categoryRules[normalizedCategory]}
+    function buildSpeakerSuggestionPrompt({ title, artist, lines = [] } = {}) {
+        const numbered = (Array.isArray(lines) ? lines : [])
+            .map((line, index) => `${index}\t${String(line ?? '').trim()}`)
+            .join('\n');
+        return {
+            systemPrompt: `You assign vocalists to lyric lines for a karaoke display.
 
-Output JSON shape:
-${outputShapes[normalizedCategory]}
+Allowed labels: ${SPEAKER_SUGGESTION_LABELS.join(', ')}.
+- "NORMAL" means a single lead vocalist or an unknown split. Use it for every line of a solo song.
+- Use "MALE n" / "FEMALE n" for distinct vocalists of that voice type, numbering them consistently across the whole song (the same person always keeps the same number).
+- Use "DUET n" only for lines that are clearly sung together by two or more vocalists.
+- Rely on what you actually know about this recording's line distribution. When you are not confident about a line, fall back to "NORMAL" rather than guessing.
+- Return only JSON: {"vocalists": [{"label": "<label>", "name": "<performer name or empty>"}], "lines": [{"i": <line index>, "speaker": "<label>"}]}. Include every line index exactly once. No Markdown.`,
+            userPrompt: `Song: ${String(title || '').trim() || 'unknown'}\nArtist: ${String(artist || '').trim() || 'unknown'}\n\nLines (index<TAB>text):\n${numbered}`
+        };
+    }
 
-Input lines:
-${JSON.stringify(payload)}`;
+    function buildOfficialVideoJudgePrompt({ trackName, artists = [], durationSec = 0, candidates = [] } = {}) {
+        const list = (Array.isArray(candidates) ? candidates : [])
+            .map((candidate, index) => `${index + 1}. id=${candidate.videoId} | title="${String(candidate.title || '').replace(/"/g, "'")}" | channel="${String(candidate.channel || '').replace(/"/g, "'")}" | verified=${candidate.verified ? 'yes' : 'no'} | duration=${Number(candidate.duration) || 0}s`)
+            .join('\n');
+        return {
+            systemPrompt: `You pick the official music video for a song from YouTube search results.
+
+Choose a candidate only when it is the official music video uploaded by the artist, the artist's label, or an official collaboration channel.
+Reject: fan uploads, lyric videos, official audio or visualizers (still images), live stages, dance practice, teasers, shorts, covers, remixes, sped-up or slowed versions, reaction videos.
+A music video is usually within roughly 0.9x to 1.4x of the track length.
+Return only JSON: {"videoId": "<id or null>", "reason": "<one short sentence>"}. Use null when no candidate qualifies. No Markdown.`,
+            userPrompt: `Track: ${String(trackName || '').trim()}\nArtists: ${(Array.isArray(artists) ? artists : []).filter(Boolean).join(', ')}\nTrack length: ${Number(durationSec) || 0}s\n\nCandidates:\n${list}`
+        };
     }
 
     function buildCulturalAnnotationsPrompt({ sourceLang = 'auto', targetLang = 'ko', lines = [] } = {}) {
@@ -1721,6 +1670,30 @@ ${JSON.stringify(payload)}`;
         }
 
         /**
+         * 사용자가 직접 적은 번역 지침 저장 ("반말로", "고유명사는 원문 유지" 등)
+         * 모든 LLM 제공자의 가사 번역 프롬프트에 그대로 들어간다.
+         * @param {string} instruction
+         * @returns {string} 정규화된 지침
+         */
+        setTranslationInstruction(instruction) {
+            const normalized = normalizeTranslationInstruction(instruction);
+            const previous = this.getTranslationInstruction();
+            setStoredValue(TRANSLATION_INSTRUCTION_STORAGE_KEY, normalized);
+            if (previous !== normalized) {
+                this.emit('translation:instruction:changed', { instruction: normalized, previous });
+            }
+            return normalized;
+        }
+
+        getTranslationInstruction() {
+            return normalizeTranslationInstruction(getStoredValue(TRANSLATION_INSTRUCTION_STORAGE_KEY));
+        }
+
+        get TRANSLATION_INSTRUCTION_MAX_LENGTH() {
+            return TRANSLATION_INSTRUCTION_MAX_LENGTH;
+        }
+
+        /**
          * AI 제공자별 추가 재시도 횟수 저장
          * @param {number} retryCount - 최초 요청 실패 후 추가로 시도할 횟수
          * @returns {number} 0~5 범위로 정규화된 재시도 횟수
@@ -1778,15 +1751,27 @@ ${JSON.stringify(payload)}`;
 
         /**
          * 모든 AI 제공자가 공유하는 가사 번역 시스템 프롬프트 생성
-         * @param {Object} params - { text, lang, translationStyle }
+         * @param {Object} params - { text, lang, translationStyle, title, artist, instruction }
          * @returns {{systemPrompt: string, userPrompt: string, style: string, lineCount: number}}
          */
-        buildLyricsTranslationPrompt({ text, lang, translationStyle } = {}) {
+        buildLyricsTranslationPrompt({ text, lang, translationStyle, title, artist, instruction } = {}) {
             const normalizedText = String(text ?? '').replace(/\r\n?/g, '\n');
             const lineCount = normalizedText.split('\n').length;
             const style = normalizeTranslationStyle(translationStyle || this.getTranslationStyle());
             const langInfo = getTranslationLanguageInfo(lang);
             const styleInstruction = getTranslationStyleInstruction(style);
+            const songTitle = String(title ?? '').trim();
+            const songArtist = String(artist ?? '').trim();
+            // 곡 정보가 있으면 화자의 성별과 관계, 장르에 맞는 어투를 모델이 스스로 잡는다.
+            const songContext = songTitle || songArtist
+                ? `\nSONG CONTEXT:\n- Title: ${songTitle || 'unknown'}\n- Artist: ${songArtist || 'unknown'}\nUse what you know about this song and artist (narrator, addressee, relationships, genre, register, slang) to choose fitting wording. Do not add facts to the lyrics themselves.\n`
+                : '';
+            const userInstruction = normalizeTranslationInstruction(
+                instruction === undefined ? this.getTranslationInstruction() : instruction
+            );
+            const preferenceBlock = userInstruction
+                ? `\nUSER PREFERENCES (follow unless they conflict with the output contract):\n${userInstruction}\n`
+                : '';
 
             const systemPrompt = `You are the lyrics translation system for ivLyrics.
 
@@ -1794,7 +1779,7 @@ Translate song lyrics into ${langInfo.name} (${langInfo.native}).
 
 TRANSLATION STYLE:
 ${styleInstruction}
-
+${songContext}${preferenceBlock}
 CRITICAL OUTPUT CONTRACT:
 - This is a translation task. Translate the meaning of every non-empty lyric line.
 - Write the translated lyrics in ${langInfo.name} (${langInfo.native}) only.
@@ -1861,10 +1846,6 @@ ${normalizedText}
 
         get RESEARCH_OUTPUT_VERSION() {
             return RESEARCH_OUTPUT_VERSION;
-        }
-
-        buildLyricsStudyPrompt(params = {}) {
-            return buildLyricsStudyPrompt(params);
         }
 
         buildCulturalAnnotationsPrompt(params = {}) {
@@ -1982,7 +1963,7 @@ ${normalizedText}
          * - author: string (제작자)
          * - description: string | { en: string, ko: string, ... } (설명)
          * - version: string (버전)
-         * - supports: { translate: boolean, metadata: boolean, research|tmi: boolean, lyricsStudy: boolean, characterPronunciation: boolean, culturalAnnotations: boolean } (지원 기능)
+         * - supports: { translate: boolean, metadata: boolean, research|tmi: boolean, characterPronunciation: boolean, culturalAnnotations: boolean } (지원 기능)
          * 
          * 필수 메서드:
          * - getSettingsUI(): React.Component (설정 UI)
@@ -1991,7 +1972,7 @@ ${normalizedText}
          * - translateLyrics(params): Promise<Object> (supports.translate = true인 경우)
          * - translateMetadata(params): Promise<Object> (supports.metadata = true인 경우)
          * - generateResearch(params) 또는 generateTMI(params): Promise<Object> (Research 지원 시)
-         * - generateLyricsStudy(params): Promise<Object> (supports.lyricsStudy = true인 경우)
+         * - completeJson({ prompt }): Promise<Object> (짧은 JSON 보조 작업, LLM 제공자만)
          * - generateCharacterPronunciation(params): Promise<Object> (supports.characterPronunciation = true인 경우)
          * - generateCulturalAnnotations(params): Promise<Object> (supports.culturalAnnotations = true인 경우)
          */
@@ -2016,7 +1997,6 @@ ${normalizedText}
                     translate: typeof addon.translateLyrics === 'function',
                     metadata: typeof addon.translateMetadata === 'function',
                     tmi: typeof addon.generateResearch === 'function' || typeof addon.generateTMI === 'function',
-                    lyricsStudy: typeof addon.generateLyricsStudy === 'function',
                     characterPronunciation: typeof addon.generateCharacterPronunciation === 'function',
                     culturalAnnotations: typeof addon.generateCulturalAnnotations === 'function'
                 };
@@ -2033,7 +2013,7 @@ ${normalizedText}
 
             this._addons.set(addon.id, addon);
             window.__ivLyricsDebugLog?.(`[AIAddonManager] Registered addon: ${addon.id} (${addon.name})`);
-            window.__ivLyricsDebugLog?.(`[AIAddonManager] Supports: translate=${addon.supports.translate}, metadata=${addon.supports.metadata}, tmi=${addon.supports.tmi}, lyricsStudy=${addon.supports.lyricsStudy}, characterPronunciation=${addon.supports.characterPronunciation}, culturalAnnotations=${addon.supports.culturalAnnotations}`);
+            window.__ivLyricsDebugLog?.(`[AIAddonManager] Supports: translate=${addon.supports.translate}, metadata=${addon.supports.metadata}, tmi=${addon.supports.tmi}, characterPronunciation=${addon.supports.characterPronunciation}, culturalAnnotations=${addon.supports.culturalAnnotations}`);
 
             // 이미 초기화 완료된 경우, 새 Addon도 초기화
             if (this._initialized && typeof addon.init === 'function') {
@@ -2075,7 +2055,7 @@ ${normalizedText}
             }
 
             // 기능 메서드 중 최소 하나는 있어야 함
-            const featureMethods = ['translateLyrics', 'translateMetadata', 'generateResearch', 'generateTMI', 'generateLyricsStudy', 'generateCharacterPronunciation', 'generateCulturalAnnotations'];
+            const featureMethods = ['translateLyrics', 'translateMetadata', 'generateResearch', 'generateTMI', 'completeJson', 'generateCharacterPronunciation', 'generateCulturalAnnotations'];
             const hasAnyFeature = featureMethods.some(m => typeof addon[m] === 'function');
             if (!hasAnyFeature) {
                 errors.push(`Must implement at least one of: ${featureMethods.join(', ')}`);
@@ -2214,7 +2194,7 @@ ${normalizedText}
 
         /**
          * 특정 기능을 지원하는 활성화된 Provider 목록 (순서대로)
-         * @param {'translate'|'metadata'|'research'|'tmi'|'lyricsStudy'|'characterPronunciation'|'culturalAnnotations'} capability - 기능 유형
+         * @param {'translate'|'metadata'|'research'|'tmi'|'characterPronunciation'|'culturalAnnotations'} capability - 기능 유형
          * @returns {Object[]}
          */
         getEnabledProvidersFor(capability) {
@@ -2417,7 +2397,9 @@ ${normalizedText}
                 : this.buildLyricsTranslationPrompt({
                     text: params.text,
                     lang: params.lang,
-                    translationStyle
+                    translationStyle,
+                    title: params.title,
+                    artist: params.artist
                 });
 
             // 디버그 로깅
@@ -3140,67 +3122,89 @@ ${normalizedText}
         }
 
         /**
-         * 가사 학습 모드 생성 (활성화된 Provider 순서대로 시도)
-         * @param {Object} params - { trackId, title, artist, targetLang, sourceLang, lines }
+         * 짧은 JSON 응답이 필요한 보조 작업의 공용 통로. LLM 계열 제공자만 참여한다.
+         * @param {{systemPrompt: string, userPrompt: string}} prompt
+         * @param {{ type?: string, capability?: string, providers?: Array }} options
          * @returns {Promise<Object>}
          */
-        async generateLyricsStudy(params) {
-            const providers = this.getEnabledProvidersFor('lyricsStudy');
-
-            if (providers.length === 0) {
-                console.warn('[AIAddonManager] No lyrics study providers enabled');
+        async completeJson(prompt, { type = 'json', capability = 'translate', providers = null } = {}) {
+            const candidates = (Array.isArray(providers) ? providers : this.getEnabledProvidersFor(capability))
+                .filter(addon => typeof addon.completeJson === 'function');
+            if (candidates.length === 0) {
                 throw new Error(this._t('aiProviders.noEnabledProviders', 'No AI providers enabled. Please enable at least one provider in settings.'));
             }
 
-            if (window.AddonDebug?.isEnabled()) {
-                window.AddonDebug.log('ai', 'generateLyricsStudy called', {
-                    providers: providers.map(p => p.id),
-                    targetLang: params.targetLang,
-                    sourceLang: params.sourceLang,
-                    lineCount: Array.isArray(params.lines) ? params.lines.length : 0
-                });
-                window.AddonDebug.time('ai', 'generateLyricsStudy');
-            }
-
-            this.emit('ai:request:start', {
-                type: 'lyricsStudy',
-                providers: providers.map(p => p.id),
-                params: { ...params, lines: '[...]' }
-            });
-
+            this.emit('ai:request:start', { type, providers: candidates.map(p => p.id) });
             let lastError = null;
-
-            for (const addon of providers) {
-                if (typeof addon.generateLyricsStudy !== 'function') continue;
-
+            for (const addon of candidates) {
                 try {
-                    window.__ivLyricsDebugLog?.(`[AIAddonManager] Trying lyrics study provider: ${addon.id}`);
-                    const result = await this._callProvider(addon, 'generateLyricsStudy', {
-                        ...params,
-                        lyricsStudyPrompt: this.buildLyricsStudyPrompt(params)
-                    });
-
-                    if (window.AddonDebug?.isEnabled()) {
-                        window.AddonDebug.timeEnd('ai', 'generateLyricsStudy');
+                    const result = await this._callProvider(addon, 'completeJson', { prompt, type });
+                    if (!result || typeof result !== 'object') {
+                        throw new Error('Empty JSON response');
                     }
-
-                    this.emit('ai:request:success', { type: 'lyricsStudy', provider: addon.id });
-                    return result;
+                    this.emit('ai:request:success', { type, provider: addon.id });
+                    return { ...result, provider: addon.id };
                 } catch (e) {
-                    console.warn(`[AIAddonManager] Provider ${addon.id} failed for generateLyricsStudy:`, e.message);
+                    console.warn(`[AIAddonManager] Provider ${addon.id} failed for ${type}:`, e.message);
                     lastError = e;
-                    continue;
                 }
             }
-
-            if (window.AddonDebug?.isEnabled()) {
-                window.AddonDebug.timeEnd('ai', 'generateLyricsStudy');
-                window.AddonDebug.error('ai', 'generateLyricsStudy all providers failed');
-            }
-
             const errorMsg = lastError?.message || this._t('aiProviders.allProvidersFailed', 'All AI providers failed to process the request.');
-            this.emit('ai:request:error', { type: 'lyricsStudy', error: errorMsg });
+            this.emit('ai:request:error', { type, error: errorMsg });
             throw new Error(errorMsg);
+        }
+
+        hasJsonProvider(capability = 'translate') {
+            return this.getEnabledProvidersFor(capability).some(addon => typeof addon.completeJson === 'function');
+        }
+
+        /**
+         * 규칙 기반 감지가 확신하지 못한 가사의 언어를 묻는다.
+         * @returns {Promise<string|null>} ISO 639-1 코드(중국어는 zh-hans/zh-hant), 확신이 낮으면 null
+         */
+        async detectLyricsLanguage(params = {}) {
+            const result = await this.completeJson(buildLanguageDetectionPrompt(params), { type: 'languageDetection' });
+            const code = String(result?.language || '').trim().toLowerCase().replace(/_/g, '-');
+            const confidence = Number(result?.confidence);
+            if (!/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/.test(code)) return null;
+            if (Number.isFinite(confidence) && confidence < 0.7) return null;
+            if (code === 'zh' || code === 'zh-cn' || code === 'zh-sg') return 'zh-hans';
+            if (code === 'zh-tw' || code === 'zh-hk' || code === 'zh-mo') return 'zh-hant';
+            return code;
+        }
+
+        /**
+         * 싱크 제작기용 화자 배정 초안. 줄 인덱스 → 허용된 화자 라벨.
+         * @returns {Promise<{ speakers: Map<number, string>, vocalists: Array }>}
+         */
+        async suggestLyricSpeakers(params = {}) {
+            const lines = Array.isArray(params.lines) ? params.lines : [];
+            const result = await this.completeJson(buildSpeakerSuggestionPrompt({ ...params, lines }), { type: 'speakerSuggestion' });
+            const allowed = new Set(SPEAKER_SUGGESTION_LABELS);
+            const speakers = new Map();
+            for (const entry of Array.isArray(result?.lines) ? result.lines : []) {
+                const index = Number(entry?.i ?? entry?.index ?? entry?.line);
+                const label = String(entry?.speaker || '').trim().toUpperCase();
+                if (!Number.isInteger(index) || index < 0 || index >= lines.length) continue;
+                if (!allowed.has(label)) continue;
+                speakers.set(index, label);
+            }
+            if (speakers.size === 0) {
+                throw new Error('Speaker suggestion returned no usable lines');
+            }
+            return { speakers, vocalists: Array.isArray(result?.vocalists) ? result.vocalists : [], provider: result?.provider || null };
+        }
+
+        /**
+         * 규칙 점수가 애매한 YouTube 후보 중 공식 뮤직비디오를 고른다.
+         * @returns {Promise<string|null>} 후보 목록에 있는 videoId, 없으면 null
+         */
+        async judgeOfficialMusicVideo(params = {}) {
+            const candidates = Array.isArray(params.candidates) ? params.candidates : [];
+            if (candidates.length === 0) return null;
+            const result = await this.completeJson(buildOfficialVideoJudgePrompt({ ...params, candidates }), { type: 'officialVideoJudge' });
+            const videoId = String(result?.videoId || '').trim();
+            return candidates.some(candidate => candidate.videoId === videoId) ? videoId : null;
         }
 
         /**

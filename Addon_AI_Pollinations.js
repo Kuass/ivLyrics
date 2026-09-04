@@ -31,7 +31,6 @@
             metadata: true,     // 메타데이터 번역
             tmi: true,
             researchWebSearch: true,
-            lyricsStudy: true,
             characterPronunciation: true,
             culturalAnnotations: true
         },
@@ -1086,14 +1085,11 @@
             );
         },
 
-        async generateLyricsStudy(params) {
-            if (!Array.isArray(params?.lines) || params.lines.length === 0) {
-                throw new Error('No lyrics lines provided');
-            }
-
-            const prompt = params.lyricsStudyPrompt;
+        // 언어 감지, 화자 제안, 영상 판정처럼 짧은 JSON 응답이 필요한 보조 작업용 공용 통로다.
+        async completeJson(params) {
+            const prompt = params?.prompt;
             if (!prompt) {
-                throw new Error('[Pollinations.ai] Central lyrics study prompt is unavailable.');
+                throw new Error('[Pollinations.ai] Central JSON prompt is unavailable.');
             }
             return await callPollinationsAPI(prompt);
         },

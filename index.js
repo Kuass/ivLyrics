@@ -475,9 +475,14 @@ const getTranslationResultCacheHash = (text, isPhonetic = false) => {
 
   const translationStyle =
     window.AIAddonManager?.getTranslationStyle?.() || "natural";
-  return translationStyle !== "natural"
+  const styledHash = translationStyle !== "natural"
     ? `${sourceHash}:style=${translationStyle}`
     : sourceHash;
+  // 사용자 번역 지침이 바뀌면 이전 번역을 다시 쓰지 않도록 키에 포함한다.
+  const instruction = window.AIAddonManager?.getTranslationInstruction?.() || "";
+  return instruction
+    ? `${styledHash}:inst=${getTranslationSourceCacheHash(instruction)}`
+    : styledHash;
 };
 
 const getLyricsProcessingShapeSignature = (lyrics = []) => {
@@ -2380,6 +2385,15 @@ const getOrSeedVideoStageTypographySetting = (
   return fallback;
 };
 
+// 저장값이 비어 있으면 기본값을, 숫자가 아니면 기본값을 돌려준다. Number(null)이 0이 되는 함정을 피한다.
+const readFiniteNumber = (value, fallback) => {
+  if (value === null || value === undefined || value === "") return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+const readNumericSetting = (storageKey, fallback) =>
+  readFiniteNumber(StorageManager.getItem(storageKey), fallback);
+
 const CONFIG = {
   visual: {
     language:
@@ -2543,6 +2557,16 @@ const CONFIG = {
     ),
     "video-prefer-official-channel": StorageManager.get(
       "ivLyrics:visual:video-prefer-official-channel",
+      true
+    ),
+    // 규칙 점수가 애매한 후보를 AI 제공자에게 판정받는다. LLM 제공자가 켜져 있을 때만 동작한다.
+    "video-official-ai-judge": StorageManager.get(
+      "ivLyrics:visual:video-official-ai-judge",
+      true
+    ),
+    // 규칙 기반 언어 감지가 확신하지 못하면 AI 제공자에게 묻고, 다르면 곡별 언어로 저장한다.
+    "translate:ai-language-detection": StorageManager.get(
+      "ivLyrics:visual:translate:ai-language-detection",
       true
     ),
     "video-background": StorageManager.get(
@@ -2993,6 +3017,10 @@ const CONFIG = {
     "fullscreen-lyrics-right-padding":
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-lyrics-right-padding")) ||
       0,
+    // 전체 화면 가사 배치: 지나간 줄 수, 줄 사이 추가 간격(px), 현재 줄에서 멀어질 때마다 줄어드는 비율(%)
+    "fullscreen-lines-before": readNumericSetting("ivLyrics:visual:fullscreen-lines-before", 2),
+    "fullscreen-line-gap": readNumericSetting("ivLyrics:visual:fullscreen-line-gap", 12),
+    "fullscreen-line-scale-step": readNumericSetting("ivLyrics:visual:fullscreen-line-scale-step", 8),
     // Fullscreen UI elements
     "fullscreen-show-clock": StorageManager.get(
       "ivLyrics:visual:fullscreen-show-clock",
@@ -5650,6 +5678,55 @@ class LyricsContainer extends react.Component {
    * @param {string} title - 원본 제목
    * @param {string} artist - 원본 아티스트
    */
+  /**
+   * 규칙 기반 언어 감지가 확신하지 못한 곡만 AI 제공자에게 다시 묻는다.
+   * 답이 다르면 곡별 언어 오버라이드로 저장하고, 사용자가 직접 바꿨을 때와 같은 경로로 다시 그린다.
+   * 같은 가사에는 세션당 한 번만 묻는다.
+   */
+  refineLanguageWithAI(info, lyrics, heuristicLanguage) {
+    if (CONFIG.visual["translate:ai-language-detection"] === false) return;
+    const service = window.LyricsService;
+    const manager = window.AIAddonManager;
+    if (!service?.detectLanguageDetailed || !manager?.detectLyricsLanguage || !manager.hasJsonProvider?.()) return;
+    if (!Array.isArray(lyrics) || lyrics.length < 2) return;
+
+    const { uncertain } = service.detectLanguageDetailed(lyrics);
+    if (!uncertain) return;
+
+    const lines = lyrics
+      .map((line) => (typeof line === "string" ? line : line?.originalText || line?.text || ""))
+      .filter((text) => text.trim() && !Utils.isSectionHeader?.(text));
+    if (lines.length < 2) return;
+
+    this._aiLanguageChecks = this._aiLanguageChecks || new Set();
+    const checkKey = `${info.uri}:${getTranslationSourceCacheHash(lines.join("\n"))}`;
+    if (this._aiLanguageChecks.has(checkKey)) return;
+    this._aiLanguageChecks.add(checkKey);
+
+    manager
+      .detectLyricsLanguage({ title: info.title, artist: info.artist, lines })
+      .then(async (language) => {
+        if (!language) return;
+        const normalize = (code) => String(code || "").toLowerCase();
+        if (normalize(language) === normalize(heuristicLanguage)) return;
+        if (Spicetify.Player.data?.item?.uri !== info.uri) return;
+        if (this.trackLanguageOverride) return;
+
+        service.overrideDetectedLanguage?.(lyrics, language);
+        await TrackLanguageDB.setLanguage(info.uri, language);
+        this.trackLanguageOverride = language;
+        service.clearLyricsSnapshot?.(info.uri);
+        this._dmResults = {};
+        this.lastProcessedUri = null;
+        this.lastProcessedMode = null;
+        this.forceUpdate();
+        window.__ivLyricsDebugLog?.(`[ivLyrics] AI language detection: ${heuristicLanguage || "none"} -> ${language}`);
+      })
+      .catch((error) => {
+        console.warn("[ivLyrics] AI language detection failed:", error?.message || error);
+      });
+  }
+
   async fetchMetadataTranslation(uri, title, artist) {
     // 메타데이터 번역 설정이 꺼져 있으면 스킵
     if (!CONFIG.visual["translate-metadata"]) {
@@ -7095,6 +7172,9 @@ class LyricsContainer extends react.Component {
         (configuredLanguageOverride && configuredLanguageOverride !== 'off'
           ? configuredLanguageOverride
           : Utils.detectLanguage(initialLyricsForMode || []));
+      if (!trackLanguageOverride && (!configuredLanguageOverride || configuredLanguageOverride === 'off')) {
+        this.refineLanguageWithAI(info, initialLyricsForMode || [], presentationLanguage);
+      }
       let presentationModeKey = 'gemini';
       try {
         if (presentationLanguage) {
@@ -9401,6 +9481,8 @@ class LyricsContainer extends react.Component {
       ...getLyricsTypographyStyleVariables(CONFIG.visual),
       "--animation-tempo": this.state.tempo,
       "--lyrics-fullscreen-right-padding": `${CONFIG.visual["fullscreen-lyrics-right-padding"] || 40}px`,
+      "--fullscreen-line-gap": `${readFiniteNumber(CONFIG.visual["fullscreen-line-gap"], 12)}px`,
+      "--fullscreen-line-scale-step": readFiniteNumber(CONFIG.visual["fullscreen-line-scale-step"], 8) / 100,
       "--fullscreen-tmi-font-size": (CONFIG.visual["fullscreen-tmi-font-size"] || 100) / 100,
     };
 
@@ -9622,6 +9704,8 @@ class LyricsContainer extends react.Component {
         (100 - (CONFIG.visual["highlight-intensity"] || 70)) / 100,
       "--animation-tempo": this.state.tempo,
       "--lyrics-fullscreen-right-padding": `${CONFIG.visual["fullscreen-lyrics-right-padding"] || 40}px`,
+      "--fullscreen-line-gap": `${readFiniteNumber(CONFIG.visual["fullscreen-line-gap"], 12)}px`,
+      "--fullscreen-line-scale-step": readFiniteNumber(CONFIG.visual["fullscreen-line-scale-step"], 8) / 100,
       "--fullscreen-tmi-font-size": (CONFIG.visual["fullscreen-tmi-font-size"] || 100) / 100,
       "--iv-motion-ease-standard": "cubic-bezier(0.22, 1, 0.36, 1)",
       "--iv-motion-duration-fast": this.shouldReduceMotion() ? "1ms" : "180ms",

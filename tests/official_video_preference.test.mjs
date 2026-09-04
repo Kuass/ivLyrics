@@ -93,3 +93,49 @@ test("returns the input untouched without a video id or metadata", async () => {
   const info = { youtubeVideoId: "ccccccccccc" };
   assert.deepEqual(await U.preferOfficialYouTubeVideo(info, { trackName: "", artists: [] }), info);
 });
+
+test("reads the first caption cue from WebVTT, srv3, json3 and TTML bodies", () => {
+  assert.equal(U.parseFirstCaptionCueSeconds("WEBVTT\n\n00:00:07.591 --> 00:00:09.200\nhello"), 7.591);
+  assert.equal(U.parseFirstCaptionCueSeconds("WEBVTT\n\n01:02:03.5 --> 01:02:04.000\nx"), 3723.5);
+  assert.equal(U.parseFirstCaptionCueSeconds('<timedtext><body><p t="12340" d="1000">x</p></body></timedtext>'), 12.34);
+  assert.equal(U.parseFirstCaptionCueSeconds('{"events":[{"tStartMs":4500,"dDurationMs":900}]}'), 4.5);
+  assert.equal(U.parseFirstCaptionCueSeconds('<p begin="00:00:15.250" end="00:00:16">x</p>'), 15.25);
+  assert.equal(U.parseFirstCaptionCueSeconds('<p begin="8.75s" end="9s">x</p>'), 8.75);
+  assert.equal(U.parseFirstCaptionCueSeconds(""), null);
+  assert.equal(U.parseFirstCaptionCueSeconds("no cues here"), null);
+});
+
+test("accepts caption anchors only within a music-video intro range", () => {
+  assert.equal(U.isPlausibleCaptionAnchor(7.5, 12), true);
+  assert.equal(U.isPlausibleCaptionAnchor(90, 10), true);
+  assert.equal(U.isPlausibleCaptionAnchor(200, 10), false, "a three-minute intro is not a music video anchor");
+  assert.equal(U.isPlausibleCaptionAnchor(20, 30), true, "a short negative pre-roll is within tolerance");
+  assert.equal(U.isPlausibleCaptionAnchor(0, 60), false, "captions starting a minute before the lyric are misaligned");
+  assert.equal(U.isPlausibleCaptionAnchor(30, null), true);
+  assert.equal(U.isPlausibleCaptionAnchor(NaN, 10), false);
+});
+
+test("lets the AI judge pick among ambiguous candidates and ignores unknown ids", async () => {
+  const scored = [
+    { candidate: candidate("Bloody Mary (Official Video)", "Some Fan Channel", { verified: false }), score: 60 },
+    { candidate: { ...candidate("Bloody Mary Official Audio", "Lady Gaga"), videoId: "bbbbbbbbbbb" }, score: 90 },
+    { candidate: { ...candidate("Bloody Mary", "Interscope Records"), videoId: "ccccccccccc" }, score: 80 },
+  ];
+  context.window.CONFIG = { visual: {} };
+  context.window.AIAddonManager = {
+    hasJsonProvider: () => true,
+    judgeOfficialMusicVideo: async ({ candidates }) => {
+      assert.ok(candidates.every((entry) => !/official audio/i.test(entry.title)), "audio-only uploads are never offered to the judge");
+      return "ccccccccccc";
+    },
+  };
+  const judged = await U.judgeOfficialVideoWithAI(scored, meta);
+  assert.equal(judged.candidate.videoId, "ccccccccccc");
+  assert.equal(judged.judge, "ai");
+
+  context.window.AIAddonManager.judgeOfficialMusicVideo = async () => "zzzzzzzzzzz";
+  assert.equal(await U.judgeOfficialVideoWithAI(scored, meta), null);
+
+  context.window.CONFIG.visual["video-official-ai-judge"] = false;
+  assert.equal(await U.judgeOfficialVideoWithAI(scored, meta), null, "the setting switches the judge off");
+});

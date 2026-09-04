@@ -15128,3 +15128,47 @@ a.research-media-item:hover {
   .research-icon-button,
   .research-source-list a { transition: none !important; }
 }
+
+/* fork: 전체 화면 곡 전환을 부드럽게 한다. 앨범 아트 배경은 이전 이미지 위로 페이드인하고,
+   제목·아티스트 텍스트는 곡이 바뀔 때 다시 마운트되어 짧게 떠오른다. */
+.ivlyrics-video-fallback-layer.is-entering {
+  animation: ivlyrics-video-fallback-in 500ms ease both;
+}
+
+@keyframes ivlyrics-video-fallback-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.lyrics-fullscreen-title-container > div,
+.lyrics-fullscreen-artist-container > div {
+  animation: ivlyrics-fullscreen-text-in 420ms var(--iv-motion-ease-standard, ease) both;
+}
+
+@keyframes ivlyrics-fullscreen-text-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.lyrics-fullscreen-title {
+  transition:
+    font-size var(--iv-motion-duration-medium, 240ms) var(--iv-motion-ease-standard, ease),
+    transform var(--iv-motion-duration-slow) var(--iv-motion-ease-emphasis),
+    opacity var(--iv-motion-duration-medium) var(--iv-motion-ease-standard),
+    letter-spacing var(--iv-motion-duration-medium) var(--iv-motion-ease-standard);
+}
+
+/* fork: 전체 화면 가사 배치. 줄 사이 고정 간격을 글자 크기 대신 설정값으로 두고,
+   현재 줄에서 멀어질수록 줄을 조금씩 작게 그린다. --blur-index는 현재 줄과의 거리(최대 3)다. */
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-active .lyrics-lyricsContainer-SyncedLyrics {
+  --lyrics-line-height: var(--fullscreen-line-gap, 12px);
+}
+
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-active
+  .lyrics-lyricsContainer-SyncedLyricsPage:not(.scrolling-active)
+  .lyrics-lyricsContainer-SyncedLyrics
+  > .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active):not(.lyrics-lyricsContainer-LyricsLine-paddingLine) {
+  transform:
+    translateY(calc(var(--position-index) * var(--lyrics-line-height) + var(--offset)))
+    scale(calc(1 - var(--blur-index, 0) * var(--fullscreen-line-scale-step, 0.08)));
+}

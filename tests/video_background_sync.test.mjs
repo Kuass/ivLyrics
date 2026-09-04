@@ -10,7 +10,7 @@ assert.ok(helperBoundary > 0, "VideoBackground sync helpers must remain before t
 const context = vm.createContext({});
 vm.runInContext(
     `${source.slice(0, helperBoundary)}\n` +
-    "globalThis.__videoSyncTest = { getLyricsStartTimeSeconds, getVideoSyncOffsetSeconds, resolveVideoSyncState, wrapVideoSyncTime, syncYouTubePlayerTimeline, settleYouTubeHoldPrime };",
+    "globalThis.__videoSyncTest = { getLyricsStartTimeSeconds, getVideoSyncOffsetSeconds, resolveVideoSyncState, wrapVideoSyncTime, syncYouTubePlayerTimeline, settleYouTubeHoldPrime, createVideoSeekState };",
     context
 );
 
@@ -21,6 +21,7 @@ const {
     wrapVideoSyncTime,
     syncYouTubePlayerTimeline,
     settleYouTubeHoldPrime,
+    createVideoSeekState,
 } = context.__videoSyncTest;
 
 test("converts the first lyric timestamp from milliseconds", () => {
@@ -172,4 +173,64 @@ test("seeks exactly to the mapped time when leaving the held pre-roll", () => {
 
     assert.deepEqual(calls, [["seekTo", 7.591, true], ["playVideo"]]);
     assert.deepEqual(holdState, { isHolding: false, primePending: false });
+});
+
+const makePlayer = (calls, currentTime, state = 1) => ({
+    getPlayerState: () => state,
+    getCurrentTime: () => currentTime,
+    seekTo: (...args) => calls.push(["seekTo", ...args]),
+    playVideo: () => calls.push(["playVideo"]),
+    pauseVideo: () => calls.push(["pauseVideo"]),
+});
+const runSync = ({ calls, currentTime, target, seekState, now, holdState = { isHolding: false, primePending: false } }) =>
+    syncYouTubePlayerTimeline({
+        player: makePlayer(calls, currentTime),
+        targetVideoTime: target,
+        shouldHoldAtStart: false,
+        shouldPlay: true,
+        holdState,
+        seekState,
+        now,
+    });
+
+test("tolerates a small drift instead of seeking on every tick", () => {
+    const calls = [];
+    const seekState = createVideoSeekState();
+    runSync({ calls, currentTime: 10.1, target: 10, seekState, now: 5000 });
+    assert.deepEqual(calls.filter((call) => call[0] === "seekTo"), []);
+});
+
+test("corrects a persistent fine drift only after it holds direction for four samples", () => {
+    const calls = [];
+    const seekState = createVideoSeekState();
+    for (let sample = 0; sample < 3; sample += 1) {
+        runSync({ calls, currentTime: 10.3 + sample * 0.25, target: 10 + sample * 0.25, seekState, now: 5000 + sample * 250 });
+    }
+    assert.deepEqual(calls.filter((call) => call[0] === "seekTo"), [], "three samples are not yet a trend");
+    runSync({ calls, currentTime: 11.05, target: 10.75, seekState, now: 5750 });
+    assert.deepEqual(calls.filter((call) => call[0] === "seekTo"), [["seekTo", 10.75, true]]);
+});
+
+test("learns the seek latency and compensates the next seek", () => {
+    const calls = [];
+    const seekState = createVideoSeekState();
+    // A big drift forces a seek at t=0.
+    runSync({ calls, currentTime: 20, target: 10, seekState, now: 0 });
+    assert.deepEqual(calls.at(-1), ["seekTo", 10, true]);
+    // One second later the video still sits 0.3s behind the target: the seek landed late.
+    runSync({ calls, currentTime: 10.7, target: 11, seekState, now: 1000 });
+    assert.ok(Math.abs(seekState.seekBias - 0.15) < 1e-9, `bias should move half the residual, got ${seekState.seekBias}`);
+    // The next forced seek aims slightly ahead to absorb that latency.
+    runSync({ calls, currentTime: 40, target: 30, seekState, now: 5000 });
+    assert.deepEqual(calls.at(-1), ["seekTo", 30.15, true]);
+});
+
+test("does not seek again right after a seek unless the drift is severe", () => {
+    const calls = [];
+    const seekState = createVideoSeekState();
+    runSync({ calls, currentTime: 20, target: 10, seekState, now: 0 });
+    runSync({ calls, currentTime: 9.2, target: 10, seekState, now: 300 });
+    assert.equal(calls.filter((call) => call[0] === "seekTo").length, 1, "a 0.8s drift 300ms after seeking is buffering, not drift");
+    runSync({ calls, currentTime: 5, target: 10, seekState, now: 400 });
+    assert.equal(calls.filter((call) => call[0] === "seekTo").length, 2, "a 5s drift is corrected immediately");
 });

@@ -181,6 +181,14 @@ window.LANG_KO = {
       "label": "전체 화면에서만 동영상 배경",
       "desc": "전체 화면 보기가 열려 있을 때만 YouTube 배경을 재생합니다. 가사 페이지에서는 블러 그라데이션 배경을 씁니다."
     },
+    "aiLanguageDetection": {
+      "label": "언어 감지가 애매하면 AI에게 확인",
+      "desc": "내장 감지기가 언어를 확신하지 못할 때(로마자 표기 가사, 여러 언어가 섞인 곡, 스페인어와 포르투갈어처럼 비슷한 라틴 문자 언어) 켜 둔 AI 제공자에게 묻고, 답을 이 곡의 언어로 저장합니다."
+    },
+    "videoOfficialAiJudge": {
+      "label": "애매한 공식 영상 판정은 AI에게",
+      "desc": "채널과 제목 규칙만으로 공식 뮤직비디오를 가리지 못할 때, 검색 상위 후보의 제목·채널·길이를 켜 둔 AI 제공자에게 보내 고르게 합니다."
+    },
     "videoPreferOfficialChannel": {
       "label": "아티스트 공식 채널 영상 우선",
       "desc": "서버가 고른 영상의 채널을 확인해서, 아티스트 공식 채널의 뮤직비디오가 있으면 그것으로 바꿉니다. 확인과 검색을 위해 YouTube와 공개 검색 인스턴스에 곡 제목을 보냅니다."
@@ -425,6 +433,11 @@ window.LANG_KO = {
         "literal": { "label": "직역", "description": "원문의 단어와 어순에 최대한 가깝게 번역합니다." },
         "adaptive": { "label": "의역", "description": "앞뒤 줄의 문맥을 반영해 가장 매끄럽게 이어지도록 번역합니다." }
       },
+      "translationInstruction": {
+        "title": "AI 번역 추가 지침",
+        "description": "모든 AI 번역 요청에 그대로 덧붙이는 자유 형식 지침입니다. 말투, 존댓말 여부, 원문으로 둘 이름 같은 취향을 적어 두면 제공자와 무관하게 적용됩니다. 입력칸을 벗어나면 저장됩니다.",
+        "placeholder": "예: 반말로 번역해. 멤버 이름은 원문 그대로 둬. 비속어를 순화하지 마."
+      },
       "retryCount": {
         "label": "Provider별 재시도 횟수",
         "description": "요청 실패 후 같은 Provider에서 추가로 시도할 횟수입니다. 0으로 설정하면 한 번 실패한 즉시 다음 Provider로 전환합니다."
@@ -445,7 +458,6 @@ window.LANG_KO = {
         "translate": "번역",
         "metadata": "메타데이터",
         "tmi": "TMI",
-        "lyricsStudy": "학습",
         "characterPronunciation": "글자 발음",
         "culturalAnnotations": "문화적 배경"
       },
@@ -1520,6 +1532,18 @@ window.LANG_KO = {
         "desc": "아티스트 글자 크기",
         "info": "전체화면에서 아티스트 이름의 글자 크기를 설정합니다 (14-36px)"
       },
+      "linesBefore": {
+        "desc": "지나간 가사 표시 줄 수",
+        "info": "전체 화면에서 현재 줄 위에 남겨 둘, 이미 부른 가사 줄 수입니다."
+      },
+      "lineGap": {
+        "desc": "가사 줄 사이 추가 간격",
+        "info": "전체 화면에서 이웃한 가사 줄 사이에 더하는 간격입니다. 가사 페이지의 간격은 그대로 유지됩니다."
+      },
+      "lineScale": {
+        "desc": "현재 줄에서 멀어질 때 축소 비율",
+        "info": "현재 줄에서 한 줄 멀어질 때마다 이만큼 더 작게 표시합니다. 세 줄까지 적용되며 0이면 모두 같은 크기입니다."
+      },
       "lyricsRightMargin": {
         "desc": "가사 오른쪽 여백",
         "info": "전체화면에서 가사 영역의 오른쪽 여백을 설정합니다. 가운데 정렬 시 가사가 오른쪽에 치우쳐 보이는 것을 방지합니다 (0-300px)"
@@ -2238,6 +2262,12 @@ window.LANG_KO = {
     "typeLabel": "텍스트 효과",
     "unselectedType": "텍스트 효과 미선택",
     "allLine": "전체 줄",
+    "speakerSuggest": "AI 화자 제안",
+    "speakerSuggesting": "AI가 화자를 배정하는 중...",
+    "speakerSuggestDesc": "AI가 아는 이 곡의 파트 분배를 바탕으로 줄마다 화자를 초안으로 배정합니다. 결과는 그대로 고칠 수 있습니다.",
+    "speakerSuggestApplied": "AI가 제안한 화자를 {count}줄에 적용했습니다. 확인 후 필요한 줄만 고치세요.",
+    "speakerSuggestFailed": "AI 화자 제안에 실패했습니다.",
+    "speakerSuggestNoProvider": "화자 제안에는 LLM 계열 AI 제공자가 하나 이상 켜져 있어야 합니다.",
     "bulkVocalLabel": "모든 보컬",
     "bulkVocalPlaceholder": "보컬 선택...",
     "bulkVocalApplied": "곡 전체 보컬을 변경했습니다.",

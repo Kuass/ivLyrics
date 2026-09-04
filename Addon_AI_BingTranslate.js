@@ -47,7 +47,6 @@
             pronunciation: false,
             metadata: true,
             tmi: false,
-            lyricsStudy: false,
             characterPronunciation: false,
             culturalAnnotations: false
         }

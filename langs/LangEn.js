@@ -181,6 +181,14 @@ window.LANG_EN = {
       "label": "Video background only in fullscreen",
       "desc": "Play the YouTube background only while the fullscreen view is open; the lyrics page uses the blur gradient instead."
     },
+    "aiLanguageDetection": {
+      "label": "Ask AI when language detection is unsure",
+      "desc": "When the built-in detector cannot tell the language (romanized lyrics, mixed languages, similar Latin-script languages such as Spanish and Portuguese), ask an enabled AI provider and save the answer as this track's language."
+    },
+    "videoOfficialAiJudge": {
+      "label": "Let AI settle ambiguous official-video matches",
+      "desc": "When the channel and title rules cannot decide, send the top search results (title, channel, length) to an enabled AI provider to pick the official music video."
+    },
     "videoPreferOfficialChannel": {
       "label": "Prefer the artist's official channel",
       "desc": "Check the picked video's channel and switch to the artist's official music video when one exists. Sends the track title to YouTube and a public search instance."
@@ -425,6 +433,11 @@ window.LANG_EN = {
         "literal": { "label": "Literal", "description": "Stays as close as possible to the original wording and order." },
         "adaptive": { "label": "Adaptive", "description": "Uses surrounding lines for the smoothest, most connected phrasing." }
       },
+      "translationInstruction": {
+        "title": "Extra instructions for AI translation",
+        "description": "Free-form preferences added to every AI translation request, such as tone, honorifics, or names to keep in the original script. Saved when you leave the field.",
+        "placeholder": "e.g. Use casual speech. Keep member names in the original script. Do not soften profanity."
+      },
       "retryCount": {
         "label": "Retries per provider",
         "description": "Number of additional attempts after a failed request. Set to 0 to switch to the next provider immediately."
@@ -445,7 +458,6 @@ window.LANG_EN = {
         "translate": "Translation",
         "metadata": "Metadata",
         "tmi": "TMI",
-        "lyricsStudy": "Learning",
         "characterPronunciation": "Character pronunciation",
         "culturalAnnotations": "Cultural context"
       },
@@ -1520,6 +1532,18 @@ window.LANG_EN = {
         "desc": "Artist Font Size",
         "info": "Set font size for artist name in fullscreen (14-36px)"
       },
+      "linesBefore": {
+        "desc": "Past lines kept on screen",
+        "info": "How many already-sung lines stay visible above the current line in fullscreen."
+      },
+      "lineGap": {
+        "desc": "Extra space between lines",
+        "info": "Gap added between neighbouring lyric lines in fullscreen. The lyrics page keeps its own spacing."
+      },
+      "lineScale": {
+        "desc": "Shrink per line away from the current one",
+        "info": "Each line before or after the current one is scaled down by this much more, up to three lines away. 0 keeps every line the same size."
+      },
       "lyricsRightMargin": {
         "desc": "Lyrics Right Margin",
         "info": "Set right margin for lyrics area. Prevents lyrics from looking too far right when centered (0-300px)"
@@ -2238,6 +2262,12 @@ window.LANG_EN = {
     "typeLabel": "Text effect",
     "unselectedType": "Text effect not selected",
     "allLine": "Full line",
+    "speakerSuggest": "AI speaker suggestion",
+    "speakerSuggesting": "AI is assigning speakers...",
+    "speakerSuggestDesc": "Drafts a speaker for every line from what the AI knows about this song's part distribution. You can still edit any line afterwards.",
+    "speakerSuggestApplied": "Applied AI-suggested speakers to {count} lines. Review and fix only the lines that need it.",
+    "speakerSuggestFailed": "AI speaker suggestion failed.",
+    "speakerSuggestNoProvider": "Speaker suggestion needs at least one enabled LLM provider.",
     "bulkVocalLabel": "All vocals",
     "bulkVocalPlaceholder": "Set speaker...",
     "bulkVocalApplied": "Applied the vocal speaker to the whole song.",
