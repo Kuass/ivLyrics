@@ -651,6 +651,8 @@ window.LANG_EN = {
     "controls": {
       "like": "Like",
       "unlike": "Remove Like",
+      "hide": "Hide (dislike)",
+      "unhide": "Unhide",
       "shuffle": "Shuffle",
       "previous": "Previous",
       "next": "Next",
@@ -856,8 +858,8 @@ window.LANG_EN = {
       "empty": "No patch notes available."
     },
     "donate": {
-      "title": "Buy the developer a coffee",
-      "button": "Donate"
+      "title": "Buy the original author (ivLis) a coffee",
+      "button": "Support the original author"
     },
     "multiVocalColors": {
       "title": "Multi-vocal Colors",
@@ -1535,6 +1537,18 @@ window.LANG_EN = {
       "linesBefore": {
         "desc": "Past lines kept on screen",
         "info": "How many already-sung lines stay visible above the current line in fullscreen."
+      },
+      "linesAfter": {
+        "desc": "Upcoming lines shown",
+        "info": "How many upcoming lines are shown below the current line in fullscreen."
+      },
+      "nextBoost": {
+        "desc": "Visibility of upcoming lines",
+        "info": "Blends upcoming lines toward the current line's color by this much. 0 keeps the regular inactive color."
+      },
+      "prevOpacity": {
+        "desc": "Opacity of past lines",
+        "info": "Already-sung lines are dimmed to this opacity so the current and upcoming lines stand out."
       },
       "lineGap": {
         "desc": "Extra space between lines",

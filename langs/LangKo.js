@@ -651,6 +651,8 @@ window.LANG_KO = {
     "controls": {
       "like": "좋아요",
       "unlike": "좋아요 취소",
+      "hide": "숨기기 (싫어요)",
+      "unhide": "숨기기 취소",
       "shuffle": "셔플",
       "previous": "이전 곡",
       "next": "다음 곡",
@@ -856,8 +858,8 @@ window.LANG_KO = {
       "empty": "패치 노트가 없습니다."
     },
     "donate": {
-      "title": "개발자에게 커피 한잔 사주기",
-      "button": "후원"
+      "title": "원저자 ivLis에게 커피 한잔 사주기",
+      "button": "원저자 후원"
     },
     "multiVocalColors": {
       "title": "멀티 보컬 색상",
@@ -1535,6 +1537,18 @@ window.LANG_KO = {
       "linesBefore": {
         "desc": "지나간 가사 표시 줄 수",
         "info": "전체 화면에서 현재 줄 위에 남겨 둘, 이미 부른 가사 줄 수입니다."
+      },
+      "linesAfter": {
+        "desc": "다음 가사 표시 줄 수",
+        "info": "전체 화면에서 현재 줄 아래에 보여 줄, 앞으로 부를 가사 줄 수입니다."
+      },
+      "nextBoost": {
+        "desc": "다음 가사 선명도",
+        "info": "다음 줄의 색을 현재 줄 색과 이만큼 섞어 더 잘 보이게 합니다. 0이면 원래의 비활성 색을 그대로 씁니다."
+      },
+      "prevOpacity": {
+        "desc": "이전 가사 불투명도",
+        "info": "이미 부른 줄을 이 불투명도로 눌러 두어 현재 줄과 다음 줄이 더 돋보이게 합니다."
       },
       "lineGap": {
         "desc": "가사 줄 사이 추가 간격",

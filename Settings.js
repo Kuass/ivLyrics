@@ -11665,7 +11665,18 @@ const ConfigModal = ({
     color: var(--text-primary) !important;
 }
 
-@media (max-width: 1100px) {
+/* fork: 두 열 배치를 더 좁은 창까지 유지한다. 원본은 1100px부터 한 열로 접으면서 사이드바를 220px 높이 상자로 줄였다. */
+@media (max-width: 1000px) {
+    #${APP_NAME}-config-container {
+        grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+    }
+
+    #${APP_NAME}-config-container .settings-sidebar {
+        padding: 16px 12px 20px 16px;
+    }
+}
+
+@media (max-width: 860px) {
     #${APP_NAME}-config-container {
         grid-template-columns: 1fr;
         grid-template-rows: auto auto auto minmax(0, 1fr);
@@ -11687,7 +11698,7 @@ const ConfigModal = ({
         padding: 14px 20px 6px;
         border-right: none;
         border-bottom: 1px solid var(--glass-border);
-        max-height: min(26vh, 220px);
+        max-height: min(42vh, 380px);
         scrollbar-gutter: stable;
     }
 
@@ -12798,7 +12809,7 @@ const ConfigModal = ({
     scroll-behavior: auto !important;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 860px) {
     #${APP_NAME}-config-container {
         grid-template-columns: 1fr;
     }
@@ -14091,7 +14102,7 @@ const ConfigModal = ({
     border-bottom: 0;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 860px) {
     #${APP_NAME}-config-container {
         grid-template-columns: 1fr;
         grid-template-rows: auto auto minmax(0, 1fr);
@@ -15034,7 +15045,8 @@ const ConfigModal = ({
     box-shadow: none !important;
 }
 
-@media (max-width: 900px) {
+/* fork: 한 열 배치 기준을 860px로 낮추고, 접힌 사이드바 높이를 늘려 메뉴가 잘리지 않게 한다. */
+@media (max-width: 860px) {
     .ivlyrics-settings-modal-shell:has(#${APP_NAME}-config-container) {
         width: min(calc(100vw - 20px), 820px) !important;
         max-width: calc(100vw - 20px) !important;
@@ -15057,7 +15069,7 @@ const ConfigModal = ({
     #${APP_NAME}-config-container .settings-sidebar {
         grid-column: 1 !important;
         grid-row: 2 !important;
-        max-height: min(30vh, 230px);
+        max-height: min(42vh, 380px);
         padding: 14px 16px 16px !important;
         border-right: 0 !important;
         border-bottom: 0.5px solid var(--settings-border) !important;
@@ -15149,6 +15161,104 @@ const ConfigModal = ({
         max-width: 58px;
         flex-wrap: wrap !important;
     }
+}
+
+/* fork: 가독성 보정. 원본의 설정 창은 11~12px에 두께 400인 글자와 낮은 대비의 보조 색을 쓰는데,
+   macOS에서는 획이 가늘고 거칠게 보인다. 크기와 두께를 한 단계씩 올리고 보조 색 대비를 높인다.
+   마지막에 두어 앞선 규칙을 덮어쓴다. */
+#${APP_NAME}-config-container {
+    --text-secondary: #b9bec5;
+    --text-tertiary: #8d939a;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", sans-serif;
+    -webkit-font-smoothing: auto;
+    font-synthesis: none;
+}
+
+#${APP_NAME}-config-container[data-ui-theme="light"] {
+    --text-secondary: #4a5056;
+    --text-tertiary: #6b7278;
+}
+
+#${APP_NAME}-config-container .settings-nav-group-toggle,
+#${APP_NAME}-config-container .settings-nav-group-title {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+}
+
+#${APP_NAME}-config-container .settings-nav-subitem {
+    font-size: 12.5px !important;
+    font-weight: 500 !important;
+}
+
+#${APP_NAME}-config-container .settings-nav-card-title {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+}
+
+#${APP_NAME}-config-container .settings-panel-copy h2 {
+    font-weight: 700 !important;
+}
+
+#${APP_NAME}-config-container .settings-panel-copy p {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+}
+
+#${APP_NAME}-config-container .section-text h3 {
+    font-size: 14.5px !important;
+    font-weight: 600 !important;
+}
+
+#${APP_NAME}-config-container .section-text p,
+#${APP_NAME}-config-container .setting-description,
+#${APP_NAME}-config-container .ai-translation-style-description,
+#${APP_NAME}-config-container .ai-translation-style-option-description {
+    font-size: 12.5px !important;
+    font-weight: 500 !important;
+    line-height: 1.55 !important;
+}
+
+#${APP_NAME}-config-container .setting-name,
+#${APP_NAME}-config-container .ai-translation-style-title,
+#${APP_NAME}-config-container .ai-translation-style-option-label {
+    font-size: 13.5px !important;
+    font-weight: 600 !important;
+}
+
+#${APP_NAME}-config-container .btn,
+#${APP_NAME}-config-container .btn-primary,
+#${APP_NAME}-config-container .order-btn,
+#${APP_NAME}-config-container .ai-addon-btn,
+#${APP_NAME}-config-container .about-client-copy-btn,
+#${APP_NAME}-config-container select,
+#${APP_NAME}-config-container input[type="text"],
+#${APP_NAME}-config-container input[type="number"],
+#${APP_NAME}-config-container textarea,
+#${APP_NAME}-config-container .config-text-input {
+    font-size: 12.5px !important;
+    font-weight: 500 !important;
+}
+
+/* fork: 원저자 후원 버튼은 헤더에서 눈에 덜 띄게 작게 둔다. */
+#${APP_NAME}-config-container .settings-coffee-btn {
+    min-width: 0 !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    padding: 0 9px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    gap: 5px !important;
+    align-self: center !important;
+    opacity: 0.85;
+}
+
+#${APP_NAME}-config-container .settings-coffee-btn:hover {
+    opacity: 1;
+}
+
+#${APP_NAME}-config-container .settings-coffee-btn svg {
+    width: 13px;
+    height: 13px;
 }
 `,
       },
@@ -17734,7 +17844,37 @@ const ConfigModal = ({
               key: "fullscreen-lines-before",
               type: ConfigSelection,
               options: [0, 1, 2, 3, 4],
-              defaultValue: CONFIG.visual["fullscreen-lines-before"] ?? 2,
+              defaultValue: CONFIG.visual["fullscreen-lines-before"] ?? 1,
+            },
+            {
+              desc: I18n.t("settingsAdvanced.fullscreenStyle.linesAfter.desc") || "Upcoming lines shown",
+              info: I18n.t("settingsAdvanced.fullscreenStyle.linesAfter.info") || "How many upcoming lines are shown below the current line in fullscreen.",
+              key: "fullscreen-lines-after",
+              type: ConfigSelection,
+              options: [0, 1, 2, 3, 4],
+              defaultValue: CONFIG.visual["fullscreen-lines-after"] ?? 1,
+            },
+            {
+              desc: I18n.t("settingsAdvanced.fullscreenStyle.nextBoost.desc") || "Visibility of upcoming lines",
+              info: I18n.t("settingsAdvanced.fullscreenStyle.nextBoost.info") || "Blends upcoming lines toward the current line's color by this much. 0 keeps the regular inactive color.",
+              key: "fullscreen-next-boost",
+              type: ConfigSliderRange,
+              min: 0,
+              max: 80,
+              step: 5,
+              unit: "%",
+              defaultValue: CONFIG.visual["fullscreen-next-boost"] ?? 45,
+            },
+            {
+              desc: I18n.t("settingsAdvanced.fullscreenStyle.prevOpacity.desc") || "Opacity of past lines",
+              info: I18n.t("settingsAdvanced.fullscreenStyle.prevOpacity.info") || "Already-sung lines are dimmed to this opacity so the current and upcoming lines stand out.",
+              key: "fullscreen-prev-opacity",
+              type: ConfigSliderRange,
+              min: 10,
+              max: 100,
+              step: 5,
+              unit: "%",
+              defaultValue: CONFIG.visual["fullscreen-prev-opacity"] ?? 75,
             },
             {
               desc: I18n.t("settingsAdvanced.fullscreenStyle.lineGap.desc") || "Extra space between lines",
@@ -17745,7 +17885,7 @@ const ConfigModal = ({
               max: 60,
               step: 2,
               unit: "px",
-              defaultValue: CONFIG.visual["fullscreen-line-gap"] ?? 12,
+              defaultValue: CONFIG.visual["fullscreen-line-gap"] ?? 28,
             },
             {
               desc: I18n.t("settingsAdvanced.fullscreenStyle.lineScale.desc") || "Shrink per line away from the current one",

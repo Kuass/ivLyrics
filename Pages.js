@@ -3237,6 +3237,13 @@ const getSyncedLinesBefore = () => {
 	return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const getSyncedLinesAfter = () => {
+	const fullscreen = window.lyricContainer?.state?.isFullscreen === true;
+	const value = fullscreen ? CONFIG.visual["fullscreen-lines-after"] : CONFIG.visual["lines-after"];
+	const parsed = Number(value);
+	return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const getSyncedAnimationIndex = ({ compact, isScrolling, activeLineIndex, lineNumber, visibleIndex }) => {
 	if (compact && isScrolling) {
 		return 0;
@@ -3258,7 +3265,7 @@ const shouldHideSyncedLine = ({ compact, isScrolling, animationIndex }) => {
 
 	return (
 		(animationIndex < 0 && -animationIndex > getSyncedLinesBefore()) ||
-		animationIndex > CONFIG.visual["lines-after"]
+		animationIndex > getSyncedLinesAfter()
 	);
 };
 
@@ -3986,6 +3993,8 @@ const useSyncedLyricsEngine = ({
 				lineEl.style.setProperty("--position-index", positionValue);
 				lineEl.style.setProperty("--animation-index", String(Math.abs(animationIndex) + 1));
 				lineEl.style.setProperty("--blur-index", String(Math.min(Math.abs(animationIndex), 3)));
+				// 전체 화면 CSS가 이전 줄과 다음 줄을 다르게 그릴 수 있도록 상대 위치를 남긴다.
+				lineEl.dataset.lineRelation = animationIndex < 0 ? "before" : (animationIndex > 0 ? "after" : "current");
 			}
 			if (lineEl.style.getPropertyValue("--offset") !== offsetValue) {
 				lineEl.style.setProperty("--offset", offsetValue);

@@ -3018,8 +3018,12 @@ const CONFIG = {
       Number(StorageManager.getItem("ivLyrics:visual:fullscreen-lyrics-right-padding")) ||
       0,
     // 전체 화면 가사 배치: 지나간 줄 수, 줄 사이 추가 간격(px), 현재 줄에서 멀어질 때마다 줄어드는 비율(%)
-    "fullscreen-lines-before": readNumericSetting("ivLyrics:visual:fullscreen-lines-before", 2),
-    "fullscreen-line-gap": readNumericSetting("ivLyrics:visual:fullscreen-line-gap", 12),
+    "fullscreen-lines-before": readNumericSetting("ivLyrics:visual:fullscreen-lines-before", 1),
+    "fullscreen-lines-after": readNumericSetting("ivLyrics:visual:fullscreen-lines-after", 1),
+    // 다음 줄은 현재 줄 색을 이만큼(%) 섞어 더 잘 보이게, 이전 줄은 이 불투명도(%)로 눌러 둔다.
+    "fullscreen-next-boost": readNumericSetting("ivLyrics:visual:fullscreen-next-boost", 45),
+    "fullscreen-prev-opacity": readNumericSetting("ivLyrics:visual:fullscreen-prev-opacity", 75),
+    "fullscreen-line-gap": readNumericSetting("ivLyrics:visual:fullscreen-line-gap", 28),
     "fullscreen-line-scale-step": readNumericSetting("ivLyrics:visual:fullscreen-line-scale-step", 8),
     // Fullscreen UI elements
     "fullscreen-show-clock": StorageManager.get(
@@ -9481,8 +9485,10 @@ class LyricsContainer extends react.Component {
       ...getLyricsTypographyStyleVariables(CONFIG.visual),
       "--animation-tempo": this.state.tempo,
       "--lyrics-fullscreen-right-padding": `${CONFIG.visual["fullscreen-lyrics-right-padding"] || 40}px`,
-      "--fullscreen-line-gap": `${readFiniteNumber(CONFIG.visual["fullscreen-line-gap"], 12)}px`,
+      "--fullscreen-line-gap": `${readFiniteNumber(CONFIG.visual["fullscreen-line-gap"], 28)}px`,
       "--fullscreen-line-scale-step": readFiniteNumber(CONFIG.visual["fullscreen-line-scale-step"], 8) / 100,
+      "--fullscreen-next-boost": `${readFiniteNumber(CONFIG.visual["fullscreen-next-boost"], 45)}%`,
+      "--fullscreen-prev-opacity": readFiniteNumber(CONFIG.visual["fullscreen-prev-opacity"], 75) / 100,
       "--fullscreen-tmi-font-size": (CONFIG.visual["fullscreen-tmi-font-size"] || 100) / 100,
     };
 
@@ -9704,8 +9710,10 @@ class LyricsContainer extends react.Component {
         (100 - (CONFIG.visual["highlight-intensity"] || 70)) / 100,
       "--animation-tempo": this.state.tempo,
       "--lyrics-fullscreen-right-padding": `${CONFIG.visual["fullscreen-lyrics-right-padding"] || 40}px`,
-      "--fullscreen-line-gap": `${readFiniteNumber(CONFIG.visual["fullscreen-line-gap"], 12)}px`,
+      "--fullscreen-line-gap": `${readFiniteNumber(CONFIG.visual["fullscreen-line-gap"], 28)}px`,
       "--fullscreen-line-scale-step": readFiniteNumber(CONFIG.visual["fullscreen-line-scale-step"], 8) / 100,
+      "--fullscreen-next-boost": `${readFiniteNumber(CONFIG.visual["fullscreen-next-boost"], 45)}%`,
+      "--fullscreen-prev-opacity": readFiniteNumber(CONFIG.visual["fullscreen-prev-opacity"], 75) / 100,
       "--fullscreen-tmi-font-size": (CONFIG.visual["fullscreen-tmi-font-size"] || 100) / 100,
       "--iv-motion-ease-standard": "cubic-bezier(0.22, 1, 0.36, 1)",
       "--iv-motion-duration-fast": this.shouldReduceMotion() ? "1ms" : "180ms",

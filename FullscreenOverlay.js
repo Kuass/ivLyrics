@@ -142,6 +142,31 @@ const FullscreenOverlay = (() => {
         };
     };
 
+    // Spotify는 추천곡을 재생할 때 재생 막대에 "숨기기"(싫어요) 스위치를 띄운다. 전체 화면에서는 그 막대가
+    // 가려져 있으므로, 같은 버튼을 찾아 대신 눌러 준다. 라벨은 Spotify 언어 설정을 따른다.
+    const SPOTIFY_HIDE_LABELS = ["Hide", "숨기기"];
+    const getSpotifyHideSwitch = () => {
+        try {
+            const bar = document.querySelector('[data-testid="now-playing-bar"]')
+                || document.querySelector(".main-nowPlayingBar-nowPlayingBar");
+            if (!bar) return null;
+            const localized = Spicetify.Locale?.get?.("playback-control.ban");
+            const labels = new Set(SPOTIFY_HIDE_LABELS);
+            if (localized && localized !== "playback-control.ban") labels.add(localized);
+            return Array.from(bar.querySelectorAll('button[role="switch"][aria-label]'))
+                .find((button) => labels.has(button.getAttribute("aria-label"))) || null;
+        } catch (error) {
+            return null;
+        }
+    };
+    const readSpotifyHideSwitch = () => {
+        const button = getSpotifyHideSwitch();
+        return {
+            present: Boolean(button),
+            checked: button?.getAttribute("aria-checked") === "true",
+        };
+    };
+
     const isRecommendedQueueTrack = (track) => Boolean(
         track &&
         track.queueSource !== "queued" &&
@@ -943,6 +968,7 @@ const FullscreenOverlay = (() => {
         const [isShuffle, setIsShuffle] = useState(false);
         const [repeatMode, setRepeatMode] = useState(0);
         const [isLiked, setIsLiked] = useState(false);
+        const [hideSwitch, setHideSwitch] = useState(() => readSpotifyHideSwitch());
         const [volume, setVolume] = useState(Spicetify.Player.getVolume?.() ?? 1);
         const [isMuted, setIsMuted] = useState(false);
         const [isVolumeHovered, setIsVolumeHovered] = useState(false);
@@ -1006,9 +1032,15 @@ const FullscreenOverlay = (() => {
             // Spotify can change repeat outside this component (including the
             // temporary Research playback guard), so keep both controls in sync.
             const controlStateCheckInterval = 500;
+            const updateHideSwitch = () => {
+                const next = readSpotifyHideSwitch();
+                setHideSwitch((prev) => (prev.present === next.present && prev.checked === next.checked ? prev : next));
+            };
+            updateHideSwitch();
             const controlStateIntervalId = setInterval(() => {
                 updateVolume();
                 updateRepeat();
+                updateHideSwitch();
             }, controlStateCheckInterval);
 
             Spicetify.Player.addEventListener("onplaypause", updatePlayState);
@@ -1299,6 +1331,30 @@ const FullscreenOverlay = (() => {
                         stroke: "currentColor",
                         strokeWidth: isLiked ? "0" : "1.5",
                         dangerouslySetInnerHTML: { __html: Spicetify.SVGIcons["heart"] }
+                    })
+                ),
+                // 숨기기(싫어요): Spotify가 추천곡에 띄우는 스위치를 대신 누른다.
+                hideSwitch.present && react.createElement("button", {
+                    className: `fullscreen-control-btn fullscreen-hide-btn ${hideSwitch.checked ? 'active' : ''}`,
+                    style: smallButtonStyle,
+                    onClick: () => {
+                        const button = getSpotifyHideSwitch();
+                        if (!button) return;
+                        button.click();
+                        setTimeout(() => setHideSwitch(readSpotifyHideSwitch()), 250);
+                    },
+                    title: hideSwitch.checked ? I18n.t("fullscreen.controls.unhide") : I18n.t("fullscreen.controls.hide")
+                },
+                    react.createElement("svg", {
+                        viewBox: "0 0 24 24",
+                        fill: hideSwitch.checked ? "currentColor" : "none",
+                        stroke: "currentColor",
+                        strokeWidth: "1.8",
+                        strokeLinecap: "round",
+                        strokeLinejoin: "round",
+                        dangerouslySetInnerHTML: {
+                            __html: '<path d="M17 14V2M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/>'
+                        }
                     })
                 ),
                 // Shuffle
