@@ -286,6 +286,61 @@
         return null;
     }
 
+    // 타임스탬프가 전부 0이거나 같은 값이면 재생 시작과 함께 마지막 줄만 활성화되고,
+    // 초 단위를 ms로 잘못 읽은 데이터는 첫 몇 초 만에 가사가 모두 지나간다.
+    // 그런 결과는 동기화 가사로 쓰지 않고 다음 제공자나 비동기 가사로 넘어간다.
+    const BROKEN_TIMING_MIN_SPAN_MS = 30_000;
+    const BROKEN_TIMING_SPAN_DURATION_RATIO = 0.15;
+    const BROKEN_TIMING_MAX_REGRESSION_RATIO = 0.2;
+
+    function hasUsableLineTiming(lines, durationMs = null) {
+        if (!Array.isArray(lines) || lines.length === 0) return false;
+        if (lines.length === 1) return toFiniteLyricsTime(lines[0]?.startTime) !== null;
+
+        const times = lines
+            .map(line => toFiniteLyricsTime(line?.startTime))
+            .filter(time => time !== null);
+        if (times.length < 2) return false;
+
+        // 절반 이상이 같은 시각이면 타이밍이 비어 있는 것과 같다.
+        const distinct = new Set(times);
+        if (distinct.size * 2 < times.length || distinct.size === 1) return false;
+
+        const minTime = Math.min(...times);
+        const maxTime = Math.max(...times);
+        const duration = toFiniteLyricsTime(durationMs);
+        const minSpan = duration
+            ? Math.min(BROKEN_TIMING_MIN_SPAN_MS, duration * BROKEN_TIMING_SPAN_DURATION_RATIO)
+            : BROKEN_TIMING_MIN_SPAN_MS;
+        if (times.length >= 3 && maxTime - minTime < minSpan) return false;
+        if (duration && minTime > duration) return false;
+
+        let regressions = 0;
+        for (let index = 1; index < times.length; index += 1) {
+            if (times[index] < times[index - 1]) regressions += 1;
+        }
+        return regressions <= times.length * BROKEN_TIMING_MAX_REGRESSION_RATIO;
+    }
+
+    // 깨진 타이밍의 동기화·노래방 가사를 비우고, 남는 텍스트는 비동기 가사로 보존한다.
+    function dropBrokenLineTiming(result, info = {}) {
+        if (!result || typeof result !== 'object') return { result, dropped: [] };
+        const durationMs = getLyricsDurationMs(info);
+        const dropped = [];
+        let next = result;
+        for (const type of [LYRICS_TYPES.KARAOKE, LYRICS_TYPES.SYNCED]) {
+            const lines = result[type];
+            if (!Array.isArray(lines) || lines.length === 0) continue;
+            if (hasUsableLineTiming(lines, durationMs)) continue;
+            dropped.push(type);
+            next = { ...next, [type]: null };
+            if (type === LYRICS_TYPES.SYNCED && !Array.isArray(next.unsynced)) {
+                next.unsynced = lines.map(line => ({ text: line?.text || '' }));
+            }
+        }
+        return { result: next, dropped };
+    }
+
     function normalizeInstrumentalBreakSyllables(syllables, marker, startTime, endTime) {
         if (!Array.isArray(syllables) || syllables.length === 0) {
             return { syllables, changed: false };
@@ -1254,6 +1309,12 @@
             if (!result || result.error) {
                 window.__ivLyricsDebugLog?.(`[LyricsAddonManager] Provider ${provider.id} returned error:`, result?.error);
                 return null;
+            }
+
+            const brokenTiming = dropBrokenLineTiming(result, info);
+            if (brokenTiming.dropped.length) {
+                console.warn(`[LyricsAddonManager] Dropped broken ${brokenTiming.dropped.join('/')} timing from ${provider.id}`);
+                result = brokenTiming.result;
             }
 
             const normalizedInstrumentalBreaks = normalizeProviderInstrumentalBreaks(result, info);
