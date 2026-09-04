@@ -13743,6 +13743,16 @@ const ConfigModal = ({
     margin: 0;
 }
 
+/* 위의 margin: 0이 ID 선택자 우선순위로 가사 페이지의 간격 규칙을 덮어쓰므로,
+   "원문과의 간격"·"발음과의 간격" 설정이 미리보기에도 반영되도록 다시 적용한다. */
+#${APP_NAME}-config-container .settings-live-preview-line > .lyrics-lyricsContainer-LyricsLine > p.lyrics-lyricsContainer-LyricsLine-phonetic {
+    margin-top: var(--lyrics-phonetic-spacing, 4px);
+}
+
+#${APP_NAME}-config-container .settings-live-preview-line > .lyrics-lyricsContainer-LyricsLine > p.lyrics-lyricsContainer-LyricsLine-translation {
+    margin-top: var(--lyrics-translation-spacing, 8px);
+}
+
 #${APP_NAME}-config-container .settings-live-preview-line .lyrics-lyricsContainer-LyricsLine > p,
 #${APP_NAME}-config-container .settings-live-preview-line .lyrics-lyricsContainer-LyricsLine-phonetic,
 #${APP_NAME}-config-container .settings-live-preview-line .lyrics-lyricsContainer-LyricsLine-translation,

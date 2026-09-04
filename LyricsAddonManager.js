@@ -341,6 +341,43 @@
         return { result: next, dropped };
     }
 
+    // Spotify(Musixmatch) 등은 한국어 곡의 가사를 로마자 표기("tteonabeorin neoneun imi yeope...")로만
+    // 내려주기도 한다. 그런 결과는 다른 제공자를 먼저 시도한 뒤, 어디에도 원문 표기가 없을 때에만 쓴다.
+    const ROMANIZED_KOREAN_MIN_TOKENS = 8;
+    const ROMANIZED_KOREAN_MIN_HITS = 4;
+    const ROMANIZED_KOREAN_MIN_RATIO = 0.3;
+    // 영어에는 드물고 국어의 로마자 표기에서는 흔한 모음(eo·eu·ae·yeo·wae·oe)과 조사·어미.
+    const ROMANIZED_KOREAN_TOKEN_PATTERN = /eo|eu|ae|yeo|wae|oe|(?:neun|reul|eul|ege|eseo|deul|nikka|jiman|myeon)$/;
+    const ROMANIZED_KOREAN_COMMON_WORDS = new Set([
+        'nan', 'nal', 'nae', 'neo', 'neol', 'geu', 'uri', 'urin', 'mal', 'sarang', 'saram', 'tto', 'maeum', 'saranghae'
+    ]);
+    const NATIVE_SCRIPT_PATTERN = /[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7AF\u3040-\u30FF\u4E00-\u9FFF]/;
+
+    function collectLyricsLineText(result) {
+        for (const type of [LYRICS_TYPES.KARAOKE, LYRICS_TYPES.SYNCED, LYRICS_TYPES.UNSYNCED]) {
+            const lines = result?.[type];
+            if (!Array.isArray(lines) || lines.length === 0) continue;
+            // 한 종류만 봐도 표기 여부는 같다.
+            return lines.map(line => (typeof line?.text === 'string' && line.text.trim())
+                ? line.text
+                : getKaraokeLineSyllables(line).map(syllable => syllable?.text || '').join(''));
+        }
+        return [];
+    }
+
+    // ponytail: 토큰 비율 휴리스틱이라 짧은 후렴만 있는 곡은 못 잡는다. 오탐이 보이면 목록·비율을 조정한다.
+    function looksRomanizedKorean(result) {
+        const text = collectLyricsLineText(result).join('\n');
+        if (!text.trim() || NATIVE_SCRIPT_PATTERN.test(text)) return false;
+        // 반복되는 후렴("video games, video games")이 비율을 끌어올리지 못하도록 고유 단어만 센다.
+        const tokens = Array.from(new Set(text.toLowerCase().match(/[a-z]+/g) || []));
+        if (tokens.length < ROMANIZED_KOREAN_MIN_TOKENS) return false;
+        const hits = tokens.filter(token => (
+            ROMANIZED_KOREAN_TOKEN_PATTERN.test(token) || ROMANIZED_KOREAN_COMMON_WORDS.has(token)
+        )).length;
+        return hits >= ROMANIZED_KOREAN_MIN_HITS && hits >= tokens.length * ROMANIZED_KOREAN_MIN_RATIO;
+    }
+
     function normalizeInstrumentalBreakSyllables(syllables, marker, startTime, endTime) {
         if (!Array.isArray(syllables) || syllables.length === 0) {
             return { syllables, changed: false };
@@ -1546,7 +1583,8 @@
                 hasWordKaraoke,
                 hasSynced,
                 hasUnsynced,
-                isPseudoKaraoke
+                isPseudoKaraoke,
+                isRomanizedKorean: looksRomanizedKorean(finalResult)
             };
         }
 
@@ -1656,6 +1694,8 @@
                 enabledProviders.map(provider => [provider.id, this._getProviderTypeSettings(provider)])
             );
             const providerAttempts = new Map();
+            // 로마자 표기로만 온 가사는 다른 제공자를 모두 시도한 뒤의 마지막 선택지로 미룬다.
+            let deferredRomanized = null;
             const loadProviderOnce = async (provider, lyricsType = null) => {
                 if (providerAttempts.has(provider.id)) {
                     return providerAttempts.get(provider.id);
@@ -1715,17 +1755,20 @@
 
                         const candidate = await loadProviderOnce(provider, lyricsType);
                         const selectedResult = this._selectProviderCandidateForType(candidate, lyricsType);
-                        if (selectedResult) {
-                            const finalResult = this._finalizeLyricsFetch(
-                                selectedResult,
-                                info,
-                                provider.id,
-                                selectionPolicy,
-                                lyricsType
-                            );
-                            this.clearActiveLyricsSearchProgress(info.uri, forcedProviderId);
-                            return finalResult;
+                        if (!selectedResult) continue;
+                        if (candidate.isRomanizedKorean) {
+                            deferredRomanized ??= { result: selectedResult, providerId: provider.id, lyricsType };
+                            continue;
                         }
+                        const finalResult = this._finalizeLyricsFetch(
+                            selectedResult,
+                            info,
+                            provider.id,
+                            selectionPolicy,
+                            lyricsType
+                        );
+                        this.clearActiveLyricsSearchProgress(info.uri, forcedProviderId);
+                        return finalResult;
                     }
                 }
             } else {
@@ -1742,18 +1785,35 @@
                                 : candidate.hasUnsynced
                                     ? LYRICS_TYPES.UNSYNCED
                                     : null;
-                    if (selectionType) {
-                        const finalResult = this._finalizeLyricsFetch(
-                            candidate.result,
-                            info,
-                            provider.id,
-                            selectionPolicy,
-                            selectionType
-                        );
-                        this.clearActiveLyricsSearchProgress(info.uri, forcedProviderId);
-                        return finalResult;
+                    if (!selectionType) continue;
+                    if (candidate.isRomanizedKorean) {
+                        deferredRomanized ??= { result: candidate.result, providerId: provider.id, lyricsType: selectionType };
+                        continue;
                     }
+                    const finalResult = this._finalizeLyricsFetch(
+                        candidate.result,
+                        info,
+                        provider.id,
+                        selectionPolicy,
+                        selectionType
+                    );
+                    this.clearActiveLyricsSearchProgress(info.uri, forcedProviderId);
+                    return finalResult;
                 }
+            }
+
+            // 원문 표기 가사가 어느 제공자에도 없으면 로마자 표기 결과라도 보여 준다.
+            if (deferredRomanized) {
+                console.warn(`[LyricsAddonManager] Only romanized lyrics found; using ${deferredRomanized.providerId}`);
+                const finalResult = this._finalizeLyricsFetch(
+                    deferredRomanized.result,
+                    info,
+                    deferredRomanized.providerId,
+                    selectionPolicy,
+                    deferredRomanized.lyricsType
+                );
+                this.clearActiveLyricsSearchProgress(info.uri, forcedProviderId);
+                return finalResult;
             }
 
             if (window.AddonDebug?.isEnabled()) {

@@ -15129,15 +15129,25 @@ a.research-media-item:hover {
   .research-source-list a { transition: none !important; }
 }
 
-/* fork: 전체 화면 곡 전환을 부드럽게 한다. 앨범 아트 배경은 이전 이미지 위로 페이드인하고,
+/* fork: 전체 화면 곡 전환을 부드럽게 한다. 영상 배경은 곡이 바뀌면 검정으로 내려가고,
+   영상이 준비되면 페이드인한다. 영상이 없거나 실패하면 앨범 색상 블롭 그라데이션이 대신 떠오른다.
    제목·아티스트 텍스트는 곡이 바뀔 때 다시 마운트되어 짧게 떠오른다. */
-.ivlyrics-video-fallback-layer.is-entering {
-  animation: ivlyrics-video-fallback-in 500ms ease both;
+.ivlyrics-video-ambient {
+  --c1: var(--ivLyrics-c1, 30, 30, 40);
+  --c2: var(--ivLyrics-c2, 60, 40, 70);
+  --c3: var(--ivLyrics-c3, 20, 50, 60);
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background-color: rgba(var(--c1), 1);
+  opacity: 0;
+  transition: opacity 900ms ease, background-color 1.5s ease;
+  z-index: 0;
+  pointer-events: none;
 }
 
-@keyframes ivlyrics-video-fallback-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.ivlyrics-video-ambient.is-visible {
+  opacity: 1;
 }
 
 .lyrics-fullscreen-title-container > div,

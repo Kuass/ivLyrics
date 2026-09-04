@@ -60,6 +60,8 @@ A personal fork of [ivLis-Studio/ivLyrics](https://github.com/ivLis-Studio/ivLyr
 
 - **망가진 타임스탬프 필터링**: 타임스탬프가 전부 같은 값이거나, 초 단위를 밀리초로 잘못 읽었거나, 순서가 뒤섞인 결과는 동기화 가사로 쓰지 않고 다음 제공자로 넘어갑니다. 다른 제공자도 없으면 같은 텍스트를 비동기 가사로 보여 줍니다. 원본에서는 이런 가사가 걸리면 재생 시작과 함께 마지막 줄만 보였습니다.\
   **Broken timestamp filtering**: synced results whose timestamps are all identical, in seconds instead of milliseconds, or mostly out of order are rejected and the next provider is tried. With no other provider, the same text is shown as unsynced lyrics. Upstream showed only the last line from the start in these cases.
+- **로마자 표기 가사 후순위**: 한국어 곡인데 Spotify(Musixmatch) 등이 가사를 로마자 표기("tteonabeorin neoneun...")로만 내려주면, 그 결과는 뒤로 미루고 다른 제공자에서 한글 원문을 먼저 찾습니다. 어디에도 원문이 없을 때에만 로마자 가사를 보여 줍니다. Lyrically(Paxsenix)처럼 원문을 보유한 제공자가 켜져 있어야 효과가 있습니다.\
+  **Romanized lyrics deferred**: when a Korean song comes back from Spotify (Musixmatch) or another provider only as romanized text ("tteonabeorin neoneun..."), that result is set aside and the other providers are tried for the Hangul original first. The romanized text is shown only when no provider has the original. This needs a provider that carries the original, such as Lyrically (Paxsenix), to be enabled.
 - **패널 가사 표시 조건**: 우측 패널 가사는 Spotify가 그 곡의 가사를 직접 보여 주지 않을 때만 표시됩니다. 설정 "패널 가사" 탭의 "Spotify 기본 가사가 없을 때만 표시"로 끕니다.\
   **Panel lyrics condition**: the Now Playing panel shows lyrics only when Spotify itself does not. Toggle: Settings > Panel lyrics > "Only when Spotify has no lyrics".
 
@@ -90,8 +92,8 @@ Every AI feature runs only when at least one LLM provider is enabled, and each h
 
 ### 전체 화면 / Fullscreen
 
-- **곡 전환**: 이전 영상 플레이어를 배경이 어두워지는 0.5초 동안 남겨 둔 뒤 정리하고, 앨범 아트 배경은 이전 이미지 위로 페이드인하며, 제목과 아티스트 글자는 짧게 떠오르며 바뀝니다.\
-  **Track transitions**: the previous player is kept through the 0.5 s fade-out before disposal, the album-art fallback cross-fades over the previous image, and title and artist text animate in.
+- **곡 전환**: 곡이 바뀌면 이전 영상이 검정으로 페이드아웃된 뒤 정리되고, 새 영상은 준비되는 대로 검정 위로 페이드인합니다. 영상이 없거나 불러오지 못한 곡, 그리고 재생을 멈춘 동안에는 앨범 아트 대신 앨범 색상으로 만든 블롭 그라데이션(블러 그라데이션 배경과 같은 모양)이 떠오릅니다. 제목과 아티스트 글자는 짧게 떠오르며 바뀝니다.\
+  **Track transitions**: on a track change the previous video fades to black before disposal and the new video fades in over black once it is ready. When a track has no video, the video fails to load, or playback is paused, an album-colour blob gradient (the same look as the blur-gradient background) fades in instead of album art. Title and artist text animate in.
 - **제목 자동 축소**: 긴 제목은 글자 크기가 자동으로 줄어듭니다. 한글·한자·가나는 라틴 문자보다 넓게 계산하고, 설정 크기의 55% 아래로는 내려가지 않습니다.\
   **Title auto-fit**: long titles shrink automatically. CJK glyphs count as wider than Latin letters; the size never drops below 55 % of the configured value.
 - **줄 전환**: 줄이 바뀔 때의 이동을 620ms의 완만한 곡선으로 늘리고, 색·불투명도·크기 변화도 같은 시간에 걸쳐 함께 바뀝니다. 노래방 모드의 줄 전환 애니메이션 설정이 꺼져 있어도 전체 화면에서는 이동을 애니메이션합니다.\
@@ -118,6 +120,8 @@ Every AI feature runs only when at least one LLM provider is enabled, and each h
   **Legibility**: font sizes and weights are one step larger and secondary text has more contrast. Pretendard and the macOS system font come first in the font stack.
 - **원저자 후원 버튼**: 헤더의 후원 버튼을 "원저자 후원"으로 이름을 바꾸고 작게 줄였습니다.\
   **Support the original author**: the header donate button is renamed and made smaller.
+- **미리보기 간격 반영**: 외관 스타일의 "원문과의 간격"과 "발음과의 간격"이 실제 가사에는 적용되면서 미리보기에서는 무시되던 문제를 고쳤습니다. 미리보기 전용 CSS가 모든 문단의 여백을 0으로 강제하고 있었습니다.\
+  **Preview spacing**: the "gap from original" and "gap from pronunciation" sliders in the appearance styles applied to real lyrics but not to the live preview, whose CSS forced every paragraph margin to 0. The preview now follows both values.
 
 ### 업데이트 알림 / Update notice
 
@@ -210,6 +214,7 @@ Run unit tests with `node --test tests/`.
 | --- | --- |
 | `tests/official_video_preference.test.mjs` | 영상 채점, 자막 기준점 파서, AI 판정 경로 / video scoring, caption-cue parser, AI judge path |
 | `tests/broken_sync_timing.test.mjs` | 깨진 타임스탬프 판별 / broken timestamp detection |
+| `tests/romanized_korean_fallback.test.mjs` | 로마자 표기 한국어 가사 판별 / romanized Korean lyrics detection |
 | `tests/video_background_sync.test.mjs` | 영상 되감기 보정 / video seek correction |
 
 저장소를 `~/.config/spicetify/CustomApps/ivLyrics`에 두지 않아도 됩니다. 수정 후에는 `ivlyrics update --ref <branch>`로 설치하거나, `rsync`로 복사한 뒤 `spicetify apply`를 실행합니다.\

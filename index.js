@@ -1142,6 +1142,31 @@ function normalizeIvLyricsTrackBackgroundOverride(value) {
   return { mode };
 }
 
+// 블러 그라데이션 배경과 영상 배경의 대체 화면이 함께 쓰는 앨범 색상 CSS 변수.
+function buildAmbientGradientColorVars(dynamicColors) {
+  // hex/rgb 문자열에서 RGB 값 추출
+  const parseColor = (color, fallback) => {
+    if (!color) return fallback;
+    const hexMatch = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
+    if (hexMatch) {
+      return { r: parseInt(hexMatch[1], 16), g: parseInt(hexMatch[2], 16), b: parseInt(hexMatch[3], 16) };
+    }
+    const rgbMatch = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(color);
+    if (rgbMatch) {
+      return { r: parseInt(rgbMatch[1]), g: parseInt(rgbMatch[2]), b: parseInt(rgbMatch[3]) };
+    }
+    return fallback;
+  };
+  const c1 = parseColor(dynamicColors?.minContrast, { r: 30, g: 30, b: 40 });
+  const c2 = parseColor(dynamicColors?.highContrast, { r: 60, g: 40, b: 70 });
+  const c3 = parseColor(dynamicColors?.overlayColor, { r: 20, g: 50, b: 60 });
+  return {
+    "--ivLyrics-c1": `${c1.r}, ${c1.g}, ${c1.b}`,
+    "--ivLyrics-c2": `${c2.r}, ${c2.g}, ${c2.b}`,
+    "--ivLyrics-c3": `${c3.r}, ${c3.g}, ${c3.b}`,
+  };
+}
+
 function getIvLyricsTrackBackgroundMode(value) {
   return normalizeIvLyricsTrackBackgroundOverride(value)?.mode || null;
 }
@@ -6771,7 +6796,10 @@ class LyricsContainer extends react.Component {
       vibrant = 8747370;
     }
 
-    if (this.getEffectiveBackgroundMode() === "blur-gradient-background") {
+    // 영상 배경도 영상이 없거나 멈춘 동안 같은 색상 그라데이션을 대체 화면으로 쓴다.
+    const needsDynamicColors = ["blur-gradient-background", "video-background"]
+      .includes(this.getEffectiveBackgroundMode());
+    if (needsDynamicColors) {
       try {
         const coverUrl =
           Spicetify.Player.data?.item?.metadata?.image_xlarge_url ||
@@ -9657,36 +9685,7 @@ class LyricsContainer extends react.Component {
       }
     } else if (!this.state.isFADMode && effectiveBackgroundMode === "blur-gradient-background") {
       const brightness = CONFIG.visual["background-brightness"] / 100;
-
-      // hex/rgb 문자열에서 RGB 값 추출
-      const parseColor = (color) => {
-        if (!color) return { r: 30, g: 30, b: 40 };
-        // hex 형식
-        const hexMatch = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
-        if (hexMatch) {
-          return { r: parseInt(hexMatch[1], 16), g: parseInt(hexMatch[2], 16), b: parseInt(hexMatch[3], 16) };
-        }
-        // rgb() 형식
-        const rgbMatch = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(color);
-        if (rgbMatch) {
-          return { r: parseInt(rgbMatch[1]), g: parseInt(rgbMatch[2]), b: parseInt(rgbMatch[3]) };
-        }
-        return { r: 30, g: 30, b: 40 };
-      };
-
-      let c1 = { r: 30, g: 30, b: 40 };
-      let c2 = { r: 60, g: 40, b: 70 };
-      let c3 = { r: 20, g: 50, b: 60 };
-
-      if (this.state.dynamicColors) {
-        c1 = parseColor(this.state.dynamicColors.minContrast);
-        c2 = parseColor(this.state.dynamicColors.highContrast);
-        c3 = parseColor(this.state.dynamicColors.overlayColor);
-      }
-
-      backgroundStyle["--ivLyrics-c1"] = `${c1.r}, ${c1.g}, ${c1.b}`;
-      backgroundStyle["--ivLyrics-c2"] = `${c2.r}, ${c2.g}, ${c2.b}`;
-      backgroundStyle["--ivLyrics-c3"] = `${c3.r}, ${c3.g}, ${c3.b}`;
+      Object.assign(backgroundStyle, buildAmbientGradientColorVars(this.state.dynamicColors));
       Object.assign(backgroundStyle, compositedBackgroundStyle);
       backgroundStyle.filter = `brightness(${brightness}) saturate(2.5)`;
     } else if (
@@ -10361,7 +10360,8 @@ class LyricsContainer extends react.Component {
         coverMode: CONFIG.visual["video-cover"],
         videoScale: CONFIG.visual["video-scale"],
         externalVideoInfo: this.state.videoInfo,
-        onLoadingChange: this.handleVideoBackgroundLoadingChange
+        onLoadingChange: this.handleVideoBackgroundLoadingChange,
+        ambientColorVars: buildAmbientGradientColorVars(this.state.dynamicColors)
       }),
       shouldRenderStaticBackground && react.createElement("div", {
         className: "lyrics-lyricsContainer-LyricsBackground",

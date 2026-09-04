@@ -255,7 +255,7 @@ const isSpotifyPlaybackActive = (playerState = Spicetify.Player?.data) => {
     }
 };
 
-const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, coverMode, videoScale, externalVideoInfo, onLoadingChange }) => {
+const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, coverMode, videoScale, externalVideoInfo, onLoadingChange, ambientColorVars }) => {
     const { useState, useEffect, useRef, useCallback } = react;
     const VIDEO_BACKGROUND_DEBUG = false;
     const videoBackgroundDebug = (...args) => {
@@ -358,24 +358,9 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         primePending: false,
     });
     const youtubeSeekStateRef = useRef(createVideoSeekState());
-    const readAlbumArtUrl = () =>
-        Spicetify.Player.data?.item?.metadata?.image_xlarge_url ||
-        Spicetify.Player.data?.item?.metadata?.image_large_url ||
-        Spicetify.Player.data?.item?.metadata?.image_url ||
-        null;
-    const [fallbackArt, setFallbackArt] = useState(() => ({ current: readAlbumArtUrl(), previous: null }));
-    useEffect(() => {
-        const nextUrl = readAlbumArtUrl();
-        let timer = null;
-        setFallbackArt((state) => {
-            if (state.current === nextUrl) return state;
-            return { current: nextUrl, previous: state.current };
-        });
-        timer = setTimeout(() => {
-            setFallbackArt((state) => (state.previous ? { ...state, previous: null } : state));
-        }, VIDEO_RETIRE_DELAY_MS);
-        return () => clearTimeout(timer);
-    }, [trackUri]);
+    // 배경 단계: 곡이 바뀌면 검정으로 내려가고(loading), 영상이 준비되면 영상이(ready),
+    // 영상이 없거나 실패하면 앨범 색상 그라데이션이(unavailable) 페이드인한다.
+    const [videoPhase, setVideoPhase] = useState("loading");
     const brightnessValue = Math.min(Math.max(Number(brightness) || 0, 0), 100);
     const brightnessRatio = brightnessValue / 100;
     const blurValue = Math.min(Math.max(Number(blurAmount) || 0, 0), 80);
@@ -478,6 +463,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
     }, [trackUri, videoInfo]);
 
     const reportVideoBackgroundStatus = useCallback((phase, details = {}) => {
+        setVideoPhase(phase === "loading" ? "loading" : phase === "complete" ? "ready" : "unavailable");
         if (typeof onLoadingChange !== "function") return;
         onLoadingChange({
             phase,
@@ -1624,35 +1610,21 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         return () => clearInterval(syncInterval);
     }, [isPlayerReady, videoInfo, firstLyricTime, trackOffsetMs, isPlaying]);
 
-    // Render Album Art Background (Fallback)
-    // 앨범 아트 폴백은 이전 곡의 이미지를 아래에 남긴 채 새 이미지를 위에서 페이드인해서, 곡 전환이 한 번에 튀지 않게 한다.
-    const renderFallback = () => {
-        const layerStyle = (url) => ({
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            backgroundImage: url ? `url(${url})` : "none",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            filter: `brightness(${brightnessRatio}) blur(${blurValue}px)`,
-            transform: "translateZ(0) scale(1.1)",
-            ...blurCompositeStyle,
-            zIndex: 0,
-        });
-        return react.createElement(react.Fragment, null,
-            fallbackArt.previous && react.createElement("div", {
-                key: `fallback-prev:${fallbackArt.previous}`,
-                style: layerStyle(fallbackArt.previous),
-            }),
-            react.createElement("div", {
-                key: `fallback:${fallbackArt.current || "none"}`,
-                className: fallbackArt.previous ? "ivlyrics-video-fallback-layer is-entering" : "ivlyrics-video-fallback-layer",
-                style: layerStyle(fallbackArt.current),
-            })
-        );
-    };
+    // 영상이 없거나 실패했을 때, 그리고 재생이 멈춰 영상을 숨길 때의 배경.
+    // 블러 그라데이션 모드와 같은 블롭을 쓰되, 앨범 아트는 쓰지 않는다.
+    const showAmbient = videoPhase === "unavailable" || (videoPhase === "ready" && !isPlaying);
+    const renderFallback = () => react.createElement("div", {
+        className: `ivlyrics-video-ambient color-gradient-bg${showAmbient ? " is-visible" : ""}`,
+        style: {
+            ...(ambientColorVars || {}),
+            filter: `brightness(${brightnessRatio}) saturate(2.5)`,
+        },
+    },
+        [1, 2, 3, 4, 5, 6].map((index) => react.createElement("div", {
+            key: `blob${index}`,
+            className: `gradient-blob blob-${index}`,
+        }))
+    );
 
     // 헬퍼 모드용 video 태그 스타일
     const helperVideoStyle = {
@@ -1665,7 +1637,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         minHeight: useCoverMode ? "100%" : undefined,
         transform: videoTransform,
         opacity: isPlayerReady && isPlaying ? 1 : 0,
-        transition: "opacity 0.5s ease",
+        transition: "opacity 0.8s ease",
         zIndex: 1,
         pointerEvents: "none",
         filter: blurValue ? `blur(${blurValue}px)` : "none",
@@ -1683,6 +1655,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
             overflow: "hidden",
             zIndex: 0,
             isolation: "isolate",
+            backgroundColor: "black",
         }
     },
         renderFallback(),
@@ -1809,7 +1782,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 minHeight: useCoverMode ? "100%" : undefined,
                 transform: videoTransform,
                 opacity: isPlayerReady && isPlaying ? 1 : 0, // Hide when paused or not ready
-                transition: "opacity 0.5s ease",
+                transition: "opacity 0.8s ease",
                 zIndex: 1,
                 pointerEvents: "none",
                 filter: blurValue ? `blur(${blurValue}px)` : "none",

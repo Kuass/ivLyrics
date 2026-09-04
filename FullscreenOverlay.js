@@ -143,16 +143,39 @@ const FullscreenOverlay = (() => {
     };
 
     // Spotify는 추천곡을 재생할 때 재생 막대에 "숨기기"(싫어요) 스위치를 띄운다. 전체 화면에서는 그 막대가
-    // 가려져 있으므로, 같은 버튼을 찾아 대신 눌러 준다. 라벨은 Spotify 언어 설정을 따른다.
-    const SPOTIFY_HIDE_LABELS = ["Hide", "숨기기"];
+    // 가려져 있으므로, 같은 버튼을 찾아 대신 눌러 준다. 라벨은 재생 컨텍스트에 따라 "곡 숨기기",
+    // "이 플레이리스트에서 숨기기", "이 앨범에서 숨기기" 등으로 달라지고 Spotify 언어 설정을 따르므로,
+    // 해당 Locale 키들을 모두 현재 언어로 풀어서 비교한다.
+    const SPOTIFY_HIDE_LABEL_KEYS = [
+        "playback-control.ban",
+        "web-player.feedback.hide-song",
+        "web-player.feedback.hide-in-playlist",
+        "web-player.feedback.hide-in-album",
+        "web-player.feedback.hidden",
+        "web-player.feedback.show-in-playlist",
+        "web-player.feedback.show-in-album",
+    ];
+    // Locale을 읽을 수 없을 때를 위한 영어/한국어 대비값.
+    const SPOTIFY_HIDE_LABEL_FALLBACKS = [
+        "Hide", "Hide song", "Hide in this playlist", "Hide in this album",
+        "Hidden", "Show in this playlist", "Show in this album",
+        "숨기기", "곡 숨기기", "이 플레이리스트에서 숨기기", "이 앨범에서 숨기기",
+        "숨김", "이 플레이리스트에 표시하기", "이 앨범에 표시하기",
+    ];
+    const getSpotifyHideLabels = () => {
+        const labels = new Set(SPOTIFY_HIDE_LABEL_FALLBACKS);
+        for (const key of SPOTIFY_HIDE_LABEL_KEYS) {
+            const localized = Spicetify.Locale?.get?.(key);
+            if (localized && localized !== key) labels.add(localized);
+        }
+        return labels;
+    };
     const getSpotifyHideSwitch = () => {
         try {
             const bar = document.querySelector('[data-testid="now-playing-bar"]')
                 || document.querySelector(".main-nowPlayingBar-nowPlayingBar");
             if (!bar) return null;
-            const localized = Spicetify.Locale?.get?.("playback-control.ban");
-            const labels = new Set(SPOTIFY_HIDE_LABELS);
-            if (localized && localized !== "playback-control.ban") labels.add(localized);
+            const labels = getSpotifyHideLabels();
             return Array.from(bar.querySelectorAll('button[role="switch"][aria-label]'))
                 .find((button) => labels.has(button.getAttribute("aria-label"))) || null;
         } catch (error) {
