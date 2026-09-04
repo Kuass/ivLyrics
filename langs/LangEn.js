@@ -1037,6 +1037,10 @@ window.LANG_EN = {
         "label": "Opacity",
         "desc": "Opacity of pronunciation (0-100%)"
       },
+      "inline": {
+        "label": "Attach pronunciation to each word",
+        "desc": "Shows the pronunciation under each word of the original instead of on a separate line. Applies to pronunciations fetched after enabling; lines whose chunk count does not match fall back to a single line."
+      },
       "gap": {
         "label": "Gap from Original",
         "desc": "Margin between original text and pronunciation"

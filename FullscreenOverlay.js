@@ -142,10 +142,10 @@ const FullscreenOverlay = (() => {
         };
     };
 
-    // Spotify는 추천곡을 재생할 때 재생 막대에 "숨기기"(싫어요) 스위치를 띄운다. 전체 화면에서는 그 막대가
-    // 가려져 있으므로, 같은 버튼을 찾아 대신 눌러 준다. 라벨은 재생 컨텍스트에 따라 "곡 숨기기",
-    // "이 플레이리스트에서 숨기기", "이 앨범에서 숨기기" 등으로 달라지고 Spotify 언어 설정을 따르므로,
-    // 해당 Locale 키들을 모두 현재 언어로 풀어서 비교한다.
+    // Spotify는 추천곡을 재생할 때 재생 막대의 좋아요 자리에 전용 버튼을 띄운다. 자동 재생·큐레이션
+    // 플레이리스트(데일리 믹스 등)에서는 "숨기기" 스위치가, 스마트셔플 추천곡에서는 "추천곡 삭제하기"와
+    // "{플레이리스트}에 추가" 버튼 쌍이 나온다. 전체 화면에서는 그 막대가 가려져 있으므로 같은 버튼을 찾아
+    // 대신 눌러 준다. 라벨은 Spotify 언어 설정을 따르므로 Locale 키를 현재 언어로 풀어서 비교한다.
     const SPOTIFY_HIDE_LABEL_KEYS = [
         "playback-control.ban",
         "web-player.feedback.hide-song",
@@ -154,30 +154,64 @@ const FullscreenOverlay = (() => {
         "web-player.feedback.hidden",
         "web-player.feedback.show-in-playlist",
         "web-player.feedback.show-in-album",
+        "web-player.smart-shuffle.removed-from-recommendations-button",
     ];
-    // Locale을 읽을 수 없을 때를 위한 영어/한국어 대비값.
+    const SPOTIFY_ADD_RECOMMENDATION_LABEL_KEYS = [
+        "web-player.smart-shuffle.add-to-playlist-button",
+        "web-player.smart-shuffle.add-to-playlist-button-fallback",
+    ];
+    // Locale을 읽을 수 없을 때를 위한 영어/한국어 대비값. "{0}"은 플레이리스트 이름 자리다.
     const SPOTIFY_HIDE_LABEL_FALLBACKS = [
         "Hide", "Hide song", "Hide in this playlist", "Hide in this album",
-        "Hidden", "Show in this playlist", "Show in this album",
+        "Hidden", "Show in this playlist", "Show in this album", "Remove recommendation",
         "숨기기", "곡 숨기기", "이 플레이리스트에서 숨기기", "이 앨범에서 숨기기",
-        "숨김", "이 플레이리스트에 표시하기", "이 앨범에 표시하기",
+        "숨김", "이 플레이리스트에 표시하기", "이 앨범에 표시하기", "추천곡 삭제하기",
     ];
-    const getSpotifyHideLabels = () => {
-        const labels = new Set(SPOTIFY_HIDE_LABEL_FALLBACKS);
-        for (const key of SPOTIFY_HIDE_LABEL_KEYS) {
+    const SPOTIFY_ADD_RECOMMENDATION_LABEL_FALLBACKS = [
+        "Add to {0}", "Add to playlist", "{0}에 추가", "플레이리스트에 추가하기",
+    ];
+    const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const buildSpotifyLabelMatcher = (keys, fallbacks) => {
+        const labels = new Set(fallbacks);
+        for (const key of keys) {
             const localized = Spicetify.Locale?.get?.(key);
             if (localized && localized !== key) labels.add(localized);
         }
-        return labels;
+        const patterns = Array.from(labels).map((label) => new RegExp(
+            `^${label.split("{0}").map(escapeRegExp).join(".+")}$`
+        ));
+        return (label) => typeof label === "string" && patterns.some((pattern) => pattern.test(label));
+    };
+    const getSpotifyNowPlayingBar = () => document.querySelector('[data-testid="now-playing-bar"]')
+        || document.querySelector(".main-nowPlayingBar-nowPlayingBar");
+    const isSmartShuffleRecommendation = () => {
+        const item = Spicetify.Player.data?.item;
+        return item?.metadata?.provider === "enhanced_recommendation" && item?.provider !== "queue";
     };
     const getSpotifyHideSwitch = () => {
         try {
-            const bar = document.querySelector('[data-testid="now-playing-bar"]')
-                || document.querySelector(".main-nowPlayingBar-nowPlayingBar");
+            const bar = getSpotifyNowPlayingBar();
             if (!bar) return null;
-            const labels = getSpotifyHideLabels();
-            return Array.from(bar.querySelectorAll('button[role="switch"][aria-label]'))
-                .find((button) => labels.has(button.getAttribute("aria-label"))) || null;
+            const matches = buildSpotifyLabelMatcher(SPOTIFY_HIDE_LABEL_KEYS, SPOTIFY_HIDE_LABEL_FALLBACKS);
+            return Array.from(bar.querySelectorAll("button[aria-label]"))
+                .find((button) => matches(button.getAttribute("aria-label"))) || null;
+        } catch (error) {
+            return null;
+        }
+    };
+    // 스마트셔플의 "추가" 버튼. 좋아요 버튼("좋아요 표시한 곡에 추가")과 헷갈리지 않도록 추천곡일 때만,
+    // 그리고 aria-checked가 없는(스위치가 아닌) 버튼만 본다.
+    const getSpotifyAddRecommendationButton = () => {
+        try {
+            if (!isSmartShuffleRecommendation()) return null;
+            const bar = getSpotifyNowPlayingBar();
+            if (!bar) return null;
+            const matches = buildSpotifyLabelMatcher(
+                SPOTIFY_ADD_RECOMMENDATION_LABEL_KEYS,
+                SPOTIFY_ADD_RECOMMENDATION_LABEL_FALLBACKS
+            );
+            return Array.from(bar.querySelectorAll("button[aria-label]:not([aria-checked])"))
+                .find((button) => matches(button.getAttribute("aria-label"))) || null;
         } catch (error) {
             return null;
         }
@@ -187,6 +221,13 @@ const FullscreenOverlay = (() => {
         return {
             present: Boolean(button),
             checked: button?.getAttribute("aria-checked") === "true",
+        };
+    };
+    const readSpotifyAddRecommendation = () => {
+        const button = getSpotifyAddRecommendationButton();
+        return {
+            present: Boolean(button),
+            label: button?.getAttribute("aria-label") || "",
         };
     };
 
@@ -992,6 +1033,7 @@ const FullscreenOverlay = (() => {
         const [repeatMode, setRepeatMode] = useState(0);
         const [isLiked, setIsLiked] = useState(false);
         const [hideSwitch, setHideSwitch] = useState(() => readSpotifyHideSwitch());
+        const [addRecommendation, setAddRecommendation] = useState(() => readSpotifyAddRecommendation());
         const [volume, setVolume] = useState(Spicetify.Player.getVolume?.() ?? 1);
         const [isMuted, setIsMuted] = useState(false);
         const [isVolumeHovered, setIsVolumeHovered] = useState(false);
@@ -1058,6 +1100,8 @@ const FullscreenOverlay = (() => {
             const updateHideSwitch = () => {
                 const next = readSpotifyHideSwitch();
                 setHideSwitch((prev) => (prev.present === next.present && prev.checked === next.checked ? prev : next));
+                const nextAdd = readSpotifyAddRecommendation();
+                setAddRecommendation((prev) => (prev.present === nextAdd.present && prev.label === nextAdd.label ? prev : nextAdd));
             };
             updateHideSwitch();
             const controlStateIntervalId = setInterval(() => {
@@ -1378,6 +1422,24 @@ const FullscreenOverlay = (() => {
                         dangerouslySetInnerHTML: {
                             __html: '<path d="M17 14V2M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/>'
                         }
+                    })
+                ),
+                // 스마트셔플 추천곡을 현재 플레이리스트에 추가한다. 제목은 Spotify가 붙인 라벨을 그대로 쓴다.
+                addRecommendation.present && react.createElement("button", {
+                    className: "fullscreen-control-btn fullscreen-add-recommendation-btn",
+                    style: smallButtonStyle,
+                    onClick: () => {
+                        const button = getSpotifyAddRecommendationButton();
+                        if (!button) return;
+                        button.click();
+                        setTimeout(() => setAddRecommendation(readSpotifyAddRecommendation()), 250);
+                    },
+                    title: addRecommendation.label
+                },
+                    react.createElement("svg", {
+                        viewBox: "0 0 16 16",
+                        fill: "currentColor",
+                        dangerouslySetInnerHTML: { __html: Spicetify.SVGIcons["plus2px"] || Spicetify.SVGIcons["plus-alt"] || "" }
                     })
                 ),
                 // Shuffle

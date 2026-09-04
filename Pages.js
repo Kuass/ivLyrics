@@ -266,7 +266,17 @@ const getLyricsDisplayMode = (
 		// originalText is the actual original lyric, while `text` and `text2`
 		// are typed pronunciation and translation supplements respectively.
 
-		if (showTranslatedBelow) {
+		// 조각별 발음이 있으면 별도 줄 대신 원문 조각 아래에 ruby로 붙인다(후리가나와 겹치지 않도록 후리가나는 생략).
+		const inlineSegments = CONFIG.visual["pronunciation-inline"] !== false
+			&& Array.isArray(line?.phoneticSegments) && line.phoneticSegments.length
+			? line.phoneticSegments
+			: null;
+
+		if (showTranslatedBelow && inlineSegments) {
+			mainText = Utils.buildInlinePronunciationHTML(inlineSegments);
+			subText = null;
+			subText2 = text2 ? safeRenderText(text2) : null;
+		} else if (showTranslatedBelow) {
 			// Show original as main, translations below
 			// Apply furigana to original text if enabled
 			const processedOriginalText = safeRenderText(originalText);
@@ -747,9 +757,10 @@ const normalizeUnsyncedLyrics = (lyrics) => {
 	return [];
 };
 
-const getUnsyncedLineRenderData = (lyrics, text, originalText, text2) => {
+const getUnsyncedLineRenderData = (lyrics, text, originalText, text2, line = null) => {
+	// 조각별 발음(phoneticSegments)을 읽을 수 있도록 줄 객체도 넘긴다.
 	const { mainText: lineText, subText, subText2: showMode2Translation } =
-		getLyricsDisplayMode(false, null, text, originalText, text2);
+		getLyricsDisplayMode(false, line, text, originalText, text2);
 
 	const belowOrigin = (typeof originalText === "object"
 		? originalText?.props?.children?.[0]
@@ -5843,7 +5854,7 @@ const UnsyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, co
 			showMode2Translation,
 			belowMode,
 			showMode2,
-		} = getUnsyncedLineRenderData(lyrics, text, originalText, text2);
+		} = getUnsyncedLineRenderData(lyrics, text, originalText, text2, line);
 
 		return {
 			key: index,

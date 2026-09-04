@@ -16012,6 +16012,12 @@ const ConfigModal = ({
               unit: "%",
             },
             {
+              desc: I18n.t("settingsAdvanced.pronunciationStyle.inline.label"),
+              info: I18n.t("settingsAdvanced.pronunciationStyle.inline.desc"),
+              key: "pronunciation-inline",
+              defaultValue: CONFIG.visual["pronunciation-inline"] !== false,
+            },
+            {
               desc: I18n.t("settingsAdvanced.pronunciationStyle.gap.label"),
               info: I18n.t("settingsAdvanced.pronunciationStyle.gap.desc"),
               key: "phonetic-spacing",

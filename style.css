@@ -4914,6 +4914,26 @@ ruby rt {
   white-space: nowrap;
 }
 
+/* fork: 발음을 별도 줄이 아니라 원문 조각마다 아래에 붙여 보여 준다. 발음 스타일 설정 변수를 그대로 쓴다. */
+.lyrics-lyricsContainer-LyricsLine ruby.lyrics-pronunciation-ruby {
+  ruby-position: under;
+  ruby-align: center;
+}
+
+.lyrics-lyricsContainer-LyricsLine ruby.lyrics-pronunciation-ruby rt {
+  display: ruby-text;
+  font-family: var(--lyrics-phonetic-font-family, var(--lyrics-font-family, var(--font-family)));
+  font-size: var(--lyrics-phonetic-font-size, calc(var(--lyrics-font-size) * 0.6));
+  font-weight: var(--lyrics-phonetic-font-weight, 400);
+  letter-spacing: var(--lyrics-phonetic-letter-spacing, 0);
+  opacity: var(--lyrics-phonetic-opacity, 0.7);
+  line-height: 1.2;
+  padding-top: max(0px, var(--lyrics-phonetic-spacing, 4px));
+  text-shadow: var(--lyrics-phonetic-outline-shadow, none);
+  white-space: nowrap;
+  user-select: none;
+}
+
 /* Active line furigana styling */
 .lyrics-lyricsContainer-LyricsLine-active ruby rt {
   opacity: 0.9;
@@ -5664,21 +5684,55 @@ ruby rt {
   padding: 60px 10%;
 }
 
-/* Fullscreen - no lyrics state */
+/* Fullscreen - no lyrics state.
+   fork: 열 수를 1로 줄이면 가사가 로드되는 순간 배치가 한 번에 바뀐다. 두 열은 그대로 두고
+   왼쪽 패널만 transform으로 화면 가운데로 옮기고, 가사 열은 투명하게 숨겨 두었다가 페이드인한다. */
 .lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics {
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
 }
 
 .lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics .lyrics-fullscreen-left-panel {
   grid-column: 1;
+  grid-row: 1;
   justify-content: center;
   align-items: center;
+  transform: translateX(50%);
+}
+
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics.layout-reversed .lyrics-fullscreen-left-panel {
+  transform: translateX(-50%);
 }
 
 .lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics .lyrics-lyricsContainer-SyncedLyricsPage,
 .lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics .lyrics-lyricsContainer-UnsyncedLyricsPage,
 .lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics .lyrics-lyricsContainer-LyricsUnavailablePage {
-  display: none !important;
+  /* 가사 페이지가 자동 배치로 1열을 먼저 차지하면 왼쪽 패널이 2행으로 밀리므로 자리를 명시한다. */
+  grid-column: 2;
+  grid-row: 1;
+  opacity: 0 !important;
+  transform: translateY(32px);
+  pointer-events: none;
+}
+
+/* 한 열 배치와 세로 화면은 원래대로 한 열만 쓴다. */
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics.fullscreen-single-column,
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics.portrait-mode {
+  grid-template-columns: 1fr;
+}
+
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics.fullscreen-single-column .lyrics-fullscreen-left-panel,
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics.portrait-mode .lyrics-fullscreen-left-panel {
+  transform: none;
+}
+
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics.fullscreen-single-column .lyrics-lyricsContainer-SyncedLyricsPage,
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics.fullscreen-single-column .lyrics-lyricsContainer-UnsyncedLyricsPage,
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics.fullscreen-single-column .lyrics-lyricsContainer-LyricsUnavailablePage,
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics.portrait-mode .lyrics-lyricsContainer-SyncedLyricsPage,
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics.portrait-mode .lyrics-lyricsContainer-UnsyncedLyricsPage,
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics.portrait-mode .lyrics-lyricsContainer-LyricsUnavailablePage {
+  grid-column: auto;
+  grid-row: auto;
 }
 
 /* ==========================================
@@ -5941,7 +5995,8 @@ ruby rt {
 .fullscreen-player-controls.compact {
   min-width: unset;
   width: 100%;
-  max-width: 400px;
+  /* fork: 추천곡 버튼(숨기기·추가)이 붙으면 9개가 되므로 400px에서는 버튼이 눌린다. */
+  max-width: 540px;
   padding: 16px 0;
   gap: 12px;
 }
@@ -6107,6 +6162,12 @@ ruby rt {
 
 .fullscreen-control-main-row {
   gap: 6px;
+  /* fork: 버튼은 고정 크기를 지키고, 폭이 모자라면 눌리지 말고 줄을 바꾼다. */
+  flex-wrap: wrap;
+}
+
+.fullscreen-control-row > .fullscreen-control-btn {
+  flex: 0 0 auto;
 }
 
 .fullscreen-control-volume-row {

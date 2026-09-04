@@ -665,6 +665,72 @@ const Utils = {
     }
     return react.createElement("p1", null, reactChildren);
   },
+  // 발음을 원문 조각마다 붙이기 위한 분절. AI 요청 때와 화면에 그릴 때 같은 함수로 잘라야 짝이 맞는다.
+  // 조각들의 text와 gap을 순서대로 이어 붙이면 원문(앞뒤 공백 제외)이 된다.
+  PRONUNCIATION_SEGMENT_SEPARATOR: "｜",
+  segmentTextForPronunciation(text) {
+    const source = String(text || "").trim();
+    if (!source) return [];
+    const segmenter = window.LyricsWordSegmenter;
+    let tokens = [];
+    try {
+      tokens = typeof segmenter?.segmentLyrics === "function"
+        ? segmenter.segmentLyrics(source, "auto")
+        : source.split(/\s+/);
+    } catch (error) {
+      tokens = source.split(/\s+/);
+    }
+    const segments = [];
+    let cursor = 0;
+    for (const token of tokens) {
+      if (!token) continue;
+      const start = source.indexOf(token, cursor);
+      if (start < 0) continue;
+      if (segments.length) {
+        segments[segments.length - 1].gap = source.slice(cursor, start);
+      }
+      segments.push({ text: token, gap: "" });
+      cursor = start + token.length;
+    }
+    // 분절기가 놓친 꼬리 문자는 마지막 조각에 붙인다.
+    if (segments.length && cursor < source.length) {
+      segments[segments.length - 1].text += source.slice(cursor);
+    }
+    return segments;
+  },
+  buildPronunciationRequestText(text) {
+    const segments = this.segmentTextForPronunciation(text);
+    if (segments.length < 2) return String(text || "").trim();
+    return segments.map((segment) => segment.text).join(this.PRONUNCIATION_SEGMENT_SEPARATOR);
+  },
+  // "｜"로 구분된 발음을 원문 조각과 짝지어 돌려준다. 개수가 맞지 않으면 segments 없이 정리된 문장만 준다.
+  splitInlinePronunciation(originalText, pronunciation) {
+    const raw = String(pronunciation || "");
+    if (!raw.includes(this.PRONUNCIATION_SEGMENT_SEPARATOR)) {
+      return { text: raw, segments: null };
+    }
+    const parts = raw.split(this.PRONUNCIATION_SEGMENT_SEPARATOR).map((part) => part.trim());
+    const cleaned = parts.filter(Boolean).join(" ");
+    const segments = this.segmentTextForPronunciation(originalText);
+    if (!segments.length || segments.length !== parts.length) {
+      return { text: cleaned, segments: null };
+    }
+    return {
+      text: cleaned,
+      segments: segments.map((segment, index) => ({ ...segment, pronunciation: parts[index] })),
+    };
+  },
+  buildInlinePronunciationHTML(segments) {
+    if (!Array.isArray(segments) || segments.length === 0) return "";
+    return segments.map((segment) => {
+      const base = String(segment.text || "");
+      const pronunciation = String(segment.pronunciation || "");
+      const gap = String(segment.gap || "");
+      if (!pronunciation) return base + gap;
+      return `<ruby class="lyrics-pronunciation-ruby">${base}<rt>${pronunciation}</rt></ruby>${gap}`;
+    }).join("");
+  },
+
   rubyTextToHTML(s) {
     // React 310 방지: null/undefined/빈 문자열 체크
     if (!s || typeof s !== "string" || s.trim() === "") {
@@ -674,6 +740,7 @@ const Utils = {
     let out = s.replace(/</g, "&lt;").replace(/>/g, "&gt;");
     // Re-enable allowed ruby tags
     out = out
+      .replace(/&lt;ruby class="lyrics-pronunciation-ruby"&gt;/g, '<ruby class="lyrics-pronunciation-ruby">')
       .replace(/&lt;ruby&gt;/g, "<ruby>")
       .replace(/&lt;\/ruby&gt;/g, "</ruby>")
       .replace(/&lt;rt&gt;/g, "<rt>")

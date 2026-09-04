@@ -1105,6 +1105,7 @@ TASK RULES:
 - Return exactly ${lineCount} lines, with one pronunciation for each input line in the same order.
 - Never merge multiple input lines or split one input line into multiple output lines.
 - If an input line contains " / " between simultaneous vocal parts, preserve " / " and convert each part separately.
+- Some input lines contain the separator ｜ between word groups. Keep every ｜ in the output line at the same position: write exactly one pronunciation chunk per group, in the same order, and never add, merge, or drop a separator. Do not put ｜ in lines that did not have it.
 - Keep empty lines empty. Keep music symbols and structural markers such as ♪, [Chorus], and (Yeah).
 - Do not add line numbers, prefixes, explanations, JSON, Markdown, or code fences.
 - Return only the pronunciation lines.

@@ -62,6 +62,8 @@ A personal fork of [ivLis-Studio/ivLyrics](https://github.com/ivLis-Studio/ivLyr
   **Broken timestamp filtering**: synced results whose timestamps are all identical, in seconds instead of milliseconds, or mostly out of order are rejected and the next provider is tried. With no other provider, the same text is shown as unsynced lyrics. Upstream showed only the last line from the start in these cases.
 - **로마자 표기 가사 후순위**: 한국어 곡인데 Spotify(Musixmatch) 등이 가사를 로마자 표기("tteonabeorin neoneun...")로만 내려주면, 그 결과는 뒤로 미루고 다른 제공자에서 한글 원문을 먼저 찾습니다. 어디에도 원문이 없을 때에만 로마자 가사를 보여 줍니다. Lyrically(Paxsenix)처럼 원문을 보유한 제공자가 켜져 있어야 효과가 있습니다.\
   **Romanized lyrics deferred**: when a Korean song comes back from Spotify (Musixmatch) or another provider only as romanized text ("tteonabeorin neoneun..."), that result is set aside and the other providers are tried for the Hangul original first. The romanized text is shown only when no provider has the original. This needs a provider that carries the original, such as Lyrically (Paxsenix), to be enabled.
+- **원문 조각마다 발음 붙이기**: 발음 표기(로마자 등)를 별도 줄에 두는 대신 원문 단어마다 아래에 붙여 보여 줍니다. 원문이 두세 줄로 접혀도 어느 단어의 발음인지 바로 보입니다. 요청할 때 원문을 단어 조각으로 잘라 "｜"로 이어 보내고, 같은 구분자로 돌아온 답을 조각과 짝지어 그립니다. 조각 수가 맞지 않는 줄이나 노래방(글자 단위) 모드에서는 예전처럼 한 줄 발음으로 보여 줍니다. 설정 "발음 스타일" 탭에서 끌 수 있습니다.\
+  **Pronunciation under each word**: instead of a separate pronunciation line, the romanization is attached under each word of the original, so a lyric that wraps to two or three lines stays readable. The request sends the original split into word chunks joined by "｜", and a reply that keeps the separators is paired chunk by chunk. Lines whose chunk count differs, and karaoke (per-character) mode, fall back to the single pronunciation line. Toggle: Settings > Pronunciation style.
 - **패널 가사 표시 조건**: 우측 패널 가사는 Spotify가 그 곡의 가사를 직접 보여 주지 않을 때만 표시됩니다. 설정 "패널 가사" 탭의 "Spotify 기본 가사가 없을 때만 표시"로 끕니다.\
   **Panel lyrics condition**: the Now Playing panel shows lyrics only when Spotify itself does not. Toggle: Settings > Panel lyrics > "Only when Spotify has no lyrics".
 
@@ -94,12 +96,14 @@ Every AI feature runs only when at least one LLM provider is enabled, and each h
 
 - **곡 전환**: 곡이 바뀌면 이전 영상이 검정으로 페이드아웃된 뒤 정리되고, 새 영상은 준비되는 대로 검정 위로 페이드인합니다. 영상이 없거나 불러오지 못한 곡, 그리고 재생을 멈춘 동안에는 앨범 아트 대신 앨범 색상으로 만든 블롭 그라데이션(블러 그라데이션 배경과 같은 모양)이 떠오릅니다. 제목과 아티스트 글자는 짧게 떠오르며 바뀝니다.\
   **Track transitions**: on a track change the previous video fades to black before disposal and the new video fades in over black once it is ready. When a track has no video, the video fails to load, or playback is paused, an album-colour blob gradient (the same look as the blur-gradient background) fades in instead of album art. Title and artist text animate in.
+- **가사 로드 전환**: 가사가 아직 없을 때는 앨범 아트가 화면 가운데에 있다가, 가사가 로드되면 옆으로 밀리면서 가사 열이 아래에서 떠오릅니다. 두 열 배치를 유지한 채 왼쪽 패널만 이동시키므로 레이아웃이 한 번에 바뀌지 않습니다.\
+  **Lyrics load transition**: while no lyrics are loaded the album art sits in the centre; once lyrics arrive it slides aside and the lyrics column rises in. The two-column grid is kept and only the left panel moves, so the layout never snaps.
 - **제목 자동 축소**: 긴 제목은 글자 크기가 자동으로 줄어듭니다. 한글·한자·가나는 라틴 문자보다 넓게 계산하고, 설정 크기의 55% 아래로는 내려가지 않습니다.\
   **Title auto-fit**: long titles shrink automatically. CJK glyphs count as wider than Latin letters; the size never drops below 55 % of the configured value.
 - **줄 전환**: 줄이 바뀔 때의 이동을 620ms의 완만한 곡선으로 늘리고, 색·불투명도·크기 변화도 같은 시간에 걸쳐 함께 바뀝니다. 노래방 모드의 줄 전환 애니메이션 설정이 꺼져 있어도 전체 화면에서는 이동을 애니메이션합니다.\
   **Line transitions**: line movement takes 620 ms on a gentle curve, and color, opacity and scale changes animate over the same time. In fullscreen the movement is animated even when the karaoke line-transition setting is off.
-- **추천곡 숨기기**: Spotify가 추천곡을 재생할 때 재생 막대에 띄우는 "숨기기" 스위치를 전체 화면의 좋아요 버튼 옆에서 그대로 누를 수 있습니다. Spotify가 그 스위치를 보여 주는 곡에서만 나타나고, 상태도 Spotify 값을 따릅니다.\
-  **Hide recommended tracks**: the "Hide" switch Spotify shows in the playbar for recommended tracks can be pressed next to the fullscreen like button. It appears only when Spotify shows its own switch and mirrors its state.
+- **추천곡 버튼**: Spotify가 추천곡을 재생할 때 재생 막대의 좋아요 자리에 띄우는 버튼을 전체 화면의 좋아요 버튼 옆에서 그대로 누를 수 있습니다. 자동 재생과 데일리 믹스 같은 큐레이션 플레이리스트에서는 "숨기기" 스위치가, 스마트셔플 추천곡에서는 "추천곡 삭제하기"와 "플레이리스트에 추가" 버튼 쌍이 나옵니다. Spotify가 그 버튼을 보여 주는 곡에서만 나타나고, 라벨과 상태도 Spotify 값을 따릅니다. 버튼이 아홉 개가 되어도 눌리지 않도록 왼쪽 패널 컨트롤 폭을 540px까지 늘리고 넘치면 줄을 바꿉니다.\
+  **Recommended-track buttons**: the buttons Spotify puts in the playbar's like slot for recommended tracks can be pressed next to the fullscreen like button. Autoplay and curated playlists such as Daily Mix get the "Hide" switch; Smart Shuffle recommendations get the "Remove recommendation" and "Add to playlist" pair. They appear only when Spotify shows its own buttons and mirror their labels and state. The left-panel controls widen to 540 px and wrap so nine buttons never get squeezed.
 - **가사 배치**: 전체 화면 스타일 설정에서 따로 조절하며, 가사 페이지의 배치는 그대로입니다. 이전 줄은 불투명도를 낮추고 다음 줄은 현재 줄 색을 섞어, 다음 줄이 이전 줄보다 잘 보입니다.\
   **Lyric layout**: adjusted in the fullscreen style settings; the lyrics page keeps its own layout. Past lines are dimmed and upcoming lines are blended toward the current color, so the next line reads more clearly than the previous one.
 
@@ -215,6 +219,7 @@ Run unit tests with `node --test tests/`.
 | `tests/official_video_preference.test.mjs` | 영상 채점, 자막 기준점 파서, AI 판정 경로 / video scoring, caption-cue parser, AI judge path |
 | `tests/broken_sync_timing.test.mjs` | 깨진 타임스탬프 판별 / broken timestamp detection |
 | `tests/romanized_korean_fallback.test.mjs` | 로마자 표기 한국어 가사 판별 / romanized Korean lyrics detection |
+| `tests/inline_pronunciation.test.mjs` | 원문 조각·발음 짝짓기 / pronunciation chunk pairing |
 | `tests/video_background_sync.test.mjs` | 영상 되감기 보정 / video seek correction |
 
 저장소를 `~/.config/spicetify/CustomApps/ivLyrics`에 두지 않아도 됩니다. 수정 후에는 `ivlyrics update --ref <branch>`로 설치하거나, `rsync`로 복사한 뒤 `spicetify apply`를 실행합니다.\

@@ -451,6 +451,17 @@ const getNonSectionLyricsText = (lyrics = []) =>
     .map((request) => request.text || "")
     .join("\n");
 
+const isInlinePronunciationEnabled = () => CONFIG?.visual?.["pronunciation-inline"] !== false;
+
+// 발음 요청은 줄마다 원문을 단어 조각으로 잘라 "｜"로 이어 보낸다. 답에 같은 구분자가 돌아오면
+// 조각별 발음을 원문 아래에 붙여 그릴 수 있고, 아니면 평소처럼 한 줄 발음으로 쓴다.
+const getPronunciationRequestText = (lyrics = []) =>
+  buildTranslationLineRequests(lyrics)
+    .map((request) => (isInlinePronunciationEnabled()
+      ? Utils.buildPronunciationRequestText(request.text || "")
+      : (request.text || "")))
+    .join("\n");
+
 const getLegacyNonSectionLyricsText = (lyrics = []) =>
   lyrics
     .map((line) => line?.originalText || line?.text || "")
@@ -2708,6 +2719,7 @@ const CONFIG = {
       StorageManager.getItem("ivLyrics:visual:phonetic-opacity") || "70",
     "phonetic-spacing":
       StorageManager.getItem("ivLyrics:visual:phonetic-spacing") || "-1",
+    "pronunciation-inline": StorageManager.get("ivLyrics:visual:pronunciation-inline", true),
     "phonetic-hyphen-replace":
       StorageManager.getItem("ivLyrics:visual:phonetic-hyphen-replace") || "keep",
     "original-letter-spacing":
@@ -3849,7 +3861,7 @@ const Prefetcher = {
                 trackId,
                 artist: trackInfo.artist,
                 title: trackInfo.title,
-                text,
+                text: getPronunciationRequestText(lyricsArray),
                 wantSmartPhonetic: true,
                 sourceLang: detectedLanguage || "auto",
                 provider: lyrics.provider,
@@ -6512,7 +6524,7 @@ class LyricsContainer extends react.Component {
           trackId,
           artist: this.state.artist || lyricsState.artist,
           title: this.state.title || lyricsState.title,
-          text,
+          text: getPronunciationRequestText(originalLyrics),
           wantSmartPhonetic: true,
           sourceLang:
             this.trackLanguageOverride || this.provideLanguageCode(originalLyrics) || "auto",
@@ -7953,7 +7965,7 @@ class LyricsContainer extends react.Component {
           targetField,
           (value, originalPart) => {
             const processedValue = isPhoneticMode
-              ? processPhoneticHyphen(value)
+              ? processPhoneticHyphen(String(value || "").split(Utils.PRONUNCIATION_SEGMENT_SEPARATOR).join(" "))
               : value;
             const text = String(processedValue || "").trim();
             return isNoteLine(text)
@@ -7972,13 +7984,17 @@ class LyricsContainer extends react.Component {
       }
 
       // Create safe line object ensuring all properties are valid
-      const finalPhoneticText = finalText ? String(finalText) : null;
+      const inlinePronunciation = finalText
+        ? Utils.splitInlinePronunciation(originalText, String(finalText))
+        : { text: null, segments: null };
+      const finalPhoneticText = inlinePronunciation.text || null;
       const finalTranslationText = finalText2 ? String(finalText2) : null;
       const safeLine = {
         ...(line && typeof line === "object" ? line : {}),
         vocals: finalVocals,
         originalText: String(originalText),
         phoneticText: finalPhoneticText,
+        phoneticSegments: inlinePronunciation.segments,
         text: finalPhoneticText,
         text2: finalTranslationText,
         translationText: finalTranslationText,
