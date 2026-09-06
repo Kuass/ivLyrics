@@ -6735,13 +6735,19 @@ const ConfigModal = ({
   // 패치노트 불러오기
   useEffect(() => {
     if (activeTab === "about") {
+      const controller = new AbortController();
+      let disposed = false;
+      let requestTimeout;
       const loadPatchNotes = async () => {
+        if (disposed) return;
         const container = document.getElementById("patch-notes-container");
         if (!container) return;
 
+        requestTimeout = setTimeout(() => controller.abort(), 15000);
         try {
           const response = await fetch(
-            `https://api.github.com/repos/${FORK_REPO}/releases/latest`
+            `https://api.github.com/repos/${FORK_REPO}/releases/latest`,
+            { signal: controller.signal }
           );
 
           if (!response.ok) {
@@ -6749,6 +6755,7 @@ const ConfigModal = ({
           }
 
           const data = await response.json();
+          if (disposed) return;
           const version = escapeSettingsReleaseHtml(data.tag_name || "Unknown");
           const publishedDate = escapeSettingsReleaseHtml(data.published_at
             ? new Date(data.published_at).toLocaleDateString("ko-KR", {
@@ -6809,6 +6816,7 @@ const ConfigModal = ({
             </div>
           `;
         } catch (error) {
+          if (disposed) return;
           console.error("Failed to load patch notes:", error);
           container.style.display = "flex";
           container.style.alignItems = "center";
@@ -6831,11 +6839,19 @@ const ConfigModal = ({
               <p style="margin: 4px 0 0; font-size: 12px; opacity: 0.7;">${checkGithubReleases}</p>
             </div>
           `;
+        } finally {
+          clearTimeout(requestTimeout);
         }
       };
 
       // 짧은 지연 후 로드 (DOM이 준비되도록)
-      setTimeout(loadPatchNotes, 100);
+      const loadTimer = setTimeout(loadPatchNotes, 100);
+      return () => {
+        disposed = true;
+        clearTimeout(loadTimer);
+        clearTimeout(requestTimeout);
+        controller.abort();
+      };
     }
 	  }, [activeTab, uiTheme]);
 
