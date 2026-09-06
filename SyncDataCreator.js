@@ -126,6 +126,60 @@ const getSyncCreatorLockedPlaybackProgressIndex = (previewIndex, lockIndex, reco
 	if (!Number.isFinite(numericPreviewIndex)) return -1;
 	return Math.max(-1, Math.min(numericLockIndex, numericPreviewIndex));
 };
+const getSyncCreatorPreviewProgressIndex = (chars, currentTimeSec) => {
+	if (!Array.isArray(chars) || chars.length === 0 || !Number.isFinite(currentTimeSec)) return -1;
+	if (currentTimeSec < chars[0]) return -1;
+	for (let i = chars.length - 1; i >= 0; i--) {
+		if (currentTimeSec < chars[i]) continue;
+		if (i >= chars.length - 1) return i;
+		const currentCharTime = Number(chars[i]);
+		const nextCharTime = Number(chars[i + 1]);
+		if (!Number.isFinite(currentCharTime) || !Number.isFinite(nextCharTime) || nextCharTime <= currentCharTime) return i;
+		return i + Math.max(0, Math.min(1, (currentTimeSec - currentCharTime) / (nextCharTime - currentCharTime)));
+	}
+	return -1;
+};
+const buildSyncCreatorPlaybackTimeline = (lyricsLines, syncData, sourceLines) => {
+	const timings = new Map();
+	const source = (Array.isArray(sourceLines) ? sourceLines : []).filter(line => (
+		typeof line?.text === 'string' && line.text.trim()
+	));
+	const normalizedSource = normalizeSyncCreatorStandaloneParentheticalLines(source.map(line => line.text).join('\n'))
+		.split('\n').map((text, index) => ({ text: text.trim(), startTime: source[index]?.startTime })).filter(line => line.text);
+	// Only use LRCLIB timing when it belongs to this exact lyric text/order.
+	if (normalizedSource.length === lyricsLines.length && normalizedSource.every((line, index) => line.text === lyricsLines[index])) {
+		normalizedSource.forEach((line, index) => {
+			if (Number.isFinite(line.startTime) && line.startTime >= 0) timings.set(index, line.startTime);
+		});
+	}
+	const indexesByStart = new Map();
+	let offset = 0;
+	lyricsLines.forEach((line, index) => { indexesByStart.set(offset, index); offset += Array.from(line).length; });
+	for (const line of Array.isArray(syncData?.lines) ? syncData.lines : []) {
+		const index = indexesByStart.get(line.start);
+		if (index === undefined) continue;
+		let firstTime = Infinity;
+		for (const chars of [line.chars, ...(line.parallel?.parts || []).map(part => part.chars)]) {
+			for (const time of Array.isArray(chars) ? chars : []) {
+				if (typeof time === 'number' && Number.isFinite(time) && time >= 0) firstTime = Math.min(firstTime, time);
+			}
+		}
+		if (Number.isFinite(firstTime)) timings.set(index, firstTime * 1000);
+	}
+	return [...timings].map(([lineIndex, startTime]) => ({ lineIndex, startTime }))
+		.sort((left, right) => left.startTime - right.startTime || left.lineIndex - right.lineIndex);
+};
+const getSyncCreatorPlaybackLineIndex = (timeline, positionMs) => {
+	if (!timeline.length || !Number.isFinite(positionMs) || positionMs < 0) return -1;
+	let low = 0;
+	let high = timeline.length;
+	while (low < high) {
+		const middle = Math.floor((low + high) / 2);
+		if (timeline[middle].startTime <= positionMs) low = middle + 1;
+		else high = middle;
+	}
+	return low > 0 ? timeline[low - 1].lineIndex : 0;
+};
 const countSyncCreatorRangeChars = (ranges) => (Array.isArray(ranges) ? ranges : []).reduce((sum, range) => {
 	const start = Number(range?.start);
 	const end = Number(range?.end);
@@ -2839,6 +2893,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const positionUpdateTimerRef = useRef(null);
 	const charTimesRef = useRef([]);
 	const charElementsRef = useRef([]);
+	const parallelPreviewElementsRef = useRef(new Map());
 	const charHitBoxesRef = useRef([]);
 	const charScrollMetricsRef = useRef([]);
 	const rtlTextRunRef = useRef(null);
@@ -2852,6 +2907,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const lastPaintedPlaybackIndexRef = useRef(-1);
 	const preventNextTrackRef = useRef(false);
 	const hasAutoLoadedLyricsRef = useRef(false);
+	const pendingPlaybackNavigationRef = useRef(true);
 	const providerRef = useRef(provider);
 	const selectedLrclibSourceRef = useRef(selectedLrclibSource);
 	const customSpeakerMetaMemoryRef = useRef(new Map());
@@ -2888,6 +2944,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		return sessionClientRevisionRef.current;
 	}, []);
 	const claimSessionForLocalEditing = useCallback(() => {
+		pendingPlaybackNavigationRef.current = false;
 		// Once the user starts editing, no pending or newly scheduled automatic
 		// recovery may replace the live editor state.
 		sessionAutoRecoveryBlockedRef.current = true;
@@ -3149,13 +3206,23 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const buildSyntheticLrclibResult = useCallback((candidate) => {
 		const text = getLrclibCandidateText(candidate);
 		const lines = buildLineObjectsFromText(text);
+		const timedSource = String(candidate?.syncedLyrics || '').split('\n')
+			.filter(line => stripLrclibTimestamp(line));
+		const timedLines = normalizeSyncCreatorStandaloneParentheticalLines(timedSource.map(stripLrclibTimestamp).join('\n'))
+			.split('\n').map((text, index) => {
+				const line = { text: text.trim() };
+				const match = timedSource[index]?.trim().match(/^\[(\d+):(\d+(?:[.,]\d+)?)\]/);
+				return match ? { ...line, startTime: (Number(match[1]) * 60 + Number(match[2].replace(',', '.'))) * 1000 } : line;
+			}).filter(line => line.text);
+		const syncedLines = timedLines.length === lines.length && timedLines.every((line, index) => line.text === lines[index].text)
+			? timedLines : lines;
 		return {
 			provider: 'lrclib',
 			lrclibSource: buildLrclibSyncSource(candidate),
-			synced: candidate?.preferredLyricsSource === 'synced' ? lines : null,
+			synced: candidate?.preferredLyricsSource === 'synced' ? syncedLines : null,
 			unsynced: lines
 		};
-	}, [buildLineObjectsFromText, buildLrclibSyncSource, getLrclibCandidateText]);
+	}, [buildLineObjectsFromText, buildLrclibSyncSource, getLrclibCandidateText, stripLrclibTimestamp]);
 
 	const clearLrclibCandidateState = useCallback(() => {
 		setLrclibCandidates([]);
@@ -3169,6 +3236,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	), []);
 	const beginSyncCreatorSourceChange = useCallback(() => {
 		const sourceChangeRequestId = ++sessionSourceChangeRequestRef.current;
+		pendingPlaybackNavigationRef.current = true;
 		const latestRecord = latestSessionRecordRef.current;
 		if (sessionAutosaveTimerRef.current) {
 			clearTimeout(sessionAutosaveTimerRef.current);
@@ -3873,6 +3941,38 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	]);
 	const currentParallelParts = currentParallelData?.parts || [];
 	const hasCurrentParallelParts = currentParallelParts.length > 1;
+	const currentParallelPreviewTargets = useMemo(() => {
+		const targets = new Map();
+		for (const part of currentParallelData?.parts || []) {
+			const savedPart = currentExistingLineData?.parallel?.parts?.find(item => item.id === part.id);
+			const timingSource = hasReusableSyncCreatorParallelChars(part, part) ? part : savedPart;
+			// Re-splitting can inherit out-of-order timings from overlapping vocals.
+			const chars = hasReusableSyncCreatorParallelChars(part, timingSource)
+				&& Array.from(timingSource.chars).every((time, index, times) => (
+					isFiniteSyncCreatorTime(time) && time >= 0 && (index === 0 || time >= times[index - 1])
+				)) ? timingSource.chars : [];
+			const text = rangesToCharRefs(part.ranges, currentFullLineChars, currentLineStart).map(ref => ref.char).join('');
+			const color = getSyncCreatorSpeakerTextColor(part.speaker, part['speaker-color'], part['speaker-fallback']);
+			const preview = {
+				chars, color, mutedColor: `color-mix(in srgb, ${color} 54%, transparent)`,
+				direction: getSyncCreatorTextDirection(text), useTextRun: hasSyncCreatorRtlText(text)
+			};
+			preview.ref = (element) => {
+				if (!element) {
+					parallelPreviewElementsRef.current.delete(part.id);
+					return;
+				}
+				parallelPreviewElementsRef.current.set(part.id, {
+					...preview,
+					elements: Array.from(element.querySelectorAll('[data-iv-sync-creator-preview-index]')),
+					textRun: element.querySelector('[data-iv-sync-creator-preview-text-run]'),
+					lastIndex: -2, lastPosition: NaN
+				});
+			};
+			targets.set(part.id, preview);
+		}
+		return targets;
+	}, [currentParallelData, currentExistingLineData, currentFullLineChars, currentLineStart]);
 	const currentParentheticalLayoutCandidate = useMemo(() => {
 		if (
 			!multiVocalMode
@@ -4650,6 +4750,24 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		void loadLyrics();
 	}, [loadLyrics]);
 
+	const playbackTimeline = useMemo(() => {
+		const linesByStart = new Map((syncData?.lines || []).map(line => [line.start, line]));
+		return buildSyncCreatorPlaybackTimeline(lyricsLines, syncData, lyrics?.synced)
+			.filter(entry => !isLineCoveredByMergedPrevious(entry.lineIndex, linesByStart));
+	}, [lyricsLines, syncData, lyrics?.synced, isLineCoveredByMergedPrevious]);
+
+	// Resolve once the asynchronous source/timing load (or vocal choice) is ready.
+	useEffect(() => {
+		if (!pendingPlaybackNavigationRef.current || isLoading || !lyricsText || pendingMultiVocalDecision) return;
+		pendingPlaybackNavigationRef.current = false;
+		const pos = Number(Spicetify.Player?.getProgress?.());
+		const lineIndex = getSyncCreatorPlaybackLineIndex(playbackTimeline, pos);
+		if (lineIndex >= 0) {
+			setCurrentLineIndex(lineIndex);
+			if (lyricsScrollRef.current) lyricsScrollRef.current.scrollLeft = 0;
+		}
+	}, [isLoading, lyricsText, playbackTimeline, pendingMultiVocalDecision]);
+
 	// 재생 위치 업데이트 + 미리보기 자동 줄 이동
 	useEffect(() => {
 		let lastCommittedPosition = -1;
@@ -4670,22 +4788,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				setPosition(pos);
 			}
 
-			if (mode === 'preview' && syncData && syncData.lines) {
-				const currentTimeSec = pos / 1000;
-
-				for (let i = syncData.lines.length - 1; i >= 0; i--) {
-					const lineData = syncData.lines[i];
-					if (lineData.chars && lineData.chars[0] <= currentTimeSec) {
-						const lineIdx = lineIndexByStart.get(lineData.start) ?? -1;
-
-						if (lineIdx >= 0 && lineIdx !== currentLineIndex) {
-							setCurrentLineIndex(lineIdx);
-							if (lyricsScrollRef.current) {
-								lyricsScrollRef.current.scrollLeft = 0;
-							}
-						}
-						break;
-					}
+			if (mode === 'preview') {
+				const lineIndex = getSyncCreatorPlaybackLineIndex(playbackTimeline, pos);
+				if (lineIndex >= 0 && lineIndex !== currentLineIndex) {
+					setCurrentLineIndex(lineIndex);
+					if (lyricsScrollRef.current) lyricsScrollRef.current.scrollLeft = 0;
 				}
 			}
 		};
@@ -4704,7 +4811,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				positionUpdateTimerRef.current = null;
 			}
 		};
-	}, [mode, syncData, lineIndexByStart, currentLineIndex]);
+	}, [mode, playbackTimeline, currentLineIndex]);
 
 	const autoScroll = useCallback((charIndex) => {
 		if (!lyricsScrollRef.current || charIndex < 0) return;
@@ -7282,7 +7389,6 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				return;
 			}
 			setMode(newMode);
-			if (newMode === 'preview') Spicetify.Player.seek(0);
 			if (!Spicetify.Player.isPlaying()) Spicetify.Player.play();
 		}
 	}, [claimSessionForLocalEditing, mode, isCurrentSyncTargetMetaComplete, showMissingMetaToast]);
@@ -7389,6 +7495,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		);
 		if (!confirmed) return;
 
+		pendingPlaybackNavigationRef.current = false;
 		setCurrentLineIndex(0);
 		setSyncData(null);
 		setParallelPartMetaDrafts({});
@@ -7776,12 +7883,17 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 		setProviderValue(restoredProvider);
 		setAddonId(SYNC_CREATOR_SOURCE_ADDON_ID);
-		setLyrics({
+		setLyrics(previousLyrics => ({
 			provider: restoredProvider,
-			synced: restoredLines,
+			synced: options.automatic === true
+				&& previousLyrics?.provider === restoredProvider
+				&& extractLyricsText(previousLyrics?.synced) === restoredLyricsText
+				&& String(previousLyrics?.lrclibSource?.lrclibId || '') === String(record.lrclibSource?.lrclibId || '')
+					? previousLyrics.synced : restoredLines,
 			unsynced: restoredLines,
+			lrclibSource: record.lrclibSource || undefined,
 			karaokeSource: record.karaokeSource || undefined
-		});
+		}));
 		setLyricsText(restoredLyricsText);
 		setSyncData(restoredSyncData);
 		setSelectedLrclibSourceValue(record.lrclibSource || null);
@@ -7789,6 +7901,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			? ''
 			: String(record.lrclibSource.lrclibId));
 		setSelectedLrclibCandidateKey(String(editor.selectedLrclibCandidateKey || ''));
+		pendingPlaybackNavigationRef.current = options.automatic === true;
 		setCurrentLineIndex(restoredLineIndex);
 		setActiveParallelPartId(String(editor.activeParallelPartId || 'full'));
 		setMultiVocalMode(editor.multiVocalMode === true);
@@ -7842,6 +7955,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	}, [
 		announceHistoryStatus,
 		clearRecordingLock,
+		extractLyricsText,
 		setProviderValue,
 		setRecordingProgressIndex,
 		setSelectedLrclibSourceValue,
@@ -8839,30 +8953,39 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		const chars = activeParallelPart
 			? (hasReusableSyncCreatorParallelChars(activeParallelPart, savedPart) ? savedPart.chars : null)
 			: lineData?.chars;
-		if (!lineData || !Array.isArray(chars) || chars.length === 0) return -1;
-		if (currentTimeSec < chars[0]) return -1;
-
-		for (let i = chars.length - 1; i >= 0; i--) {
-			if (currentTimeSec < chars[i]) continue;
-			if (i >= chars.length - 1) return i;
-
-			const currentCharTime = Number(chars[i]);
-			const nextCharTime = Number(chars[i + 1]);
-			if (!Number.isFinite(currentCharTime) || !Number.isFinite(nextCharTime) || nextCharTime <= currentCharTime) {
-				return i;
-			}
-
-			const ratio = Math.max(0, Math.min(1, (currentTimeSec - currentCharTime) / (nextCharTime - currentCharTime)));
-			return i + ratio;
-		}
-
-		return -1;
+		return getSyncCreatorPreviewProgressIndex(chars, currentTimeSec);
 	}, [syncLinesByStart, lineCharOffsets, activeParallelPart]);
 
 	const getPreviewProgressIndex = useCallback((lineIndex) => {
 		const progressIndex = getPreviewProgressIndexAtTime(lineIndex, position / 1000);
 		return Number.isFinite(progressIndex) ? Math.floor(progressIndex) : -1;
 	}, [getPreviewProgressIndexAtTime, position]);
+
+	const applyParallelPlaybackProgressVisual = useCallback((currentTimeSec) => {
+		// These read-only previews never share recording refs or lock state.
+		for (const preview of parallelPreviewElementsRef.current.values()) {
+			if (preview.lastPosition === currentTimeSec) continue;
+			preview.lastPosition = currentTimeSec;
+			const nextIndex = Math.floor(getSyncCreatorPreviewProgressIndex(preview.chars, currentTimeSec));
+			const previousIndex = preview.lastIndex;
+			if (previousIndex === nextIndex) continue;
+			preview.lastIndex = nextIndex;
+			if (preview.textRun) {
+				const percent = preview.chars.length > 0 ? ((nextIndex + 1) / preview.chars.length) * 100 : 0;
+				preview.textRun.style.backgroundImage = getSyncCreatorProgressGradient(
+					preview.direction, percent, preview.color, preview.mutedColor
+				);
+				continue;
+			}
+			const first = previousIndex < -1 ? 0 : Math.max(0, Math.min(previousIndex, nextIndex));
+			const last = previousIndex < -1 ? preview.elements.length - 1 : Math.max(previousIndex, nextIndex);
+			for (let i = first; i <= last && i < preview.elements.length; i++) {
+				preview.elements[i].style.background = i < preview.chars.length
+					? (i <= nextIndex ? SYNC_CREATOR_PROGRESS_BACKGROUND : SYNC_CREATOR_SYNCED_BACKGROUND)
+					: '';
+			}
+		}
+	}, []);
 
 	const applyPlaybackProgressVisual = useCallback((nextIndex) => {
 		const numericIndex = Number(nextIndex);
@@ -8961,6 +9084,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		const paint = () => {
 			if (disposed) return;
 			const pos = Number(Spicetify.Player?.getProgress?.() || 0);
+			applyParallelPlaybackProgressVisual(pos / 1000);
 			// Keep polling for seeks/resume. A paused preview needs no repeat lookup,
 			// unless another effect invalidated its paint; recording locks stay live.
 			if (mode !== 'record' && Number.isFinite(pos) && pos === lastPreviewPosition
@@ -9001,6 +9125,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		activeParallelPartId,
 		lyricsLines.length,
 		getPreviewProgressIndexAtTime,
+		applyParallelPlaybackProgressVisual,
 		applyPlaybackProgressVisual,
 		applyRecordingProgressVisual,
 		getActiveRecordingLockIndex
@@ -10246,16 +10371,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		const partCharRefs = rangesToCharRefs(part.ranges, currentFullLineChars, currentLineStart);
 		const partChars = partCharRefs.map(ref => ref.char);
 		const partDisplayItems = getSyncCreatorParallelPartDisplayItems(part, currentFullLineChars, currentLineStart);
-		const savedPart = currentLineData?.parallel?.parts?.find(item => item.id === part.id);
-		const syncedCount = hasReusableSyncCreatorParallelChars(part, savedPart)
-			? Math.min(savedPart.chars.length, partChars.length)
-			: 0;
+		const preview = currentParallelPreviewTargets.get(part.id);
+		const { chars: previewChars, color: partSpeakerTextColor, mutedColor: partMutedColor,
+			direction: partDirection, useTextRun: usePartTextRun } = preview;
+		const syncedCount = previewChars.length;
 		const speakerLabel = part.speaker || SYNC_CREATOR_DEFAULT_SPEAKER;
-		const partSpeakerTextColor = getSyncCreatorSpeakerTextColor(
-			speakerLabel,
-			part['speaker-color'],
-			part['speaker-fallback']
-		);
 		const isDuetSpeaker = isSyncCreatorDuetSpeaker(speakerLabel, part['speaker-fallback']);
 		const kindLabel = getSyncCreatorKindLabel(part.kind) || part.kind || SYNC_CREATOR_DEFAULT_KIND;
 		const handlePartPointerDown = (e) => {
@@ -10295,8 +10415,26 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				},
 					renderCurrentLineCharacters()
 				)
-				: react.createElement('div', { style: s.parallelStackText },
-					partDisplayItems.map((item) => {
+				: react.createElement('div', {
+					style: { ...s.parallelStackText, direction: partDirection },
+					ref: preview.ref
+				}, usePartTextRun ? react.createElement('span', {
+					'data-iv-sync-creator-preview-text-run': 'true',
+					dir: partDirection,
+					style: {
+						...s.rtlTextRun,
+						...s.parallelStackChar,
+						whiteSpace: 'pre-wrap',
+						overflowWrap: 'anywhere',
+						color: 'transparent',
+						backgroundImage: getSyncCreatorProgressGradient(
+							partDirection,
+							0,
+							partSpeakerTextColor,
+							partMutedColor
+						)
+					}
+				}, partDisplayItems.map(item => item.text || item.char || '').join('')) : partDisplayItems.map((item) => {
 						if (item.type === 'separator') {
 							return react.createElement('span', {
 								key: `${part.id}-${item.key}`,
@@ -10305,6 +10443,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						}
 						return react.createElement('span', {
 							key: `${part.id}-${item.charIndex}`,
+							'data-iv-sync-creator-preview-index': item.charIndex,
 							style: {
 								...s.parallelStackChar,
 								...(item.charIndex < syncedCount ? s.parallelStackCharSynced : null),

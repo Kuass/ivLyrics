@@ -1711,7 +1711,15 @@ const getInterludeInfo = (line, nextLine = null, lineIndex = -1, lineCount = 0) 
 	};
 };
 
-const getTrailingKaraokeInterludeInfo = (line, nextLine = null, lineIndex = -1, lineCount = 0) => {
+const buildKaraokeCumulativeEndTimes = (lines) => {
+	let latestEndTime = 0;
+	return lines.map((line) => {
+		latestEndTime = Math.max(latestEndTime, getKaraokeLineFillEndTime(line) ?? 0);
+		return latestEndTime;
+	});
+};
+
+const getTrailingKaraokeInterludeInfo = (line, nextLine = null, lineIndex = -1, lineCount = 0, precedingFillEndTime = null) => {
 	if (!isAutoInstrumentalBreakEnabled()) {
 		return { isInterlude: false, durationMs: 0, source: "karaoke-trailing-gap" };
 	}
@@ -1724,7 +1732,10 @@ const getTrailingKaraokeInterludeInfo = (line, nextLine = null, lineIndex = -1, 
 		return { isInterlude: false, durationMs: 0, source: "karaoke-trailing-gap" };
 	}
 
-	const fillEndTime = getKaraokeLineFillEndTime(line);
+	const ownFillEndTime = getKaraokeLineFillEndTime(line);
+	// A short response ending does not start an interlude while an earlier
+	// independent vocal is still playing.
+	const fillEndTime = ownFillEndTime === null ? null : Math.max(ownFillEndTime, precedingFillEndTime ?? 0);
 	const startTime = fillEndTime !== null ? fillEndTime + KARAOKE_TRAILING_INTERLUDE_DELAY_MS : null;
 	const trackEndTime = lineIndex === Math.max(0, lineCount - 1) ? getCurrentTrackDurationMs() : null;
 	const endTime = nextStartTime ?? trackEndTime;
@@ -1763,12 +1774,13 @@ const createActiveTrailingKaraokeInterludeLine = ({
 	isActiveLine = false,
 	isKara = false,
 	activationAdvanceMs = 0,
+	precedingFillEndTime = null,
 }) => {
 	if (!isKara || !isActiveLine || line?.interludeInfo?.isInterlude) {
 		return null;
 	}
 
-	const interludeInfo = getTrailingKaraokeInterludeInfo(line, nextLine, lineIndex, lineCount);
+	const interludeInfo = getTrailingKaraokeInterludeInfo(line, nextLine, lineIndex, lineCount, precedingFillEndTime);
 	const previewStartTime = interludeInfo.startTime !== null
 		? interludeInfo.startTime - Math.max(0, activationAdvanceMs)
 		: null;
@@ -3558,6 +3570,10 @@ const useSyncedLyricsEngine = ({
 			: EMPTY_GLOBAL_CHAR_STATE
 	), [globalCharTimeline, position]);
 
+	const cumulativeVocalEndTimes = useMemo(
+		() => isKara ? buildKaraokeCumulativeEndTimes(preparedLyrics) : [],
+		[preparedLyrics, isKara]
+	);
 	const activeSourceLineIndex = activeLineIndex - leadingEmptyLines;
 	const trailingInterludeLine = useMemo(() => (
 		activeSourceLineIndex >= 0
@@ -3566,6 +3582,7 @@ const useSyncedLyricsEngine = ({
 				nextLine: preparedLyrics[activeSourceLineIndex + 1],
 				lineIndex: activeSourceLineIndex,
 				lineCount: preparedLyrics.length,
+				precedingFillEndTime: cumulativeVocalEndTimes[activeSourceLineIndex],
 				position,
 				isActiveLine: true,
 				isKara,
@@ -3574,7 +3591,7 @@ const useSyncedLyricsEngine = ({
 					: 0,
 			})
 			: null
-	), [activeSourceLineIndex, preparedLyrics, position, isKara, shouldPrecenterKaraokeTransitions]);
+	), [activeSourceLineIndex, preparedLyrics, position, isKara, shouldPrecenterKaraokeTransitions, cumulativeVocalEndTimes]);
 	const isTrailingInterludeActive = !!trailingInterludeLine
 		&& trailingInterludeLine.isPrecentered !== true;
 	const trailingInterludeKey = trailingInterludeLine
@@ -4032,6 +4049,7 @@ const useSyncedLyricsEngine = ({
 						nextLine: preparedLyrics[index + 1],
 						lineIndex: index,
 						lineCount: preparedLyrics.length,
+						precedingFillEndTime: cumulativeVocalEndTimes[index],
 						position,
 						isActiveLine: isAnchorLine,
 						isKara,
@@ -4253,6 +4271,7 @@ const useSyncedLyricsEngine = ({
 		preparedLyrics,
 		paddedLyrics,
 		playbackWindows,
+		cumulativeVocalEndTimes,
 		position,
 		isScrolling,
 		isKara,

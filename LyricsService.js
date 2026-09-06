@@ -7625,6 +7625,7 @@
                     displayMode1: snapshot.displayMode1,
                     displayMode2: snapshot.displayMode2,
                     pronunciationNotation: snapshot.pronunciationNotation,
+                    translationTargetLanguage: snapshot.translationTargetLanguage,
                     translationSourceText: snapshot.translationSourceText,
                     presentationComplete: snapshot.presentationComplete
                 }
@@ -7744,9 +7745,11 @@
                     return lyricsProviderInflightRequests.get(requestKey);
                 }
 
+                const initialSnapshot = this.getLyricsSnapshot(info?.uri);
                 const request = window.LyricsAddonManager.getLyrics(info, forcedProviderId)
                     .then((result) => {
                         if (requestGeneration === lyricsProviderRequestGeneration &&
+                            this.getLyricsSnapshot(info?.uri) === initialSnapshot &&
                             result && !result.error && info?.uri) {
                             this.publishLyricsSnapshot({
                                 trackUri: info.uri,
@@ -7918,9 +7921,37 @@
                 skipTranslation = false
             } = options;
 
+            const requestGeneration = lyricsProviderRequestGeneration;
+            const initialSnapshot = this.getLyricsSnapshot(info?.uri);
+            const initialSnapshotRevision = initialSnapshot?.revision || 0;
+            let acceptedSnapshot = initialSnapshot;
+            const translationTargetLanguage = getTranslationTargetLanguage();
+            const pronunciationNotation = getServicePronunciationNotation();
+            let presentationSettingsCurrent = () => true;
+            const staleResult = () => ({ lyrics: [], provider: null, error: null, stale: true });
+            const isCurrentRequest = () => {
+                const currentUri = Utils.getPlayerPlaybackSnapshot()?.uri
+                    || Spicetify.Player.data?.item?.uri;
+                return requestGeneration === lyricsProviderRequestGeneration
+                    && (!currentUri || currentUri === info?.uri)
+                    && this.getLyricsSnapshot(info?.uri) === acceptedSnapshot
+                    && getTranslationTargetLanguage() === translationTargetLanguage
+                    && getServicePronunciationNotation() === pronunciationNotation
+                    && presentationSettingsCurrent();
+            };
+
             try {
                 // 1. 가사 가져오기 (LyricsAddonManager 사용)
                 const lyricsResult = await this.getLyricsFromProviders(info);
+                const providerSnapshot = this.getLyricsSnapshot(info?.uri);
+                // This request may publish one raw result. A page, panel or other
+                // fallback presentation published during the await must win.
+                if (providerSnapshot?.revision === initialSnapshotRevision + 1
+                    && providerSnapshot.source === 'lyrics-service'
+                    && providerSnapshot.rawResult === lyricsResult) {
+                    acceptedSnapshot = providerSnapshot;
+                }
+                if (!isCurrentRequest()) return staleResult();
 
                 if (lyricsResult.error) {
                     // 가사 없음 - 오버레이에 트랙 정보만 전송
@@ -7986,6 +8017,10 @@
                 if (mode2 === null) {
                     mode2 = Spicetify.LocalStorage.get(`ivLyrics:visual:translation-mode-2:${modeKey}`) || "none";
                 }
+                presentationSettingsCurrent = () => (
+                    (displayMode1 !== null || mode1 === (Spicetify.LocalStorage.get(`ivLyrics:visual:translation-mode:${modeKey}`) || 'none'))
+                    && (displayMode2 !== null || mode2 === (Spicetify.LocalStorage.get(`ivLyrics:visual:translation-mode-2:${modeKey}`) || 'none'))
+                );
 
                 serviceDebug('[LyricsService] 언어 감지:', { detectedLanguage, friendlyLanguage, modeKey, mode1, mode2 });
 
@@ -8019,7 +8054,8 @@
                     lyricsType,
                     displayMode1: mode1,
                     displayMode2: mode2,
-                    pronunciationNotation: getServicePronunciationNotation(),
+                    pronunciationNotation,
+                    translationTargetLanguage,
                     translationSourceText: overlayTranslationSourceText,
                     presentationComplete: false
                 };
@@ -8053,6 +8089,7 @@
                                 sourceLang: detectedLanguage || 'auto',
                                 provider: provider
                             });
+                            if (!isCurrentRequest()) return staleResult();
                             pronResult = wantPhonetic ? response.phonetic : response.translation;
                         }
 
@@ -8069,6 +8106,7 @@
                                 sourceLang: detectedLanguage || 'auto',
                                 provider: provider
                             });
+                            if (!isCurrentRequest()) return staleResult();
                             transResult = wantPhonetic ? response.phonetic : response.translation;
                         }
 
@@ -8160,7 +8198,8 @@
                     presentationComplete
                 };
 
-                this.publishLyricsSnapshot({
+                if (!isCurrentRequest()) return staleResult();
+                const publishedSnapshot = this.publishLyricsSnapshot({
                     trackUri: info.uri,
                     trackInfo: { uri: info.uri, title: info.title, artist: info.artist },
                     displayLyrics: lyrics,
@@ -8168,13 +8207,16 @@
                     lyricsType,
                     displayMode1: mode1,
                     displayMode2: mode2,
-                    pronunciationNotation: getServicePronunciationNotation(),
+                    pronunciationNotation,
+                    translationTargetLanguage,
                     translationSourceText: overlayTranslationSourceText,
                     presentationComplete,
                     source: skipTranslation
                         ? 'lyrics-service-original-fallback'
                         : 'lyrics-service-presentation'
                 });
+                acceptedSnapshot = publishedSnapshot;
+                if (!isCurrentRequest()) return staleResult();
 
                 // 6. 오버레이 전송
                 await sendLyricsToConsumers({
@@ -8185,6 +8227,7 @@
                     presentationContext: finalPresentationContext
                 });
 
+                if (!isCurrentRequest()) return staleResult();
                 // 6. 이벤트 발생
                 this.emit('lyrics-loaded', {
                     trackInfo: info,
@@ -9195,8 +9238,8 @@
 
     const getOverlaySupplementVisibility = (presentationContext = null) => {
         const hasExplicitModes = !!presentationContext && (
-            Object.prototype.hasOwnProperty.call(presentationContext, 'displayMode1')
-            || Object.prototype.hasOwnProperty.call(presentationContext, 'displayMode2')
+            presentationContext.displayMode1 != null
+            || presentationContext.displayMode2 != null
         );
         if (!hasExplicitModes) {
             return { pronunciation: true, translation: true };
@@ -9273,7 +9316,7 @@
             if (syllables.length === 0) return null;
 
             const getString = (value) => typeof value === 'string' ? value : '';
-            const text = getString(part.text) || syllables.map(syllable => syllable.text).join('');
+            const text = getOverlayVocalOriginalText(part, syllables);
             return {
                 id: getString(part.id),
                 role: getString(part.role) || fallbackRole,
@@ -9283,10 +9326,10 @@
                 kind: getString(part.kind) || 'vocal',
                 text,
                 phonetic: visibility.pronunciation
-                    ? getDistinctOverlaySupplement(part.phonetic ?? part.phoneticText ?? part.pronText, text)
+                    ? getOverlayLineAuxiliaryText(part, 'pronunciation', text) || ''
                     : '',
                 translation: visibility.translation
-                    ? getDistinctOverlaySupplement(part.translation ?? part.translationText ?? part.transText, text)
+                    ? getOverlayLineAuxiliaryText(part, 'translation', text) || ''
                     : '',
                 syllables
             };
@@ -9360,15 +9403,20 @@
         });
     };
 
+    const getOverlayVocalOriginalText = (part, syllables = part?.syllables) => {
+        return (typeof part?.text === 'string' ? part.text : '')
+            || (Array.isArray(syllables) ? syllables.map(syllable => syllable?.text ?? '').join('') : '');
+    };
+
     const getOverlayLineOriginalText = (line) => {
         const value = line?.originalText ?? line?.text ?? '';
         return typeof value === 'string' ? value : String(value ?? '');
     };
 
-    const getOverlayLineAuxiliaryText = (line, type) => {
-        const originalText = getOverlayLineOriginalText(line);
+    const getOverlayLineAuxiliaryText = (line, type, originalText = getOverlayLineOriginalText(line)) => {
         const candidates = type === 'pronunciation'
             ? [
+                line?.phonetic,
                 line?.phoneticText,
                 line?.pronunciationText,
                 line?.pronText,
@@ -9401,6 +9449,7 @@
             context.displayMode1 || 'none',
             context.displayMode2 || 'none',
             context.pronunciationNotation || 'translation',
+            context.translationTargetLanguage || '',
             getLyricsTextCacheHash(sourceText)
         ]);
     };
@@ -9426,16 +9475,21 @@
 
         let preservedPronunciationCount = 0;
         let preservedTranslationCount = 0;
-        const lyrics = nextLyrics.map((line, index) => {
-            const previousLine = previousLyrics[index];
-            const previousOriginal = getOverlayLineOriginalText(previousLine).normalize('NFC').trim();
-            const nextOriginal = getOverlayLineOriginalText(line).normalize('NFC').trim();
+        const preserveLine = (previousLine, line, isVocal = false) => {
+            if (!previousLine || !line) return line;
+            const getOriginalText = isVocal ? getOverlayVocalOriginalText : getOverlayLineOriginalText;
+            const previousOriginal = getOriginalText(previousLine).normalize('NFC').trim();
+            const nextOriginal = getOriginalText(line).normalize('NFC').trim();
             if (!previousOriginal || previousOriginal !== nextOriginal) {
                 return line;
             }
 
-            const previousStartTime = Number(previousLine?.startTime);
-            const nextStartTime = Number(line?.startTime);
+            if (isVocal && (
+                (previousLine.id && line.id && previousLine.id !== line.id)
+                || (previousLine.speaker || '') !== (line.speaker || '')
+            )) return line;
+            const previousStartTime = Number(isVocal ? previousLine.syllables?.[0]?.startTime : previousLine.startTime);
+            const nextStartTime = Number(isVocal ? line.syllables?.[0]?.startTime : line.startTime);
             if (
                 Number.isFinite(previousStartTime)
                 && Number.isFinite(nextStartTime)
@@ -9461,19 +9515,37 @@
             if (!nextPronunciation && previousPronunciation) {
                 nextLine = {
                     ...nextLine,
-                    phoneticText: previousPronunciation
+                    [isVocal ? 'phonetic' : 'phoneticText']: previousPronunciation
                 };
                 preservedPronunciationCount += 1;
             }
             if (!nextTranslation && previousTranslation) {
                 nextLine = {
                     ...nextLine,
-                    text2: previousTranslation
+                    [isVocal ? 'translation' : 'text2']: previousTranslation
                 };
                 preservedTranslationCount += 1;
             }
 
+            if (!isVocal && previousLine.vocals && line.vocals) {
+                const previousVocals = previousLine.vocals;
+                const lead = preserveLine(previousVocals.lead, line.vocals.lead, true);
+                const previousBackground = Array.isArray(previousVocals.background) ? previousVocals.background : [];
+                const background = Array.isArray(line.vocals.background)
+                    ? line.vocals.background.map((part, index) => {
+                        if (!part || typeof part !== 'object') return part;
+                        const previousPart = part.id
+                            ? previousBackground.find(candidate => candidate?.id === part.id)
+                            : previousBackground[index];
+                        return preserveLine(previousPart, part, true);
+                    })
+                    : line.vocals.background;
+                nextLine = { ...nextLine, vocals: { ...line.vocals, lead, background } };
+            }
             return nextLine;
+        };
+        const lyrics = nextLyrics.map((line, index) => {
+            return preserveLine(previousLyrics[index], line);
         });
 
         return {
@@ -9484,6 +9556,20 @@
     };
 
     const LYRICS_SEND_RETRY_DELAYS = [250, 750];
+
+    const resolveOverlayPresentationContext = (sender, trackInfo, context) => {
+        const previous = sender._lastTrackInfo?.uri === trackInfo.uri
+            ? sender._lastPresentationContext
+            : null;
+        if (!previous) return context;
+        if (!context) return previous;
+        // Missing fields describe an incomplete update; only explicit mode
+        // values such as 'none' change what the user wants to display.
+        const updates = Object.fromEntries(Object.entries(context).filter(([, value]) => value != null));
+        return Object.keys(previous).some(key => !(key in updates))
+            ? { ...previous, ...updates }
+            : context;
+    };
 
     // lyricsHelperSender의 프로토타입. 공용 전송/큐/오프셋 로직만 가진다.
     const LyricsSenderBase = {
@@ -10132,13 +10218,7 @@
                 }
 
                 const currentReqId = ++this._reqId;
-                const effectivePresentationContext = presentationContext
-                    || (
-                        this._lastTrackInfo?.uri === trackInfo.uri
-                        && ['explicit', 'offset-event', 'reconnect'].includes(sendReason)
-                        ? this._lastPresentationContext
-                        : null
-                    );
+                const effectivePresentationContext = resolveOverlayPresentationContext(this, trackInfo, presentationContext);
                 const presentationKey = getOverlayPresentationKey(
                     trackInfo,
                     lyrics,
@@ -10184,7 +10264,9 @@
                     return;
                 }
 
-                const lyricsHash = JSON.stringify(lyricsToSend);
+                const mappedLines = mapLyricsForSender(lyricsToSend, offset, supplementVisibility);
+                const isSynced = lyricsToSend.some(l => l.startTime !== undefined && l.startTime !== null);
+                const lyricsHash = JSON.stringify([mappedLines, isSynced]);
 
                 if (!forceResend &&
                     this.lastSentUri === trackInfo.uri &&
@@ -10215,8 +10297,6 @@
                     albumArt = resolveSpotifyImageUrl(imageUrl);
                 } catch (e) { }
 
-                const mappedLines = mapLyricsForSender(lyricsToSend, offset, supplementVisibility);
-
                 // 현재 트랙 정보 가져오기 (Spicetify.Player.data에서 최신 정보 사용)
                 const currentTitle = trackInfo.title || Spicetify.Player.data?.item?.metadata?.title || '';
                 const currentArtist = trackInfo.artist || Spicetify.Player.data?.item?.metadata?.artist_name || '';
@@ -10239,7 +10319,7 @@
                         duration: Spicetify.Player.getDuration() || 0
                     },
                     lyrics: mappedLines,
-                    isSynced: lyricsToSend.some(l => l.startTime !== undefined && l.startTime !== null)
+                    isSynced
                 }, {
                     key: deliveryKey,
                     generation: deliveryGeneration,
@@ -10323,6 +10403,8 @@
                             lyricsType: detail.lyricsType,
                             displayMode1: detail.displayMode1,
                             displayMode2: detail.displayMode2,
+                            pronunciationNotation: detail.pronunciationNotation,
+                            translationTargetLanguage: detail.translationTargetLanguage,
                             translationSourceText: detail.translationSourceText,
                             presentationComplete: detail.presentationComplete
                         });

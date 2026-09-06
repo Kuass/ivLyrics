@@ -19,8 +19,8 @@ A personal derivative of [ivLis-Studio/ivLyrics](https://github.com/ivLis-Studio
 
 ## 1. 원본과 달라진 점 / Differences from upstream
 
-원본 6.6.10(2026-09-06)까지의 변경을 반영하고 있습니다. 원본 저장소는 로컬 `origin` 원격으로만 연결되어 있어, 업스트림 반영은 가져오기와 병합으로 이루어집니다.\
-Tracks upstream through 6.6.10 (2026-09-06). The upstream repository is only linked as a local `origin` remote, so syncing is a fetch-and-merge, not a GitHub fork comparison.
+원본 6.6.11(2026-09-07)까지의 변경을 반영하고 있습니다. 원본 저장소는 로컬 `origin` 원격으로만 연결되어 있어, 업스트림 반영은 가져오기와 병합으로 이루어집니다.\
+Tracks upstream through 6.6.11 (2026-09-07). The upstream repository is only linked as a local `origin` remote, so syncing is a fetch-and-merge, not a GitHub fork comparison.
 
 ### 제거한 기능 / Removed
 
