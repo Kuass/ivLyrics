@@ -1,8 +1,8 @@
-# ivLyrics (Kuass fork)
+# ivLyrics (Kuass edition)
 
-[ivLis-Studio/ivLyrics](https://github.com/ivLis-Studio/ivLyrics)를 개인 용도로 다듬은 포크입니다. Spicetify용 가사 앱이며, 번역·발음 표기·노래방 가사·전체 화면 같은 핵심 기능은 그대로 두고, 운영 서버에 묶인 부가 기능과 쓰지 않는 모드를 걷어냈습니다. 원본에서 겪었던 "업데이트하면 설정이 전부 사라지는" 문제를 앱 바깥에서 막아 주는 관리 도구도 함께 제공합니다.
+[ivLis-Studio/ivLyrics](https://github.com/ivLis-Studio/ivLyrics)에서 갈라져 나와 개인 용도로 다듬은 파생 프로젝트입니다. GitHub 포크 관계는 끊었고 독립 저장소로 관리하지만, 원본의 변경은 계속 가져와 병합합니다. Spicetify용 가사 앱이며, 번역·발음 표기·노래방 가사·전체 화면 같은 핵심 기능은 그대로 두고, 운영 서버에 묶인 부가 기능과 쓰지 않는 모드를 걷어냈습니다. 원본에서 겪었던 "업데이트하면 설정이 전부 사라지는" 문제를 앱 바깥에서 막아 주는 관리 도구도 함께 제공합니다.
 
-A personal fork of [ivLis-Studio/ivLyrics](https://github.com/ivLis-Studio/ivLyrics), a lyrics app for Spicetify. Core features such as translation, pronunciation, karaoke lyrics and fullscreen mode are kept; features tied to the upstream server and unused modes are removed. It also ships a management tool that prevents the upstream problem of settings being wiped on update.
+A personal derivative of [ivLis-Studio/ivLyrics](https://github.com/ivLis-Studio/ivLyrics), a lyrics app for Spicetify. It is maintained as a standalone repository, no longer a GitHub fork, while upstream changes keep being merged in. Core features such as translation, pronunciation, karaoke lyrics and fullscreen mode are kept; features tied to the upstream server and unused modes are removed. It also ships a management tool that prevents the upstream problem of settings being wiped on update.
 
 > macOS 전용이며 Spicetify가 먼저 설치되어 있어야 합니다.\
 > macOS only. Spicetify must already be installed.
@@ -19,8 +19,8 @@ A personal fork of [ivLis-Studio/ivLyrics](https://github.com/ivLis-Studio/ivLyr
 
 ## 1. 원본과 달라진 점 / Differences from upstream
 
-원본 6.6.10(2026-09-06)까지의 변경을 반영하고 있습니다.\
-Tracks upstream through 6.6.10 (2026-09-06).
+원본 6.6.10(2026-09-06)까지의 변경을 반영하고 있습니다. 원본 저장소는 로컬 `origin` 원격으로만 연결되어 있어, 업스트림 반영은 가져오기와 병합으로 이루어집니다.\
+Tracks upstream through 6.6.10 (2026-09-06). The upstream repository is only linked as a local `origin` remote, so syncing is a fetch-and-merge, not a GitHub fork comparison.
 
 ### 제거한 기능 / Removed
 
@@ -233,6 +233,6 @@ The repository does not need to live in `~/.config/spicetify/CustomApps/ivLyrics
 
 ## 7. 크레딧과 라이선스 / Credits and license
 
-원저작은 [ivLis STUDIO](https://github.com/ivLis-Studio)의 ivLyrics이며, 그 뿌리는 spicetify의 [Lyrics-Plus](https://github.com/spicetify/cli/tree/main/CustomApps/lyrics-plus)입니다. 이 포크는 원본과 같은 LGPL-2.1 라이선스를 따릅니다. Spotify와 무관한 비공식 확장 프로그램이며, 사용에 따른 책임은 사용자에게 있습니다.
+원저작은 [ivLis STUDIO](https://github.com/ivLis-Studio)의 ivLyrics이며, 그 뿌리는 spicetify의 [Lyrics-Plus](https://github.com/spicetify/cli/tree/main/CustomApps/lyrics-plus)입니다. 이 프로젝트는 원본과 같은 LGPL-2.1 라이선스를 따릅니다. Spotify와 무관한 비공식 확장 프로그램이며, 사용에 따른 책임은 사용자에게 있습니다.
 
-The original work is ivLyrics by [ivLis STUDIO](https://github.com/ivLis-Studio), itself descended from spicetify's [Lyrics-Plus](https://github.com/spicetify/cli/tree/main/CustomApps/lyrics-plus). This fork keeps the upstream LGPL-2.1 license. It is an unofficial extension unaffiliated with Spotify; use at your own risk.
+The original work is ivLyrics by [ivLis STUDIO](https://github.com/ivLis-Studio), itself descended from spicetify's [Lyrics-Plus](https://github.com/spicetify/cli/tree/main/CustomApps/lyrics-plus). This project keeps the upstream LGPL-2.1 license. It is an unofficial extension unaffiliated with Spotify; use at your own risk.
