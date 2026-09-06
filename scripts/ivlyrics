@@ -241,11 +241,12 @@ cmd_backup() {
     printf 'spotify-running\n' > "${target}/.taken-while-running"
   fi
   ln -sfn "${target}" "${BACKUP_ROOT}/latest"
-  prune_snapshots
+  prune_snapshots "${1:-}"
   log "Snapshot saved: ${target} ($(du -sh "${target}" | cut -f1))"
 }
 
 prune_snapshots() {
+  local protected_snapshot="${1:-}"
   local snapshots
   snapshots="$(list_snapshots | sort)"
   local count
@@ -253,9 +254,14 @@ prune_snapshots() {
   if [ "${count}" -le "${KEEP_SNAPSHOTS}" ]; then
     return 0
   fi
-  printf '%s\n' "${snapshots}" | head -n "$((count - KEEP_SNAPSHOTS))" | while IFS= read -r old; do
-    [ -n "${old}" ] && rm -rf "${old}"
-  done
+  local old
+  while IFS= read -r old; do
+    [ "${count}" -gt "${KEEP_SNAPSHOTS}" ] || break
+    [ -n "${old}" ] || continue
+    [ ! "${old}" -ef "${protected_snapshot}" ] || continue
+    rm -rf "${old}"
+    count=$((count - 1))
+  done <<< "${snapshots}"
 }
 
 list_snapshots() {
@@ -272,10 +278,16 @@ cmd_restore() {
     snapshot="${BACKUP_ROOT}/${snapshot}"
   fi
   [ -n "${snapshot}" ] && [ -d "${snapshot}" ] || die "no snapshot found. Run 'ivlyrics backup' first or pass a snapshot path."
+  # Pin aliases such as 'latest' before backup replaces them, and keep this
+  # snapshot out of retention pruning until restoration has finished.
+  snapshot="$(cd "${snapshot}" && pwd -P)"
+  if [ ! -d "${snapshot}/Local Storage" ] && [ ! -d "${snapshot}/IndexedDB" ]; then
+    die "snapshot contains no Spotify storage: ${snapshot}"
+  fi
 
   spotify_quit
   heal_links
-  cmd_backup || true
+  cmd_backup "${snapshot}" || true
 
   local name target
   for name in "${PROTECTED_ITEMS[@]}"; do
@@ -366,7 +378,9 @@ cmd_unprotect() {
 # ---------------------------------------------------------- launchd guard ----
 install_guard_agent() {
   mkdir -p "${BIN_DIR}" "${HOME}/Library/LaunchAgents"
-  cp "$(script_path)" "${BIN_DIR}/ivlyrics"
+  if [ ! "$(script_path)" -ef "${BIN_DIR}/ivlyrics" ]; then
+    cp "$(script_path)" "${BIN_DIR}/ivlyrics"
+  fi
   chmod +x "${BIN_DIR}/ivlyrics"
   cat > "${LAUNCH_AGENT_PLIST}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
