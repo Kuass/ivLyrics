@@ -12,21 +12,20 @@ const VideoHelperService = (() => {
   // 연결 상태
   let isConnected = false;
   let lastHealthCheck = 0;
+  let healthCheckPromise = null;
   const HEALTH_CHECK_INTERVAL = 30000; // 30초
 
   /**
    * 헬퍼 서버 상태 확인
    * @returns {Promise<boolean>} 연결 여부
    */
-  const checkHealth = async () => {
+  const performHealthCheck = async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-
       const response = await fetch(`${BASE_URL}/health`, {
         signal: controller.signal,
       });
-      clearTimeout(timeoutId);
 
       isConnected = response.ok && (await response.text()) === "OK";
       lastHealthCheck = Date.now();
@@ -35,7 +34,16 @@ const VideoHelperService = (() => {
       isConnected = false;
       lastHealthCheck = Date.now();
       return false;
+    } finally {
+      clearTimeout(timeoutId);
     }
+  };
+
+  const checkHealth = () => {
+    if (!healthCheckPromise) {
+      healthCheckPromise = performHealthCheck().finally(() => { healthCheckPromise = null; });
+    }
+    return healthCheckPromise;
   };
 
   /**
@@ -43,7 +51,8 @@ const VideoHelperService = (() => {
    * @returns {Promise<boolean>}
    */
   const isHelperAvailable = async () => {
-    if (Date.now() - lastHealthCheck < HEALTH_CHECK_INTERVAL) {
+    if (healthCheckPromise) return healthCheckPromise;
+    if (lastHealthCheck && Date.now() - lastHealthCheck < HEALTH_CHECK_INTERVAL) {
       return isConnected;
     }
     return await checkHealth();
@@ -59,8 +68,13 @@ const VideoHelperService = (() => {
       return { success: false, url: null, message: "Invalid video ID" };
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
     try {
-      const response = await fetch(`${BASE_URL}/video/status?id=${encodeURIComponent(videoId)}`);
+      const response = await fetch(`${BASE_URL}/video/status?id=${encodeURIComponent(videoId)}`, {
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       return {
         success: data.success,
@@ -70,6 +84,8 @@ const VideoHelperService = (() => {
       };
     } catch (e) {
       return { success: false, url: null, message: "Failed to check video status" };
+    } finally {
+      clearTimeout(timeoutId);
     }
   };
 
@@ -85,168 +101,171 @@ const VideoHelperService = (() => {
   const requestVideo = (videoId, callbacks = {}) => {
     const { onProgress, onComplete, onError } = callbacks;
     let aborted = false;
+    let settled = false;
+    let reader = null;
+    let idleTimer = null;
+    const controller = new AbortController();
+    const MAX_EVENT_SIZE = 1024 * 1024;
+
+    const finish = (callback, value) => {
+      if (aborted || settled) return;
+      settled = true;
+      clearTimeout(idleTimer);
+      callback?.(value);
+    };
+    const cancelReader = () => {
+      if (reader) reader.cancel().catch(() => {});
+    };
+    const resetIdleTimeout = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        controller.abort();
+        cancelReader();
+        finish(onError, "Video request timed out");
+      }, 90_000);
+    };
+    const isVideoUrl = value => {
+      if (typeof value !== "string") return false;
+      try {
+        return ["http:", "https:"].includes(new URL(value).protocol);
+      } catch {
+        return false;
+      }
+    };
 
     if (!videoId) {
-      onError?.("Invalid video ID");
-      return () => { };
+      finish(onError, "Invalid video ID");
+      return () => {};
     }
 
-    const controller = new AbortController();
-
     const fetchVideo = async () => {
+      resetIdleTimeout();
       try {
         const response = await fetch(`${BASE_URL}/video/request?id=${encodeURIComponent(videoId)}`, {
           signal: controller.signal,
         });
-
-        const contentType = response.headers.get("content-type") || "";
-
-        // JSON 응답 (이미 존재하는 경우)
-        if (contentType.includes("application/json")) {
-          const data = await response.json();
-          if (aborted) return;
-
-          if (data.success) {
-            onComplete?.(data.url);
-          } else {
-            onError?.(data.message || "Video request failed");
-          }
+        if (aborted || settled) {
+          await response.body?.cancel();
           return;
         }
-
-        // SSE 스트림 (다운로드 진행 중)
-        if (contentType.includes("text/event-stream")) {
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-          let pendingData = null; // data가 먼저 오고 event가 나중에 오는 형식 대응
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done || aborted) break;
-
-            buffer += decoder.decode(value, { stream: true });
-
-            // 줄 단위로 처리
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || ""; // 마지막 불완전한 줄은 버퍼에 유지
-
-            for (const line of lines) {
-              const trimmedLine = line.trim();
-
-              // 빈 줄이면 이벤트 끝
-              if (!trimmedLine) {
-                pendingData = null;
-                continue;
-              }
-
-              // data: 줄 처리 (먼저 옴)
-              if (trimmedLine.startsWith("data:")) {
-                const dataStr = trimmedLine.slice(5).trim();
-                if (!dataStr) continue;
-
-                try {
-                  pendingData = JSON.parse(dataStr);
-                } catch (e) {
-                  pendingData = null;
-                }
-                continue;
-              }
-
-              // event: 줄 처리 (나중에 옴)
-              if (trimmedLine.startsWith("event:")) {
-                const eventType = trimmedLine.slice(6).trim();
-
-                if (!pendingData) continue;
-                const data = pendingData;
-                pendingData = null;
-
-                // progress 이벤트
-                if (eventType === "progress") {
-                  onProgress?.({
-                    percent: data.percent || 0,
-                    speed: data.speed,
-                    eta: data.eta,
-                    message: data.message,
-                    status: data.status,
-                  });
-                }
-                // complete 이벤트
-                else if (eventType === "complete") {
-                  // status가 completed이고 message가 URL인 경우에만 완료 처리
-                  if (data.status === "completed") {
-                    const videoUrl = data.url || data.message;
-                    // URL 형식인지 확인 (http로 시작하는 경우만)
-                    if (videoUrl && typeof videoUrl === 'string' && videoUrl.startsWith('http')) {
-                      window.__ivLyricsDebugLog?.("[VideoHelperService] Download complete, URL:", videoUrl);
-                      onComplete?.(videoUrl);
-                      return;
-                    }
-                    // "Download completed" 같은 메시지면 다음 이벤트 기다림
-                  }
-                  // status가 error지만 WARNING 메시지면 무시하고 계속 진행
-                  else if (data.status === "error") {
-                    const msg = data.message || "";
-                    if (msg.startsWith("WARNING")) {
-                      window.__ivLyricsDebugLog?.("[VideoHelperService] Ignoring warning:", msg);
-                      // WARNING은 무시하고 계속 진행
-                    } else {
-                      // 진짜 에러
-                      onError?.(msg || "Download failed");
-                      return;
-                    }
-                  }
-                }
-                // error 이벤트
-                else if (eventType === "error") {
-                  onError?.(data.message || "Download failed");
-                  return;
-                }
-              }
-            }
-          }
-
-          // 스트림이 끝났는데 완료 콜백이 호출되지 않은 경우
-          // 버퍼에 남은 데이터 처리
-          if (buffer.trim()) {
-            const dataMatch = buffer.match(/data:\s*({.*})/);
-            if (dataMatch) {
-              try {
-                const data = JSON.parse(dataMatch[1]);
-                if (data.status === "completed") {
-                  const videoUrl = data.url || data.message;
-                  if (videoUrl && videoUrl.startsWith('http')) {
-                    window.__ivLyricsDebugLog?.("[VideoHelperService] Final buffer complete, URL:", videoUrl);
-                    onComplete?.(videoUrl);
-                    return;
-                  }
-                }
-              } catch (e) {
-                // ignore
-              }
-            }
-          }
-        } else {
-          // 알 수 없는 응답 타입
-          const text = await response.text();
-          if (!aborted) {
-            onError?.("Unexpected response: " + text.substring(0, 100));
-          }
+        if (!response.ok) {
+          await response.body?.cancel();
+          throw new Error(`Video request failed (HTTP ${response.status})`);
         }
-      } catch (e) {
-        if (aborted) return;
-        if (e.name === "AbortError") return;
-        console.error("[VideoHelperService] Request error:", e);
-        onError?.(e.message || "Request failed");
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const data = await response.json();
+          if (data.success && isVideoUrl(data.url)) finish(onComplete, data.url);
+          else finish(onError, data.message || "Video request failed");
+          return;
+        }
+        if (!contentType.includes("text/event-stream") || !response.body) {
+          await response.body?.cancel();
+          throw new Error("Unexpected video response type");
+        }
+
+        reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let eventType = "";
+        let dataLines = [];
+        let eventSize = 0;
+        const dispatch = () => {
+          const type = eventType;
+          const payload = dataLines.join("\n");
+          eventType = "";
+          dataLines = [];
+          eventSize = 0;
+          if (!payload || aborted || settled) return;
+          let data;
+          try { data = JSON.parse(payload); } catch { return; }
+          if (!data || typeof data !== "object") return;
+          if (type === "progress") {
+            onProgress?.({
+              percent: data.percent || 0, speed: data.speed, eta: data.eta,
+              message: data.message, status: data.status,
+            });
+          } else if (type === "error") {
+            finish(onError, data.message || "Download failed");
+          } else if (type === "complete" || (!type && data.status === "completed")) {
+            if (data.status === "completed") {
+              const videoUrl = data.url || data.message;
+              if (isVideoUrl(videoUrl)) finish(onComplete, videoUrl);
+            } else if (data.status === "error") {
+              const message = String(data.message || "");
+              if (!message.startsWith("WARNING")) finish(onError, message || "Download failed");
+            }
+          }
+        };
+        const processLine = line => {
+          if (!line) { dispatch(); return; }
+          eventSize += line.length;
+          if (eventSize > MAX_EVENT_SIZE) throw new Error("Video event exceeds size limit");
+          if (line.startsWith(":")) return;
+          const separator = line.indexOf(":");
+          const field = separator < 0 ? line : line.slice(0, separator);
+          let value = separator < 0 ? "" : line.slice(separator + 1);
+          if (value.startsWith(" ")) value = value.slice(1);
+          if (field === "event") eventType = value;
+          else if (field === "data") dataLines.push(value);
+        };
+        const consume = (final = false) => {
+          let start = 0;
+          for (let index = 0; index < buffer.length; index++) {
+            const character = buffer[index];
+            if (character !== "\n" && character !== "\r") continue;
+            // Keep a split CRLF pair together until the next network chunk.
+            if (character === "\r" && index === buffer.length - 1 && !final) break;
+            processLine(buffer.slice(start, index));
+            if (character === "\r" && buffer[index + 1] === "\n") index++;
+            start = index + 1;
+            if (aborted || settled) break;
+          }
+          buffer = buffer.slice(start);
+          if (!settled && !aborted && buffer.length + eventSize > MAX_EVENT_SIZE) {
+            throw new Error("Video event exceeds size limit");
+          }
+          if (final && !settled && !aborted) {
+            if (buffer) processLine(buffer);
+            buffer = "";
+            dispatch();
+          }
+        };
+
+        while (!aborted && !settled) {
+          const { done, value } = await reader.read();
+          if (aborted || settled) break;
+          if (done) {
+            buffer += decoder.decode();
+            consume(true);
+            break;
+          }
+          resetIdleTimeout();
+          buffer += decoder.decode(value, { stream: true });
+          consume();
+        }
+        finish(onError, "Video stream ended before download completed");
+      } catch (error) {
+        if (!aborted && !settled) {
+          console.error("[VideoHelperService] Request error:", error);
+          finish(onError, error.message || "Request failed");
+        }
+      } finally {
+        clearTimeout(idleTimer);
+        if (reader) {
+          try { await reader.cancel(); } catch {}
+          reader.releaseLock();
+          reader = null;
+        }
       }
     };
 
     fetchVideo();
-
-    // abort 함수 반환
     return () => {
       aborted = true;
+      clearTimeout(idleTimer);
       controller.abort();
+      cancelReader();
     };
   };
 
