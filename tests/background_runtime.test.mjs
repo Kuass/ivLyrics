@@ -42,6 +42,43 @@ test("memory cache keeps lyric references, expiry and LRU without traversing lyr
   assert.equal(cache.get("track:lyrics"), null);
 });
 
+test("cache replacement retains unrelated songs and uses access order when timestamps tie", () => {
+  const context = vm.createContext({ Date: { now: () => 100 } });
+  vm.runInContext(`${indexSource.slice(cacheStart, cacheEnd)}\nglobalThis.cache = CacheManager;`, context);
+  const cache = context.cache;
+  cache._maxSize = 3;
+  cache.set("a", 1);
+  cache.set("b", 2);
+  cache.set("c", 3);
+  cache.set("a", 4);
+  assert.equal(cache._cache.size, 3);
+  assert.equal(cache.get("b"), 2);
+  cache.set("d", 5);
+  assert.equal(cache.get("c"), null);
+  assert.equal(cache.get("a"), 4);
+  assert.equal(cache.get("b"), 2);
+});
+
+test("small caches remain bounded and repeated initialization owns one cleanup timer", () => {
+  const timers = new Set();
+  const context = vm.createContext({
+    Date, performance: {},
+    setInterval: callback => { timers.add(callback); return callback; },
+    clearInterval: callback => timers.delete(callback),
+  });
+  vm.runInContext(`${indexSource.slice(cacheStart, cacheEnd)}\nglobalThis.cache = CacheManager;`, context);
+  const cache = context.cache;
+  cache._maxSize = 1;
+  for (let i = 0; i < 10; i++) cache.set(i, i);
+  assert.equal(cache._cache.size, 1);
+  assert.equal(cache.get(9), 9);
+  cache.init();
+  cache.init();
+  assert.equal(timers.size, 1);
+  cache.clear();
+  assert.equal(timers.size, 0);
+});
+
 const serviceSource = readFileSync(new URL("../LyricsService.js", import.meta.url), "utf8");
 // The fork keeps the shared lifecycle on LyricsSenderBase and the helper's own
 // progress worker as a property descriptor on lyricsHelperSender.

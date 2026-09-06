@@ -3158,6 +3158,8 @@ const CacheManager = {
   },
 
   set(key, data) {
+    // A replacement is a new access, not an additional cache entry.
+    this._cache.delete(key);
     // Clean up if cache is getting too large
     if (this._cache.size >= this._maxSize) {
       this._cleanupOldEntries();
@@ -3172,14 +3174,11 @@ const CacheManager = {
 
   _cleanupOldEntries() {
     // LRU eviction - remove oldest entries
-    const entries = Array.from(this._cache.entries());
-    const toRemove = Math.floor(entries.length * 0.3); // Remove 30% to reduce frequent cleanups
+    const toRemove = Math.max(1, Math.floor(this._cache.size * 0.3));
 
-    // Sort by last accessed time (oldest first)
-    entries.sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
-
+    // Map insertion order preserves access order even within the same millisecond.
     for (let i = 0; i < toRemove; i++) {
-      this._cache.delete(entries[i][0]);
+      this._cache.delete(this._cache.keys().next().value);
     }
 
     if (this._statsEnabled) {
@@ -3189,6 +3188,7 @@ const CacheManager = {
   },
 
   _startPeriodicCleanup() {
+    if (this._cleanupTimer !== null) return;
     // Clean up expired entries every 5 minutes
     this._cleanupTimer = setInterval(() => {
       const now = Date.now();
@@ -3234,13 +3234,10 @@ const CacheManager = {
   },
 
   _aggressiveCleanup() {
-    const entries = Array.from(this._cache.entries());
-    const toRemove = Math.floor(entries.length * 0.5);
-
-    entries.sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
+    const toRemove = Math.floor(this._cache.size * 0.5);
 
     for (let i = 0; i < toRemove; i++) {
-      this._cache.delete(entries[i][0]);
+      this._cache.delete(this._cache.keys().next().value);
     }
   },
 
