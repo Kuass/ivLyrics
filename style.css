@@ -11,18 +11,6 @@
 
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css");
 
-@property --offset {
-  syntax: "<length>";
-  inherits: true;
-  initial-value: 0px;
-}
-
-@property --position-index {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0;
-}
-
 :root {
   --iv-motion-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
   --iv-motion-ease-emphasis: cubic-bezier(0.2, 0.9, 0.2, 1);
@@ -1646,25 +1634,52 @@ body.ivlyrics-page-active .main-topBar-container {
   height: 0;
 }
 
+/* This zero-height root otherwise loses :hover in the gaps between moving
+   rows, making Spotify's shared hover selectors restyle the whole song.
+   Fill only its hit area behind the rows, using the positioned page's bounds;
+   keep row geometry, text selection and click targets unchanged. */
+.lyrics-lyricsContainer-SyncedLyricsPage:not(.scrolling-active)
+  > .lyrics-lyricsContainer-SyncedLyrics:not(.settings-live-preview-line)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+/* These values position the outer row only. Stop their changing inherited
+   values at the content boundary so a hand-off does not restyle every glyph.
+   Keep --offset inherited from the synced root to the row itself. */
+.lyrics-lyricsContainer-SyncedLyrics > .lyrics-lyricsContainer-LyricsLine > * {
+  --offset: initial;
+  --position-index: initial;
+  --animation-index: initial;
+  --blur-index: initial;
+  --line-shift-duration: initial;
+  --line-shift-delay: initial;
+}
+
+.lyrics-lyricsContainer-LyricsLine {
+  --iv-karaoke-past-color-share: 0%;
+}
+
 .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine {
   transform: translateY(calc(var(--position-index) * var(--lyrics-line-height) + var(--offset)));
   transform-origin: var(--lyrics-align-text);
   color: var(--lyrics-color-inactive);
-  transition: transform var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms))
-      var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1))
-      var(--line-shift-delay, 0s);
+  transition-timing-function:
+    var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1)),
+    cubic-bezier(0.16, 1, 0.3, 1),
+    cubic-bezier(0.16, 1, 0.3, 1);
+  transition-duration:
+    var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms)),
+    300ms,
+    360ms;
+  transition-delay: var(--line-shift-delay, 0s), 0s, 0s;
+  /* Skip `filter` here: blur snaps to new value when --blur-index changes instead of
+     transitioning across every visible line in parallel (huge GPU spike during scroll). */
+  transition-property: transform, color, opacity;
   opacity: 1;
-  will-change: transform;
-  contain: paint;
-}
-
-/* Line-synced lyrics render as one font run instead of the padded karaoke
-   glyph layers. Let ascenders, descenders, outlines and shadows paint slightly
-   past the containment edge without changing row height or centering. */
-.lyrics-lyricsContainer-SyncedLyricsPage:not(.is-karaoke)
-  .lyrics-lyricsContainer-SyncedLyrics
-  > .lyrics-lyricsContainer-LyricsLine {
-  overflow-clip-margin: 0.24em;
+  will-change: auto;
 }
 
 /* Only currently visible auto-follow rows receive compositor layers. Hidden
@@ -1675,12 +1690,12 @@ body.ivlyrics-page-active .main-topBar-container {
   will-change: transform;
 }
 
-.lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine {
-  filter: blur(calc(var(--blur-index) * 1.5px));
+.lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active) {
+  letter-spacing: -0.005em;
 }
 
-.lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active {
-  filter: none;
+.lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine {
+  filter: blur(calc(var(--blur-index) * 1.5px));
 }
 
 /* 하이라이트 모드: 현재 가사만 밝게, 나머지는 희미하게 */
@@ -1697,7 +1712,9 @@ body.ivlyrics-page-active .main-topBar-container {
 .lyrics-lyricsContainer-LyricsContainer.highlight-mode-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active,
 .lyrics-lyricsContainer-LyricsContainer.highlight-mode-enabled .lyrics-lyricsContainer-SyncedScrollView .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active {
   opacity: 1 !important;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.7);
+  text-shadow:
+    var(--lyrics-original-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
 }
 
 /* 하이라이트 모드: Unsynced 가사에도 적용 */
@@ -1708,7 +1725,9 @@ body.ivlyrics-page-active .main-topBar-container {
 
 .lyrics-lyricsContainer-LyricsContainer.highlight-mode-enabled .lyrics-lyricsContainer-UnsyncedLyricsPage .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active {
   opacity: 1 !important;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.7);
+  text-shadow:
+    var(--lyrics-original-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
 }
 
 /* 하이라이트 모드 + 호버 효과: 마우스 올리면 밝게 */
@@ -1724,7 +1743,7 @@ body.ivlyrics-page-active .main-topBar-container {
 .lyrics-lyricsContainer-UnsyncedLyricsPage .lyrics-lyricsContainer-LyricsLine {
   color: var(--lyrics-color-inactive);
   opacity: 0.5;
-  filter: none;
+  filter: blur(0px);
   transform: translateY(0);
   transition:
     color var(--iv-motion-duration-fast) var(--iv-motion-ease-standard),
@@ -1758,16 +1777,27 @@ body.ivlyrics-page-active .main-topBar-container {
   color: var(--lyrics-color-active);
   opacity: 1;
   filter: none !important;
-  transition: transform var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms))
+  transition:
+    transform var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms))
       var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1))
-      var(--line-shift-delay, 0s);
+      var(--line-shift-delay, 0s),
+    color 0.3s var(--iv-motion-ease-standard),
+    opacity 0.4s var(--iv-motion-ease-standard),
+    text-shadow 0.4s var(--iv-motion-ease-standard);
 }
 
 .lyrics-lyricsContainer-LyricsLine > p,
 .lyrics-lyricsContainer-LyricsLine-phonetic,
 .lyrics-lyricsContainer-LyricsLine-translation,
 .lyrics-karaoke-line {
-  transition: none;
+  transition:
+    transform var(--iv-lyrics-centering-duration, 300ms)
+      var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1)),
+    opacity var(--iv-motion-duration-medium) var(--iv-motion-ease-standard),
+    letter-spacing var(--iv-motion-duration-medium) var(--iv-motion-ease-standard),
+    text-shadow var(--iv-motion-duration-medium) var(--iv-motion-ease-standard),
+    --ivlyrics-effect-strength var(--iv-lyrics-centering-duration, 300ms)
+      var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1));
 }
 
 .lyrics-lyricsContainer-LyricsLine > p:has(.lyrics-karaoke-stack),
@@ -1775,6 +1805,11 @@ body.ivlyrics-page-active .main-topBar-container {
   overflow: visible;
 }
 
+.lyrics-lyricsContainer-LyricsLine-active > p,
+.lyrics-lyricsContainer-LyricsLine-active .lyrics-lyricsContainer-LyricsLine-phonetic,
+.lyrics-lyricsContainer-LyricsLine-active .lyrics-lyricsContainer-LyricsLine-translation {
+  transform: translateY(-2px);
+}
 
 .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine.lyrics-lyricsContainer-LyricsLine-active {
   transform: translateY(calc(var(--position-index) * var(--lyrics-line-height) + var(--offset)));
@@ -1856,7 +1891,9 @@ body.ivlyrics-page-active .main-topBar-container {
       var(--lyrics-font-family, var(--font-family)));
   letter-spacing: var(--lyrics-original-letter-spacing, 0);
   line-height: 1.2;
-  text-shadow: var(--lyrics-text-shadow);
+  text-shadow:
+    var(--lyrics-original-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
   opacity: var(--lyrics-original-opacity, 1);
   overflow-wrap: break-word;
   margin-bottom: 32px;
@@ -1911,7 +1948,9 @@ body.ivlyrics-page-active .main-topBar-container {
   font-family: var(--lyrics-original-font-family,
       var(--lyrics-font-family, var(--font-family)));
   letter-spacing: var(--lyrics-original-letter-spacing, 0);
-  text-shadow: var(--lyrics-text-shadow);
+  text-shadow:
+    var(--lyrics-original-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
   line-height: 1;
   opacity: var(--lyrics-original-opacity, 1);
   white-space: normal;
@@ -2085,7 +2124,6 @@ div.lyrics-tabBar-headerItemLink {
   max-width: 100%;
   --ivlyrics-effect-strength: 0;
   --karaoke-glyph-bleed-x: 0.16em;
-  --karaoke-glyph-bleed-y: 0.22em;
   letter-spacing: var(--lyrics-original-letter-spacing, 0);
   line-height: 1.38;
   color: var(--lyrics-color-inactive);
@@ -2148,19 +2186,34 @@ div.lyrics-tabBar-headerItemLink {
 .lyrics-lyricsContainer-SyncedLyricsPage.is-karaoke
   .lyrics-lyricsContainer-SyncedLyrics:has(.lyrics-karaoke-part.active-vocal-row)
   > .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-paddingLine) {
-  transition-property: transform;
-  transition-duration: var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms)) !important;
-  transition-timing-function: var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1)) !important;
-  transition-delay: var(--line-shift-delay, 0s) !important;
+  transition-property: transform, color, opacity;
+  transition-duration:
+    var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms)),
+    300ms,
+    360ms !important;
+  transition-timing-function:
+    var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1)),
+    cubic-bezier(0.16, 1, 0.3, 1),
+    cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition-delay: var(--line-shift-delay, 0s), 0s, 0s !important;
 }
 
 .lyrics-lyricsContainer-SyncedLyricsPage:not(.scrolling-active)
   .lyrics-lyricsContainer-SyncedLyrics
   > .lyrics-lyricsContainer-LyricsLine-paddingLine {
-  transition-property: transform !important;
-  transition-duration: var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms)) !important;
-  transition-timing-function: var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1)) !important;
-  transition-delay: var(--line-shift-delay, 0s) !important;
+  transition-property: transform, color, opacity !important;
+  transition-duration:
+    var(--line-shift-duration, var(--iv-lyrics-centering-duration, 300ms)),
+    300ms,
+    420ms !important;
+  transition-timing-function:
+    var(--iv-lyrics-centering-ease, cubic-bezier(0.42, 0, 0.58, 1)),
+    cubic-bezier(0.16, 1, 0.3, 1),
+    cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition-delay:
+    var(--line-shift-delay, 0s),
+    0s,
+    0s !important;
 }
 
 .lyrics-karaoke-part {
@@ -2170,10 +2223,7 @@ div.lyrics-tabBar-headerItemLink {
   padding-block: 0.03em;
 }
 
-.lyrics-karaoke-part.background {
-  font-size: 0.92em;
-  opacity: 0.9;
-}
+/* Lead/background describe timing tracks, including equal duet singers. */
 
 .lyrics-karaoke-part.effect,
 .lyrics-karaoke-part.speaker-sfx {
@@ -2365,14 +2415,14 @@ div.lyrics-tabBar-headerItemLink {
     filter: brightness(calc(1 + (0.22 * var(--ivlyrics-effect-strength))));
     text-shadow:
       var(--lyrics-current-original-outline-shadow, 0 0 0 transparent),
-      0 0 0.18em rgb(255 255 255 / calc(0.34 * var(--ivlyrics-effect-strength))),
-      0 0 0.42em color-mix(in srgb, currentColor calc(100% * var(--ivlyrics-effect-strength)), transparent);
+      0 0 0.18em rgb(255 255 255 / calc(0.34 * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0))),
+      0 0 0.42em color-mix(in srgb, currentColor calc(100% * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0)), transparent);
   }
   58% {
     filter: brightness(calc(1 - (0.04 * var(--ivlyrics-effect-strength))));
     text-shadow:
       var(--lyrics-current-original-outline-shadow, 0 0 0 transparent),
-      0 0 0.08em rgb(255 255 255 / calc(0.16 * var(--ivlyrics-effect-strength)));
+      0 0 0.08em rgb(255 255 255 / calc(0.16 * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0)));
   }
 }
 
@@ -2383,10 +2433,10 @@ div.lyrics-tabBar-headerItemLink {
   50% {
     text-shadow:
       var(--lyrics-current-original-outline-shadow, 0 0 0 transparent),
-      0.07em 0.04em 0 rgb(255 255 255 / calc(0.18 * var(--ivlyrics-effect-strength))),
+      0.07em 0.04em 0 rgb(255 255 255 / calc(0.18 * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0))),
       0.14em 0.08em 0.22em color-mix(
         in srgb,
-        var(--lyrics-color-active, #fff) calc(36% * var(--ivlyrics-effect-strength)),
+        var(--lyrics-color-active, #fff) calc(36% * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0)),
         transparent
       );
   }
@@ -2434,17 +2484,17 @@ div.lyrics-tabBar-headerItemLink {
     filter: brightness(calc(1 + (0.08 * var(--ivlyrics-effect-strength))));
     text-shadow:
       var(--lyrics-current-original-outline-shadow, 0 0 0 transparent),
-      0 0 0.12em rgb(255 255 255 / calc(0.3 * var(--ivlyrics-effect-strength))),
-      0 0 0.48em color-mix(in srgb, var(--lyrics-color-active, #fff) calc(42% * var(--ivlyrics-effect-strength)), transparent),
-      0 0 0.76em color-mix(in srgb, var(--lyrics-color-active, #fff) calc(20% * var(--ivlyrics-effect-strength)), transparent);
+      0 0 0.12em rgb(255 255 255 / calc(0.3 * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0))),
+      0 0 0.48em color-mix(in srgb, var(--lyrics-color-active, #fff) calc(42% * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0)), transparent),
+      0 0 0.76em color-mix(in srgb, var(--lyrics-color-active, #fff) calc(20% * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0)), transparent);
   }
   50% {
     filter: brightness(calc(1 + (0.03 * var(--ivlyrics-effect-strength))));
     text-shadow:
       var(--lyrics-current-original-outline-shadow, 0 0 0 transparent),
-      0 0 0.1em rgb(255 255 255 / calc(0.24 * var(--ivlyrics-effect-strength))),
-      0 0 0.4em color-mix(in srgb, var(--lyrics-color-active, #fff) calc(36% * var(--ivlyrics-effect-strength)), transparent),
-      0 0 0.68em color-mix(in srgb, var(--lyrics-color-active, #fff) calc(16% * var(--ivlyrics-effect-strength)), transparent);
+      0 0 0.1em rgb(255 255 255 / calc(0.24 * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0))),
+      0 0 0.4em color-mix(in srgb, var(--lyrics-color-active, #fff) calc(36% * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0)), transparent),
+      0 0 0.68em color-mix(in srgb, var(--lyrics-color-active, #fff) calc(16% * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0)), transparent);
   }
 }
 
@@ -2457,15 +2507,15 @@ div.lyrics-tabBar-headerItemLink {
     translate: calc(-0.035em * var(--ivlyrics-effect-strength)) calc(0.01em * var(--ivlyrics-effect-strength));
     text-shadow:
       var(--lyrics-current-original-outline-shadow, 0 0 0 transparent),
-      0.045em 0 rgb(111 211 255 / calc(0.34 * var(--ivlyrics-effect-strength))),
-      -0.045em 0 rgb(255 116 172 / calc(0.3 * var(--ivlyrics-effect-strength)));
+      0.045em 0 rgb(111 211 255 / calc(0.34 * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0))),
+      -0.045em 0 rgb(255 116 172 / calc(0.3 * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0)));
   }
   18% {
     translate: calc(0.03em * var(--ivlyrics-effect-strength)) calc(-0.01em * var(--ivlyrics-effect-strength));
     text-shadow:
       var(--lyrics-current-original-outline-shadow, 0 0 0 transparent),
-      -0.04em 0 rgb(111 211 255 / calc(0.26 * var(--ivlyrics-effect-strength))),
-      0.04em 0 rgb(255 116 172 / calc(0.28 * var(--ivlyrics-effect-strength)));
+      -0.04em 0 rgb(111 211 255 / calc(0.26 * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0))),
+      0.04em 0 rgb(255 116 172 / calc(0.28 * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0)));
   }
   20%, 64% {
     translate: 0 0;
@@ -2475,8 +2525,8 @@ div.lyrics-tabBar-headerItemLink {
     translate: calc(0.025em * var(--ivlyrics-effect-strength)) 0;
     text-shadow:
       var(--lyrics-current-original-outline-shadow, 0 0 0 transparent),
-      0.035em 0 rgb(111 211 255 / calc(0.24 * var(--ivlyrics-effect-strength))),
-      -0.035em 0 rgb(255 116 172 / calc(0.24 * var(--ivlyrics-effect-strength)));
+      0.035em 0 rgb(111 211 255 / calc(0.24 * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0))),
+      -0.035em 0 rgb(255 116 172 / calc(0.24 * var(--ivlyrics-effect-strength) * var(--lyrics-shadow-enabled, 0)));
   }
   68% {
     translate: 0 0;
@@ -2749,12 +2799,13 @@ div.lyrics-tabBar-headerItemLink {
   vertical-align: baseline;
   overflow: visible;
   overflow-wrap: anywhere;
-  contain: style layout;
 }
 
+/* Keep idle glyphs and words in 2D. A zero-depth translate3d promotes thousands
+   of offscreen glyphs; bounce distance, scale and transition timing stay the same. */
 .lyrics-karaoke-word.is-word-timed {
   transform-origin: center bottom;
-  transform: translate3d(0, var(--karaoke-bounce-y, 0), 0) scale(var(--karaoke-bounce-scale, 1));
+  transform: translateY(var(--karaoke-bounce-y, 0)) scale(var(--karaoke-bounce-scale, 1));
   transition: transform 75ms linear;
 }
 
@@ -2762,8 +2813,14 @@ div.lyrics-tabBar-headerItemLink {
   will-change: transform;
 }
 
+/* The word wrapper owns motion in word mode; inherited motion variables must
+   not apply the same transform a second time to its individual glyphs. */
+.lyrics-karaoke-word.is-word-timed .lyrics-karaoke-char {
+  transform: none;
+}
+
 .lyrics-karaoke-text-run-segment {
-  --iv-karaoke-completed-color: var(--lyrics-color-active);
+  --iv-karaoke-completed-color: color-mix(in srgb, var(--lyrics-color-inactive) var(--iv-karaoke-past-color-share, 0%), var(--lyrics-color-active));
   display: inline-block;
   max-width: 100%;
   white-space: pre-wrap;
@@ -2778,13 +2835,10 @@ div.lyrics-tabBar-headerItemLink {
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
   transform-origin: center bottom;
-  transform: translate3d(0, var(--karaoke-bounce-y, 0), 0) scale(var(--karaoke-bounce-scale, 1));
+  transform: translateY(var(--karaoke-bounce-y, 0)) scale(var(--karaoke-bounce-scale, 1));
   transition:
     transform 75ms linear,
     --iv-karaoke-completed-color 520ms cubic-bezier(0.16, 1, 0.3, 1);
-  /* 내부 스타일/레이아웃 변경이 외부 형제·부모 레이아웃에 영향 주지 않음을 브라우저에 명시.
-     inline-block 재계산 범위를 세그먼트 단위로 격리하여 reflow 비용을 대폭 줄입니다. */
-  contain: style layout;
 }
 
 .lyrics-karaoke-text-run-segment.is-word-timed {
@@ -2793,15 +2847,6 @@ div.lyrics-tabBar-headerItemLink {
 
 .lyrics-karaoke-text-run-segment.is-bouncing {
   will-change: transform;
-}
-
-/* pending 상태에서는 bounce가 없으므로 transform을 제거하여 레이어 생성 방지.
-   브라우저가 불필요한 합성 레이어를 만들지 않아 메모리와 GPU 비용이 줄어듭니다. */
-.lyrics-karaoke-text-run-segment--pending:not(.is-bouncing),
-.lyrics-karaoke-text-run-segment--done:not(.is-bouncing),
-.lyrics-karaoke-char--pending:not(.is-bouncing),
-.lyrics-karaoke-char--done:not(.is-bouncing) {
-  transform: none;
 }
 
 /* Semi-transparent glyph colors are composited once per shaped glyph. In
@@ -2842,7 +2887,7 @@ div.lyrics-tabBar-headerItemLink {
 }
 
 .lyrics-karaoke-char {
-  --iv-karaoke-completed-color: var(--lyrics-color-active);
+  --iv-karaoke-completed-color: color-mix(in srgb, var(--lyrics-color-inactive) var(--iv-karaoke-past-color-share, 0%), var(--lyrics-color-active));
   display: inline-block;
   white-space: pre-wrap;
   padding-inline: var(--karaoke-glyph-bleed-x, 0.16em);
@@ -2855,11 +2900,10 @@ div.lyrics-tabBar-headerItemLink {
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
   transform-origin: center bottom;
-  transform: translate3d(0, var(--karaoke-bounce-y, 0), 0) scale(var(--karaoke-bounce-scale, 1));
+  transform: translateY(var(--karaoke-bounce-y, 0)) scale(var(--karaoke-bounce-scale, 1));
   transition:
     transform 75ms linear,
     --iv-karaoke-completed-color 520ms cubic-bezier(0.16, 1, 0.3, 1);
-  contain: style layout;
 }
 
 /* As with text runs, the wrapper stays transparent and the nested glyph-fill
@@ -2903,9 +2947,11 @@ div.lyrics-tabBar-headerItemLink {
 }
 
 .lyrics-lyricsContainer-SyncedLyricsPage.is-karaoke
-  .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active):has(.lyrics-karaoke-line.is-complete)
-  :is(.lyrics-karaoke-char, .lyrics-karaoke-text-run-segment, .lyrics-karaoke-glyph-fill) {
-  --iv-karaoke-completed-color: var(--lyrics-color-inactive);
+  .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active):has(.lyrics-karaoke-line.is-complete) {
+  /* Keep :has invalidation on the row, rather than adding all glyphs to the
+     document's relational-selector invalidation set. Resolve the endpoint on
+     each glyph so nested vocal rows retain their own speaker colors. */
+  --iv-karaoke-past-color-share: 100%;
 }
 
 .lyrics-lyricsContainer-LyricsContainer.highlight-mode-enabled
@@ -4507,9 +4553,7 @@ body:has(#lyrics-fullscreen-container) [data-tippy-root] {
 .lyrics-lyricsContainer-LyricsLine,
 /* Lyrics sub-lines base style (backwards compatibility) */
 .lyrics-lyricsContainer-LyricsLine-sub {
-  text-shadow: var(--lyrics-text-shadow,
-      0 2px 6px rgba(0, 0, 0, 0.55),
-      0 0 14px rgba(0, 0, 0, 0.45));
+  text-shadow: var(--lyrics-text-shadow, 0 0 0 transparent);
   -webkit-text-stroke: 0px rgba(0, 0, 0, 0.35);
   font-family: "Pretendard Variable", Pretendard, -apple-system,
     BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI",
@@ -4532,9 +4576,7 @@ body:has(#lyrics-fullscreen-container) [data-tippy-root] {
   margin-top: var(--lyrics-phonetic-spacing, 4px);
   opacity: var(--lyrics-phonetic-opacity, 0.7);
   line-height: calc(var(--lyrics-phonetic-font-size, calc(var(--lyrics-font-size) * 0.6)) * 1.3);
-  text-shadow: var(--lyrics-text-shadow,
-      0 2px 6px rgba(0, 0, 0, 0.55),
-      0 0 14px rgba(0, 0, 0, 0.45));
+  text-shadow: var(--lyrics-text-shadow, 0 0 0 transparent);
   -webkit-text-stroke: 0px rgba(0, 0, 0, 0.35);
   font-family: "Pretendard Variable", Pretendard, -apple-system,
     BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI",
@@ -4551,9 +4593,7 @@ body:has(#lyrics-fullscreen-container) [data-tippy-root] {
   margin-top: var(--lyrics-translation-spacing, 8px);
   opacity: var(--lyrics-translation-opacity, 0.6);
   line-height: calc(var(--lyrics-translation-font-size, calc(var(--lyrics-font-size) * 0.7)) * 1.4);
-  text-shadow: var(--lyrics-text-shadow,
-      0 2px 6px rgba(0, 0, 0, 0.55),
-      0 0 14px rgba(0, 0, 0, 0.45));
+  text-shadow: var(--lyrics-text-shadow, 0 0 0 transparent);
   -webkit-text-stroke: 0px rgba(0, 0, 0, 0.35);
   font-family: "Pretendard Variable", Pretendard, -apple-system,
     BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI",
@@ -4597,9 +4637,7 @@ body:has(#lyrics-fullscreen-container) [data-tippy-root] {
   overflow-wrap: anywhere;
   white-space: normal;
   text-align: var(--lyrics-align-text, center);
-  text-shadow: var(--lyrics-text-shadow,
-      0 2px 6px rgba(0, 0, 0, 0.55),
-      0 0 14px rgba(0, 0, 0, 0.45));
+  text-shadow: var(--lyrics-text-shadow, 0 0 0 transparent);
   transition:
     transform var(--iv-motion-duration-slow) var(--iv-motion-ease-emphasis),
     opacity var(--iv-motion-duration-medium) var(--iv-motion-ease-standard);
@@ -4608,7 +4646,7 @@ body:has(#lyrics-fullscreen-container) [data-tippy-root] {
 .lyrics-lyricsContainer-LyricsLine-active .lyrics-lyricsContainer-LyricsLine-culturalNote {
   color: var(--lyrics-color-active);
   opacity: var(--lyrics-cultural-note-opacity, 0.6);
-  transform: none;
+  transform: translateY(-2px);
 }
 
 /* Legacy support: .lyrics-lyricsContainer-LyricsLine-sub uses translation style */
@@ -4623,7 +4661,7 @@ body:has(#lyrics-fullscreen-container) [data-tippy-root] {
 }
 
 .lyrics-lyricsContainer-LyricsLine-active {
-  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.7), 0 0 18px rgba(0, 0, 0, 0.65);
+  text-shadow: var(--lyrics-text-shadow, 0 0 0 transparent);
   -webkit-text-stroke: 0px rgba(0, 0, 0, 0.45);
 }
 
@@ -4937,7 +4975,7 @@ ruby rt {
 /* Active line furigana styling */
 .lyrics-lyricsContainer-LyricsLine-active ruby rt {
   opacity: 0.9;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  text-shadow: var(--lyrics-text-shadow, 0 0 0 transparent);
 }
 
 
@@ -5444,7 +5482,7 @@ ruby rt {
   height: 100vh;
   /* Reserve space for ticker */
   width: 100%;
-  padding: 0 var(--lyrics-fullscreen-right-padding, 40px) 0 40px;
+  padding: 0 40px;
   box-sizing: border-box;
   display: grid;
   grid-template-rows: 1fr 30px;
@@ -5465,7 +5503,7 @@ ruby rt {
   height: 100vh;
   /* Reserve space for ticker */
   width: 100%;
-  padding: 60px var(--lyrics-fullscreen-right-padding, 40px) 60px 40px;
+  padding: 60px 40px;
   box-sizing: border-box;
   display: block;
   overflow-y: auto;
@@ -5506,15 +5544,6 @@ ruby rt {
   height: 20px;
 }
 
-/* Reversed layout: Left padding instead of right */
-.lyrics-lyricsContainer-LyricsContainer.fullscreen-active.layout-reversed .lyrics-lyricsContainer-SyncedLyricsPage {
-  padding: 0 40px 0 var(--lyrics-fullscreen-right-padding, 40px);
-}
-
-.lyrics-lyricsContainer-LyricsContainer.fullscreen-active.layout-reversed .lyrics-lyricsContainer-UnsyncedLyricsPage {
-  padding: 60px 40px 60px var(--lyrics-fullscreen-right-padding, 40px);
-}
-
 /* Adjust lyrics text size and alignment in fullscreen */
 .lyrics-lyricsContainer-LyricsContainer.fullscreen-active .lyrics-lyricsContainer-LyricsLine {
   text-align: var(--lyrics-align-text);
@@ -5532,7 +5561,7 @@ ruby rt {
 .lyrics-lyricsContainer-LyricsContainer.fullscreen-active .lyrics-lyricsContainer-SyncedLyricsPage.scrolling-active {
   overflow-y: auto !important;
   overflow-x: hidden;
-  padding: 0 var(--lyrics-fullscreen-right-padding, 40px) 0 40px;
+  padding: 0 40px;
   margin: 0;
   width: 100%;
   max-width: none;
@@ -5540,14 +5569,29 @@ ruby rt {
   box-sizing: border-box;
 }
 
-/* Reversed layout: Scrolling mode left padding */
-.lyrics-lyricsContainer-LyricsContainer.fullscreen-active.layout-reversed .lyrics-lyricsContainer-SyncedLyricsPage.scrolling-active {
-  padding: 0 40px 0 var(--lyrics-fullscreen-right-padding, 40px);
-}
-
 .lyrics-lyricsContainer-LyricsContainer.fullscreen-active .lyrics-lyricsContainer-SyncedLyricsPage.scrolling-active .lyrics-lyricsContainer-SyncedScrollView {
   width: 100%;
   padding: 50vh 0 50vh;
+}
+
+/* Give standard fullscreen lyrics equal breathing room on both sides. */
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-active:not(:is(.tv-mode-active, .portrait-mode, .fullscreen-single-column, .fullscreen-focus-active, .fullscreen-no-lyrics, .marketplace-active)) > :is(.lyrics-lyricsContainer-SyncedLyricsPage, .lyrics-lyricsContainer-UnsyncedLyricsPage) {
+  padding-inline: 64px;
+}
+
+/* Center within the visible space beside the album, rather than the grid's
+   second half. Absolute positioning keeps lyric width out of album sizing. */
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-active[data-album-centered-lyrics="true"]:not(:is(.tv-mode-active, .portrait-mode, .fullscreen-single-column, .fullscreen-focus-active, .fullscreen-no-lyrics, .marketplace-active)) > :is(.lyrics-lyricsContainer-SyncedLyricsPage, .lyrics-lyricsContainer-UnsyncedLyricsPage) {
+  position: absolute;
+  top: 0;
+  left: var(--lyrics-fullscreen-region-left, 50%);
+  right: var(--lyrics-fullscreen-region-right, 0px);
+  /* Also override the fullscreen scrolling page's ID-scoped width cap. */
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0;
+  margin: 0 !important;
+  scrollbar-gutter: stable both-edges;
 }
 
 .lyrics-lyricsContainer-LyricsContainer.fullscreen-active.fullscreen-page-ui {
@@ -9438,9 +9482,7 @@ html.is-lp-view-transition .ivlyrics-fullscreen-shared-album {
       transparent);
   font-family: var(--iv-video-stage-original-font-family,
       var(--iv-vinyl-original-font-family, 'Pretendard Variable')), Pretendard, sans-serif !important;
-  text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.62),
-    0 2px 5px rgba(0, 0, 0, 0.2) !important;
+  text-shadow: var(--lyrics-text-shadow, 0 0 0 transparent) !important;
 }
 
 .fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-phonetic,
@@ -9456,8 +9498,7 @@ html.is-lp-view-transition .ivlyrics-fullscreen-shared-album {
       var(--iv-video-stage-lyric-background-color, #000000)
       var(--iv-video-stage-lyric-background-opacity, 46%),
       transparent);
-  text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.52) !important;
+  text-shadow: var(--lyrics-text-shadow, 0 0 0 transparent) !important;
 }
 
 .fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-culturalNote {
@@ -9472,8 +9513,7 @@ html.is-lp-view-transition .ivlyrics-fullscreen-shared-album {
       transparent);
   font-family: var(--iv-video-stage-cultural-font-family,
       var(--iv-vinyl-cultural-note-font-family, 'Pretendard Variable')), Pretendard, sans-serif !important;
-  text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.52) !important;
+  text-shadow: var(--lyrics-text-shadow, 0 0 0 transparent) !important;
 }
 
 .fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-phonetic {
@@ -9506,9 +9546,7 @@ html.is-lp-view-transition .ivlyrics-fullscreen-shared-album {
 }
 
 .fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-karaoke-line {
-  filter:
-    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.62))
-    drop-shadow(0 2px 5px rgba(0, 0, 0, 0.2));
+  filter: var(--lyrics-text-drop-shadow, none);
 }
 
 
@@ -10900,6 +10938,8 @@ html.is-lp-view-transition .ivlyrics-fullscreen-shared-album {
 .lyrics-lyricsContainer-LyricsContainer.fullscreen-active.tv-mode-active .lyrics-lyricsContainer-SyncedLyricsPage,
 .lyrics-lyricsContainer-LyricsContainer.fullscreen-active.tv-mode-active .lyrics-lyricsContainer-UnsyncedLyricsPage {
   grid-column: 1 !important;
+  /* Keep the full-width TV lyrics centered with symmetric side padding. */
+  padding-inline: 40px;
   padding-bottom: 200px;
 }
 
@@ -11246,18 +11286,6 @@ html.is-lp-view-transition .ivlyrics-fullscreen-shared-album {
   font-weight: 850;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-.ivlyrics-sync-creator-shell .sync-creator-range-style-tape {
-  letter-spacing: 0 !important;
-  word-spacing: 0 !important;
-}
-
-.ivlyrics-sync-creator-shell .sync-creator-range-style-char {
-  letter-spacing: 0 !important;
-  line-height: inherit;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
 }
 
 .ivlyrics-sync-creator-shell .sync-creator-range-effect-picker .sync-creator-effect-strip {
@@ -13154,17 +13182,13 @@ html.is-lp-view-transition .ivlyrics-fullscreen-shared-album {
 }
 
 .lyrics-lyricsContainer-LyricsLine-active {
-  text-shadow:
-    var(--lyrics-original-outline-shadow, 0 0 0 transparent),
-    0 3px 10px rgba(0, 0, 0, 0.7),
-    0 0 18px rgba(0, 0, 0, 0.65);
+  text-shadow: var(--lyrics-original-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
 }
 
 .lyrics-lyricsContainer-LyricsLine-active > p:first-child {
-  text-shadow:
-    var(--lyrics-original-outline-shadow, 0 0 0 transparent),
-    0 3px 10px rgba(0, 0, 0, 0.7),
-    0 0 18px rgba(0, 0, 0, 0.65);
+  text-shadow: var(--lyrics-original-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
 }
 
 /* The depth blur is applied to the whole inactive line. Re-blurring dozens of
@@ -13229,7 +13253,7 @@ html.is-lp-view-transition .ivlyrics-fullscreen-shared-album {
 .lyrics-karaoke-text-run-segment::before {
   content: attr(data-outline-text) / "";
   position: absolute;
-  inset-block: calc(var(--karaoke-glyph-bleed-y, 0.22em) * -1);
+  inset-block: 0;
   inset-inline: var(--karaoke-glyph-bleed-x, 0.16em);
   z-index: -1;
   color: transparent;
@@ -13241,8 +13265,26 @@ html.is-lp-view-transition .ivlyrics-fullscreen-shared-album {
   pointer-events: none;
 }
 
+/* A small, fixed-radius glow is painted only for currently moving glyphs when
+   text shadows are enabled. Animate opacity without changing glyph geometry. */
+.lyrics-karaoke-char.is-bouncing::after,
+.lyrics-karaoke-text-run-segment.is-bouncing::after,
+.lyrics-karaoke-word.is-word-timed.is-bouncing .lyrics-karaoke-char::after {
+  content: attr(data-outline-text) / "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline: var(--karaoke-glyph-bleed-x, 0.16em);
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: 0 transparent;
+  text-shadow: 0 0 0.16em var(--lyrics-color-active);
+  opacity: calc(var(--karaoke-motion-glow, 0) * var(--lyrics-shadow-enabled, 0));
+  transition: opacity 75ms linear;
+  pointer-events: none;
+}
+
 .lyrics-karaoke-glyph-fill {
-  --iv-karaoke-completed-color: var(--lyrics-color-active);
+  --iv-karaoke-completed-color: color-mix(in srgb, var(--lyrics-color-inactive) var(--iv-karaoke-past-color-share, 0%), var(--lyrics-color-active));
   display: inline-block;
   position: relative;
   /* Expand only the paint box for slanted glyph overhang. Equal negative
@@ -13250,11 +13292,6 @@ html.is-lp-view-transition .ivlyrics-fullscreen-shared-album {
      positions, word spacing and wrapping stay exactly unchanged. */
   padding-inline: var(--karaoke-glyph-bleed-x, 0.16em);
   margin-inline: calc(var(--karaoke-glyph-bleed-x, 0.16em) * -1);
-  /* Bounce/float transforms and tall combining marks can paint outside the
-     font's normal inline box. Expand and cancel only the paint box so the top
-     and bottom of a glyph are not clipped without changing line geometry. */
-  padding-block: var(--karaoke-glyph-bleed-y, 0.22em);
-  margin-block: calc(var(--karaoke-glyph-bleed-y, 0.22em) * -1);
   overflow: visible;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
@@ -13313,9 +13350,8 @@ html.is-lp-view-transition .ivlyrics-fullscreen-shared-album {
 }
 
 .lyrics-lyricsContainer-LyricsLine-active ruby rt {
-  text-shadow:
-    var(--lyrics-furigana-outline-shadow, 0 0 0 transparent),
-    0 1px 4px rgba(0, 0, 0, 0.5);
+  text-shadow: var(--lyrics-furigana-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
 }
 
 .lyrics-break-label {
@@ -13327,9 +13363,8 @@ html.is-lp-view-transition .ivlyrics-fullscreen-shared-album {
   --lyrics-current-original-outline-shadow: var(--iv-vinyl-original-outline-shadow, 0 0 0 transparent);
   --lyrics-current-original-outline-stroke-width: var(--iv-vinyl-original-outline-stroke-width, 0px);
   --lyrics-current-original-outline-stroke-color: var(--iv-vinyl-original-outline-stroke-color, #000000);
-  text-shadow:
-    var(--iv-vinyl-original-outline-shadow, 0 0 0 transparent),
-    0 2px 18px rgba(0, 0, 0, 0.62);
+  text-shadow: var(--iv-vinyl-original-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
 }
 
 .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine .lyrics-karaoke-line {
@@ -13337,46 +13372,38 @@ html.is-lp-view-transition .ivlyrics-fullscreen-shared-album {
 }
 
 .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-phonetic {
-  text-shadow:
-    var(--iv-vinyl-phonetic-outline-shadow, 0 0 0 transparent),
-    0 2px 18px rgba(0, 0, 0, 0.62);
+  text-shadow: var(--iv-vinyl-phonetic-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
 }
 
 .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-translation {
-  text-shadow:
-    var(--iv-vinyl-translation-outline-shadow, 0 0 0 transparent),
-    0 2px 18px rgba(0, 0, 0, 0.62);
+  text-shadow: var(--iv-vinyl-translation-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
 }
 
 .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-culturalNote {
-  text-shadow:
-    var(--iv-vinyl-cultural-note-outline-shadow, 0 0 0 transparent),
-    0 2px 18px rgba(0, 0, 0, 0.62);
+  text-shadow: var(--iv-vinyl-cultural-note-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent);
 }
 
 .fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine > p {
-  text-shadow:
-    var(--iv-vinyl-original-outline-shadow, 0 0 0 transparent),
-    0 1px 2px rgba(0, 0, 0, 0.62),
-    0 2px 5px rgba(0, 0, 0, 0.2) !important;
+  text-shadow: var(--iv-vinyl-original-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent) !important;
 }
 
 .fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-phonetic {
-  text-shadow:
-    var(--iv-vinyl-phonetic-outline-shadow, 0 0 0 transparent),
-    0 1px 2px rgba(0, 0, 0, 0.52) !important;
+  text-shadow: var(--iv-vinyl-phonetic-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent) !important;
 }
 
 .fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-translation {
-  text-shadow:
-    var(--iv-vinyl-translation-outline-shadow, 0 0 0 transparent),
-    0 1px 2px rgba(0, 0, 0, 0.52) !important;
+  text-shadow: var(--iv-vinyl-translation-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent) !important;
 }
 
 .fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine-culturalNote {
-  text-shadow:
-    var(--iv-vinyl-cultural-note-outline-shadow, 0 0 0 transparent),
-    0 1px 2px rgba(0, 0, 0, 0.52) !important;
+  text-shadow: var(--iv-vinyl-cultural-note-outline-shadow, 0 0 0 transparent),
+    var(--lyrics-text-shadow, 0 0 0 transparent) !important;
 }
 
 .fullscreen-vinyl-overlay.is-presentation-video .fullscreen-vinyl-active-lyric .lyrics-lyricsContainer-LyricsLine > p:has(.lyrics-karaoke-line),

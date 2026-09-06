@@ -19,6 +19,9 @@ A personal fork of [ivLis-Studio/ivLyrics](https://github.com/ivLis-Studio/ivLyr
 
 ## 1. 원본과 달라진 점 / Differences from upstream
 
+원본 6.6.10(2026-09-06)까지의 변경을 반영하고 있습니다.\
+Tracks upstream through 6.6.10 (2026-09-06).
+
 ### 제거한 기능 / Removed
 
 - 공지 시스템, 마켓플레이스, 초기 설정 마법사\

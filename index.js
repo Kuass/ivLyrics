@@ -1466,381 +1466,128 @@ const TrackSyncDB = {
 // TrackSyncDB를 window에 등록 (LyricsService와 다른 컴포넌트에서 사용 가능)
 window.TrackSyncDB = TrackSyncDB;
 
-// IndexedDB for track language overrides (곡별 언어 오버라이드)
-const LANG_DB_NAME = "ivLyrics-lang-db";
-const LANG_DB_VERSION = 1;
-const LANG_STORE_NAME = "track-language-overrides";
-
-let langDbInstance = null;
-
-const initLangDB = () => {
-  return new Promise((resolve, reject) => {
-    if (langDbInstance) {
-      resolve(langDbInstance);
+// Track overrides share storage mechanics; sync offsets retain their separate
+// transaction-completion and import guarantees above.
+const createTrackOverrideDB = ({ dbName, storeName, label, setting, methods, normalize }) => {
+  let dbInstance = null;
+  const [getName, setName, clearName] = methods;
+  const open = () => new Promise((resolve, reject) => {
+    if (dbInstance) {
+      resolve(dbInstance);
       return;
     }
-
-    const request = indexedDB.open(LANG_DB_NAME, LANG_DB_VERSION);
-
+    const request = indexedDB.open(dbName, 1);
     request.onerror = () => {
-      console.error("[ivLyrics] Language IndexedDB error:", request.error);
+      console.error(`[ivLyrics] ${label} IndexedDB error:`, request.error);
       reject(request.error);
     };
-
     request.onsuccess = () => {
-      langDbInstance = request.result;
-      ivLyricsDebug("[ivLyrics] Language IndexedDB initialized");
-      resolve(langDbInstance);
+      dbInstance = request.result;
+      ivLyricsDebug(`[ivLyrics] ${label} IndexedDB initialized`);
+      resolve(dbInstance);
     };
-
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
-      if (!db.objectStoreNames.contains(LANG_STORE_NAME)) {
-        db.createObjectStore(LANG_STORE_NAME);
-        ivLyricsDebug("[ivLyrics] Language IndexedDB object store created");
+      if (!db.objectStoreNames.contains(storeName)) {
+        db.createObjectStore(storeName);
+        ivLyricsDebug(`[ivLyrics] ${label} IndexedDB object store created`);
       }
     };
   });
+  const requestValue = (db, operation, args, result = () => undefined) => new Promise((resolve, reject) => {
+    const transaction = db.transaction([storeName], operation === "get" ? "readonly" : "readwrite");
+    const request = transaction.objectStore(storeName)[operation](...args);
+    request.onsuccess = () => resolve(result(request.result));
+    request.onerror = () => reject(request.error);
+  });
+  const getAll = (db) => new Promise((resolve, reject) => {
+    const store = db.transaction([storeName], "readonly").objectStore(storeName);
+    const request = store.getAllKeys();
+    request.onsuccess = () => {
+      const keys = request.result;
+      const valuesRequest = store.getAll();
+      valuesRequest.onsuccess = () => {
+        const result = {};
+        keys.forEach((key, index) => {
+          const value = normalize ? normalize(valuesRequest.result[index]) : valuesRequest.result[index];
+          if (!normalize || value) result[key] = value;
+        });
+        resolve(result);
+      };
+      valuesRequest.onerror = () => reject(valuesRequest.error);
+    };
+    request.onerror = () => reject(request.error);
+  });
+
+  return {
+    async [getName](trackUri) {
+      try {
+        const db = await open();
+        // Preserve the existing API boundary: open failures use fallback values;
+        // request failures reject, and writes settle on request success.
+        return requestValue(db, "get", [trackUri], normalize || ((value) => value || null));
+      } catch (error) {
+        console.error(`[ivLyrics] Failed to get ${setting} override:`, error);
+        return null;
+      }
+    },
+    async [setName](trackUri, value) {
+      try {
+        const storedValue = normalize ? normalize(value) : value;
+        if (normalize && !storedValue) {
+          await this[clearName](trackUri);
+          return;
+        }
+        const db = await open();
+        return requestValue(db, "put", [storedValue, trackUri]);
+      } catch (error) {
+        console.error(`[ivLyrics] Failed to set ${setting} override:`, error);
+      }
+    },
+    async [clearName](trackUri) {
+      try {
+        const db = await open();
+        return requestValue(db, "delete", [trackUri]);
+      } catch (error) {
+        console.error(`[ivLyrics] Failed to clear ${setting} override:`, error);
+      }
+    },
+    async getAllOverrides() {
+      try {
+        const db = await open();
+        return getAll(db);
+      } catch (error) {
+        console.error(`[ivLyrics] Failed to get all ${setting} overrides:`, error);
+        return {};
+      }
+    },
+  };
 };
 
-const TrackLanguageDB = {
-  async getLanguage(trackUri) {
-    try {
-      const db = await initLangDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([LANG_STORE_NAME], "readonly");
-        const store = transaction.objectStore(LANG_STORE_NAME);
-        const request = store.get(trackUri);
-
-        request.onsuccess = () => resolve(request.result || null);
-        request.onerror = () => reject(request.error);
-      });
-    } catch (error) {
-      console.error("[ivLyrics] Failed to get language override:", error);
-      return null;
-    }
-  },
-
-  async setLanguage(trackUri, language) {
-    try {
-      const db = await initLangDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([LANG_STORE_NAME], "readwrite");
-        const store = transaction.objectStore(LANG_STORE_NAME);
-        const request = store.put(language, trackUri);
-
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    } catch (error) {
-      console.error("[ivLyrics] Failed to set language override:", error);
-    }
-  },
-
-  async clearLanguage(trackUri) {
-    try {
-      const db = await initLangDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([LANG_STORE_NAME], "readwrite");
-        const store = transaction.objectStore(LANG_STORE_NAME);
-        const request = store.delete(trackUri);
-
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    } catch (error) {
-      console.error("[ivLyrics] Failed to clear language override:", error);
-    }
-  },
-
-  async getAllOverrides() {
-    try {
-      const db = await initLangDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([LANG_STORE_NAME], "readonly");
-        const store = transaction.objectStore(LANG_STORE_NAME);
-        const request = store.getAllKeys();
-
-        request.onsuccess = () => {
-          const keys = request.result;
-          const getAllRequest = store.getAll();
-
-          getAllRequest.onsuccess = () => {
-            const values = getAllRequest.result;
-            const result = {};
-            keys.forEach((key, index) => {
-              result[key] = values[index];
-            });
-            resolve(result);
-          };
-
-          getAllRequest.onerror = () => reject(getAllRequest.error);
-        };
-
-        request.onerror = () => reject(request.error);
-      });
-    } catch (error) {
-      console.error("[ivLyrics] Failed to get all language overrides:", error);
-      return {};
-    }
-  },
-};
-
-// TrackLanguageDB를 window에 등록 (다른 컴포넌트에서 사용 가능)
+const TrackLanguageDB = createTrackOverrideDB({
+  dbName: "ivLyrics-lang-db",
+  storeName: "track-language-overrides",
+  label: "Language",
+  setting: "language",
+  methods: ["getLanguage", "setLanguage", "clearLanguage"],
+});
+const TrackLyricsProviderDB = createTrackOverrideDB({
+  dbName: "ivLyrics-provider-db",
+  storeName: "track-lyrics-provider-overrides",
+  label: "Provider",
+  setting: "provider",
+  methods: ["getProvider", "setProvider", "clearProvider"],
+});
+const TrackBackgroundDB = createTrackOverrideDB({
+  dbName: "ivLyrics-background-db",
+  storeName: "track-background-overrides",
+  label: "Background",
+  setting: "background",
+  methods: ["getOverride", "setOverride", "clearOverride"],
+  normalize: normalizeIvLyricsTrackBackgroundOverride,
+});
 window.TrackLanguageDB = TrackLanguageDB;
-
-// IndexedDB for track lyrics provider overrides (곡별 가사 제공자 오버라이드)
-const PROVIDER_DB_NAME = "ivLyrics-provider-db";
-const PROVIDER_DB_VERSION = 1;
-const PROVIDER_STORE_NAME = "track-lyrics-provider-overrides";
-
-let providerDbInstance = null;
-
-const initProviderDB = () => {
-  return new Promise((resolve, reject) => {
-    if (providerDbInstance) {
-      resolve(providerDbInstance);
-      return;
-    }
-
-    const request = indexedDB.open(PROVIDER_DB_NAME, PROVIDER_DB_VERSION);
-
-    request.onerror = () => {
-      console.error("[ivLyrics] Provider IndexedDB error:", request.error);
-      reject(request.error);
-    };
-
-    request.onsuccess = () => {
-      providerDbInstance = request.result;
-      ivLyricsDebug("[ivLyrics] Provider IndexedDB initialized");
-      resolve(providerDbInstance);
-    };
-
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains(PROVIDER_STORE_NAME)) {
-        db.createObjectStore(PROVIDER_STORE_NAME);
-        ivLyricsDebug("[ivLyrics] Provider IndexedDB object store created");
-      }
-    };
-  });
-};
-
-const TrackLyricsProviderDB = {
-  async getProvider(trackUri) {
-    try {
-      const db = await initProviderDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([PROVIDER_STORE_NAME], "readonly");
-        const store = transaction.objectStore(PROVIDER_STORE_NAME);
-        const request = store.get(trackUri);
-
-        request.onsuccess = () => resolve(request.result || null);
-        request.onerror = () => reject(request.error);
-      });
-    } catch (error) {
-      console.error("[ivLyrics] Failed to get provider override:", error);
-      return null;
-    }
-  },
-
-  async setProvider(trackUri, providerId) {
-    try {
-      const db = await initProviderDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([PROVIDER_STORE_NAME], "readwrite");
-        const store = transaction.objectStore(PROVIDER_STORE_NAME);
-        const request = store.put(providerId, trackUri);
-
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    } catch (error) {
-      console.error("[ivLyrics] Failed to set provider override:", error);
-    }
-  },
-
-  async clearProvider(trackUri) {
-    try {
-      const db = await initProviderDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([PROVIDER_STORE_NAME], "readwrite");
-        const store = transaction.objectStore(PROVIDER_STORE_NAME);
-        const request = store.delete(trackUri);
-
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    } catch (error) {
-      console.error("[ivLyrics] Failed to clear provider override:", error);
-    }
-  },
-
-  async getAllOverrides() {
-    try {
-      const db = await initProviderDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([PROVIDER_STORE_NAME], "readonly");
-        const store = transaction.objectStore(PROVIDER_STORE_NAME);
-        const request = store.getAllKeys();
-
-        request.onsuccess = () => {
-          const keys = request.result;
-          const getAllRequest = store.getAll();
-
-          getAllRequest.onsuccess = () => {
-            const values = getAllRequest.result;
-            const result = {};
-            keys.forEach((key, index) => {
-              result[key] = values[index];
-            });
-            resolve(result);
-          };
-
-          getAllRequest.onerror = () => reject(getAllRequest.error);
-        };
-
-        request.onerror = () => reject(request.error);
-      });
-    } catch (error) {
-      console.error("[ivLyrics] Failed to get all provider overrides:", error);
-      return {};
-    }
-  },
-};
-
 window.TrackLyricsProviderDB = TrackLyricsProviderDB;
-
-// IndexedDB for track background overrides (곡별 배경 오버라이드)
-const BACKGROUND_DB_NAME = "ivLyrics-background-db";
-const BACKGROUND_DB_VERSION = 1;
-const BACKGROUND_STORE_NAME = "track-background-overrides";
-
-let backgroundDbInstance = null;
-
-const initBackgroundDB = () => {
-  return new Promise((resolve, reject) => {
-    if (backgroundDbInstance) {
-      resolve(backgroundDbInstance);
-      return;
-    }
-
-    const request = indexedDB.open(BACKGROUND_DB_NAME, BACKGROUND_DB_VERSION);
-
-    request.onerror = () => {
-      console.error("[ivLyrics] Background IndexedDB error:", request.error);
-      reject(request.error);
-    };
-
-    request.onsuccess = () => {
-      backgroundDbInstance = request.result;
-      ivLyricsDebug("[ivLyrics] Background IndexedDB initialized");
-      resolve(backgroundDbInstance);
-    };
-
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains(BACKGROUND_STORE_NAME)) {
-        db.createObjectStore(BACKGROUND_STORE_NAME);
-        ivLyricsDebug("[ivLyrics] Background IndexedDB object store created");
-      }
-    };
-  });
-};
-
-const TrackBackgroundDB = {
-  async getOverride(trackUri) {
-    try {
-      const db = await initBackgroundDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([BACKGROUND_STORE_NAME], "readonly");
-        const store = transaction.objectStore(BACKGROUND_STORE_NAME);
-        const request = store.get(trackUri);
-
-        request.onsuccess = () =>
-          resolve(normalizeIvLyricsTrackBackgroundOverride(request.result));
-        request.onerror = () => reject(request.error);
-      });
-    } catch (error) {
-      console.error("[ivLyrics] Failed to get background override:", error);
-      return null;
-    }
-  },
-
-  async setOverride(trackUri, override) {
-    try {
-      const normalizedOverride = normalizeIvLyricsTrackBackgroundOverride(override);
-      if (!normalizedOverride) {
-        await this.clearOverride(trackUri);
-        return;
-      }
-
-      const db = await initBackgroundDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([BACKGROUND_STORE_NAME], "readwrite");
-        const store = transaction.objectStore(BACKGROUND_STORE_NAME);
-        const request = store.put(normalizedOverride, trackUri);
-
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    } catch (error) {
-      console.error("[ivLyrics] Failed to set background override:", error);
-    }
-  },
-
-  async clearOverride(trackUri) {
-    try {
-      const db = await initBackgroundDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([BACKGROUND_STORE_NAME], "readwrite");
-        const store = transaction.objectStore(BACKGROUND_STORE_NAME);
-        const request = store.delete(trackUri);
-
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    } catch (error) {
-      console.error("[ivLyrics] Failed to clear background override:", error);
-    }
-  },
-
-  async getAllOverrides() {
-    try {
-      const db = await initBackgroundDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([BACKGROUND_STORE_NAME], "readonly");
-        const store = transaction.objectStore(BACKGROUND_STORE_NAME);
-        const request = store.getAllKeys();
-
-        request.onsuccess = () => {
-          const keys = request.result;
-          const getAllRequest = store.getAll();
-
-          getAllRequest.onsuccess = () => {
-            const values = getAllRequest.result;
-            const result = {};
-            keys.forEach((key, index) => {
-              const override = normalizeIvLyricsTrackBackgroundOverride(values[index]);
-              if (override) {
-                result[key] = override;
-              }
-            });
-            resolve(result);
-          };
-
-          getAllRequest.onerror = () => reject(getAllRequest.error);
-        };
-
-        request.onerror = () => reject(request.error);
-      });
-    } catch (error) {
-      console.error("[ivLyrics] Failed to get all background overrides:", error);
-      return {};
-    }
-  },
-};
-
 window.TrackBackgroundDB = TrackBackgroundDB;
 
 // Migrate from localStorage to IndexedDB
@@ -2772,7 +2519,7 @@ const CONFIG = {
       ) || "auto",
     "translate:display-mode":
       StorageManager.getItem("ivLyrics:visual:translate:display-mode") ||
-      "replace",
+      "below",
     "translate:target-language":
       StorageManager.getItem("ivLyrics:visual:translate:target-language") ||
       "auto",
@@ -3063,9 +2810,6 @@ const CONFIG = {
       StorageManager.getItem("ivLyrics:visual:fullscreen-artist-outline-width") || "0",
     "fullscreen-artist-outline-color":
       StorageManager.getItem("ivLyrics:visual:fullscreen-artist-outline-color") || "#000000",
-    "fullscreen-lyrics-right-padding":
-      Number(StorageManager.getItem("ivLyrics:visual:fullscreen-lyrics-right-padding")) ||
-      0,
     // 전체 화면 가사 배치: 지나간 줄 수, 줄 사이 추가 간격(px), 현재 줄에서 멀어질 때마다 줄어드는 비율(%)
     "fullscreen-lines-before": readNumericSetting("ivLyrics:visual:fullscreen-lines-before", 1),
     "fullscreen-lines-after": readNumericSetting("ivLyrics:visual:fullscreen-lines-after", 1),
@@ -3332,15 +3076,10 @@ const getLyricsTextCacheHash = (lyrics = []) => {
   return `txt-${(hash >>> 0).toString(36)}-${length.toString(36)}`;
 };
 
-const hasUsableLyricsContent = (lyrics) => Array.isArray(lyrics) && lyrics.length > 0;
-const firstUsableLyricsContent = (...candidates) => (
-  candidates.find(hasUsableLyricsContent) || null
-);
-
 const getSyncDataRendererCacheVersion = (lyricsState = {}) => (
   lyricsState?.syncDataApplied
     ? `${lyricsState.syncDataRendererVersion || "legacy-sync-data-renderer"}:${getLyricsTextCacheHash(
-      firstUsableLyricsContent(lyricsState.karaoke, lyricsState.synced, lyricsState.unsynced)
+      lyricsState.karaoke || lyricsState.synced || lyricsState.unsynced
     )}`
     : "base"
 );
@@ -3357,12 +3096,11 @@ const isLyricsRenderCacheCurrent = (lyricsState = {}) => (
 const getDisplayModeCacheKey = (lyricsState = {}, mode = "") => {
   const providerKey = lyricsState.provider || "";
   const providerCacheVersion = lyricsState.cacheVersion || "provider-cache-legacy";
-  const sourceLyrics = firstUsableLyricsContent(
-    lyricsState.currentLyrics,
-    lyricsState.karaoke,
-    lyricsState.synced,
-    lyricsState.unsynced
-  ) || [];
+  const sourceLyrics = lyricsState.currentLyrics
+    || lyricsState.karaoke
+    || lyricsState.synced
+    || lyricsState.unsynced
+    || [];
   const lyricsShape = getLyricsProcessingShapeSignature(sourceLyrics);
   const pronunciationNotation = mode === "gemini_romaji"
     ? `:${getCurrentLyricsPronunciationNotation()}`
@@ -3429,7 +3167,6 @@ const CacheManager = {
       data,
       expiry: Date.now() + this._ttl,
       lastAccessed: Date.now(),
-      size: this._estimateSize(data),
     });
   },
 
@@ -3504,15 +3241,6 @@ const CacheManager = {
 
     for (let i = 0; i < toRemove; i++) {
       this._cache.delete(entries[i][0]);
-    }
-  },
-
-  _estimateSize(data) {
-    // Rough estimation of object size in bytes
-    try {
-      return JSON.stringify(data).length * 2; // 2 bytes per character (UTF-16)
-    } catch {
-      return 1000; // Default estimate
     }
   },
 
@@ -3711,7 +3439,7 @@ const Prefetcher = {
         // 1단계: 가사 먼저 프리페치
         const lyrics = await this._prefetchLyrics(trackInfo, mode);
 
-        if (!lyrics || !firstUsableLyricsContent(lyrics.karaoke, lyrics.synced, lyrics.unsynced)) {
+        if (!lyrics || (!lyrics.synced && !lyrics.unsynced && !lyrics.karaoke)) {
           ivLyricsDebug(`[Prefetcher] No lyrics found for: ${trackInfo.title}`);
         } else {
           // 2단계: 가사 로드 완료 후 번역/발음 프리페치
@@ -3796,8 +3524,8 @@ const Prefetcher = {
       return this._inflightRequests.get(versionedCacheKeyBase);
     }
 
-    const lyricsArray = firstUsableLyricsContent(lyrics.karaoke, lyrics.synced, lyrics.unsynced);
-    if (!lyricsArray) return;
+    const lyricsArray = lyrics.karaoke || lyrics.synced || lyrics.unsynced;
+    if (!lyricsArray || lyricsArray.length === 0) return;
 
     // 언어 감지
     const detectedLanguage = LyricsService.detectLanguage(lyricsArray);
@@ -5145,13 +4873,13 @@ class LyricsContainer extends react.Component {
 
   getCurrentCulturalAnnotationLyrics() {
     const currentMode = this.getCurrentMode();
-    if (isKaraokeRenderMode(currentMode) && hasUsableLyricsContent(this.state.karaoke)) {
+    if (isKaraokeRenderMode(currentMode) && Array.isArray(this.state.karaoke)) {
       return this.state.karaoke;
     }
-    if (currentMode === SYNCED && hasUsableLyricsContent(this.state.synced)) {
+    if (currentMode === SYNCED && Array.isArray(this.state.synced)) {
       return this.state.synced;
     }
-    if (currentMode === UNSYNCED && hasUsableLyricsContent(this.state.unsynced)) {
+    if (currentMode === UNSYNCED && Array.isArray(this.state.unsynced)) {
       return this.state.unsynced;
     }
     return Array.isArray(this.state.currentLyrics) ? this.state.currentLyrics : [];
@@ -5320,13 +5048,13 @@ class LyricsContainer extends react.Component {
   getEditingBaseLyrics() {
     const currentMode = this.getCurrentMode();
 
-    if (isKaraokeRenderMode(currentMode) && hasUsableLyricsContent(this.state.karaoke)) {
+    if (isKaraokeRenderMode(currentMode) && Array.isArray(this.state.karaoke)) {
       return this.state.karaoke;
     }
-    if (currentMode === SYNCED && hasUsableLyricsContent(this.state.synced)) {
+    if (currentMode === SYNCED && Array.isArray(this.state.synced)) {
       return this.state.synced;
     }
-    if (currentMode === UNSYNCED && hasUsableLyricsContent(this.state.unsynced)) {
+    if (currentMode === UNSYNCED && Array.isArray(this.state.unsynced)) {
       return this.state.unsynced;
     }
 
@@ -6356,20 +6084,15 @@ class LyricsContainer extends react.Component {
 
       // 원본 가사를 가져오기 위해 synced, karaoke, unsynced 중 현재 모드에 해당하는 것 사용
       let originalLyrics = [];
-      if (isKaraokeRenderMode(currentMode) && hasUsableLyricsContent(this.state.karaoke)) {
+      if (isKaraokeRenderMode(currentMode) && this.state.karaoke) {
         originalLyrics = this.state.karaoke;
-      } else if (currentMode === SYNCED && hasUsableLyricsContent(this.state.synced)) {
+      } else if (currentMode === SYNCED && this.state.synced) {
         originalLyrics = this.state.synced;
-      } else if (currentMode === UNSYNCED && hasUsableLyricsContent(this.state.unsynced)) {
+      } else if (currentMode === UNSYNCED && this.state.unsynced) {
         originalLyrics = this.state.unsynced;
       } else {
         // fallback: currentLyrics에서 originalText 사용
-        originalLyrics = firstUsableLyricsContent(
-          this.state.currentLyrics,
-          this.state.karaoke,
-          this.state.synced,
-          this.state.unsynced
-        ) || [];
+        originalLyrics = this.state.currentLyrics || [];
       }
 
       // Section line 제거하고 원문 텍스트만 추출 (getGeminiTranslation과 동일)
@@ -7300,12 +7023,10 @@ class LyricsContainer extends react.Component {
       // if song changed one time
       if (tempState.uri !== this.state.uri || refresh) {
         // Detect language from the new lyrics data
-        const hasLyricsContent = window.ivLyricsDataUtils?.hasLyricsContent
-          || ((lyrics) => Array.isArray(lyrics) && lyrics.length > 0);
         let defaultLanguage = null;
-        if (hasLyricsContent(tempState.synced)) {
+        if (tempState.synced) {
           defaultLanguage = Utils.detectLanguage(tempState.synced);
-        } else if (hasLyricsContent(tempState.unsynced)) {
+        } else if (tempState.unsynced) {
           defaultLanguage = Utils.detectLanguage(tempState.unsynced);
         }
 
@@ -7363,18 +7084,18 @@ class LyricsContainer extends react.Component {
     const dataMode = getLyricsDataMode(mode);
     const preferredModeKey =
       typeof dataMode === "number" && dataMode >= 0 ? CONFIG.modes?.[dataMode] : null;
-    const sharedResolver = window.ivLyricsDataUtils?.resolveLyricsForMode;
-    if (typeof sharedResolver === "function") {
-      return sharedResolver(lyricsState, preferredModeKey);
-    }
+    const preferredLyrics =
+      preferredModeKey && lyricsState[preferredModeKey]
+        ? lyricsState[preferredModeKey]
+        : null;
 
-    const hasContent = (lyrics) => Array.isArray(lyrics) && lyrics.length > 0;
-    return [
-      preferredModeKey ? lyricsState[preferredModeKey] : null,
-      lyricsState.karaoke,
-      lyricsState.synced,
-      lyricsState.unsynced,
-    ].find(hasContent) || null;
+    return (
+      preferredLyrics ||
+      lyricsState.karaoke ||
+      lyricsState.synced ||
+      lyricsState.unsynced ||
+      null
+    );
   }
 
   lyricsSource(lyricsState, mode) {
@@ -9388,13 +9109,8 @@ class LyricsContainer extends react.Component {
 
     // Listen for lyric index changes from Pages.js
     this.handleLyricIndexChange = (event) => {
-      const nextIndex = event.detail?.index;
-      if (typeof nextIndex === 'number' && this.state.currentLyricIndex !== nextIndex) {
-        if (this.state.isFullscreen) {
-          this.setState({ currentLyricIndex: nextIndex });
-        } else {
-          this.state.currentLyricIndex = nextIndex;
-        }
+      if (event.detail && typeof event.detail.index === 'number') {
+        this.setState({ currentLyricIndex: event.detail.index });
       }
     };
     window.addEventListener("ivLyrics:lyric-index-changed", this.handleLyricIndexChange);
@@ -9566,7 +9282,6 @@ class LyricsContainer extends react.Component {
       ...this.styleVariables,
       ...getLyricsTypographyStyleVariables(CONFIG.visual),
       "--animation-tempo": this.state.tempo,
-      "--lyrics-fullscreen-right-padding": `${CONFIG.visual["fullscreen-lyrics-right-padding"] || 40}px`,
       "--fullscreen-line-gap": `${readFiniteNumber(CONFIG.visual["fullscreen-line-gap"], 28)}px`,
       "--fullscreen-line-scale-step": readFiniteNumber(CONFIG.visual["fullscreen-line-scale-step"], 8) / 100,
       "--fullscreen-next-boost": `${readFiniteNumber(CONFIG.visual["fullscreen-next-boost"], 45)}%`,
@@ -9580,25 +9295,19 @@ class LyricsContainer extends react.Component {
 
   isModeAvailable(mode, lyricsState = this.state) {
     if (!lyricsState || mode === -1) return false;
-    const hasContent = window.ivLyricsDataUtils?.hasLyricsContent
-      || ((lyrics) => Array.isArray(lyrics) && lyrics.length > 0);
     if (isKaraokeRenderMode(mode)) {
-      return hasContent(lyricsState.karaoke) && CONFIG.visual["karaoke-mode-enabled"];
+      return !!lyricsState.karaoke && CONFIG.visual["karaoke-mode-enabled"];
     }
-    if (mode === SYNCED) return hasContent(lyricsState.synced);
-    if (mode === UNSYNCED) return hasContent(lyricsState.unsynced);
+    if (mode === SYNCED) return !!lyricsState.synced;
+    if (mode === UNSYNCED) return !!lyricsState.unsynced;
     return false;
   }
 
   getAutomaticMode(lyricsState = this.state) {
-    const hasContent = window.ivLyricsDataUtils?.hasLyricsContent
-      || ((lyrics) => Array.isArray(lyrics) && lyrics.length > 0);
-    if (hasContent(lyricsState?.karaoke) && CONFIG.visual["karaoke-mode-enabled"]) {
-      return lyricsState.karaokeGranularity === "word" ? WORD_KARAOKE : KARAOKE;
-    }
-    if (hasContent(lyricsState?.synced)) return SYNCED;
-    if (hasContent(lyricsState?.unsynced)) return UNSYNCED;
-    return -1;
+    // Prefer renderers independently of source timing granularity: word-timed
+    // karaoke also supports character rendering.
+    return [KARAOKE, WORD_KARAOKE, SYNCED, UNSYNCED]
+      .find((mode) => this.isModeAvailable(mode, lyricsState)) ?? -1;
   }
 
   getCurrentMode() {
@@ -9762,7 +9471,6 @@ class LyricsContainer extends react.Component {
       "--highlight-inactive-opacity":
         (100 - (CONFIG.visual["highlight-intensity"] || 70)) / 100,
       "--animation-tempo": this.state.tempo,
-      "--lyrics-fullscreen-right-padding": `${CONFIG.visual["fullscreen-lyrics-right-padding"] || 40}px`,
       "--fullscreen-line-gap": `${readFiniteNumber(CONFIG.visual["fullscreen-line-gap"], 28)}px`,
       "--fullscreen-line-scale-step": readFiniteNumber(CONFIG.visual["fullscreen-line-scale-step"], 8) / 100,
       "--fullscreen-next-boost": `${readFiniteNumber(CONFIG.visual["fullscreen-next-boost"], 45)}%`,
@@ -9788,7 +9496,8 @@ class LyricsContainer extends react.Component {
         "--lyrics-original-opacity": 1,
         "--lyrics-translation-opacity": 0,
         "--lyrics-phonetic-opacity": 0,
-        "--lyrics-text-shadow": "none",
+        "--lyrics-text-shadow": "0 0 0 transparent",
+        "--lyrics-shadow-enabled": 0,
         "--lyrics-text-drop-shadow": "none",
       };
     }
@@ -10020,11 +9729,7 @@ class LyricsContainer extends react.Component {
         ? updateBannerDOM.createPortal(updateBannerContent, document.body)
         : updateBannerContent;
 
-    const hasLyrics = !!firstUsableLyricsContent(
-      this.state.karaoke,
-      this.state.synced,
-      this.state.unsynced
-    );
+    const hasLyrics = !!(this.state.karaoke || this.state.synced || this.state.unsynced);
     const isTwoColumn = CONFIG.visual["fullscreen-two-column"] !== false;
     const isLayoutReversed = CONFIG.visual["fullscreen-layout-reverse"] === true;
     const centerWhenNoLyrics = CONFIG.visual["fullscreen-center-when-no-lyrics"] !== false;
@@ -10374,9 +10079,7 @@ class LyricsContainer extends react.Component {
         activeLyrics: shouldHideFullscreenLyrics || !Array.isArray(this.state.currentLyrics)
           ? []
           : this.state.currentLyrics,
-        activeLyricsKaraoke: !shouldHideFullscreenLyrics
-          && isKaraokeRenderMode(mode)
-          && hasUsableLyricsContent(this.state.karaoke),
+        activeLyricsKaraoke: !shouldHideFullscreenLyrics && isKaraokeRenderMode(mode) && !!this.state.karaoke,
         karaokeSource: this.state.karaokeSource,
         lyricsSettingsRevision: this.reRenderLyricsPage,
         translatedMetadata: this.state.translatedMetadata,

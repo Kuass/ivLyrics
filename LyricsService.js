@@ -5595,7 +5595,7 @@
          * @returns {Array} - synced 형식 가사
          */
         function convertKaraokeToSynced(karaoke) {
-            if (!Array.isArray(karaoke) || karaoke.length === 0) return null;
+            if (!karaoke || !Array.isArray(karaoke)) return null;
 
             return karaoke.map(line => ({
                 startTime: line.startTime,
@@ -7934,13 +7934,7 @@
                 }
 
                 // 2. 가사 선택 (synced, karaoke, unsynced 순)
-                const firstLyricsContent = window.ivLyricsDataUtils?.firstLyricsContent
-                    || ((...candidates) => candidates.find(candidate => Array.isArray(candidate) && candidate.length > 0) || null);
-                let lyrics = firstLyricsContent(
-                    lyricsResult.karaoke,
-                    lyricsResult.synced,
-                    lyricsResult.unsynced
-                ) || [];
+                let lyrics = lyricsResult.karaoke || lyricsResult.synced || lyricsResult.unsynced || [];
                 const provider = lyricsResult.provider;
                 const lyricsType = lyrics === lyricsResult.karaoke
                     ? 'karaoke'
@@ -8315,17 +8309,13 @@
                 || (typeof result.provider === 'string' && result.provider.startsWith('spotify-') && syncData?.provider === 'spotify');
 
             if (syncData && isProviderMatch) {
-                const firstLyricsContent = window.ivLyricsDataUtils?.firstLyricsContent
-                    || ((...candidates) => candidates.find(candidate => Array.isArray(candidate) && candidate.length > 0) || null);
-                const baseLyrics = firstLyricsContent(result.synced, result.unsynced);
-                const karaoke = baseLyrics
-                    ? window.SyncDataService.applySyncDataToLyrics(baseLyrics, syncData, {
-                        durationMs: result.durationMs || result.duration_ms || result.duration,
-                        result
-                    })
-                    : null;
+                const baseLyrics = result.synced || result.unsynced;
+                const karaoke = window.SyncDataService.applySyncDataToLyrics(baseLyrics, syncData, {
+                    durationMs: result.durationMs || result.duration_ms || result.duration,
+                    result
+                });
 
-                if (Array.isArray(karaoke) && karaoke.length > 0) {
+                if (karaoke) {
                     result.karaoke = karaoke;
                     result.syncDataApplied = true;
                     result.syncDataProvider = result.provider;
@@ -9525,8 +9515,13 @@
         _lastReqId: 0,
         _pendingLyricsSend: null,
         _lyricsSendActive: false,
+        _runtimeGeneration: 0,
+        _connectionRecoveryTimer: null,
 
         handleConnectionRecovery() {
+            const runtimeGeneration = this._runtimeGeneration;
+            if (!this.isRuntimeRequestCurrent(runtimeGeneration) || !this.isConnected) return;
+            this.clearConnectionRecovery();
             // 가사 요청 자체가 연결을 복구한 경우 현재 큐가 성공 상태를 기록하므로
             // 여기서 같은 payload를 다시 예약하지 않는다.
             if (this._lyricsSendActive) return;
@@ -9538,7 +9533,9 @@
                 if (failure.reconnectUsed) return;
                 failure.reconnectUsed = true;
                 const { generation, key } = failure;
-                setTimeout(() => {
+                this._connectionRecoveryTimer = setTimeout(() => {
+                    if (!this.isRuntimeRequestCurrent(runtimeGeneration) || !this.isConnected) return;
+                    this._connectionRecoveryTimer = null;
                     const currentFailure = this._terminalDeliveryFailure;
                     if (!this.enabled || !currentFailure
                         || currentFailure.generation !== generation
@@ -9552,16 +9549,33 @@
                 return;
             }
 
-            setTimeout(() => this.resendWithNewOffset('reconnect'), 100);
+            this._connectionRecoveryTimer = setTimeout(() => {
+                if (!this.isRuntimeRequestCurrent(runtimeGeneration) || !this.isConnected) return;
+                this._connectionRecoveryTimer = null;
+                this.resendWithNewOffset('reconnect');
+            }, 100);
+        },
+
+        isRuntimeRequestCurrent(generation, port = this.port) {
+            return this._runtimeListenerSetup && this.enabled
+                && this._runtimeGeneration === generation && this.port === port;
+        },
+
+        clearConnectionRecovery() {
+            if (this._connectionRecoveryTimer !== null) clearTimeout(this._connectionRecoveryTimer);
+            this._connectionRecoveryTimer = null;
         },
 
         async sendToEndpoint(endpoint, data) {
             if (!this.enabled) return;
+            const runtimeGeneration = this._runtimeGeneration;
+            const port = this.port;
+            if (!this.isRuntimeRequestCurrent(runtimeGeneration, port)) return false;
 
             const isProgressEndpoint = endpoint === '/progress' || endpoint === '/lyrics/progress';
 
             try {
-                const response = await fetch(`http://localhost:${this.port}${endpoint}`, {
+                const response = await fetch(`http://localhost:${port}${endpoint}`, {
                     method: 'POST',
                     mode: 'cors',
                     headers: { 'Content-Type': 'application/json' },
@@ -9569,11 +9583,13 @@
                     signal: AbortSignal.timeout(2000)
                 });
 
+                if (!this.isRuntimeRequestCurrent(runtimeGeneration, port)) return false;
                 if (!response.ok) {
                     let responseDetail = '';
                     try {
                         responseDetail = await response.text();
                     } catch (e) { }
+                    if (!this.isRuntimeRequestCurrent(runtimeGeneration, port)) return false;
                     if (this._isConnected) {
                         this.isConnected = false;
                     }
@@ -9593,6 +9609,7 @@
                 }
                 return true;
             } catch (e) {
+                if (!this.isRuntimeRequestCurrent(runtimeGeneration, port)) return false;
                 if (this._isConnected) {
                     this.isConnected = false;
                 }
@@ -9793,6 +9810,195 @@
                 this._lastPresentationContext
             );
         },
+
+        syncProgressConnection() {
+            // An in-flight probe may resolve after destroy. Only the installed
+            // runtime may create another worker or reconnect timer.
+            if (!this._runtimeListenerSetup) {
+                this.stopProgressSync();
+                return;
+            }
+            if (this.isConnected && this.enabled) {
+                if (this._connectionCheckTimer) clearTimeout(this._connectionCheckTimer);
+                this._connectionCheckTimer = null;
+                this.startProgressSync();
+            } else {
+                this.clearConnectionRecovery();
+                this.stopProgressSync();
+                if (this.enabled) this.scheduleConnectionCheck(5000);
+            }
+        },
+
+        async sendProgressPayload(endpoint, payload, trackUri) {
+            const runtimeGeneration = this._runtimeGeneration;
+            const worker = this._worker;
+            const key = JSON.stringify([trackUri, payload]);
+            const now = Date.now();
+            // Receivers hide stale data after five seconds. Retain a two-second
+            // heartbeat, while sending pause, seek, queue and track changes now.
+            if (!payload.isPlaying && key === this._lastProgressPayloadKey
+                && now - this._lastProgressSentAt < 2000) return;
+            if (await this.sendToEndpoint(endpoint, payload)
+                && runtimeGeneration === this._runtimeGeneration && worker === this._worker) {
+                this._lastProgressPayloadKey = key;
+                this._lastProgressSentAt = now;
+            }
+        },
+
+        stopProgressSync() {
+            this._lastProgressPayloadKey = null;
+            this._lastProgressSentAt = 0;
+            if (!this._worker) return;
+            cleanupWorker(this._worker);
+            this._worker = null;
+            this._isSendingProgress = false;
+            this._lastProgressUri = null;
+        },
+
+        teardownOffsetListener() {
+            if (!this._offsetListenerSetup) return;
+            this._offsetListenerSetup = false;
+
+            if (this._storageListener) {
+                window.removeEventListener('storage', this._storageListener);
+                this._storageListener = null;
+            }
+            if (this._delayChangedListener) {
+                window.removeEventListener('ivLyrics:delay-changed', this._delayChangedListener);
+                this._delayChangedListener = null;
+            }
+            if (this._offsetChangedListener) {
+                window.removeEventListener('ivLyrics:offset-changed', this._offsetChangedListener);
+                window.removeEventListener('ivLyrics:global-offset-changed', this._offsetChangedListener);
+                this._offsetChangedListener = null;
+            }
+            if (this._lyricsReadyListener) {
+                window.removeEventListener('ivLyrics:lyrics-ready', this._lyricsReadyListener);
+                this._lyricsReadyListener = null;
+            }
+            if (this._visibilityChangeListener) {
+                document.removeEventListener('visibilitychange', this._visibilityChangeListener);
+                this._visibilityChangeListener = null;
+            }
+            if (this._focusListener) {
+                window.removeEventListener('focus', this._focusListener);
+                this._focusListener = null;
+            }
+            if (this._songChangeListener && typeof Spicetify.Player?.removeEventListener === 'function') {
+                try {
+                    Spicetify.Player.removeEventListener('songchange', this._songChangeListener);
+                } catch (e) { }
+                this._songChangeListener = null;
+            }
+        },
+
+        scheduleConnectionCheck(delay = 1000) {
+            if (this._connectionCheckTimer) {
+                clearTimeout(this._connectionCheckTimer);
+            }
+
+            const runtimeGeneration = this._runtimeGeneration;
+            if (!this.isRuntimeRequestCurrent(runtimeGeneration)) {
+                this._connectionCheckTimer = null;
+                return;
+            }
+
+            this._connectionCheckTimer = setTimeout(() => {
+                if (!this.isRuntimeRequestCurrent(runtimeGeneration)) return;
+                this._connectionCheckTimer = null;
+                this.checkConnection();
+            }, delay);
+        },
+
+        syncRuntimeState() {
+            const enabled = !!this.enabled;
+            if (this._runtimeEnabledState === enabled) {
+                return;
+            }
+
+            this._runtimeEnabledState = enabled;
+            this._runtimeGeneration += 1;
+            this.clearConnectionRecovery();
+            if (enabled) {
+                this.startProgressSync();
+                this.setupOffsetListener();
+                this.scheduleConnectionCheck();
+            } else {
+                this.stopProgressSync();
+                this.teardownOffsetListener();
+                clearSettingsPolling(this);
+                this.lastSentUri = null;
+                this.lastSentLyrics = null;
+                this.lastSentOffset = null;
+                this._lastSentDedupeToken = null;
+                this.lastDeliveredUri = null;
+                this._deliveryGeneration += 1;
+                this._deliveryKey = null;
+                this._terminalDeliveryFailure = null;
+                this._pendingLyricsSend = null;
+                this._lastTrackInfo = null;
+                this._lastLyrics = null;
+                this._offsetCache = {};
+                this.isConnected = false;
+            }
+        },
+
+        setupRuntimeListener() {
+            if (this._runtimeListenerSetup) return;
+            this._runtimeGeneration += 1;
+            this._runtimeListenerSetup = true;
+
+            this._runtimeStorageListener = () => {
+                this.syncRuntimeState();
+            };
+            this._runtimeEventListener = () => {
+                this.syncRuntimeState();
+            };
+
+            window.addEventListener('storage', this._runtimeStorageListener);
+            window.addEventListener('ivLyrics', this._runtimeEventListener);
+        },
+
+        teardownRuntimeListener() {
+            if (!this._runtimeListenerSetup) return;
+            this._runtimeListenerSetup = false;
+
+            if (this._runtimeStorageListener) {
+                window.removeEventListener('storage', this._runtimeStorageListener);
+                this._runtimeStorageListener = null;
+            }
+            if (this._runtimeEventListener) {
+                window.removeEventListener('ivLyrics', this._runtimeEventListener);
+                this._runtimeEventListener = null;
+            }
+            if (this._connectionCheckTimer) {
+                clearTimeout(this._connectionCheckTimer);
+                this._connectionCheckTimer = null;
+            }
+        },
+
+        destroy() {
+            if (this._runtimeListenerSetup || this._initialized) {
+                this._runtimeGeneration += 1;
+                this._deliveryGeneration += 1;
+            }
+            this._pendingLyricsSend = null;
+            this._deliveryKey = null;
+            this._terminalDeliveryFailure = null;
+            this._lastSentDedupeToken = null;
+            this.lastSentUri = null;
+            this.lastSentLyrics = null;
+            this.lastSentOffset = null;
+            this.lastDeliveredUri = null;
+            this.clearConnectionRecovery();
+            this.stopProgressSync();
+            this.teardownOffsetListener();
+            this.teardownRuntimeListener();
+            clearSettingsPolling(this);
+            this._isConnected = false;
+            this._initialized = false;
+            this._runtimeEnabledState = undefined;
+        }
     };
 
     const lyricsHelperSender = Object.create(LyricsSenderBase, {
@@ -9827,10 +10033,14 @@
         _worker: { value: null, writable: true },
         _isSendingProgress: { value: false, writable: true },
         _lastProgressUri: { value: null, writable: true },
+        _lastProgressPayloadKey: { value: null, writable: true },
+        _lastProgressSentAt: { value: 0, writable: true },
         _reqId: { value: 0, writable: true },
         _lastReqId: { value: 0, writable: true },
         _pendingLyricsSend: { value: null, writable: true },
         _lyricsSendActive: { value: false, writable: true },
+        _runtimeGeneration: { value: 0, writable: true },
+        _connectionRecoveryTimer: { value: null, writable: true },
         _initialized: { value: false, writable: true },
         _offsetListenerSetup: { value: false, writable: true },
         _runtimeListenerSetup: { value: false, writable: true },
@@ -9891,6 +10101,7 @@
             set(value) {
                 const wasConnected = this._isConnected;
                 this._isConnected = value;
+                this.syncProgressConnection();
 
                 window.dispatchEvent(new CustomEvent('ivLyrics:lyrics-helper-connection', {
                     detail: { connected: value }
@@ -10153,7 +10364,6 @@
 
                     // 오버레이 활성화 상태가 아니면 스킵
                     if (!this.enabled) return;
-                    // 현재 곡 조회는 별도 OverlayService의 단일 songchange 리스너가 담당한다.
                     helperDebug('[lyricsHelperSender] 곡 변경 - 전송 상태 초기화:', previousUri);
                 };
 
@@ -10167,48 +10377,13 @@
                 Spicetify.Player.addEventListener('songchange', this._songChangeListener);
             }
         },
-        teardownOffsetListener: {
-            value: function () {
-                if (!this._offsetListenerSetup) return;
-                this._offsetListenerSetup = false;
-
-                if (this._storageListener) {
-                    window.removeEventListener('storage', this._storageListener);
-                    this._storageListener = null;
-                }
-                if (this._delayChangedListener) {
-                    window.removeEventListener('ivLyrics:delay-changed', this._delayChangedListener);
-                    this._delayChangedListener = null;
-                }
-                if (this._offsetChangedListener) {
-                    window.removeEventListener('ivLyrics:offset-changed', this._offsetChangedListener);
-                    window.removeEventListener('ivLyrics:global-offset-changed', this._offsetChangedListener);
-                    this._offsetChangedListener = null;
-                }
-                if (this._lyricsReadyListener) {
-                    window.removeEventListener('ivLyrics:lyrics-ready', this._lyricsReadyListener);
-                    this._lyricsReadyListener = null;
-                }
-                if (this._visibilityChangeListener) {
-                    document.removeEventListener('visibilitychange', this._visibilityChangeListener);
-                    this._visibilityChangeListener = null;
-                }
-                if (this._focusListener) {
-                    window.removeEventListener('focus', this._focusListener);
-                    this._focusListener = null;
-                }
-                if (this._songChangeListener && typeof Spicetify.Player?.removeEventListener === 'function') {
-                    try {
-                        Spicetify.Player.removeEventListener('songchange', this._songChangeListener);
-                    } catch (e) { }
-                    this._songChangeListener = null;
-                }
-            }
-        },
+        // Reuse the same lifecycle code while retaining own method descriptors and
+        // the independent worker/listener state declared above.
+        teardownOffsetListener: { value: LyricsSenderBase.teardownOffsetListener },
         startProgressSync: {
             value: function () {
                 if (this._worker) return;
-                if (!this.enabled) return;
+                if (!this.enabled || !this.isConnected) return;
 
                 const blob = new Blob([`
                   let interval = null;
@@ -10226,8 +10401,11 @@
                 `], { type: 'application/javascript' });
 
                 const workerUrl = URL.createObjectURL(blob);
-                this._worker = new Worker(workerUrl);
-                URL.revokeObjectURL(workerUrl);
+                try {
+                    this._worker = new Worker(workerUrl);
+                } finally {
+                    URL.revokeObjectURL(workerUrl);
+                }
 
                 this._worker.onmessage = async () => {
                     if (!this.enabled) return;
@@ -10246,6 +10424,7 @@
                     }
 
                     this._isSendingProgress = true;
+                    const sendingWorker = this._worker;
                     try {
                         const playbackSnapshot = Utils.getPlayerPlaybackSnapshot();
                         const progressTiming = normalizeSenderProgressTiming(
@@ -10292,131 +10471,48 @@
                         } catch (e) { }
 
                         // 새로운 엔드포인트 사용: /lyrics/progress
-                        await this.sendToEndpoint('/lyrics/progress', {
+                        await this.sendProgressPayload('/lyrics/progress', {
                             position: position,
                             isPlaying: getOverlayProgressIsPlaying(),
                             duration: duration,
                             remaining: remaining,
                             currentTrack: currentTrack,
                             nextTrack: nextTrack
-                        });
+                        }, currentUri);
                     } finally {
-                        this._isSendingProgress = false;
+                        if (this._worker === sendingWorker) this._isSendingProgress = false;
                     }
                 };
 
                 this._worker.postMessage('start');
             }
         },
-        stopProgressSync: {
-            value: function () {
-                if (!this._worker) return;
-                cleanupWorker(this._worker);
-                this._worker = null;
-                this._isSendingProgress = false;
-                this._lastProgressUri = null;
-            }
-        },
-        scheduleConnectionCheck: {
-            value: function () {
-                if (this._connectionCheckTimer) {
-                    clearTimeout(this._connectionCheckTimer);
-                }
-
-                if (!this.enabled) {
-                    this._connectionCheckTimer = null;
-                    return;
-                }
-
-                this._connectionCheckTimer = setTimeout(() => {
-                    this._connectionCheckTimer = null;
-                    this.checkConnection();
-                }, 1000);
-            }
-        },
-        syncRuntimeState: {
-            value: function () {
-                const enabled = !!this.enabled;
-                if (this._runtimeEnabledState === enabled) {
-                    return;
-                }
-
-                this._runtimeEnabledState = enabled;
-                if (enabled) {
-                    this.startProgressSync();
-                    this.setupOffsetListener();
-                    this.scheduleConnectionCheck();
-                } else {
-                    this.stopProgressSync();
-                    this.teardownOffsetListener();
-                    clearSettingsPolling(this);
-                    this.lastSentUri = null;
-                    this.lastSentLyrics = null;
-                    this.lastSentOffset = null;
-                    this._lastSentDedupeToken = null;
-                    this.lastDeliveredUri = null;
-                    this._deliveryGeneration += 1;
-                    this._deliveryKey = null;
-                    this._terminalDeliveryFailure = null;
-                    this._pendingLyricsSend = null;
-                    this._lastTrackInfo = null;
-                    this._lastLyrics = null;
-                    this._offsetCache = {};
-                    this.isConnected = false;
-                }
-            }
-        },
-        setupRuntimeListener: {
-            value: function () {
-                if (this._runtimeListenerSetup) return;
-                this._runtimeListenerSetup = true;
-
-                this._runtimeStorageListener = () => {
-                    this.syncRuntimeState();
-                };
-                this._runtimeEventListener = () => {
-                    this.syncRuntimeState();
-                };
-
-                window.addEventListener('storage', this._runtimeStorageListener);
-                window.addEventListener('ivLyrics', this._runtimeEventListener);
-            }
-        },
-        teardownRuntimeListener: {
-            value: function () {
-                if (!this._runtimeListenerSetup) return;
-                this._runtimeListenerSetup = false;
-
-                if (this._runtimeStorageListener) {
-                    window.removeEventListener('storage', this._runtimeStorageListener);
-                    this._runtimeStorageListener = null;
-                }
-                if (this._runtimeEventListener) {
-                    window.removeEventListener('ivLyrics', this._runtimeEventListener);
-                    this._runtimeEventListener = null;
-                }
-                if (this._connectionCheckTimer) {
-                    clearTimeout(this._connectionCheckTimer);
-                    this._connectionCheckTimer = null;
-                }
-            }
-        },
+        stopProgressSync: { value: LyricsSenderBase.stopProgressSync },
+        scheduleConnectionCheck: { value: LyricsSenderBase.scheduleConnectionCheck },
+        syncRuntimeState: { value: LyricsSenderBase.syncRuntimeState },
+        setupRuntimeListener: { value: LyricsSenderBase.setupRuntimeListener },
+        teardownRuntimeListener: { value: LyricsSenderBase.teardownRuntimeListener },
         checkConnection: {
             value: async function () {
                 if (!this.enabled) return false;
+                const runtimeGeneration = this._runtimeGeneration;
+                const port = this.port;
+                if (!this.isRuntimeRequestCurrent(runtimeGeneration, port)) return false;
 
                 try {
                     // /lyrics/progress 엔드포인트로 연결 확인
-                    const response = await fetch(`http://localhost:${this.port}/lyrics/progress`, {
+                    const response = await fetch(`http://localhost:${port}/lyrics/progress`, {
                         method: 'POST',
                         mode: 'cors',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ position: 0, isPlaying: false }),
                         signal: AbortSignal.timeout(1000)
                     });
+                    if (!this.isRuntimeRequestCurrent(runtimeGeneration, port)) return false;
                     this.isConnected = response.ok;
                     return this.isConnected;
                 } catch (e) {
+                    if (!this.isRuntimeRequestCurrent(runtimeGeneration, port)) return false;
                     this.isConnected = false;
                     return false;
                 }
@@ -10431,14 +10527,7 @@
                 helperDebug('[lyricsHelperSender] Initialized in Extension');
             }
         },
-        destroy: {
-            value: function () {
-                this.stopProgressSync();
-                this.teardownOffsetListener();
-                this.teardownRuntimeListener();
-                clearSettingsPolling(this);
-            }
-        }
+        destroy: { value: LyricsSenderBase.destroy }
     });
 
 

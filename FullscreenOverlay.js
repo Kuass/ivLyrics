@@ -732,6 +732,28 @@ const FullscreenOverlay = (() => {
         );
     };
 
+    // These fields are read directly while rendering the overlay. Keep their
+    // polling fallback even when playback position is not used by this layout,
+    // including metadata that arrives after songchange or mutates in place.
+    const getOverlayMetadataSnapshot = () => {
+        const item = Spicetify.Player.data?.item;
+        const metadata = item?.metadata;
+        return [
+            getFirstSpotifyUri(item?.uri),
+            getCurrentArtistUri(),
+            getCurrentAlbumUri(),
+            metadata?.title,
+            metadata?.artist_name,
+            metadata?.album_title,
+            metadata?.album_disc_number,
+            metadata?.year,
+            metadata?.image_xlarge_url,
+            metadata?.image_large_url,
+            item?.album?.images?.[0]?.url,
+            metadata?.image_url
+        ];
+    };
+
     // Clock Component
     const Clock = ({ show, showSeconds = false, size = 48 }) => {
         const [time, setTime] = useState(new Date());
@@ -1659,6 +1681,21 @@ const FullscreenOverlay = (() => {
         );
     };
 
+    const renderQueueItem = (track, key, onTrackClick) => react.createElement("div", {
+        key,
+        className: "fullscreen-queue-item",
+        onClick: () => onTrackClick(track)
+    },
+        track.image && react.createElement("img", {
+            src: track.image,
+            className: "fullscreen-queue-item-image"
+        }),
+        react.createElement("div", { className: "fullscreen-queue-item-info" },
+            react.createElement("div", { className: "fullscreen-queue-item-title" }, track.title),
+            react.createElement("div", { className: "fullscreen-queue-item-artist" }, track.artist)
+        )
+    );
+
     // Queue Panel Component - 오른쪽 hover 시 재생 대기열 표시
     const QueuePanel = ({ show, isFullscreen }) => {
         const [isHovered, setIsHovered] = useState(false);
@@ -1941,20 +1978,7 @@ const FullscreenOverlay = (() => {
                             ),
                             react.createElement("div", { className: "fullscreen-queue-list" },
                                 upNextTracks.map((track, idx) =>
-                                    react.createElement("div", {
-                                        key: track.key || `next-${track.uid || track.uri || idx}`,
-                                        className: "fullscreen-queue-item",
-                                        onClick: () => handleTrackClick(track)
-                                    },
-                                        track.image && react.createElement("img", {
-                                            src: track.image,
-                                            className: "fullscreen-queue-item-image"
-                                        }),
-                                        react.createElement("div", { className: "fullscreen-queue-item-info" },
-                                            react.createElement("div", { className: "fullscreen-queue-item-title" }, track.title),
-                                            react.createElement("div", { className: "fullscreen-queue-item-artist" }, track.artist)
-                                        )
-                                    )
+                                    renderQueueItem(track, track.key || `next-${track.uid || track.uri || idx}`, handleTrackClick)
                                 )
                             )
                         ),
@@ -1966,20 +1990,7 @@ const FullscreenOverlay = (() => {
                             ),
                             react.createElement("div", { className: "fullscreen-queue-list" },
                                 recommendedTracks.map((track, idx) =>
-                                    react.createElement("div", {
-                                        key: track.key || `recommended-${track.uid || track.uri || idx}`,
-                                        className: "fullscreen-queue-item",
-                                        onClick: () => handleTrackClick(track)
-                                    },
-                                        track.image && react.createElement("img", {
-                                            src: track.image,
-                                            className: "fullscreen-queue-item-image"
-                                        }),
-                                        react.createElement("div", { className: "fullscreen-queue-item-info" },
-                                            react.createElement("div", { className: "fullscreen-queue-item-title" }, track.title),
-                                            react.createElement("div", { className: "fullscreen-queue-item-artist" }, track.artist)
-                                        )
-                                    )
+                                    renderQueueItem(track, track.key || `recommended-${track.uid || track.uri || idx}`, handleTrackClick)
                                 )
                             )
                         ),
@@ -1992,20 +2003,7 @@ const FullscreenOverlay = (() => {
                         // 최근 재생 곡들
                         recentTracks.length > 0 ? react.createElement("div", { className: "fullscreen-queue-list" },
                             recentTracks.map((track, idx) =>
-                                react.createElement("div", {
-                                    key: `recent-${idx}`,
-                                    className: "fullscreen-queue-item",
-                                    onClick: () => handleTrackClick(track)
-                                },
-                                    track.image && react.createElement("img", {
-                                        src: track.image,
-                                        className: "fullscreen-queue-item-image"
-                                    }),
-                                    react.createElement("div", { className: "fullscreen-queue-item-info" },
-                                        react.createElement("div", { className: "fullscreen-queue-item-title" }, track.title),
-                                        react.createElement("div", { className: "fullscreen-queue-item-artist" }, track.artist)
-                                    )
-                                )
+                                renderQueueItem(track, `recent-${idx}`, handleTrackClick)
                             )
                         ) : react.createElement("div", { className: "fullscreen-queue-empty" },
                             I18n.t("fullscreen.queue.noRecent")
@@ -2130,6 +2128,106 @@ const FullscreenOverlay = (() => {
         );
     });
 
+    // Center standard fullscreen lyrics in the space beside the rendered album,
+    // including configured album sizes and the album's visibility transforms.
+    // Keep observation away from the frequently changing karaoke subtree.
+    const observeFullscreenAlbumLyricsRegion = (panel) => {
+        const root = panel?.closest?.(".lyrics-lyricsContainer-LyricsContainer");
+        if (!root) return () => {};
+        const view = panel.ownerDocument?.defaultView || window;
+        const attribute = "data-album-centered-lyrics";
+        const leftVariable = "--lyrics-fullscreen-region-left";
+        const rightVariable = "--lyrics-fullscreen-region-right";
+        const excludedClasses = [
+            "tv-mode-active", "portrait-mode", "fullscreen-single-column",
+            "fullscreen-focus-active", "fullscreen-no-lyrics", "marketplace-active",
+        ];
+        let frame = null;
+        let disposed = false;
+        let observedAlbum = null;
+        let resizeObserver = null;
+        const reset = () => {
+            if (root.hasAttribute(attribute)) root.removeAttribute(attribute);
+            for (const name of [leftVariable, rightVariable]) {
+                if (root.style.getPropertyValue(name)) root.style.removeProperty(name);
+            }
+        };
+        const measure = () => {
+            frame = null;
+            if (disposed) return;
+            const album = panel.querySelector(".lyrics-fullscreen-album-art");
+            if (album !== observedAlbum) {
+                if (observedAlbum) resizeObserver?.unobserve(observedAlbum);
+                observedAlbum = album;
+                if (album) resizeObserver?.observe(album);
+            }
+            if (!root.isConnected || !panel.isConnected ||
+                !root.classList.contains("fullscreen-active") ||
+                excludedClasses.some(name => root.classList.contains(name)) ||
+                panel.classList.contains("tmi-mode") ||
+                (CONFIG?.visual?.alignment || "center") !== "center" || !album) {
+                reset();
+                return;
+            }
+            const rootBox = root.getBoundingClientRect();
+            const albumBox = album.getBoundingClientRect();
+            const albumStyle = view.getComputedStyle(album);
+            if (rootBox.width <= 0 || rootBox.height <= 0 ||
+                albumBox.width <= 0 || albumBox.height <= 0 ||
+                albumStyle.visibility === "hidden" || albumStyle.visibility === "collapse" ||
+                albumStyle.display === "none") {
+                reset();
+                return;
+            }
+            const reversed = root.classList.contains("layout-reversed");
+            const inset = reversed
+                ? rootBox.right - albumBox.left
+                : albumBox.right - rootBox.left;
+            if (!Number.isFinite(inset) || inset <= 0 || inset >= rootBox.width) {
+                reset();
+                return;
+            }
+            const insets = reversed ? [0, inset] : [inset, 0];
+            for (const [index, name] of [leftVariable, rightVariable].entries()) {
+                const value = `${Math.round(insets[index] * 1000) / 1000}px`;
+                if (root.style.getPropertyValue(name) !== value) root.style.setProperty(name, value);
+            }
+            if (root.getAttribute(attribute) !== "true") root.setAttribute(attribute, "true");
+        };
+        const schedule = () => {
+            if (!disposed && frame === null) frame = view.requestAnimationFrame(measure);
+        };
+        if (typeof view.ResizeObserver === "function") {
+            resizeObserver = new view.ResizeObserver(schedule);
+            resizeObserver.observe(root);
+            resizeObserver.observe(panel);
+        }
+        const mutationObserver = typeof view.MutationObserver === "function"
+            ? new view.MutationObserver(schedule)
+            : null;
+        mutationObserver?.observe(root, { attributes: true, attributeFilter: ["class", "style"] });
+        mutationObserver?.observe(panel, {
+            attributes: true, attributeFilter: ["class", "style", "hidden"],
+            childList: true, subtree: true,
+        });
+        // ResizeObserver does not report CSS transforms. Recheck their settled
+        // image edge after hover and controls-hidden transitions, without polling.
+        panel.addEventListener("transitionend", schedule);
+        panel.addEventListener("transitioncancel", schedule);
+        view.addEventListener("resize", schedule);
+        schedule();
+        return () => {
+            disposed = true;
+            if (frame !== null) view.cancelAnimationFrame(frame);
+            mutationObserver?.disconnect();
+            resizeObserver?.disconnect();
+            panel.removeEventListener("transitionend", schedule);
+            panel.removeEventListener("transitioncancel", schedule);
+            view.removeEventListener("resize", schedule);
+            reset();
+        };
+    };
+
     // Main Overlay Component
     const Overlay = ({
         coverUrl,
@@ -2157,6 +2255,15 @@ const FullscreenOverlay = (() => {
         const [isPlaying, setIsPlaying] = useState(false);
         const [position, setPosition] = useState(0);
         const [duration, setDuration] = useState(0);
+        const [, setMetadataRevision] = useState(0);
+        const metadataSnapshotRef = useRef(null);
+        const albumLyricsRegionCleanupRef = useRef(null);
+        const setAlbumLyricsPanelRef = useCallback((panel) => {
+            albumLyricsRegionCleanupRef.current?.();
+            albumLyricsRegionCleanupRef.current = panel
+                ? observeFullscreenAlbumLyricsRegion(panel)
+                : null;
+        }, []);
         const [isPortraitViewport, setIsPortraitViewport] = useState(() => {
             if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
                 return false;
@@ -2212,13 +2319,28 @@ const FullscreenOverlay = (() => {
             };
         }, [navigateSpotifyUri]);
 
-        // Track playback state for TV mode controls
+        // Standard and compact layouts own progress in ProgressBar; changing
+        // unused root position state would rebuild the entire overlay twice a second.
+        const trackRootPosition = isFullscreen && (
+            CONFIG?.visual?.["fullscreen-tv-mode"] === true
+                ? CONFIG?.visual?.["fullscreen-tv-show-progress"] !== false
+                : false
+        );
         useEffect(() => {
             const updatePlaybackState = () => {
                 const isPaused = Spicetify.Player?.data?.isPaused ?? true;
                 setIsPlaying(!isPaused);
-                setPosition(Spicetify.Player?.getProgress?.() || 0);
+                if (trackRootPosition) {
+                    setPosition(Spicetify.Player?.getProgress?.() || 0);
+                }
                 setDuration(Spicetify.Player?.data?.item?.metadata?.duration_ms || Spicetify.Player?.getDuration?.() || 0);
+
+                const nextMetadata = getOverlayMetadataSnapshot();
+                const previousMetadata = metadataSnapshotRef.current;
+                metadataSnapshotRef.current = nextMetadata;
+                if (previousMetadata && nextMetadata.some((value, index) => !Object.is(value, previousMetadata[index]))) {
+                    setMetadataRevision((revision) => revision + 1);
+                }
             };
 
             updatePlaybackState();
@@ -2234,7 +2356,7 @@ const FullscreenOverlay = (() => {
                 Spicetify.Player?.removeEventListener?.("songchange", updatePlaybackState);
                 Spicetify.Player?.removeEventListener?.("onplaypause", updatePlaybackState);
             };
-        }, []);
+        }, [trackRootPosition]);
 
         useEffect(() => {
             uiVisibleRef.current = uiVisible;
@@ -3118,7 +3240,8 @@ const FullscreenOverlay = (() => {
             ),
             // Left panel (Album, Info & Controls) OR TMI View - Hidden in TV Mode & Portrait Mode
             !isPortraitFullscreen && isTwoColumn && !hideLeftPanel && !hideLeftPanelForTvMode && react.createElement("div", {
-                className: `lyrics-fullscreen-left-panel ${!uiVisible && showControlsInLeftPanel ? 'controls-hidden' : ''} ${tmiMode ? 'tmi-mode' : ''}`
+                className: `lyrics-fullscreen-left-panel ${!uiVisible && showControlsInLeftPanel ? 'controls-hidden' : ''} ${tmiMode ? 'tmi-mode' : ''}`,
+                ref: setAlbumLyricsPanelRef
             },
                 // TMI Mode View
                 tmiMode ? (
