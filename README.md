@@ -131,6 +131,16 @@ Every AI feature runs only when at least one LLM provider is enabled, and each h
   **Support the original author**: the header donate button is renamed and made smaller.
 - **미리보기 간격 반영**: 외관 스타일의 "원문과의 간격"과 "발음과의 간격"이 실제 가사에는 적용되면서 미리보기에서는 무시되던 문제를 고쳤습니다. 미리보기 전용 CSS가 모든 문단의 여백을 0으로 강제하고 있었습니다.\
   **Preview spacing**: the "gap from original" and "gap from pronunciation" sliders in the appearance styles applied to real lyrics but not to the live preview, whose CSS forced every paragraph margin to 0. The preview now follows both values.
+- 패치 노트 요청은 응답 본문을 읽는 시간을 포함해 15초로 제한합니다. 설정 화면을 떠나거나 테마를 바꾸면 이전 요청과 예약된 작업을 취소하므로, 늦게 도착한 응답이 화면을 덮어쓰지 않습니다.\
+  Release note requests have a 15-second deadline, including body consumption. Leaving the settings screen or changing its theme cancels the previous request and scheduled work, preventing stale responses from overwriting the screen.
+
+### 요청 안정성 / Request reliability
+
+공유 AI 요청 함수는 응답 본문을 읽는 동안에도 시간 제한을 유지합니다. 소수나 지나치게 큰 제한 시간을 안전한 정수로 보정하며, 구형 환경에서 요청을 취소하면 연결해 둔 취소 이벤트 리스너도 해제합니다.\
+The shared AI request helper keeps its deadline active while reading the response body. Fractional and oversized timeout values are normalized to safe integers, and cancellation removes attached abort listeners in older environments.
+
+저장소에 남아 있는 영상 헬퍼 통신 코드는 표준 SSE와 기존 필드 순서, 여러 청크로 나뉜 UTF-8 데이터를 처리합니다. 동시에 들어온 연결 확인은 하나의 요청으로 합치며, 다운로드 중 90초간 데이터가 없거나 스트림이 완료 전에 끝나면 오류를 알리고 자원을 정리합니다. 이 변경으로 제거했던 헬퍼 설정 UI가 다시 추가되지는 않습니다.\
+The retained video helper service handles standard SSE, legacy field ordering and UTF-8 split across chunks. Concurrent health checks share one request. Downloads report an error and release resources after 90 seconds without data or when the stream ends before completion. This does not restore the removed helper settings UI.
 
 ### 업데이트 알림 / Update notice
 
@@ -150,6 +160,8 @@ Of Spotify's roughly 1 GB, about 850 MB remains without ivLyrics, so the savings
   The panel's DOM observer watches only the right sidebar and pauses while Spotify shows its own lyrics.
 - 가사 캐시의 IndexedDB 상한을 10GiB에서 1GiB로 낮췄습니다.\
   The lyrics cache's IndexedDB limit dropped from 10 GiB to 1 GiB.
+- 메모리 캐시는 기존 항목을 갱신할 때 다른 곡을 불필요하게 제거하지 않습니다. 최근 접근 순서는 `Map`의 순서로 관리해 정렬 비용을 없앴고, 초기화가 반복되어도 정리 타이머는 하나만 유지합니다.\
+  Updating an existing memory-cache entry preserves unrelated songs. LRU eviction uses Map ordering without sorting, and repeated initialization keeps a single cleanup timer.
 - 제거한 기능이 남긴 CSS 규칙 619개(약 130KB)와 번역 문구 522개를 지웠습니다.\
   619 CSS rules (about 130 KB) and 522 translation strings left by removed features were deleted.
 - YouTube 플레이어 준비 제한 시간을 15초에서 30초로 늘려, 영상은 뜨는데 오류 알림만 뜨던 일을 없앴습니다.\
@@ -174,6 +186,9 @@ Settings live in the xpui localStorage, which Spotify stores under `~/Library/Ca
    The launchd agent `com.kuass.ivlyrics.guard` repairs broken links hourly and keeps up to 14 snapshots in `~/.config/spicetify/ivLyrics/storage-backups/`.
 3. 업데이트는 Spotify를 강제 종료하지 않고 정상 종료한 뒤 진행해, 저장소가 디스크에 온전히 기록된 상태에서 파일을 바꿉니다.\
    Updates quit Spotify gracefully instead of killing it, so storage is fully flushed before files change.
+
+복원할 때는 `latest` 같은 링크를 실제 스냅샷 경로로 먼저 고정합니다. 복원 직전 백업이 링크를 바꾸거나 보관 상한에 도달하더라도 선택한 원본은 유지하며, Spotify 저장소가 없는 폴더를 지정하면 Spotify를 종료하기 전에 오류를 알립니다.\
+Restore resolves aliases such as `latest` to a fixed snapshot path before taking a backup. The selected source remains protected when that backup changes the alias or triggers retention pruning. A directory without Spotify storage is rejected before Spotify is stopped.
 
 ## 5. 설치와 명령어 / Install and commands
 
@@ -216,8 +231,11 @@ Log file: `~/.config/spicetify/ivLyrics/ivlyrics.log`
 
 ## 6. 개발 / Development
 
-단위 테스트는 `node --test tests/`로 실행합니다.\
-Run unit tests with `node --test tests/`.
+Node.js 24 이상과 Python 3, Bash가 있으면 `node scripts/check.mjs`로 전체 검증을 실행할 수 있습니다. 별도 패키지를 설치할 필요는 없습니다. JavaScript 문법과 앱 번들, manifest에 등록된 파일, 설치 스크립트 문법, 버전 일관성을 확인한 뒤 전체 회귀 테스트를 실행합니다.\
+With Node.js 24 or later, Python 3 and Bash, run `node scripts/check.mjs` for all checks; no package installation is required. It validates JavaScript syntax, the app bundle, manifest files, installer syntax and version consistency, then runs all regression tests.
+
+테스트만 실행하려면 `node --test tests/*.test.mjs`를 사용합니다. GitHub Actions의 Quality 워크플로는 Linux와 macOS에서 검증하며, 릴리스 워크플로에서도 게시 전에 같은 검증을 실행합니다. Spotify 화면과 실제 헬퍼 연결은 별도로 확인해야 합니다.\
+To run only the tests, use `node --test tests/*.test.mjs`. The Quality workflow checks Linux and macOS, and the release workflow runs the same gate before publishing. Spotify UI behavior and live helper connections still require manual verification.
 
 | 테스트 / Test | 대상 / Covers |
 | --- | --- |
@@ -227,6 +245,10 @@ Run unit tests with `node --test tests/`.
 | `tests/inline_pronunciation.test.mjs` | 원문 조각·발음 짝짓기 / pronunciation chunk pairing |
 | `tests/ai_result_repair.test.mjs` | AI 응답 줄 수 복구 / AI reply line repair |
 | `tests/video_background_sync.test.mjs` | 영상 되감기 보정 / video seek correction |
+| `tests/video_helper_service.test.mjs` | SSE 파싱, 중복 요청, 시간 제한, 취소와 자원 정리 / SSE parsing, request deduplication, deadlines, cancellation and cleanup |
+| `tests/ai_request.test.mjs` | AI 요청 시간 제한과 취소 / AI request deadlines and cancellation |
+| `tests/installer_restore.test.mjs` | 복원 원본 고정과 스냅샷 보존 / restore source pinning and snapshot retention |
+| `tests/settings_release_lifecycle.test.mjs` | 패치 노트 요청 수명과 화면 전환 / release note request lifecycle and navigation |
 
 저장소를 `~/.config/spicetify/CustomApps/ivLyrics`에 두지 않아도 됩니다. 수정 후에는 `ivlyrics update --ref <branch>`로 설치하거나, `rsync`로 복사한 뒤 `spicetify apply`를 실행합니다.\
 The repository does not need to live in `~/.config/spicetify/CustomApps/ivLyrics`. After changes, install with `ivlyrics update --ref <branch>`, or copy with `rsync` and run `spicetify apply`.
