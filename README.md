@@ -234,6 +234,9 @@ Log file: `~/.config/spicetify/ivLyrics/ivlyrics.log`
 Node.js 24 이상과 Python 3, Bash가 있으면 `node scripts/check.mjs`로 전체 검증을 실행할 수 있습니다. 별도 패키지를 설치할 필요는 없습니다. JavaScript 문법과 앱 번들, manifest에 등록된 파일, 설치 스크립트 문법, 버전 일관성을 확인한 뒤 전체 회귀 테스트를 실행합니다.\
 With Node.js 24 or later, Python 3 and Bash, run `node scripts/check.mjs` for all checks; no package installation is required. It validates JavaScript syntax, the app bundle, manifest files, installer syntax and version consistency, then runs all regression tests.
 
+일부 회귀 테스트는 이전 버전의 소스를 `git show`로 읽어 비교하므로 Git과 전체 커밋 이력이 필요합니다. ZIP 다운로드 대신 일반 `git clone`을 사용하고, 얕은 복제본이라면 `git fetch --unshallow`로 이력을 가져온 뒤 실행합니다.\
+Some regression tests compare against earlier sources using `git show`, so Git and the complete commit history are required. Use a normal `git clone` instead of a ZIP download; for a shallow clone, run `git fetch --unshallow` before testing.
+
 테스트만 실행하려면 `node --test tests/*.test.mjs`를 사용합니다. GitHub Actions의 Quality 워크플로는 Linux와 macOS에서 검증하며, 릴리스 워크플로에서도 게시 전에 같은 검증을 실행합니다. Spotify 화면과 실제 헬퍼 연결은 별도로 확인해야 합니다.\
 To run only the tests, use `node --test tests/*.test.mjs`. The Quality workflow checks Linux and macOS, and the release workflow runs the same gate before publishing. Spotify UI behavior and live helper connections still require manual verification.
 

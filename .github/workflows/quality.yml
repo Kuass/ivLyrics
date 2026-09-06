@@ -22,6 +22,9 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Differential regressions read baseline sources from earlier commits.
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
