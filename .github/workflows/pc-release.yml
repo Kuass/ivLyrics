@@ -36,6 +36,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
       - name: Verify release branch
         shell: bash
         env:
@@ -66,8 +71,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 .github/scripts/set_release_version.py check "$RELEASE_VERSION"
-          node --check Utils.js
-          python3 -m json.tool manifest.json >/dev/null
+          node scripts/check.mjs
           git diff --check
 
           actual="$(git diff --name-only)"
