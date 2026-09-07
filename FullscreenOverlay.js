@@ -2228,6 +2228,52 @@ const FullscreenOverlay = (() => {
         };
     };
 
+    const CrossfadeAlbumImage = ({ src, className, style }) => {
+        const [images, setImages] = useState(() => ({ current: src, previous: null }));
+        useEffect(() => {
+            if (!src || src === images.current) return;
+            let disposed = false;
+            const image = new Image();
+            image.onload = async () => {
+                try {
+                    if (image.decode) await image.decode();
+                } catch {
+                    // Keep the last decoded cover when the next image cannot be displayed.
+                    return;
+                }
+                if (!disposed) {
+                    setImages(previous => ({ current: src, previous: previous.current }));
+                }
+            };
+            image.src = src;
+            return () => {
+                disposed = true;
+                image.onload = null;
+            };
+        }, [src]);
+        useEffect(() => {
+            if (!images.previous) return;
+            const timer = setTimeout(() => setImages(previous => (
+                previous.current === images.current ? { ...previous, previous: null } : previous
+            )), 650);
+            return () => clearTimeout(timer);
+        }, [images.current, images.previous]);
+        return react.createElement("span", {
+            className: `${className} ivlyrics-album-crossfade`, style,
+        },
+            images.previous && react.createElement("img", {
+                key: `previous-${images.previous}`, src: images.previous,
+                className: "ivlyrics-album-crossfade-layer", alt: "", draggable: false,
+                "aria-hidden": true,
+            }),
+            images.current && react.createElement("img", {
+                key: images.current, src: images.current,
+                className: `ivlyrics-album-crossfade-layer${images.previous ? " is-entering" : ""}`,
+                alt: "", draggable: false,
+            })
+        );
+    };
+
     // Main Overlay Component
     const Overlay = ({
         coverUrl,
@@ -2781,7 +2827,7 @@ const FullscreenOverlay = (() => {
         const renderAlbumVisual = ({
             coverClassName,
             coverStyle
-        }) => react.createElement("img", {
+        }) => react.createElement(CrossfadeAlbumImage, {
             src: currentCoverUrl,
             className: coverClassName,
             style: coverStyle,

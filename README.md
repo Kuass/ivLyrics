@@ -65,8 +65,10 @@ Tracks upstream through 6.6.11 (2026-09-07). The upstream repository is only lin
   **Broken timestamp filtering**: synced results whose timestamps are all identical, in seconds instead of milliseconds, or mostly out of order are rejected and the next provider is tried. With no other provider, the same text is shown as unsynced lyrics. Upstream showed only the last line from the start in these cases.
 - **로마자 표기 가사 후순위**: 한국어 곡인데 Spotify(Musixmatch) 등이 가사를 로마자 표기("tteonabeorin neoneun...")로만 내려주면, 그 결과는 뒤로 미루고 다른 제공자에서 한글 원문을 먼저 찾습니다. 어디에도 원문이 없을 때에만 로마자 가사를 보여 줍니다. Lyrically(Paxsenix)처럼 원문을 보유한 제공자가 켜져 있어야 효과가 있습니다.\
   **Romanized lyrics deferred**: when a Korean song comes back from Spotify (Musixmatch) or another provider only as romanized text ("tteonabeorin neoneun..."), that result is set aside and the other providers are tried for the Hangul original first. The romanized text is shown only when no provider has the original. This needs a provider that carries the original, such as Lyrically (Paxsenix), to be enabled.
-- **원문 조각마다 발음 붙이기**: 발음 표기(로마자 등)를 별도 줄에 두는 대신 원문 단어마다 아래에 붙여 보여 줍니다. 원문이 두세 줄로 접혀도 어느 단어의 발음인지 바로 보입니다. 요청할 때 원문을 단어 조각으로 잘라 "｜"로 이어 보내고, 같은 구분자로 돌아온 답을 조각과 짝지어 그립니다. 조각 수가 맞지 않는 줄이나 노래방(글자 단위) 모드에서는 예전처럼 한 줄 발음으로 보여 줍니다. 설정 "발음 스타일" 탭에서 끌 수 있습니다.\
-  **Pronunciation under each word**: instead of a separate pronunciation line, the romanization is attached under each word of the original, so a lyric that wraps to two or three lines stays readable. The request sends the original split into word chunks joined by "｜", and a reply that keeps the separators is paired chunk by chunk. Lines whose chunk count differs, and karaoke (per-character) mode, fall back to the single pronunciation line. Toggle: Settings > Pronunciation style.
+- **원문 조각마다 발음 붙이기**: 발음을 원문 단어 바로 아래에 붙여, 긴 가사가 여러 줄로 나뉘어도 원문과 발음이 함께 줄바꿈됩니다. 일반 가사와 노래방의 글자·단어 단위 표시에서 사용할 수 있으며, 노래방의 재생 강조는 유지합니다. AI가 돌려준 "｜" 구분자로 단어를 대응시키고, 구분자가 없는 기존 영어 발음은 원문과 발음의 단어 수가 같을 때 대응시킵니다. 대응할 수 없는 줄과 연결형 문자 렌더링에서는 문장 아래에 발음을 표시합니다. 해석은 가사 아래에 따로 표시하며, 설정 "발음 스타일" 탭에서 단어별 발음을 끌 수 있습니다.\
+  **Pronunciation under each word**: original words and their readings wrap together in plain lyrics and character- or word-rendered karaoke, preserving playback highlighting. AI replies are aligned using "｜" separators; legacy English readings without separators are paired when word counts match. Unmatched lines and joining-script text runs retain a separate pronunciation line. Translation stays below the lyrics. Toggle: Settings > Pronunciation style.
+- **발음 간격과 가사 너비**: 단어별 발음을 원문에 가깝게 붙이고, 해당 가사의 좌우 여백을 줄였습니다. 전체 화면의 페이지 여백과 스크롤 보기의 너비 제한도 조정해 좁은 화면에서 가사가 지나치게 짧게 줄바꿈되지 않도록 했습니다.\
+  **Pronunciation spacing and lyric width**: tighter spacing brings readings closer to their original words. Smaller gutters, including fullscreen page padding, and a wider fullscreen scroll view leave more room for lyrics on narrow screens.
 - **패널 가사 표시 조건**: 우측 패널 가사는 Spotify가 그 곡의 가사를 직접 보여 주지 않을 때만 표시됩니다. 설정 "패널 가사" 탭의 "Spotify 기본 가사가 없을 때만 표시"로 끕니다.\
   **Panel lyrics condition**: the Now Playing panel shows lyrics only when Spotify itself does not. Toggle: Settings > Panel lyrics > "Only when Spotify has no lyrics".
 
@@ -101,6 +103,8 @@ Every AI feature runs only when at least one LLM provider is enabled, and each h
 
 - **곡 전환**: 곡이 바뀌면 이전 영상이 검정으로 페이드아웃된 뒤 정리되고, 새 영상은 준비되는 대로 검정 위로 페이드인합니다. 영상이 없거나 불러오지 못한 곡, 그리고 재생을 멈춘 동안에는 앨범 아트 대신 Spotify가 앨범 아트에서 뽑은 팔레트(VIBRANT·DARK_VIBRANT·LIGHT_VIBRANT)로 만든 블롭 그라데이션(블러 그라데이션 배경과 같은 모양)이 떠오릅니다. 제목과 아티스트 글자는 짧게 떠오르며 바뀝니다.\
   **Track transitions**: on a track change the previous video fades to black before disposal and the new video fades in over black once it is ready. When a track has no video, the video fails to load, or playback is paused, a blob gradient built from Spotify's album-art palette (VIBRANT, DARK_VIBRANT, LIGHT_VIBRANT; the same look as the blur-gradient background) fades in instead of album art. Title and artist text animate in.
+- **앨범 이미지 전환**: 일반·세로·TV 전체 화면에서는 다음 앨범 이미지의 로딩과 디코딩이 끝난 뒤, 이전 이미지 위로 약 0.6초 동안 서서히 나타납니다. 빠르게 곡을 넘기면 이전 요청의 결과를 무시하고, 새 이미지를 불러오지 못하면 마지막 이미지를 유지합니다. 시스템에서 동작 줄이기를 설정한 경우에는 애니메이션을 생략합니다.\
+  **Album image transitions**: normal, portrait and TV fullscreen layouts keep the previous cover visible until the next image has loaded and decoded, then fade in the replacement over approximately 0.6 seconds. Stale loads are ignored after rapid skips; failed replacements leave the last cover visible. System reduced-motion preferences disable the animation.
 - **가사 로드 전환**: 가사가 아직 없을 때는 앨범 아트가 화면 가운데에 있다가, 가사가 로드되면 옆으로 밀리면서 가사 열이 아래에서 떠오릅니다. 두 열 배치를 유지한 채 왼쪽 패널만 이동시키므로 레이아웃이 한 번에 바뀌지 않습니다.\
   **Lyrics load transition**: while no lyrics are loaded the album art sits in the centre; once lyrics arrive it slides aside and the lyrics column rises in. The two-column grid is kept and only the left panel moves, so the layout never snaps.
 - **제목 자동 축소**: 긴 제목은 글자 크기가 자동으로 줄어듭니다. 한글·한자·가나는 라틴 문자보다 넓게 계산하고, 설정 크기의 55% 아래로는 내려가지 않습니다.\
@@ -245,7 +249,8 @@ To run only the tests, use `node --test tests/*.test.mjs`. The Quality workflow 
 | `tests/official_video_preference.test.mjs` | 영상 채점, 자막 기준점 파서, AI 판정 경로 / video scoring, caption-cue parser, AI judge path |
 | `tests/broken_sync_timing.test.mjs` | 깨진 타임스탬프 판별 / broken timestamp detection |
 | `tests/romanized_korean_fallback.test.mjs` | 로마자 표기 한국어 가사 판별 / romanized Korean lyrics detection |
-| `tests/inline_pronunciation.test.mjs` | 원문 조각·발음 짝짓기 / pronunciation chunk pairing |
+| `tests/inline_pronunciation.test.mjs` | 발음 대응, 기존 영어 발음 복구, 가라오케 글자 보존 / pronunciation alignment, legacy English readings and karaoke glyph retention |
+| `tests/fullscreen_album_crossfade.test.mjs` | 앨범 로딩·디코딩, 빠른 곡 전환, 실패 처리 / album loading and decoding, rapid skips and failure handling |
 | `tests/ai_result_repair.test.mjs` | AI 응답 줄 수 복구 / AI reply line repair |
 | `tests/video_background_sync.test.mjs` | 영상 되감기 보정 / video seek correction |
 | `tests/video_helper_service.test.mjs` | SSE 파싱, 중복 요청, 시간 제한, 취소와 자원 정리 / SSE parsing, request deduplication, deadlines, cancellation and cleanup |

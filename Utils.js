@@ -706,7 +706,20 @@ const Utils = {
   splitInlinePronunciation(originalText, pronunciation) {
     const raw = String(pronunciation || "");
     if (!raw.includes(this.PRONUNCIATION_SEGMENT_SEPARATOR)) {
-      return { text: raw, segments: null };
+      const words = String(originalText || "").trim().match(/\S+/g) || [];
+      const readings = raw.trim().split(/\s+/);
+      // Legacy English results have no explicit alignment. Only pair complete words
+      // when their counts agree; never distribute pronunciation by character ratio.
+      if (!/[A-Za-z]/.test(originalText) || /[^\p{Script=Latin}\p{N}\p{P}\p{Z}\s]/u.test(originalText)
+          || !raw.trim() || words.length !== readings.length) {
+        return { text: raw, segments: null };
+      }
+      const source = String(originalText).trim();
+      const matches = Array.from(source.matchAll(/\S+/g));
+      return { text: raw, segments: matches.map((match, index) => ({
+        text: match[0], pronunciation: readings[index],
+        gap: source.slice(match.index + match[0].length, matches[index + 1]?.index ?? source.length),
+      })) };
     }
     const parts = raw.split(this.PRONUNCIATION_SEGMENT_SEPARATOR).map((part) => part.trim());
     const cleaned = parts.filter(Boolean).join(" ");
@@ -718,6 +731,14 @@ const Utils = {
       text: cleaned,
       segments: segments.map((segment, index) => ({ ...segment, pronunciation: parts[index] })),
     };
+  },
+  getInlinePronunciationSegments(originalText, pronunciation, segments) {
+    const source = String(originalText || "").trim();
+    if (Array.isArray(segments) && segments.length
+        && segments.map(segment => segment.text + (segment.gap || "")).join("") === source) {
+      return segments;
+    }
+    return this.splitInlinePronunciation(source, pronunciation).segments;
   },
   buildInlinePronunciationHTML(segments) {
     if (!Array.isArray(segments) || segments.length === 0) return "";

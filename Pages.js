@@ -261,8 +261,7 @@ const getLyricsDisplayMode = (isKara, line, text, originalText, text2) => {
 
 		// 조각별 발음이 있으면 별도 줄 대신 원문 조각 아래에 ruby로 붙인다(후리가나와 겹치지 않도록 후리가나는 생략).
 		const inlineSegments = CONFIG.visual["pronunciation-inline"] !== false
-			&& Array.isArray(line?.phoneticSegments) && line.phoneticSegments.length
-			? line.phoneticSegments
+			? Utils.getInlinePronunciationSegments(originalText, text, line?.phoneticSegments)
 			: null;
 
 		if (showTranslatedBelow && inlineSegments) {
@@ -3356,7 +3355,7 @@ const LyricsLineBlock = react.memo(({
 			mainProps,
 			mainContent
 		),
-		!shouldRenderInterlude && !hasParallelKaraokeRows && renderLyricSubLine(
+		!shouldRenderInterlude && !isKara && renderLyricSubLine(
 			"lyrics-lyricsContainer-LyricsLine-phonetic",
 			subText,
 			subCopyText
@@ -5047,6 +5046,30 @@ const getKaraokeWordBounceValues = (position, isActive, startTime, endTime, atte
 	getKaraokeBounceValues(position, isActive, startTime, endTime, attenuation, motionProfile)
 );
 
+const buildKaraokePronunciationElements = (timedChars, charElements, segments, options) => {
+	let charIndex = 0;
+	const take = (text) => {
+		const start = charIndex;
+		let length = 0;
+		while (charIndex < timedChars.length && length < text.length) {
+			length += timedChars[charIndex++].char.length;
+		}
+		return buildKaraokeWordElements(timedChars.slice(start, charIndex), charElements.slice(start, charIndex), {
+			...options, globalCharOffset: options.globalCharOffset + start,
+		});
+	};
+	const leadingSpace = timedChars.map(char => char.char).join("").match(/^\s*/)[0];
+	const children = [take(leadingSpace)];
+	segments.forEach((segment, index) => {
+		children.push(react.createElement("ruby", {
+			className: "lyrics-pronunciation-ruby", key: `pronunciation-${index}`,
+		}, take(segment.text), react.createElement("rt", null, segment.pronunciation)));
+		children.push(take(segment.gap || ""));
+	});
+	children.push(...charElements.slice(charIndex));
+	return children;
+};
+
 const KaraokeLine = react.memo(({ line, position, isActive, isEffectFocused = isActive, isEffectLive = isActive || isEffectFocused, settingsRevision = 0, globalCharOffset = 0, activeGlobalCharIndex = -1, phonetic = null, translation = null, furiganaMapOverride = null, culturalAnnotations = [], renderGranularity = null }) => {
   if (!line) {
           return "";
@@ -5131,6 +5154,8 @@ const KaraokeLine = react.memo(({ line, position, isActive, isEffectFocused = is
 			const rowActiveGlobalCharIndex = rowActiveCharIndex >= 0 ? currentOffset + rowActiveCharIndex : -1;
 			const rowPhonetic = row.phonetic || rowPhonetics[rowIndex] || "";
 			const rowTranslation = row.translation || rowTranslations[rowIndex] || "";
+			const rowInlinePronunciation = CONFIG.visual["pronunciation-inline"] !== false
+				&& Utils.getInlinePronunciationSegments(rowLine.originalText || rowLine.text, rowPhonetic, rowLine.phoneticSegments);
 
 			return react.createElement(
                           "span",
@@ -5149,10 +5174,11 @@ const KaraokeLine = react.memo(({ line, position, isActive, isEffectFocused = is
 					settingsRevision,
 					globalCharOffset: currentOffset,
 					activeGlobalCharIndex: rowActiveGlobalCharIndex,
+					...(rowInlinePronunciation ? { phonetic: rowPhonetic } : {}),
 					culturalAnnotations: culturalAnnotationsByRow[rowIndex],
 					renderGranularity,
 				}),
-				rowPhonetic && react.createElement(
+				!rowInlinePronunciation && rowPhonetic && react.createElement(
 					"span",
 					{ className: "lyrics-lyricsContainer-LyricsLine-phonetic lyrics-karaoke-part-subline" },
 					rowPhonetic
@@ -5380,7 +5406,14 @@ const KaraokeLine = react.memo(({ line, position, isActive, isEffectFocused = is
 			))
 		);
 	});
-	const lineChildren = useTextRun
+	const inlinePronunciation = useMemo(() => !useTextRun && CONFIG.visual["pronunciation-inline"] !== false
+		? Utils.getInlinePronunciationSegments(timedText, phonetic, line.phoneticSegments)
+		: null, [timedText, phonetic, line.phoneticSegments, useTextRun, settingsRevision]);
+	const lineChildren = inlinePronunciation
+		? buildKaraokePronunciationElements(timedChars, charElements, inlinePronunciation, {
+			position, isActive, isComplete, globalCharOffset, activeGlobalCharIndex, wordTimed,
+		})
+		: useTextRun
 		? buildKaraokeTextRunElements(
 			timedChars,
 			position,
@@ -5410,6 +5443,9 @@ const KaraokeLine = react.memo(({ line, position, isActive, isEffectFocused = is
 			dir: useTextRun ? (textDirection === "rtl" ? "ltr" : textDirection) : undefined,
 		},
 		lineChildren,
+		!inlinePronunciation && phonetic && react.createElement("span", {
+			className: "lyrics-lyricsContainer-LyricsLine-phonetic lyrics-karaoke-part-subline",
+		}, phonetic),
 		fallbackCulturalAnnotations.map((annotation) => react.createElement(
 				"sup",
 				{

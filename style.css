@@ -4954,22 +4954,38 @@ ruby rt {
 
 /* fork: 발음을 별도 줄이 아니라 원문 조각마다 아래에 붙여 보여 준다. 발음 스타일 설정 변수를 그대로 쓴다. */
 .lyrics-lyricsContainer-LyricsLine ruby.lyrics-pronunciation-ruby {
+  display: inline-block;
+  vertical-align: bottom;
+  white-space: nowrap;
+  line-height: 1;
   ruby-position: under;
   ruby-align: center;
 }
 
 .lyrics-lyricsContainer-LyricsLine ruby.lyrics-pronunciation-ruby rt {
-  display: ruby-text;
+  display: block;
+  text-align: center;
   font-family: var(--lyrics-phonetic-font-family, var(--lyrics-font-family, var(--font-family)));
   font-size: var(--lyrics-phonetic-font-size, calc(var(--lyrics-font-size) * 0.6));
   font-weight: var(--lyrics-phonetic-font-weight, 400);
   letter-spacing: var(--lyrics-phonetic-letter-spacing, 0);
   opacity: var(--lyrics-phonetic-opacity, 0.7);
-  line-height: 1.2;
-  padding-top: max(0px, var(--lyrics-phonetic-spacing, 4px));
+  line-height: 1.1;
+  margin-top: calc(var(--lyrics-phonetic-spacing, -1px) - 0.12em);
+  margin-bottom: 0;
+  padding-top: 0;
   text-shadow: var(--lyrics-phonetic-outline-shadow, none);
   white-space: nowrap;
   user-select: none;
+}
+
+/* Keep pronunciation pairs readable without spending a narrow pane on gutters. */
+.lyrics-lyricsContainer-LyricsLine:has(.lyrics-pronunciation-ruby) {
+  margin-inline: clamp(6px, 1.5%, 20px);
+}
+
+.split .lyrics-lyricsContainer-LyricsLine:has(.lyrics-pronunciation-ruby) {
+  padding-inline: clamp(6px, 1.5%, 20px);
 }
 
 /* Active line furigana styling */
@@ -15323,4 +15339,45 @@ a.research-media-item:hover {
     opacity var(--iv-lyrics-centering-duration, 620ms) ease,
     filter var(--iv-lyrics-centering-duration, 620ms) ease;
   will-change: transform, opacity;
+}
+
+/* Fullscreen pages have their own gutters in addition to the lyric row. */
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-active
+  .lyrics-lyricsContainer-SyncedLyricsPage:has(.lyrics-pronunciation-ruby),
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-active
+  .lyrics-lyricsContainer-UnsyncedLyricsPage:has(.lyrics-pronunciation-ruby) {
+  padding-inline: clamp(8px, 1.5%, 24px) !important;
+}
+
+#lyrics-fullscreen-container .lyrics-lyricsContainer-SyncedLyricsPage.scrolling-active:has(.lyrics-pronunciation-ruby) {
+  max-width: 100%;
+}
+
+.ivlyrics-album-crossfade {
+  display: block;
+  position: relative;
+  isolation: isolate;
+}
+
+.ivlyrics-album-crossfade > .ivlyrics-album-crossfade-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.ivlyrics-album-crossfade-layer.is-entering {
+  animation: ivlyrics-album-crossfade-in 600ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes ivlyrics-album-crossfade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ivlyrics-album-crossfade-layer.is-entering { animation: none; }
 }

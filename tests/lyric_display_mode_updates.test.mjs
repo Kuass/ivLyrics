@@ -71,6 +71,7 @@ const createHarness = (page, { mode = "replace", scrolling = false } = {}) => {
 		useLyricsPlaybackPosition: () => position,
 		useScrollActivity: () => ({ isScrolling: scrolling, handleContainerClick() {} }),
 		Utils: {
+			getInlinePronunciationSegments: () => null,
 			applyFuriganaIfEnabled(text) {
 				originalRenders++;
 				return CONFIG.visual["furigana-enabled"] && converterReady && locale === "ja"

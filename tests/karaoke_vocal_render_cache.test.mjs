@@ -27,6 +27,7 @@ const createRenderer = (source = currentSource) => {
 	const segmentCalls = [];
 	const CONFIG = { visual: {
 		"sync-data-custom-speaker-colors-enabled": true,
+		"pronunciation-inline": false,
 		"karaoke-text-effects": true,
 	} };
 	const window = {

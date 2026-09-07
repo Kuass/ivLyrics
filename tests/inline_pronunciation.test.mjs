@@ -52,3 +52,56 @@ test("segments Japanese text without spaces and reassembles it", () => {
     assert.ok(segments.length >= 2);
     assert.equal(segments.map((s) => s.text + s.gap).join(""), original);
 });
+
+test("aligns legacy English pronunciation without losing punctuation or repeated spaces", () => {
+    const result = utils.splitInlinePronunciation("Hello,  don't go away!", "헬로 돈트 고 어웨이");
+    same(result.segments.map(s => [s.text, s.pronunciation, s.gap]), [
+        ["Hello,", "헬로", "  "], ["don't", "돈트", " "], ["go", "고", " "], ["away!", "어웨이", ""],
+    ]);
+    assert.equal(utils.splitInlinePronunciation("I love you", "아이 러브유").segments, null);
+    assert.equal(utils.splitInlinePronunciation("Hello world", "").segments, null);
+});
+
+test("rejects stale alignment and recovers matching legacy readings", () => {
+    const segments = utils.getInlinePronunciationSegments("Hello world", "헬로 월드", [{ text: "wrong", pronunciation: "잘못" }]);
+    same(segments.map(s => s.text), ["Hello", "world"]);
+});
+
+test("karaoke wraps timed glyphs with pronunciation and preserves every glyph node", () => {
+    const pages = read("Pages.js");
+    const from = pages.indexOf("const buildKaraokePronunciationElements =");
+    const to = pages.indexOf("const KaraokeLine =", from);
+    const karaokeContext = vm.createContext({
+        react: { createElement: (tag, props, ...children) => ({ tag, props, children }) },
+        buildKaraokeWordElements: (chars, elements) => elements,
+    });
+    vm.runInContext(`${pages.slice(from, to)};globalThis.render = buildKaraokePronunciationElements`, karaokeContext);
+    const text = "  Hello world  ";
+    const chars = Array.from(text, (char, i) => ({ char, startTime: i * 100 }));
+    const nodes = chars.map((c, i) => ({ glyph: c.char, index: i }));
+    const segments = utils.getInlinePronunciationSegments(text, "헬로 월드");
+    const rendered = karaokeContext.render(chars, nodes, segments, { globalCharOffset: 0 });
+    const rubies = rendered.filter(n => n?.tag === "ruby");
+    assert.equal(rubies.length, 2);
+    same(rubies.map(n => n.children[1].children[0]), ["헬로", "월드"]);
+    const flattenGlyphs = n => Array.isArray(n) ? n.flatMap(flattenGlyphs)
+        : n?.glyph ? [n] : n?.tag === "ruby" ? flattenGlyphs(n.children[0]) : [];
+    const glyphs = flattenGlyphs(rendered);
+    assert.equal(glyphs.map(n => n.glyph).join(""), text);
+    glyphs.forEach((node, i) => assert.strictEqual(node, nodes[i]));
+});
+
+test("plain lyrics put pronunciation inline while leaving translation below", () => {
+    const pages = read("Pages.js");
+    const from = pages.indexOf("const safeRenderText =");
+    const to = pages.indexOf("const getFirstTrimmedString =", from);
+    const config = { visual: { "translate:display-mode": "below" } };
+    const ctx = vm.createContext({ CONFIG: config, Utils: { ...utils, applyFuriganaIfEnabled: text => text } });
+    vm.runInContext(`${pages.slice(from, to)};globalThis.display = getLyricsDisplayMode`, ctx);
+    const result = ctx.display(false, {}, "헬로 월드", "Hello world", "안녕 세상");
+    assert.match(result.mainText, /<rt>헬로<\/rt>/);
+    assert.equal(result.subText, null);
+    assert.equal(result.subText2, "안녕 세상");
+    config.visual["pronunciation-inline"] = false;
+    assert.equal(ctx.display(false, {}, "헬로 월드", "Hello world", "안녕 세상").subText, "헬로 월드");
+});

@@ -57,7 +57,7 @@ const createHarness = (source = currentSource, options = {}) => {
 	};
 	const context = vm.createContext({
 		CONFIG, window, console, Math: measuredMath,
-		Utils: { applyFuriganaIfEnabled: text => text },
+		Utils: { getInlinePronunciationSegments: () => null, applyFuriganaIfEnabled: text => text },
 		getCopyableText: value => Array.isArray(value) ? value.join("") : String(value ?? ""),
 		toFiniteTime: value => Number.isFinite(Number(value)) ? Number(value) : null,
 		KARAOKE_RELEASE_WINDOW_MS: 820,
