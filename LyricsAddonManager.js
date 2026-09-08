@@ -378,6 +378,19 @@
         return hits >= ROMANIZED_KOREAN_MIN_HITS && hits >= tokens.length * ROMANIZED_KOREAN_MIN_RATIO;
     }
 
+    function getLyricsFallbackPriority(result, info = {}) {
+        // A Hangul title is a conservative hint, not an artist-nationality guess.
+        // Han-only Korean pronunciation guides must lose even to romanization.
+        const text = collectLyricsLineText(result).join('\n');
+        const hasHangulTitle = /\p{Script=Hangul}/u.test(String(info?.title || ''));
+        if (hasHangulTitle && !/[\p{Script=Hangul}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(text)) {
+            const letters = text.match(/\p{Letter}/gu) || [];
+            const hanCount = (text.match(/\p{Script=Han}/gu) || []).length;
+            if (hanCount > 0 && hanCount >= letters.length / 2) return 2;
+        }
+        return looksRomanizedKorean(result) ? 1 : 0;
+    }
+
     function normalizeInstrumentalBreakSyllables(syllables, marker, startTime, endTime) {
         if (!Array.isArray(syllables) || syllables.length === 0) {
             return { syllables, changed: false };
@@ -1584,7 +1597,7 @@
                 hasSynced,
                 hasUnsynced,
                 isPseudoKaraoke,
-                isRomanizedKorean: looksRomanizedKorean(finalResult)
+                fallbackPriority: getLyricsFallbackPriority(finalResult, info)
             };
         }
 
@@ -1694,8 +1707,16 @@
                 enabledProviders.map(provider => [provider.id, this._getProviderTypeSettings(provider)])
             );
             const providerAttempts = new Map();
-            // 로마자 표기로만 온 가사는 다른 제공자를 모두 시도한 뒤의 마지막 선택지로 미룬다.
-            let deferredRomanized = null;
+            // Prefer ordinary lyrics, then romanization, then Han pronunciation guides.
+            // Equal-priority fallbacks retain the configured provider/type order.
+            let deferredFallback = null;
+            const deferFallback = (candidate, result, providerId, lyricsType) => {
+                if (!candidate.fallbackPriority) return false;
+                if (!deferredFallback || candidate.fallbackPriority < deferredFallback.priority) {
+                    deferredFallback = { result, providerId, lyricsType, priority: candidate.fallbackPriority };
+                }
+                return true;
+            };
             const loadProviderOnce = async (provider, lyricsType = null) => {
                 if (providerAttempts.has(provider.id)) {
                     return providerAttempts.get(provider.id);
@@ -1756,8 +1777,7 @@
                         const candidate = await loadProviderOnce(provider, lyricsType);
                         const selectedResult = this._selectProviderCandidateForType(candidate, lyricsType);
                         if (!selectedResult) continue;
-                        if (candidate.isRomanizedKorean) {
-                            deferredRomanized ??= { result: selectedResult, providerId: provider.id, lyricsType };
+                        if (deferFallback(candidate, selectedResult, provider.id, lyricsType)) {
                             continue;
                         }
                         const finalResult = this._finalizeLyricsFetch(
@@ -1786,8 +1806,7 @@
                                     ? LYRICS_TYPES.UNSYNCED
                                     : null;
                     if (!selectionType) continue;
-                    if (candidate.isRomanizedKorean) {
-                        deferredRomanized ??= { result: candidate.result, providerId: provider.id, lyricsType: selectionType };
+                    if (deferFallback(candidate, candidate.result, provider.id, selectionType)) {
                         continue;
                     }
                     const finalResult = this._finalizeLyricsFetch(
@@ -1802,15 +1821,15 @@
                 }
             }
 
-            // 원문 표기 가사가 어느 제공자에도 없으면 로마자 표기 결과라도 보여 준다.
-            if (deferredRomanized) {
-                console.warn(`[LyricsAddonManager] Only romanized lyrics found; using ${deferredRomanized.providerId}`);
+            // Preserve the best available pronunciation guide when no ordinary lyrics exist.
+            if (deferredFallback) {
+                console.warn(`[LyricsAddonManager] Only fallback lyrics found; using ${deferredFallback.providerId}`);
                 const finalResult = this._finalizeLyricsFetch(
-                    deferredRomanized.result,
+                    deferredFallback.result,
                     info,
-                    deferredRomanized.providerId,
+                    deferredFallback.providerId,
                     selectionPolicy,
-                    deferredRomanized.lyricsType
+                    deferredFallback.lyricsType
                 );
                 this.clearActiveLyricsSearchProgress(info.uri, forcedProviderId);
                 return finalResult;
