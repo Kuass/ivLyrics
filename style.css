@@ -1451,6 +1451,19 @@ body.ivlyrics-page-active .main-topBar-container {
   position: relative;
 }
 
+/* During a track handoff the album panel remains in the fullscreen grid while
+ * lyric data is fetched. Remove the loading page from grid auto-placement so
+ * the spinner stays centered in the viewport instead of being pinned to a
+ * variable-height row above the album. */
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-active.fullscreen-lyrics-loading > .lyrics-lyricsContainer-LyricsUnavailablePage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
 .lyrics-lyricsContainer-LyricsUnavailableMessage--motion {
   display: inline-flex;
   align-items: center;
@@ -5956,7 +5969,7 @@ ruby rt {
 
 .lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics .lyrics-lyricsContainer-SyncedLyricsPage,
 .lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics .lyrics-lyricsContainer-UnsyncedLyricsPage,
-.lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics .lyrics-lyricsContainer-LyricsUnavailablePage {
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-no-lyrics:not(.fullscreen-lyrics-loading) .lyrics-lyricsContainer-LyricsUnavailablePage {
   display: none !important;
 }
 
