@@ -4597,6 +4597,11 @@ class LyricsContainer extends react.Component {
         "video-background": { phase: "idle", revision: 0 },
       },
       currentLyricIndex: 0,
+      // Track changes keep the previous presentation alive while the next
+      // provider request is pending.  `empty` is only assigned after a
+      // request has resolved without any usable lyric lines.
+      lyricsStatus: "idle",
+      lyricsTransitionSeq: 0,
       videoInfo: null,
       // 메타데이터 번역
       translatedMetadata: null,
@@ -4622,6 +4627,7 @@ class LyricsContainer extends react.Component {
     this._lyricsFetchSeq = 0;
     this._activeLyricsFetchSeq = 0;
     this._lyricsPresentationSeq = 0;
+    this._lyricsTransitionSeq = 0;
     this._lyricsEditRequestSeq = 0;
     this._playbackTrackResolutionSeq = 0;
     this._playbackTrackResolutionTimer = null;
@@ -5735,19 +5741,34 @@ class LyricsContainer extends react.Component {
     this.clearCulturalAnnotationsLoading();
   }
 
-  getLoadingLyricsState(info, requestSeq) {
+  getLoadingLyricsState(info, requestSeq, options = {}) {
+    const preserveCurrentLyrics = options.preserveCurrentLyrics !== false;
+    const previousLyrics = preserveCurrentLyrics && this.state
+      ? {
+        karaoke: this.state.karaoke,
+        karaokeGranularity: this.state.karaokeGranularity,
+        synced: this.state.synced,
+        unsynced: this.state.unsynced,
+        currentLyrics: this.state.currentLyrics,
+        syncType: this.state.syncType,
+        syncPoints: this.state.syncPoints,
+        syncTypeBreakdown: this.state.syncTypeBreakdown,
+      }
+      : {};
     return {
       ...emptyState,
+      ...previousLyrics,
       uri: info?.uri || "",
       lyricsRequestSeq: requestSeq || 0,
       provider: "",
       contributors: null,
-      currentLyrics: [],
       language: null,
       translatedMetadata: null,
       trackLyricsProviderOverride: null,
       trackBackgroundOverride: null,
       isLoading: true,
+      lyricsStatus: "loading",
+      lyricsTransitionSeq: this._lyricsTransitionSeq,
       isCached: false,
       error: null,
       artist: info?.artist || "",
@@ -6897,6 +6918,7 @@ class LyricsContainer extends react.Component {
       }
 
       const requestSeq = ++this._lyricsFetchSeq;
+      const transitionSeq = ++this._lyricsTransitionSeq;
       const requestUri = info.uri;
       const hasSpotifyTrackId = !!Utils.extractTrackId(info.uri);
       this._activeLyricsFetchSeq = requestSeq;
@@ -7067,17 +7089,9 @@ class LyricsContainer extends react.Component {
         this.lastModeBeforeLoading = currentMode !== -1 ? currentMode : SYNCED;
         lyricsLoadingToken = this.startLyricsLoading();
         this.setState({
-          ...emptyState,
-          uri: requestUri,
-          lyricsRequestSeq: requestSeq,
-          artist: info.artist,
-          title: info.title,
-          coverUrl: info.image,
-          provider: "",
-          contributors: null,
+          ...this.getLoadingLyricsState(info, requestSeq),
           trackLyricsProviderOverride,
           trackBackgroundOverride,
-          isLoading: true,
           isCached: false,
         });
 
@@ -7163,6 +7177,7 @@ class LyricsContainer extends react.Component {
       }
 
       const initialLyricsForMode = this.resolveLyricsForMode(tempState, finalMode);
+      const hasResolvedLyrics = Array.isArray(initialLyricsForMode) && initialLyricsForMode.length > 0;
       const canCompleteLyricsLoading = lyricsLoadingToken !== null &&
         isLatestLyricsRequest() &&
         Array.isArray(initialLyricsForMode) &&
@@ -7237,6 +7252,8 @@ class LyricsContainer extends react.Component {
           language: defaultLanguage,
           ...this.applyTranslationStates(tempState),
           currentLyrics: sharedLyricsForMode || initialLyricsForMode || [],
+          lyricsStatus: hasResolvedLyrics ? "ready" : "empty",
+          lyricsTransitionSeq: transitionSeq,
         });
         lyricsLoadingCompleted = canCompleteLyricsLoading && isLatestLyricsRequest();
         return;
@@ -7247,6 +7264,8 @@ class LyricsContainer extends react.Component {
         ...tempState,
         ...this.applyTranslationStates(tempState),
         currentLyrics: sharedLyricsForMode || initialLyricsForMode || [],
+        lyricsStatus: hasResolvedLyrics ? "ready" : "empty",
+        lyricsTransitionSeq: transitionSeq,
       });
       lyricsLoadingCompleted = canCompleteLyricsLoading && isLatestLyricsRequest();
     } catch (error) {
@@ -7257,6 +7276,7 @@ class LyricsContainer extends react.Component {
       this.setState({
         error: `Failed to fetch lyrics: ${error.message}`,
         isLoading: false,
+        lyricsStatus: "empty",
         ...emptyState,
         uri: this.currentTrackUri,
         lyricsRequestSeq: this._activeLyricsFetchSeq,
@@ -7302,7 +7322,7 @@ class LyricsContainer extends react.Component {
     if (!lyrics) {
       if (lyricsState.isLoading) return;
       if (!isActivePresentation()) return;
-      this.setState({ currentLyrics: [] });
+      this.setState({ currentLyrics: [], lyricsStatus: "empty" });
       // 오버레이에 가사 없음 상태 전송 (트랙 정보 업데이트용)
       this.publishLyricsPresentation([], {
         uri: lyricsState.uri,
@@ -8777,18 +8797,19 @@ class LyricsContainer extends react.Component {
     if (candidateUri && candidateUri === this.currentTrackUri) return false;
 
     const transitionSeq = ++this._lyricsFetchSeq;
+    this._lyricsTransitionSeq += 1;
     this._activeLyricsFetchSeq = transitionSeq;
     this.clearPendingLyricsUpdates();
     if (this.state.isLyricsEditModalOpen) {
       this.closeLyricsEditModal({ force: true });
     }
+    // Keep the outgoing lyric arrays mounted until the replacement request
+    // resolves. Clearing them here makes fullscreen immediately enter the
+    // no-lyrics layout and causes a visible jump while providers are loading.
     this.setState({
-      karaoke: null,
-      karaokeGranularity: null,
-      synced: null,
-      unsynced: null,
-      currentLyrics: null,
       isLoading: true,
+      lyricsStatus: "loading",
+      lyricsTransitionSeq: this._lyricsTransitionSeq,
       lyricsRequestSeq: transitionSeq,
     });
     return true;
@@ -8814,6 +8835,8 @@ class LyricsContainer extends react.Component {
       coverUrl: track?.metadata?.image_xlarge_url || track?.metadata?.image_url || null,
       error: "DJ narration",
       isLoading: false,
+      lyricsStatus: "empty",
+      lyricsTransitionSeq: ++this._lyricsTransitionSeq,
       explicitMode: -1,
       lyricsRequestSeq: transitionSeq,
       videoInfo: null,
@@ -10138,6 +10161,9 @@ class LyricsContainer extends react.Component {
       }
       if (shouldUseFullscreenNoLyricsLayout) {
         fullscreenClasses += " fullscreen-no-lyrics";
+      }
+      if (this.state.isLoading && this.state.lyricsStatus === "loading") {
+        fullscreenClasses += " fullscreen-lyrics-loading";
       }
       // Portrait mode class (not in TV mode)
       if (this._isPortraitViewport && CONFIG.visual["fullscreen-tv-mode"] !== true) {
