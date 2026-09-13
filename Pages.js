@@ -5979,6 +5979,13 @@ const useSyncedLyricsEngine = ({
 		// This synchronous pass consumes any already queued layout notification.
 		// Keep offset and position-index in the same commit as before.
 		layoutObserverRef.current?.cancelPending();
+		// Auto-follow positions rows with transforms. Native scroll left by
+		// focus/scroll anchoring must not add a second, invisible displacement.
+		const container = containerRef.current;
+		if (!isScrolling && container) {
+			if (container.clientHeight === 0) return;
+			if (container.scrollTop) container.scrollTop = 0;
+		}
 		const nextOffset = getCompactSyncedOffset(containerRef.current, activeLineRef.current, isScrolling);
 		setCompactOffset((prevOffset) => (
 			Math.abs(prevOffset - nextOffset) < 0.5 ? prevOffset : nextOffset
@@ -7970,6 +7977,85 @@ const KaraokeLine = react.memo(({ line, position, isActive, isEffectFocused = is
 	);
 });
 
+// Reveal is a bounded visual effect on existing rows. Never remount the page
+// to restart it: the engine's refs, measured offset and scroll state must keep
+// referring to the same DOM while cached/translated lyrics arrive.
+const playLyricsTrackReveal = (page) => {
+	if (!page || prefersReducedLyricsMotion()) return () => {};
+	const bounds = page.getBoundingClientRect();
+	if (bounds.height <= 0 || bounds.width <= 0) return () => {};
+	const rows = [];
+	for (const row of page.querySelectorAll(".lyrics-lyricsContainer-LyricsLine")) {
+		if (row.classList.contains("lyrics-lyricsContainer-LyricsLine-paddingLine")
+			|| row.getAttribute("aria-hidden") === "true") continue;
+		const rect = row.getBoundingClientRect();
+		if (rect.height > 0 && rect.width > 0 && rect.bottom > bounds.top && rect.top < bounds.bottom) {
+			rows.push({ row, top: rect.top });
+			if (rows.length >= 12) break;
+		}
+	}
+	rows.sort((left, right) => left.top - right.top);
+	const animations = [];
+	for (let index = 0; index < rows.length; index++) {
+		const { row } = rows[index];
+		if (typeof row.animate !== "function") continue;
+		// Individual translate composes with the centering transform. Moving the
+		// whole row also keeps vocal-to-row measured distances unchanged.
+		const animation = row.animate([
+			{ translate: "0 24px" },
+			{ translate: "0 -1px", offset: 0.72 },
+			{ translate: "0 0" },
+		], {
+			duration: 420,
+			delay: Math.min(index * 26, 170),
+			easing: "cubic-bezier(0.16, 1, 0.3, 1)",
+			fill: "backwards",
+		});
+		animations.push(animation);
+		animation.addEventListener("finish", () => animation.cancel(), { once: true });
+	}
+	return () => animations.forEach(animation => animation.cancel());
+};
+
+const useLyricsTrackReveal = (pageRef, trackRevealKey, hasLyrics) => {
+	const revealedTrackRef = useRef(null);
+	useSyncedLayoutEffect(() => {
+		if (!trackRevealKey || !hasLyrics || revealedTrackRef.current === trackRevealKey) return;
+		const page = pageRef.current;
+		if (!page) return;
+		revealedTrackRef.current = trackRevealKey;
+		if (prefersReducedLyricsMotion()) return;
+		let cancelReveal = () => {};
+		let cancelled = false;
+		// The centering layout effects finish before this single animation batch.
+		const frame = requestAnimationFrame(() => {
+			if (!cancelled && pageRef.current === page && page.isConnected) {
+				cancelReveal = playLyricsTrackReveal(page);
+			}
+		});
+		const cancel = () => {
+			cancelled = true;
+			cancelAnimationFrame(frame);
+			cancelReveal();
+		};
+		const motionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+		const player = Spicetify.Player;
+		player?.addEventListener?.("onseek", cancel);
+		page.addEventListener("pointerdown", cancel, { passive: true });
+		page.addEventListener("wheel", cancel, { passive: true });
+		window.addEventListener("ivLyrics", cancel);
+		motionQuery?.addEventListener?.("change", cancel);
+		return () => {
+			cancel();
+			player?.removeEventListener?.("onseek", cancel);
+			page.removeEventListener("pointerdown", cancel);
+			page.removeEventListener("wheel", cancel);
+			window.removeEventListener("ivLyrics", cancel);
+			motionQuery?.removeEventListener?.("change", cancel);
+		};
+	}, [pageRef, trackRevealKey, hasLyrics]);
+};
+
 const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara, karaokeSource = null, karaokeRenderGranularity = null, reRenderLyricsPage = null, trackRevealKey = null }) => {
 	const position = useLyricsPlaybackPosition();
 	const karaokePosition = isKara ? position + getPseudoKaraokeRenderAdvance(karaokeSource) : position;
@@ -8070,6 +8156,8 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copy
 		cache: renderCache,
 	}), [renderItems, isKara, karaokeRenderGranularity, itemPosition, setCompactActiveLineAnchor, reRenderLyricsPage, renderCache]);
 
+	useLyricsTrackReveal(lyricContainerEle, trackRevealKey, Array.isArray(lyrics) && lyrics.length > 0);
+
 	if (!Array.isArray(lyrics) || lyrics.length === 0) {
 		return react.createElement("div", { className: "lyrics-lyricsContainer-SyncedLyricsPage" }, renderLyricsUnavailable(I18n.t("messages.noLyrics")));
 	}
@@ -8077,7 +8165,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copy
 	return react.createElement(
 		"div",
 		{
-			className: `lyrics-lyricsContainer-SyncedLyricsPage${isKara ? " is-karaoke" : ""}${karaokeLineTransitionClass}${isScrolling ? " scrolling-active" : ""}${trackRevealKey ? " lyrics-track-enter" : ""}${trackRevealKey ? ` lyrics-track-enter-${trackRevealKey}` : ""}`,
+			className: `lyrics-lyricsContainer-SyncedLyricsPage${isKara ? " is-karaoke" : ""}${karaokeLineTransitionClass}${isScrolling ? " scrolling-active" : ""}`,
 			ref: containerRefCallback,
 			onClick: handleContainerClick,
 			tabIndex: 0,
@@ -8091,7 +8179,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copy
 				style: {
 					"--offset": `${compactOffset}px`,
 				},
-				key: `${lyricsId}-${trackRevealKey || "stable"}`,
+				key: lyricsId,
 			},
 			...renderedItems
           )
@@ -8358,6 +8446,8 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributo
 		cache: renderCache,
 	}), [renderItems, isKara, itemPosition, activeLineRef, reRenderLyricsPage, renderCache]);
 
+	useLyricsTrackReveal(pageRef, trackRevealKey, Array.isArray(lyrics) && lyrics.length > 0);
+
 	if (!Array.isArray(lyrics) || lyrics.length === 0) {
 		return react.createElement("div", { className: "lyrics-lyricsContainer-UnsyncedLyricsPage" }, renderLyricsUnavailable(I18n.t("messages.noLyrics")));
 	}
@@ -8365,8 +8455,8 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributo
 	return react.createElement(
 		"div",
 		{
-			className: `lyrics-lyricsContainer-UnsyncedLyricsPage${isKara ? " is-karaoke" : ""}${karaokeLineTransitionClass}${trackRevealKey ? " lyrics-track-enter" : ""}${trackRevealKey ? ` lyrics-track-enter-${trackRevealKey}` : ""}`,
-			key: `${lyricsId}-${trackRevealKey || "stable"}`,
+			className: `lyrics-lyricsContainer-UnsyncedLyricsPage${isKara ? " is-karaoke" : ""}${karaokeLineTransitionClass}`,
+			key: lyricsId,
 			ref: pageRef,
 			onClick: handleContainerClick,
 		},
@@ -8382,6 +8472,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributo
 });
 
 const UnsyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, trackRevealKey = null }) => {
+	const pageRef = useRef(null);
 	const lyricsDisplayMode = CONFIG.visual["translate:display-mode"];
 	const furiganaEnabled = !!CONFIG.visual["furigana-enabled"];
 	const furiganaReady = window.FuriganaConverter?.isAvailable?.() === true;
@@ -8415,6 +8506,8 @@ const UnsyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, co
 		};
 	}), [lyricsArray, lyrics, lyricsDisplayMode, furiganaEnabled, furiganaReady, lyricsLocale]);
 
+	useLyricsTrackReveal(pageRef, trackRevealKey, lyricsArray.length > 0);
+
 	if (lyricsArray.length === 0) {
 		return react.createElement("div", { className: "lyrics-lyricsContainer-UnsyncedLyricsPage" }, renderLyricsUnavailable(I18n.t("messages.noLyrics")));
 	}
@@ -8422,8 +8515,8 @@ const UnsyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, co
 	return react.createElement(
 		"div",
 		{
-			className: `lyrics-lyricsContainer-UnsyncedLyricsPage${trackRevealKey ? " lyrics-track-enter" : ""}${trackRevealKey ? ` lyrics-track-enter-${trackRevealKey}` : ""}`,
-			key: trackRevealKey ? `track-${trackRevealKey}` : undefined,
+			className: "lyrics-lyricsContainer-UnsyncedLyricsPage",
+			ref: pageRef,
 		},
 		react.createElement("p", {
 			className: "lyrics-lyricsContainer-LyricsUnsyncedPadding",
@@ -8432,7 +8525,6 @@ const UnsyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, co
 			react.createElement(LyricsLineBlock, {
 				key: item.key,
 				className: "lyrics-lyricsContainer-LyricsLine lyrics-lyricsContainer-LyricsLine-active",
-				style: { "--lyrics-track-enter-index": item.key },
 				mainText: item.mainText,
 				subText: item.subText,
 				subText2: item.subText2,

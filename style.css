@@ -1627,10 +1627,20 @@ body.ivlyrics-page-active .main-topBar-container {
   grid-area: 1 / 1 / -1 / -1;
   grid-template-rows: 1fr 30px;
   overflow: hidden;
+  overflow-anchor: none;
   text-align: var(--lyrics-align-text);
   user-select: text;
   z-index: 2;
   position: relative;
+}
+
+/* Auto-follow uses row transforms, not native scrolling. `hidden` still lets
+ * focus and scroll anchoring scroll the entire page above its lyric anchor.
+ * Manual scrolling retains the existing scrolling-active overflow rules. */
+@supports (overflow: clip) {
+  .lyrics-lyricsContainer-SyncedLyricsPage:not(.scrolling-active) {
+    overflow: clip !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1758,45 +1768,6 @@ body.ivlyrics-page-active .main-topBar-container {
 
 .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-active) {
   letter-spacing: -0.005em;
-}
-
-/* Track handoff reveal: keep the synced row transform (position-index/offset)
- * untouched and animate only its text children. This gives each incoming line
- * a short spring-like rise without changing lyric anchoring or layout. */
-.lyrics-track-enter
-  :is(.lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-paddingLine) > p,
-      .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-paddingLine) > .lyrics-lyricsContainer-LyricsLine-phonetic,
-      .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-paddingLine) > .lyrics-lyricsContainer-LyricsLine-translation,
-      .lyrics-lyricsContainer-LyricsLine:not(.lyrics-lyricsContainer-LyricsLine-paddingLine) > .lyrics-lyricsContainer-LyricsLine-culturalNote) {
-  animation: ivLyricsTrackLineRise 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: min(170ms, max(0ms, calc((var(--lyrics-track-enter-index, var(--animation-index, 1)) - 1) * 26ms)));
-}
-
-@keyframes ivLyricsTrackLineRise {
-  0% {
-    translate: 0 16px;
-    scale: 0.985;
-  }
-  64% {
-    translate: 0 -2px;
-    scale: 1.002;
-  }
-  100% {
-    translate: 0 0;
-    scale: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lyrics-track-enter
-    :is(.lyrics-lyricsContainer-LyricsLine > p,
-        .lyrics-lyricsContainer-LyricsLine > .lyrics-lyricsContainer-LyricsLine-phonetic,
-        .lyrics-lyricsContainer-LyricsLine > .lyrics-lyricsContainer-LyricsLine-translation,
-        .lyrics-lyricsContainer-LyricsLine > .lyrics-lyricsContainer-LyricsLine-culturalNote) {
-    animation: none;
-    translate: none;
-    scale: 1;
-  }
 }
 
 .lyrics-lyricsContainer-LyricsContainer.blur-enabled .lyrics-lyricsContainer-SyncedLyrics .lyrics-lyricsContainer-LyricsLine {
@@ -5729,6 +5700,7 @@ ruby rt {
   display: grid;
   grid-template-rows: 1fr 30px;
   overflow: hidden;
+  overflow-anchor: none;
   text-align: var(--lyrics-align-text);
   transition:
     opacity var(--iv-motion-duration-medium) var(--iv-motion-ease-standard),

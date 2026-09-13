@@ -69,6 +69,9 @@ const createHarness = (page, { mode = "replace", scrolling = false } = {}) => {
 	const context = vm.createContext({
 		react, CONFIG, window, I18n: { t: key => key },
 		useMemo, useState, useRef, useCallback, useEffect, useSyncedLayoutEffect: useEffect,
+		// This fixture exercises display memoization, not DOM animation. Reveal
+		// lifecycle and page reconciliation keys are covered in lyrics_track_reveal.
+		useLyricsTrackReveal() {},
 		useLyricsPlaybackPosition: () => position,
 		useScrollActivity: () => ({ isScrolling: scrolling, handleContainerClick() {} }),
 		Utils: {
