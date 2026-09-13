@@ -217,6 +217,7 @@ const isSpotifyPlaybackActive = (playerState = Spicetify.Player?.data) => {
 
 const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, coverMode, videoScale, externalVideoInfo, onLoadingChange }) => {
     const { useState, useEffect, useRef, useCallback } = react;
+    const useIsoLayoutEffect = react.useLayoutEffect || useEffect;
     const VIDEO_BACKGROUND_DEBUG = false;
     const videoBackgroundDebug = (...args) => {
         if (VIDEO_BACKGROUND_DEBUG) {
@@ -306,7 +307,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
 
     // Capture the previous artwork before the new track is revealed.  The
     // old layer is removed after a single compositor-only crossfade.
-    useEffect(() => {
+    useIsoLayoutEffect(() => {
         const previousUrl = previousFallbackUrlRef.current;
         if (previousUrl && previousUrl !== albumArtUrl) {
             setPreviousFallbackUrl(previousUrl);

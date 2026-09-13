@@ -10336,6 +10336,7 @@ class LyricsContainer extends react.Component {
       (isKaraokeRenderMode(mode) && Array.isArray(this.state.karaoke) && this.state.karaoke.length > 0) ||
       (mode === SYNCED && Array.isArray(this.state.synced) && this.state.synced.length > 0);
     const canAdjustTrackSync = hasTrackSyncLyrics &&
+      !suppressStaleLyricsPage &&
       !this.state.showMarketplace &&
       !shouldHideFullscreenLyrics &&
       !isSyncCreatorActive &&
@@ -10378,23 +10379,23 @@ class LyricsContainer extends react.Component {
         title: this.state.title,
         artist: this.state.artist,
         isFullscreen: this.state.isFullscreen,
-        currentLyricIndex: shouldHideFullscreenLyrics ? 0 : this.state.currentLyricIndex || 0,
-        totalLyrics: shouldHideFullscreenLyrics
+        currentLyricIndex: shouldHideFullscreenLyrics || suppressStaleLyricsPage ? 0 : this.state.currentLyricIndex || 0,
+        totalLyrics: shouldHideFullscreenLyrics || suppressStaleLyricsPage
           ? 0
           : Array.isArray(this.state.currentLyrics)
             ? this.state.currentLyrics.length
             : 0,
-        activeLyric: shouldHideFullscreenLyrics
+        activeLyric: shouldHideFullscreenLyrics || suppressStaleLyricsPage
           ? ""
           : getPlainLyricsLineText(
             Array.isArray(this.state.currentLyrics)
               ? this.state.currentLyrics[this.state.currentLyricIndex || 0]
               : null
           ),
-        activeLyrics: shouldHideFullscreenLyrics || !Array.isArray(this.state.currentLyrics)
+        activeLyrics: shouldHideFullscreenLyrics || suppressStaleLyricsPage || !Array.isArray(this.state.currentLyrics)
           ? []
           : this.state.currentLyrics,
-        activeLyricsKaraoke: !shouldHideFullscreenLyrics && isKaraokeRenderMode(mode) && !!this.state.karaoke,
+        activeLyricsKaraoke: !shouldHideFullscreenLyrics && !suppressStaleLyricsPage && isKaraokeRenderMode(mode) && !!this.state.karaoke,
         karaokeSource: this.state.karaokeSource,
         lyricsSettingsRevision: this.reRenderLyricsPage,
         translatedMetadata: this.state.translatedMetadata,
