@@ -7970,7 +7970,7 @@ const KaraokeLine = react.memo(({ line, position, isActive, isEffectFocused = is
 	);
 });
 
-const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara, karaokeSource = null, karaokeRenderGranularity = null, reRenderLyricsPage = null }) => {
+const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara, karaokeSource = null, karaokeRenderGranularity = null, reRenderLyricsPage = null, trackRevealKey = null }) => {
 	const position = useLyricsPlaybackPosition();
 	const karaokePosition = isKara ? position + getPseudoKaraokeRenderAdvance(karaokeSource) : position;
 	const karaokeLineTransitionClass = isKara && CONFIG.visual["karaoke-line-transition"]
@@ -8077,7 +8077,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copy
 	return react.createElement(
 		"div",
 		{
-			className: `lyrics-lyricsContainer-SyncedLyricsPage${isKara ? " is-karaoke" : ""}${karaokeLineTransitionClass}${isScrolling ? " scrolling-active" : ""}`,
+			className: `lyrics-lyricsContainer-SyncedLyricsPage${isKara ? " is-karaoke" : ""}${karaokeLineTransitionClass}${isScrolling ? " scrolling-active" : ""}${trackRevealKey ? " lyrics-track-enter" : ""}${trackRevealKey ? ` lyrics-track-enter-${trackRevealKey}` : ""}`,
 			ref: containerRefCallback,
 			onClick: handleContainerClick,
 			tabIndex: 0,
@@ -8091,7 +8091,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copy
 				style: {
 					"--offset": `${compactOffset}px`,
 				},
-				key: lyricsId,
+				key: `${lyricsId}-${trackRevealKey || "stable"}`,
 			},
 			...renderedItems
           )
@@ -8325,7 +8325,7 @@ function isInViewport(element) {
 	);
 }
 
-const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara, karaokeSource = null, reRenderLyricsPage = null }) => {
+const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara, karaokeSource = null, reRenderLyricsPage = null, trackRevealKey = null }) => {
 	const position = useLyricsPlaybackPosition();
 	const karaokePosition = isKara ? position + getPseudoKaraokeRenderAdvance(karaokeSource) : position;
 	const karaokeLineTransitionClass = isKara && CONFIG.visual["karaoke-line-transition"]
@@ -8365,8 +8365,8 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributo
 	return react.createElement(
 		"div",
 		{
-			className: `lyrics-lyricsContainer-UnsyncedLyricsPage${isKara ? " is-karaoke" : ""}${karaokeLineTransitionClass}`,
-			key: lyricsId,
+			className: `lyrics-lyricsContainer-UnsyncedLyricsPage${isKara ? " is-karaoke" : ""}${karaokeLineTransitionClass}${trackRevealKey ? " lyrics-track-enter" : ""}${trackRevealKey ? ` lyrics-track-enter-${trackRevealKey}` : ""}`,
+			key: `${lyricsId}-${trackRevealKey || "stable"}`,
 			ref: pageRef,
 			onClick: handleContainerClick,
 		},
@@ -8381,7 +8381,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributo
 	);
 });
 
-const UnsyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright }) => {
+const UnsyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, trackRevealKey = null }) => {
 	const lyricsDisplayMode = CONFIG.visual["translate:display-mode"];
 	const furiganaEnabled = !!CONFIG.visual["furigana-enabled"];
 	const furiganaReady = window.FuriganaConverter?.isAvailable?.() === true;
@@ -8422,7 +8422,8 @@ const UnsyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, co
 	return react.createElement(
 		"div",
 		{
-			className: "lyrics-lyricsContainer-UnsyncedLyricsPage",
+			className: `lyrics-lyricsContainer-UnsyncedLyricsPage${trackRevealKey ? " lyrics-track-enter" : ""}${trackRevealKey ? ` lyrics-track-enter-${trackRevealKey}` : ""}`,
+			key: trackRevealKey ? `track-${trackRevealKey}` : undefined,
 		},
 		react.createElement("p", {
 			className: "lyrics-lyricsContainer-LyricsUnsyncedPadding",
@@ -8431,6 +8432,7 @@ const UnsyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, co
 			react.createElement(LyricsLineBlock, {
 				key: item.key,
 				className: "lyrics-lyricsContainer-LyricsLine lyrics-lyricsContainer-LyricsLine-active",
+				style: { "--lyrics-track-enter-index": item.key },
 				mainText: item.mainText,
 				subText: item.subText,
 				subText2: item.subText2,
@@ -8683,6 +8685,7 @@ const LyricsPageRenderer = react.memo(({
 	showMarketplace = false,
 	onCloseMarketplace = null,
 	reRenderLyricsPage = null,
+	trackRevealKey = null,
 }) => {
 	const sharedLyrics = Array.isArray(currentLyrics) ? currentLyrics : [];
 	const karaokeLyrics = Array.isArray(currentLyrics)
@@ -8712,6 +8715,7 @@ const LyricsPageRenderer = react.memo(({
 					karaokeSource,
 					karaokeRenderGranularity: mode === wordMode ? "word" : "character",
 					reRenderLyricsPage,
+					trackRevealKey,
 				},
 			};
 		}
@@ -8728,6 +8732,7 @@ const LyricsPageRenderer = react.memo(({
 					contributors,
 					copyright,
 					reRenderLyricsPage,
+					trackRevealKey,
 				},
 			};
 		}
@@ -8742,6 +8747,7 @@ const LyricsPageRenderer = react.memo(({
 					contributors,
 					copyright,
 					reRenderLyricsPage,
+					trackRevealKey,
 				},
 			};
 		}
@@ -8769,6 +8775,7 @@ const LyricsPageRenderer = react.memo(({
 		syncTypeBreakdown,
 		copyright,
 		reRenderLyricsPage,
+		trackRevealKey,
 	]);
 
 	const content = useMemo(() => {

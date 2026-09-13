@@ -9976,6 +9976,9 @@ class LyricsContainer extends react.Component {
 		syncTypeBreakdown: this.state.syncTypeBreakdown,
         copyright: this.state.copyright,
         isLoading: this.state.isLoading,
+        trackRevealKey: this.state.lyricsStatus === "ready"
+          ? this.state.lyricsTransitionSeq
+          : null,
         showMarketplace: this.state.showMarketplace,
         onCloseMarketplace: () => this.setState({ showMarketplace: false }),
         reRenderLyricsPage: this.reRenderLyricsPage,
