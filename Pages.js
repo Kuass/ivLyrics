@@ -4182,6 +4182,66 @@ const getCompactSyncedOffset = (container, activeLine, isScrolling) => {
 
 const useSyncedLayoutEffect = react.useLayoutEffect || useEffect;
 
+const createLyricsLayoutObserver = () => {
+	const raf = typeof requestAnimationFrame === "function"
+		? requestAnimationFrame : (callback) => setTimeout(callback, 0);
+	const cancelRaf = typeof cancelAnimationFrame === "function"
+		? cancelAnimationFrame : clearTimeout;
+	let frameId = null;
+	let container = null;
+	let activeLine = null;
+	let syncLayout = null;
+	let disposed = false;
+	const cancelPending = () => {
+		if (frameId !== null) cancelRaf(frameId);
+		frameId = null;
+	};
+	const scheduleSync = () => {
+		if (disposed || frameId !== null) return;
+		frameId = raf(() => {
+			frameId = null;
+			if (!disposed) syncLayout?.();
+		});
+	};
+	const resizeObserver = new ResizeObserver(scheduleSync);
+	const mutationObserver = typeof MutationObserver === "undefined"
+		? null : new MutationObserver(scheduleSync);
+	return {
+		cancelPending,
+		scheduleSync,
+		update(nextContainer, nextActiveLine, callback) {
+			syncLayout = callback;
+			// Retain each observation until its DOM target changes. Re-observing
+			// unchanged rows delivers an extra initial resize notification.
+			if (nextContainer !== container) {
+				if (container) resizeObserver.unobserve(container);
+				container = nextContainer;
+				if (container) resizeObserver.observe(container);
+			}
+			if (nextActiveLine !== activeLine) {
+				if (activeLine) resizeObserver.unobserve(activeLine);
+				activeLine = nextActiveLine;
+				mutationObserver?.disconnect();
+				if (activeLine) {
+					resizeObserver.observe(activeLine);
+					mutationObserver?.observe(activeLine, {
+						attributes: true,
+						attributeFilter: ["data-karaoke-vocal-anchor-position", "data-karaoke-vocal-anchor-window-ms"],
+						subtree: true,
+					});
+				}
+			}
+		},
+		disconnect() {
+			disposed = true;
+			cancelPending();
+			resizeObserver.disconnect();
+			mutationObserver?.disconnect();
+			container = activeLine = syncLayout = null;
+		},
+	};
+};
+
 const prepareGlobalCharTimeline = (lyrics) => {
 	const offsets = new Array(lyrics.length);
 	const chars = [];
@@ -5909,12 +5969,16 @@ const useSyncedLyricsEngine = ({
 	compactLinePlaybackPositionRef.current = position;
 	const previousPreparedLyricsRef = useRef(preparedLyrics);
 	const layoutShiftAnimationFramesRef = useRef({ first: null, second: null });
+	const layoutObserverRef = useRef(null);
 	const syncCompactOffset = useCallback(() => {
 		if (!compact) {
 			setCompactOffset(0);
 			return;
 		}
 
+		// This synchronous pass consumes any already queued layout notification.
+		// Keep offset and position-index in the same commit as before.
+		layoutObserverRef.current?.cancelPending();
 		const nextOffset = getCompactSyncedOffset(containerRef.current, activeLineRef.current, isScrolling);
 		setCompactOffset((prevOffset) => (
 			Math.abs(prevOffset - nextOffset) < 0.5 ? prevOffset : nextOffset
@@ -5969,59 +6033,27 @@ const useSyncedLyricsEngine = ({
   }, [syncCompactOffset, visualLineIndex, trailingInterludeKey, containerReady, lyricsId, preparedLyrics, settingsRevision, anchorRevision]);
 
 	useSyncedLayoutEffect(() => {
-		if (!compact || isScrolling || typeof ResizeObserver === "undefined") {
-			return undefined;
-		}
-
 		const container = containerRef.current;
 		const activeLine = activeLineRef.current;
-		if (!container || !activeLine) {
+		if (isScrolling || !container || !activeLine || typeof ResizeObserver === "undefined") {
+			layoutObserverRef.current?.disconnect();
+			layoutObserverRef.current = null;
 			return undefined;
 		}
-
-		const raf = typeof requestAnimationFrame === "function"
-			? requestAnimationFrame
-			: (callback) => setTimeout(callback, 0);
-		const cancelRaf = typeof cancelAnimationFrame === "function"
-			? cancelAnimationFrame
-			: clearTimeout;
-		let frameId = null;
-		const scheduleOffsetSync = () => {
-			if (frameId !== null) {
-				return;
-			}
-			// Resize and vocal-anchor changes share the next frame's latest geometry.
-			frameId = raf(() => {
-				frameId = null;
-				syncCompactOffset();
-			});
-		};
-
-		const observer = new ResizeObserver(scheduleOffsetSync);
-		observer.observe(activeLine);
-		observer.observe(container);
-		let mutationObserver = null;
-		if (typeof MutationObserver !== "undefined") {
-			mutationObserver = new MutationObserver(scheduleOffsetSync);
-			mutationObserver.observe(activeLine, {
-				attributes: true,
-				attributeFilter: [
-					"data-karaoke-vocal-anchor-position",
-					"data-karaoke-vocal-anchor-window-ms",
-				],
-				subtree: true,
-			});
-		}
-		return () => {
-			observer.disconnect();
-			if (mutationObserver) {
-				mutationObserver.disconnect();
-			}
-			if (frameId !== null) {
-				cancelRaf(frameId);
-			}
-		};
+		const observer = layoutObserverRef.current ??= createLyricsLayoutObserver();
+		observer.update(container, activeLine, compact ? syncCompactOffset : () => {
+			scrollSyncedContainerToActiveLine(containerRef.current, activeLineRef.current, "sync");
+		});
+		// Earlier rows can grow without resizing either observed target. The
+		// expanded view still needs the correction previously supplied by a new
+		// observer's initial notification, even when its anchor moved offscreen.
+		if (!compact) observer.scheduleSync();
   }, [compact, isScrolling, visualLineIndex, trailingInterludeKey, containerReady, lyricsId, preparedLyrics, settingsRevision, anchorRevision, syncCompactOffset]);
+
+	useSyncedLayoutEffect(() => () => {
+		layoutObserverRef.current?.disconnect();
+		layoutObserverRef.current = null;
+	}, []);
 
 	useEffect(() => {
 		const actualIndex = Math.max(0, activeLineIndex - leadingEmptyLines);
@@ -6047,6 +6079,7 @@ const useSyncedLyricsEngine = ({
 		}
 
 		if (!hasAutoScrolledRef.current || isInViewport(activeLine)) {
+			layoutObserverRef.current?.cancelPending();
 			scrollSyncedContainerToActiveLine(container, activeLine, hasAutoScrolledRef.current ? "smooth" : "auto");
 			hasAutoScrolledRef.current = true;
 		}
@@ -6065,62 +6098,6 @@ const useSyncedLyricsEngine = ({
 
 		return () => clearTimeout(timeoutId);
 	}, [compact, activeLineIndex, isScrolling, containerRef, activeLineRef, trailingInterludeKey, preparedLyrics]);
-
-	useEffect(() => {
-		if (compact || isScrolling || typeof ResizeObserver === "undefined") {
-			return undefined;
-		}
-
-		const container = containerRef.current;
-		const activeLine = activeLineRef.current;
-		if (!container || !activeLine) {
-			return undefined;
-		}
-
-		const raf = typeof requestAnimationFrame === "function"
-			? requestAnimationFrame
-			: (callback) => setTimeout(callback, 0);
-		const cancelRaf = typeof cancelAnimationFrame === "function"
-			? cancelAnimationFrame
-			: clearTimeout;
-		let frameId = null;
-		const scheduleScrollSync = () => {
-			if (frameId !== null) {
-				return;
-			}
-			// Coalesce notifications without canceling and re-queuing the same read.
-			frameId = raf(() => {
-				frameId = null;
-				scrollSyncedContainerToActiveLine(containerRef.current, activeLineRef.current, "sync");
-			});
-		};
-
-		const observer = new ResizeObserver(scheduleScrollSync);
-		observer.observe(activeLine);
-		observer.observe(container);
-		let mutationObserver = null;
-		if (typeof MutationObserver !== "undefined") {
-			mutationObserver = new MutationObserver(scheduleScrollSync);
-			mutationObserver.observe(activeLine, {
-				attributes: true,
-				attributeFilter: [
-					"data-karaoke-vocal-anchor-position",
-					"data-karaoke-vocal-anchor-window-ms",
-				],
-				subtree: true,
-			});
-		}
-
-		return () => {
-			observer.disconnect();
-			if (mutationObserver) {
-				mutationObserver.disconnect();
-			}
-			if (frameId !== null) {
-				cancelRaf(frameId);
-			}
-		};
-	}, [compact, isScrolling, visualLineIndex, trailingInterludeKey, containerRef, activeLineRef, preparedLyrics]);
 
 	const stableLineStyles = useMemo(() => {
 		if (compact && isScrolling) {
