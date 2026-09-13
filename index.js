@@ -6961,6 +6961,7 @@ class LyricsContainer extends react.Component {
         uri: requestUri,
         lyricsRequestSeq: requestSeq,
         currentLyrics: sharedDisplayLyrics,
+        lyricsDisplayUri: requestUri,
         provider: sharedSnapshot.provider || sharedRawResult?.provider || "",
         karaokeSource: sharedSnapshot.karaokeSource || sharedRawResult?.karaokeSource || null,
         // Track overrides are asynchronous. Keep processing paused until the
