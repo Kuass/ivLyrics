@@ -4602,6 +4602,7 @@ class LyricsContainer extends react.Component {
       // request has resolved without any usable lyric lines.
       lyricsStatus: "idle",
       lyricsTransitionSeq: 0,
+      lyricsDisplayUri: null,
       videoInfo: null,
       // 메타데이터 번역
       translatedMetadata: null,
@@ -5753,6 +5754,17 @@ class LyricsContainer extends react.Component {
         syncType: this.state.syncType,
         syncPoints: this.state.syncPoints,
         syncTypeBreakdown: this.state.syncTypeBreakdown,
+        // Keep track identity alongside the retained arrays. Consumers can
+        // suppress a stale presentation instead of treating it as the new
+        // track's lyrics while the provider request is pending.
+        lyricsDisplayUri: (
+          (Array.isArray(this.state.currentLyrics) && this.state.currentLyrics.length > 0) ||
+          (Array.isArray(this.state.karaoke) && this.state.karaoke.length > 0) ||
+          (Array.isArray(this.state.synced) && this.state.synced.length > 0) ||
+          (Array.isArray(this.state.unsynced) && this.state.unsynced.length > 0)
+        )
+          ? (this.state.lyricsDisplayUri || this.state.uri || null)
+          : (info?.uri || null),
       }
       : {};
     return {
@@ -7254,6 +7266,7 @@ class LyricsContainer extends react.Component {
           currentLyrics: sharedLyricsForMode || initialLyricsForMode || [],
           lyricsStatus: hasResolvedLyrics ? "ready" : "empty",
           lyricsTransitionSeq: transitionSeq,
+          lyricsDisplayUri: info.uri,
         });
         lyricsLoadingCompleted = canCompleteLyricsLoading && isLatestLyricsRequest();
         return;
@@ -7266,6 +7279,7 @@ class LyricsContainer extends react.Component {
         currentLyrics: sharedLyricsForMode || initialLyricsForMode || [],
         lyricsStatus: hasResolvedLyrics ? "ready" : "empty",
         lyricsTransitionSeq: transitionSeq,
+        lyricsDisplayUri: info.uri,
       });
       lyricsLoadingCompleted = canCompleteLyricsLoading && isLatestLyricsRequest();
     } catch (error) {
@@ -7280,6 +7294,7 @@ class LyricsContainer extends react.Component {
         ...emptyState,
         uri: this.currentTrackUri,
         lyricsRequestSeq: this._activeLyricsFetchSeq,
+        lyricsDisplayUri: this.currentTrackUri,
       });
     } finally {
       if (lyricsLoadingToken !== null) {
@@ -7322,7 +7337,11 @@ class LyricsContainer extends react.Component {
     if (!lyrics) {
       if (lyricsState.isLoading) return;
       if (!isActivePresentation()) return;
-      this.setState({ currentLyrics: [], lyricsStatus: "empty" });
+      this.setState({
+        currentLyrics: [],
+        lyricsStatus: "empty",
+        lyricsDisplayUri: lyricsState.uri || this.state.uri || null,
+      });
       // 오버레이에 가사 없음 상태 전송 (트랙 정보 업데이트용)
       this.publishLyricsPresentation([], {
         uri: lyricsState.uri,
@@ -8684,6 +8703,8 @@ class LyricsContainer extends react.Component {
         ...nextLyrics,
         ...this.applyTranslationStates(nextLyrics),
         isLoading: false,
+        lyricsStatus: "ready",
+        lyricsDisplayUri: currentUri,
         isCached: true,
         error: null,
       },
@@ -9986,6 +10007,12 @@ class LyricsContainer extends react.Component {
           )
         );
       })());
+    // During a track handoff the retained lyric arrays belong to the outgoing
+    // URI. Do not render them with the incoming track metadata; the incoming
+    // page is mounted once its request resolves.
+    const suppressStaleLyricsPage = this.state.isLoading &&
+      !!this.state.lyricsDisplayUri &&
+      this.state.lyricsDisplayUri !== this.state.uri;
 
     // Tab bar removed - modes are now auto-detected
     const topBarContent = null;
@@ -10689,7 +10716,7 @@ class LyricsContainer extends react.Component {
         )
       ),
       cacheEditModal,
-      !shouldHideFullscreenLyrics && activeLyricsPage,
+      !shouldHideFullscreenLyrics && !suppressStaleLyricsPage && activeLyricsPage,
       !this.state.showMarketplace &&
       !shouldHideFullscreenLyrics &&
       window.IvLyricsLearningMode?.StudyPanel &&

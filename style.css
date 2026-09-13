@@ -3453,6 +3453,45 @@ body:has(#lyrics-fullscreen-container) [data-tippy-root] {
   overflow: hidden;
 }
 
+/* Track background hand-off.  These layers only animate opacity and
+ * transform, so changing songs stays on the compositor and does not force a
+ * full lyrics layout pass. */
+.ivlyrics-video-background-fallback {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: opacity;
+}
+
+.ivlyrics-video-background-fallback-incoming {
+  animation: ivlyricsBackgroundFallbackIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ivlyrics-video-background-fallback-outgoing {
+  animation: ivlyricsBackgroundFallbackOut 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ivlyrics-video-background-media {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+@keyframes ivlyricsBackgroundFallbackIn {
+  from { opacity: 0.45; transform: translateZ(0) scale(1.075); }
+  to { opacity: 1; transform: translateZ(0) scale(1.1); }
+}
+
+@keyframes ivlyricsBackgroundFallbackOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ivlyrics-video-background-fallback-incoming,
+  .ivlyrics-video-background-fallback-outgoing {
+    animation-duration: 1ms;
+  }
+}
+
 #lyrics-fullscreen-container .lyrics-lyricsContainer-LyricsContainer::-webkit-scrollbar {
   background-color: transparent;
   /* transparent scrollbar track */

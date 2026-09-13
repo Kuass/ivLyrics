@@ -42,6 +42,10 @@ const getVideoSyncOffsetSeconds = (captionStartTime, lyricsStartTime, videoInfo)
 
 const VIDEO_SYNC_INTERVAL_MS = 250;
 const VIDEO_SYNC_SEEK_THRESHOLD_SECONDS = 0.5;
+// Keep the outgoing artwork briefly while a new track's background is being
+// resolved.  This avoids a black flash when YouTube or the helper takes a
+// moment to produce its first frame.
+const FALLBACK_CROSSFADE_MS = 420;
 
 const resolveVideoSyncState = ({
     spotifyTime,
@@ -265,6 +269,9 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
     const containerRef = useRef(null);
     const playerRef = useRef(null); // Use ref to hold player instance for reliable cleanup
     const videoRef = useRef(null); // HTML5 video element for helper mode
+    const previousFallbackUrlRef = useRef("");
+    const [previousFallbackUrl, setPreviousFallbackUrl] = useState("");
+    const fallbackTransitionTimerRef = useRef(null);
     const firstLyricTimeRef = useRef(firstLyricTime);
     const trackOffsetMsRef = useRef(trackOffsetMs);
     const abortDownloadRef = useRef(null); // abort function for helper download
@@ -290,6 +297,36 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
     const videoTransform = useCoverMode
         ? `translate3d(-50%, -50%, 0)${videoScaleTransform}`
         : (blurValue || videoScaleTransform ? `translateZ(0)${videoScaleTransform}` : undefined);
+
+    const albumArtUrl =
+        Spicetify.Player.data?.item?.metadata?.image_xlarge_url ||
+        Spicetify.Player.data?.item?.metadata?.image_large_url ||
+        Spicetify.Player.data?.item?.metadata?.image_url ||
+        "";
+
+    // Capture the previous artwork before the new track is revealed.  The
+    // old layer is removed after a single compositor-only crossfade.
+    useEffect(() => {
+        const previousUrl = previousFallbackUrlRef.current;
+        if (previousUrl && previousUrl !== albumArtUrl) {
+            setPreviousFallbackUrl(previousUrl);
+            if (fallbackTransitionTimerRef.current) {
+                clearTimeout(fallbackTransitionTimerRef.current);
+            }
+            fallbackTransitionTimerRef.current = setTimeout(() => {
+                fallbackTransitionTimerRef.current = null;
+                setPreviousFallbackUrl("");
+            }, FALLBACK_CROSSFADE_MS + 40);
+        }
+        previousFallbackUrlRef.current = albumArtUrl;
+    }, [trackUri, albumArtUrl]);
+
+    useEffect(() => () => {
+        if (fallbackTransitionTimerRef.current) {
+            clearTimeout(fallbackTransitionTimerRef.current);
+            fallbackTransitionTimerRef.current = null;
+        }
+    }, []);
 
     useEffect(() => {
         firstLyricTimeRef.current = firstLyricTime;
@@ -1451,30 +1488,43 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         return () => clearInterval(syncInterval);
     }, [useHelper, isPlayerReady, videoInfo, firstLyricTime, trackOffsetMs, isPlaying]);
 
-    // Render Album Art Background (Fallback)
-    const renderFallback = () => {
-        const albumArtUrl =
-            Spicetify.Player.data?.item?.metadata?.image_xlarge_url ||
-            Spicetify.Player.data?.item?.metadata?.image_large_url ||
-            Spicetify.Player.data?.item?.metadata?.image_url;
-
-        return react.createElement("div", {
+    // Render Album Art Background (Fallback).  Keep an outgoing image layer
+    // around for one short crossfade so a track change never exposes an empty
+    // or black frame while the new video is loading.
+    const fallbackStyle = {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        filter: `brightness(${brightnessRatio}) blur(${blurValue}px)`,
+        transform: "translateZ(0) scale(1.1)",
+        ...blurCompositeStyle,
+        pointerEvents: "none",
+    };
+    const renderFallback = () => react.createElement(
+        react.Fragment,
+        null,
+        previousFallbackUrl && previousFallbackUrl !== albumArtUrl && react.createElement("div", {
+            className: "ivlyrics-video-background-fallback ivlyrics-video-background-fallback-outgoing",
             style: {
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                backgroundImage: albumArtUrl ? `url(${albumArtUrl})` : "none",
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                filter: `brightness(${brightnessRatio}) blur(${blurValue}px)`,
-                transform: "translateZ(0) scale(1.1)",
-                ...blurCompositeStyle,
+                ...fallbackStyle,
+                backgroundImage: `url(${previousFallbackUrl})`,
                 zIndex: 0,
             },
-        });
-    };
+        }),
+        react.createElement("div", {
+            className: `ivlyrics-video-background-fallback${previousFallbackUrl && previousFallbackUrl !== albumArtUrl ? " ivlyrics-video-background-fallback-incoming" : ""}`,
+            style: {
+                ...fallbackStyle,
+                backgroundImage: albumArtUrl ? `url(${albumArtUrl})` : "none",
+                backgroundColor: "var(--spice-main, #121212)",
+                zIndex: 0,
+            },
+        })
+    );
 
     // 헬퍼 모드용 video 태그 스타일
     const helperVideoStyle = {
@@ -1487,7 +1537,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         minHeight: useCoverMode ? "100%" : undefined,
         transform: videoTransform,
         opacity: isPlayerReady && isPlaying ? 1 : 0,
-        transition: "opacity 0.5s ease",
+        transition: "opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
         zIndex: 1,
         pointerEvents: "none",
         filter: blurValue ? `blur(${blurValue}px)` : "none",
@@ -1613,6 +1663,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         // 헬퍼 모드: HTML5 video 태그
         useHelper && react.createElement("video", {
             ref: videoRef,
+            className: "ivlyrics-video-background-media",
             style: helperVideoStyle,
             muted: true,
             playsInline: true,
@@ -1621,6 +1672,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         // 일반 모드: YouTube IFrame 컨테이너
         !useHelper && react.createElement("div", {
             ref: containerRef,
+            className: "ivlyrics-video-background-media",
             style: {
                 position: "absolute",
                 top: useCoverMode ? "50%" : 0,
@@ -1631,7 +1683,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 minHeight: useCoverMode ? "100%" : undefined,
                 transform: videoTransform,
                 opacity: isPlayerReady && isPlaying ? 1 : 0, // Hide when paused or not ready
-                transition: "opacity 0.5s ease",
+                transition: "opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
                 zIndex: 1,
                 pointerEvents: "none",
                 filter: blurValue ? `blur(${blurValue}px)` : "none",
