@@ -38,6 +38,12 @@ const createRow = ({ width = 300, naturalWidth = 600, direction = "ltr" } = {}) 
     get scrollWidth() { return measuredWidth(); },
     getBoundingClientRect: () => ({ width: measuredWidth() }),
   };
+  let transform = "", transformWrites = 0;
+  Object.defineProperty(content.style, "transform", {
+    get: () => transform,
+    set(value) { transform = value; transformWrites++; },
+  });
+  content.transformWriteCount = () => transformWrites;
   return { viewport, content };
 };
 
@@ -286,5 +292,29 @@ test("wrapped lyrics preserve manual scrolling within a line and reset after del
 
   h.render({ activeLineIndex: 1, positionOverride: 12000 });
   assert.equal(h.scrollArea.scrollTop, 0, "the next lyric starts at the top");
+  h.unmount();
+});
+
+test("overflow holds skip repeated transforms while resize and seek still apply current geometry", () => {
+  const h = createHarness({ positionOverride: 1000 });
+  const row = h.rows[0];
+  let writes = row.content.transformWriteCount();
+  for (let positionOverride = 1017; positionOverride < 4000; positionOverride += 17) h.render({ positionOverride });
+  assert.equal(row.content.transformWriteCount(), writes);
+  assertScrolling(row, 0);
+  h.render({ positionOverride: 6000 });
+  assertScrolling(row, -170);
+  row.viewport.naturalWidth = 800;
+  h.notifyLayoutChange();
+  assertScrolling(row, -270);
+  h.render({ positionOverride: 6100 });
+  assertScrolling(row, -283.5);
+  h.render({ positionOverride: 8000 });
+  writes = row.content.transformWriteCount();
+  for (let positionOverride = 8017; positionOverride < 11000; positionOverride += 17) h.render({ positionOverride });
+  assert.equal(row.content.transformWriteCount(), writes);
+  assertScrolling(row, -540);
+  h.render({ positionOverride: 2000 });
+  assertScrolling(row, 0);
   h.unmount();
 });

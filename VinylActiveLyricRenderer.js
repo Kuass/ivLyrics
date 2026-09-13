@@ -46,6 +46,7 @@ const VinylActiveLyricRenderer = (() => {
     ) => {
         const scrollEntriesRef = useRef(new Map());
         const progressRef = useRef(0);
+        const appliedProgressRef = useRef(null);
         const hasScrollTiming = Number.isFinite(lineStartTime)
             && Number.isFinite(lineEndTime)
             && lineEndTime > lineStartTime;
@@ -121,6 +122,7 @@ const VinylActiveLyricRenderer = (() => {
                         progressRef.current
                     );
                 });
+                appliedProgressRef.current = progressRef.current;
             };
 
             const scheduleMeasure = () => {
@@ -159,6 +161,10 @@ const VinylActiveLyricRenderer = (() => {
         }, [rootRef, resetKey, motionEnabled, hasScrollTiming]);
 
         useLayoutEffect(() => {
+            // The start/end holds occupy most of a line's lifetime. Geometry
+            // measurements apply their own current transform after a resize.
+            if (appliedProgressRef.current === progressRef.current) return;
+            appliedProgressRef.current = progressRef.current;
             scrollEntriesRef.current.forEach(({ travel, direction }, content) => {
                 content.style.transform = getScrollTransform(
                     travel,
