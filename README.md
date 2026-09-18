@@ -19,8 +19,8 @@ A personal derivative of [ivLis-Studio/ivLyrics](https://github.com/ivLis-Studio
 
 ## 1. 원본과 달라진 점 / Differences from upstream
 
-원본 6.6.11(2026-09-07)까지의 변경을 반영하고 있습니다. 원본 저장소는 로컬 `origin` 원격으로만 연결되어 있어, 업스트림 반영은 가져오기와 병합으로 이루어집니다.\
-Tracks upstream through 6.6.11 (2026-09-07). The upstream repository is only linked as a local `origin` remote, so syncing is a fetch-and-merge, not a GitHub fork comparison.
+원본 6.6.21(2026-09-13)까지의 변경을 반영하고 있습니다. 원본 저장소는 로컬 `origin` 원격으로만 연결되어 있어, 업스트림 반영은 가져오기와 병합으로 이루어집니다.\
+Tracks upstream through 6.6.21 (2026-09-13). The upstream repository is only linked as a local `origin` remote, so syncing is a fetch-and-merge, not a GitHub fork comparison.
 
 ### 제거한 기능 / Removed
 
@@ -105,8 +105,8 @@ Every AI feature runs only when at least one LLM provider is enabled, and each h
   **Track transitions**: on a track change the previous video fades to black before disposal and the new video fades in over black once it is ready. When a track has no video, the video fails to load, or playback is paused, a blob gradient built from Spotify's album-art palette (VIBRANT, DARK_VIBRANT, LIGHT_VIBRANT; the same look as the blur-gradient background) fades in instead of album art. Title and artist text animate in.
 - **앨범 이미지 전환**: 일반·세로·TV 전체 화면에서는 다음 앨범 이미지의 로딩과 디코딩이 끝난 뒤, 이전 이미지 위로 약 0.6초 동안 서서히 나타납니다. 빠르게 곡을 넘기면 이전 요청의 결과를 무시하고, 새 이미지를 불러오지 못하면 마지막 이미지를 유지합니다. 시스템에서 동작 줄이기를 설정한 경우에는 애니메이션을 생략합니다.\
   **Album image transitions**: normal, portrait and TV fullscreen layouts keep the previous cover visible until the next image has loaded and decoded, then fade in the replacement over approximately 0.6 seconds. Stale loads are ignored after rapid skips; failed replacements leave the last cover visible. System reduced-motion preferences disable the animation.
-- **가사 로드 전환**: 가사가 아직 없을 때는 앨범 아트가 화면 가운데에 있다가, 가사가 로드되면 옆으로 밀리면서 가사 열이 아래에서 떠오릅니다. 두 열 배치를 유지한 채 왼쪽 패널만 이동시키므로 레이아웃이 한 번에 바뀌지 않습니다.\
-  **Lyrics load transition**: while no lyrics are loaded the album art sits in the centre; once lyrics arrive it slides aside and the lyrics column rises in. The two-column grid is kept and only the left panel moves, so the layout never snaps.
+- **가사 로드 전환**: 가사가 아직 없을 때는 앨범 아트가 화면 가운데에 있다가, 가사가 로드되면 옆으로 밀리면서 가사 열이 아래에서 떠오릅니다. 두 열 배치를 유지한 채 왼쪽 패널만 이동시키므로 레이아웃이 한 번에 바뀌지 않습니다. 가사를 불러오는 동안에는 대기 표시를 화면 가운데에 그대로 두어, 앨범 패널 위쪽의 좁은 칸에 눌리지 않습니다.\
+  **Lyrics load transition**: while no lyrics are loaded the album art sits in the centre; once lyrics arrive it slides aside and the lyrics column rises in. The two-column grid is kept and only the left panel moves, so the layout never snaps. While lyrics are being fetched the loading indicator stays centred in the viewport instead of being pinned to a narrow row above the album panel.
 - **제목 자동 축소**: 긴 제목은 글자 크기가 자동으로 줄어듭니다. 한글·한자·가나는 라틴 문자보다 넓게 계산하고, 설정 크기의 55% 아래로는 내려가지 않습니다.\
   **Title auto-fit**: long titles shrink automatically. CJK glyphs count as wider than Latin letters; the size never drops below 55 % of the configured value.
 - **줄 전환**: 줄이 바뀔 때의 이동을 620ms의 완만한 곡선으로 늘리고, 색·불투명도·크기 변화도 같은 시간에 걸쳐 함께 바뀝니다. 노래방 모드의 줄 전환 애니메이션 설정이 꺼져 있어도 전체 화면에서는 이동을 애니메이션합니다.\
