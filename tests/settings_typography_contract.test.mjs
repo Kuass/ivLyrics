@@ -122,6 +122,11 @@ const normalizeReleasedTree = (tree) => {
   for (const element of elements(expected)) {
     if (element.type === "[function:OptionList]" && Array.isArray(element.props.items)) {
       element.props.items = element.props.items.filter(item => !ignoredItemKeys.has(item.key));
+      for (const item of element.props.items) {
+        if (item.key === "lines-before" || item.key === "lines-after") {
+          item.options = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        }
+      }
     }
   }
   return expected;

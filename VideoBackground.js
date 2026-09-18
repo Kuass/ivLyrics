@@ -125,13 +125,27 @@ const syncYouTubePlayerTimeline = ({
 
     const playerState = player.getPlayerState();
     if (shouldHoldAtStart) {
-        if (!wasHoldingAtStart) {
+        const currentVideoTime = player.getCurrentTime();
+        const isAtStart = Number.isFinite(currentVideoTime) &&
+            Math.abs(currentVideoTime) <= VIDEO_SYNC_SEEK_THRESHOLD_SECONDS;
+        if (!wasHoldingAtStart || (!holdState.primePending && !isAtStart)) {
             // A paused YouTube iframe can keep painting its previous decoded frame
             // after seekTo(0). Let it reach PLAYING once so the frame is refreshed;
             // onStateChange pauses it again as soon as that frame is available.
             holdState.primePending = true;
             player.seekTo(0, true);
             player.playVideo();
+            return;
+        }
+
+        if (holdState.primePending) {
+            // Buffering can outlast a sync tick. Pausing here would cancel the
+            // refresh and leave the previous frame visible for the whole intro.
+            if (!settleYouTubeHoldPrime({ player, playerState, holdState }) &&
+                playerState !== 1 && playerState !== 3) {
+                if (!isAtStart) player.seekTo(0, true);
+                player.playVideo();
+            }
             return;
         }
 
@@ -214,6 +228,14 @@ const settleYouTubeHoldPrime = ({ player, playerState, holdState }) => {
         return false;
     }
 
+    // PLAYING may be queued from before seekTo(0). Wait until the player also
+    // reports the start position, rather than freezing that stale frame again.
+    const currentVideoTime = player.getCurrentTime();
+    if (!Number.isFinite(currentVideoTime) ||
+        Math.abs(currentVideoTime) > VIDEO_SYNC_SEEK_THRESHOLD_SECONDS) {
+        return false;
+    }
+
     holdState.primePending = false;
     player.pauseVideo();
     return true;
@@ -257,6 +279,7 @@ const isSpotifyPlaybackActive = (playerState = Spicetify.Player?.data) => {
 
 const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, coverMode, videoScale, externalVideoInfo, onLoadingChange, ambientColorVars }) => {
     const { useState, useEffect, useRef, useCallback } = react;
+    const useIsoLayoutEffect = react.useLayoutEffect || useEffect;
     const VIDEO_BACKGROUND_DEBUG = false;
     const videoBackgroundDebug = (...args) => {
         if (VIDEO_BACKGROUND_DEBUG) {
@@ -1282,6 +1305,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 lyricsStartTime,
                 videoInfo,
                 additionalDelaySeconds: (trackOffsetMsRef.current + globalDelayMs + globalSyncOffsetMs) / 1000,
+                mapVideoTime: Utils.mapVideoTimeWithSkipSegments.bind(Utils),
             })
             : null;
         const shouldPlayVideo = isPlaying && !syncState?.shouldHoldAtStart;
@@ -1304,20 +1328,18 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         }
 
         const player = playerRef.current;
-        if (!player || !isPlayerReady || typeof player.getPlayerState !== 'function') return;
+        if (!player || !isPlayerReady || !syncState || typeof player.getPlayerState !== 'function') return;
 
         try {
-            const playerState = player.getPlayerState();
-            if (!shouldPlayVideo) {
-                if (playerState === 1 || playerState === 3) {
-                    player.pauseVideo();
-                }
-                return;
-            }
-
-            if (playerState !== 1) {
-                player.playVideo();
-            }
+            // Playback events must use the same hold/seek state as the timer so
+            // pausing Spotify cannot interrupt an in-flight start-frame refresh.
+            syncYouTubePlayerTimeline({
+                player,
+                targetVideoTime: wrapVideoSyncTime(syncState.targetVideoTime, player.getDuration?.()),
+                shouldHoldAtStart: syncState.shouldHoldAtStart,
+                shouldPlay: isPlaying,
+                holdState: youtubeHoldStateRef.current,
+            });
         } catch (e) { }
     }, [useHelper, isPlaying, isPlayerReady, helperVideoUrl, videoInfo]);
 
@@ -1506,6 +1528,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                             failPlayerLifecycle(new Error(`YouTube player error: ${event?.data ?? "unknown"}`));
                         },
                         onStateChange: (event) => {
+                            if (isCancelled || playerLifecycleFailed) return;
                             const state = event?.data;
                             settleYouTubeHoldPrime({
                                 player: event?.target,
@@ -1569,7 +1592,6 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
             try {
                 const st = player.getPlayerState();
                 if (st === 1 || st === 3) {
-                    applyFixedQuality(player);
                     const now = Date.now();
                     if (now - lastCaptionDisableRef.current > 5000) {
                         lastCaptionDisableRef.current = now;
@@ -1608,7 +1630,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         const syncInterval = setInterval(syncVideo, VIDEO_SYNC_INTERVAL_MS);
 
         return () => clearInterval(syncInterval);
-    }, [isPlayerReady, videoInfo, firstLyricTime, trackOffsetMs, isPlaying]);
+    }, [useHelper, isPlayerReady, videoInfo, firstLyricTime, trackOffsetMs, isPlaying]);
 
     // 영상이 없거나 실패했을 때, 그리고 재생이 멈춰 영상을 숨길 때의 배경.
     // 블러 그라데이션 모드와 같은 블롭을 쓰되, 앨범 아트는 쓰지 않는다.
@@ -1765,6 +1787,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         // 헬퍼 모드: HTML5 video 태그
         useHelper && react.createElement("video", {
             ref: videoRef,
+            className: "ivlyrics-video-background-media",
             style: helperVideoStyle,
             muted: true,
             playsInline: true,
@@ -1773,6 +1796,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
         // 일반 모드: YouTube IFrame 컨테이너
         !useHelper && react.createElement("div", {
             ref: containerRef,
+            className: "ivlyrics-video-background-media",
             style: {
                 position: "absolute",
                 top: useCoverMode ? "50%" : 0,

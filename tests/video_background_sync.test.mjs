@@ -142,7 +142,10 @@ test("pauses the YouTube iframe as soon as its refreshed start frame is decoded"
     const calls = [];
     const holdState = { isHolding: true, primePending: true };
     const settled = settleYouTubeHoldPrime({
-        player: { pauseVideo: () => calls.push("pauseVideo") },
+        player: {
+            getCurrentTime: () => 0.1,
+            pauseVideo: () => calls.push("pauseVideo"),
+        },
         playerState: 1,
         holdState,
     });
@@ -150,6 +153,135 @@ test("pauses the YouTube iframe as soon as its refreshed start frame is decoded"
     assert.equal(settled, true);
     assert.deepEqual(calls, ["pauseVideo"]);
     assert.deepEqual(holdState, { isHolding: true, primePending: false });
+});
+
+test("lets a backward seek finish buffering across multiple sync ticks before holding its refreshed frame", () => {
+    const calls = [];
+    let playerState = 2;
+    let currentTime = 120;
+    const player = {
+        getPlayerState: () => playerState,
+        getCurrentTime: () => currentTime,
+        seekTo: (...args) => {
+            calls.push(["seekTo", ...args]);
+            playerState = 3;
+        },
+        playVideo: () => {
+            calls.push(["playVideo"]);
+            playerState = 3;
+        },
+        pauseVideo: () => {
+            calls.push(["pauseVideo"]);
+            playerState = 2;
+        },
+    };
+    const holdState = { isHolding: false, primePending: false };
+    const sync = () => syncYouTubePlayerTimeline({
+        player,
+        targetVideoTime: 0,
+        shouldHoldAtStart: true,
+        shouldPlay: true,
+        holdState,
+    });
+
+    sync();
+    for (let tick = 0; tick < 4; tick += 1) sync();
+    assert.deepEqual(calls, [["seekTo", 0, true], ["playVideo"]],
+        "periodic sync must not cancel a seek while the requested frame is buffering");
+    assert.equal(holdState.primePending, true);
+
+    currentTime = 0.1;
+    playerState = 1;
+    assert.equal(settleYouTubeHoldPrime({ player, playerState, holdState }), true);
+    sync();
+    assert.deepEqual(calls, [["seekTo", 0, true], ["playVideo"], ["pauseVideo"]]);
+    assert.deepEqual(holdState, { isHolding: true, primePending: false });
+});
+
+test("ignores a stale PLAYING event until the backward seek reaches the start frame", () => {
+    const calls = [];
+    const holdState = { isHolding: true, primePending: true };
+    const settled = settleYouTubeHoldPrime({
+        player: {
+            getCurrentTime: () => 120,
+            pauseVideo: () => calls.push("pauseVideo"),
+        },
+        playerState: 1,
+        holdState,
+    });
+
+    assert.equal(settled, false);
+    assert.deepEqual(calls, []);
+    assert.deepEqual(holdState, { isHolding: true, primePending: true });
+});
+
+test("resumes an interrupted frame refresh without re-seeking a video already at zero", () => {
+    const calls = [];
+    const player = {
+        getPlayerState: () => 2,
+        getCurrentTime: () => 0,
+        seekTo: (...args) => calls.push(["seekTo", ...args]),
+        playVideo: () => calls.push(["playVideo"]),
+        pauseVideo: () => calls.push(["pauseVideo"]),
+    };
+    const holdState = { isHolding: true, primePending: true };
+
+    syncYouTubePlayerTimeline({
+        player,
+        targetVideoTime: 0,
+        shouldHoldAtStart: true,
+        shouldPlay: true,
+        holdState,
+    });
+
+    assert.deepEqual(calls, [["playVideo"]]);
+    assert.deepEqual(holdState, { isHolding: true, primePending: true });
+});
+
+test("retries an interrupted backward seek that paused before reaching the start", () => {
+    const calls = [];
+    const player = {
+        getPlayerState: () => 2,
+        getCurrentTime: () => 120,
+        seekTo: (...args) => calls.push(["seekTo", ...args]),
+        playVideo: () => calls.push(["playVideo"]),
+        pauseVideo: () => calls.push(["pauseVideo"]),
+    };
+    const holdState = { isHolding: true, primePending: true };
+
+    syncYouTubePlayerTimeline({
+        player,
+        targetVideoTime: 0,
+        shouldHoldAtStart: true,
+        shouldPlay: true,
+        holdState,
+    });
+
+    assert.deepEqual(calls, [["seekTo", 0, true], ["playVideo"]]);
+    assert.deepEqual(holdState, { isHolding: true, primePending: true });
+});
+
+test("restores the first frame if a settled hold drifts away from zero", () => {
+    const calls = [];
+    const player = {
+        getPlayerState: () => 2,
+        getCurrentTime: () => 42,
+        seekTo: (...args) => calls.push(["seekTo", ...args]),
+        playVideo: () => calls.push(["playVideo"]),
+        pauseVideo: () => calls.push(["pauseVideo"]),
+    };
+    const holdState = { isHolding: true, primePending: false };
+
+    syncYouTubePlayerTimeline({
+        player,
+        targetVideoTime: 0,
+        shouldHoldAtStart: true,
+        shouldPlay: true,
+        holdState,
+    });
+
+    assert.deepEqual(calls, [["seekTo", 0, true], ["playVideo"]]);
+    assert.deepEqual(holdState, { isHolding: true, primePending: true });
 });
 
 test("seeks exactly to the mapped time when leaving the held pre-roll", () => {
@@ -234,3 +366,192 @@ test("does not seek again right after a seek unless the drift is severe", () => 
     runSync({ calls, currentTime: 5, target: 10, seekState, now: 400 });
     assert.equal(calls.filter((call) => call[0] === "seekTo").length, 2, "a 5s drift is corrected immediately");
 });
+
+test("leaves pre-roll at the exact mapped position while preserving paused Spotify playback", () => {
+    const calls = [];
+    const player = {
+        getPlayerState: () => 2,
+        getCurrentTime: () => 0.2,
+        seekTo: (...args) => calls.push(["seekTo", ...args]),
+        playVideo: () => calls.push(["playVideo"]),
+        pauseVideo: () => calls.push(["pauseVideo"]),
+    };
+    const holdState = { isHolding: true, primePending: false };
+
+    syncYouTubePlayerTimeline({
+        player,
+        targetVideoTime: 0.3,
+        shouldHoldAtStart: false,
+        shouldPlay: false,
+        holdState,
+    });
+
+    assert.deepEqual(calls, [["seekTo", 0.3, true]],
+        "leaving pre-roll must seek even within the regular drift tolerance and must not resume playback");
+    assert.deepEqual(holdState, { isHolding: false, primePending: false });
+});
+
+test("Spotify playback effects preserve a pending frame refresh across pause and resume", () => {
+    const effectStart = source.indexOf("    useEffect(() => {\n        const lyricsStartTime = getLyricsStartTimeSeconds(firstLyricTimeRef.current);");
+    const effectEnd = source.indexOf("    }, [useHelper, isPlaying, isPlayerReady, helperVideoUrl, videoInfo]);", effectStart);
+    assert.ok(effectStart >= 0 && effectEnd > effectStart);
+    const effectBody = source.slice(effectStart + "    useEffect(() => {".length, effectEnd);
+    const calls = [];
+    let playerState = 3;
+    let currentTime = 120;
+    const holdState = { isHolding: true, primePending: true };
+    const player = {
+        getPlayerState: () => playerState,
+        getCurrentTime: () => currentTime,
+        getDuration: () => 300,
+        seekTo: (...args) => calls.push(["seekTo", ...args]),
+        playVideo: () => {
+            calls.push(["playVideo"]);
+            playerState = 3;
+        },
+        pauseVideo: () => {
+            calls.push(["pauseVideo"]);
+            playerState = 2;
+        },
+    };
+    const effectContext = vm.createContext({
+        useHelper: false,
+        isPlaying: false,
+        isPlayerReady: true,
+        videoInfo: { captionStartTime: 7.591, isAutoGenerated: true, skipSegments: [] },
+        firstLyricTimeRef: { current: 57440 },
+        trackOffsetMsRef: { current: 0 },
+        playerRef: { current: player },
+        youtubeHoldStateRef: { current: holdState },
+        Spicetify: { Player: { getProgress: () => 0 } },
+        CONFIG: { visual: {} },
+        window: {},
+        Utils: { mapVideoTimeWithSkipSegments: (time) => time },
+    });
+    vm.runInContext(source.slice(0, helperBoundary), effectContext);
+    const runPlaybackEffect = () => vm.runInContext(`(() => { ${effectBody} })()`, effectContext);
+
+    runPlaybackEffect();
+    effectContext.isPlaying = true;
+    runPlaybackEffect();
+    assert.deepEqual(calls, [], "pause and resume must not cancel an in-flight seek");
+    assert.equal(holdState.primePending, true);
+
+    playerState = 2;
+    currentTime = 0;
+    effectContext.isPlaying = false;
+    runPlaybackEffect();
+    assert.deepEqual(calls, [["playVideo"]], "even paused Spotify needs its stale video frame refreshed");
+
+    currentTime = 0.1;
+    playerState = 1;
+    runPlaybackEffect();
+    assert.deepEqual(calls, [["playVideo"], ["pauseVideo"]]);
+    assert.deepEqual(holdState, { isHolding: true, primePending: false });
+});
+
+test("state events from cancelled or failed YouTube players cannot settle a replacement player's hold", () => {
+    const handlerStart = source.indexOf("                        onStateChange: (event) => {");
+    const handlerEnd = source.indexOf("\n                        },\n                    },", handlerStart);
+    assert.ok(handlerStart >= 0 && handlerEnd > handlerStart);
+    const handlerBody = source.slice(handlerStart + "                        onStateChange: (event) => {".length, handlerEnd);
+    const calls = [];
+    const holdState = { isHolding: true, primePending: true };
+    const eventContext = vm.createContext({
+        isCancelled: true,
+        playerLifecycleFailed: false,
+        didReportReady: false,
+        youtubeHoldStateRef: { current: holdState },
+        event: { data: 1, target: {
+            getCurrentTime: () => 0.1,
+            pauseVideo: () => calls.push("pauseVideo"),
+        } },
+        window: { YT: { PlayerState: { PLAYING: 1, CUED: 5 } } },
+        markPlayerReady: () => calls.push("markPlayerReady"),
+        disableYouTubeCaptions: () => calls.push("disableYouTubeCaptions"),
+    });
+    vm.runInContext(source.slice(0, helperBoundary), eventContext);
+    const emitStateChange = () => vm.runInContext(`(() => { ${handlerBody} })()`, eventContext);
+
+    emitStateChange();
+    eventContext.isCancelled = false;
+    eventContext.playerLifecycleFailed = true;
+    emitStateChange();
+    assert.deepEqual(calls, []);
+    assert.deepEqual(holdState, { isHolding: true, primePending: true });
+
+    eventContext.playerLifecycleFailed = false;
+    emitStateChange();
+    assert.deepEqual(calls, ["pauseVideo", "markPlayerReady", "disableYouTubeCaptions"]);
+    assert.deepEqual(holdState, { isHolding: true, primePending: false });
+});
+
+for (const [stateName, playerState] of [["PLAYING", 1], ["BUFFERING", 3]]) {
+    test(`YouTube sync in ${stateName} refreshes captions without missing quality calls and cleans up its timer`, () => {
+        const marker = source.indexOf("    // 일반 모드 (YouTube IFrame): Sync Logic");
+        const effectStart = source.indexOf("    useEffect(() => {", marker);
+        const effectEnd = source.indexOf("    }, [useHelper, isPlayerReady, videoInfo, firstLyricTime, trackOffsetMs, isPlaying]);", effectStart);
+        assert.ok(marker >= 0 && effectStart > marker && effectEnd > effectStart);
+        const effectBody = source.slice(effectStart + "    useEffect(() => {".length, effectEnd);
+        let now = 10000;
+        let progress = 12000;
+        let timelineReads = 0;
+        let mapCalls = 0;
+        let missingQualityReads = 0;
+        let qualityWrites = 0;
+        const captionTimes = [];
+        const intervals = new Map();
+        const player = {
+            getPlayerState: () => playerState,
+            getCurrentTime: () => { timelineReads += 1; return progress / 1000; },
+            getDuration: () => 300,
+            setPlaybackQuality: () => { qualityWrites += 1; },
+            setPlaybackQualityRange: () => { qualityWrites += 1; },
+        };
+        const effectContext = vm.createContext({
+            useHelper: false,
+            isPlayerReady: true,
+            isPlaying: true,
+            videoInfo: { captionStartTime: 0, isAutoGenerated: true, skipSegments: [] },
+            firstLyricTime: 0,
+            trackOffsetMs: 0,
+            playerRef: { current: player },
+            youtubeHoldStateRef: { current: { isHolding: false, primePending: false } },
+            youtubeSeekStateRef: { current: createVideoSeekState() },
+            lastCaptionDisableRef: { current: 0 },
+            Spicetify: { Player: { getProgress: () => progress } },
+            CONFIG: { visual: { delay: 0 } },
+            window: {},
+            document: { visibilityState: "visible" },
+            Date: { now: () => now },
+            Utils: { mapVideoTimeWithSkipSegments: (time) => { mapCalls += 1; return time; } },
+            disableYouTubeCaptions: () => captionTimes.push(now),
+            setInterval(callback, delay) { intervals.set(1, { callback, delay }); return 1; },
+            clearInterval: (id) => intervals.delete(id),
+        });
+        // A missing global would throw inside the effect's catch. Count access so
+        // the test cannot silently pass while that catch suppresses the failure.
+        Object.defineProperty(effectContext, "applyFixedQuality", {
+            get() {
+                missingQualityReads += 1;
+                throw new ReferenceError("applyFixedQuality is not defined");
+            },
+        });
+        vm.runInContext(source.slice(0, helperBoundary), effectContext);
+        const cleanup = vm.runInContext(`(() => { ${effectBody} })()`, effectContext);
+        assert.equal(intervals.size, 1);
+        assert.equal(intervals.get(1).delay, 250);
+        for (let tick = 0; tick < 40; tick++) {
+            now += 250;
+            progress += 250;
+            intervals.get(1).callback();
+        }
+        assert.equal(missingQualityReads, 0, "no repeated ReferenceError may be swallowed by the sync catch");
+        assert.equal(qualityWrites, 0, "the sync loop must preserve the existing quality policy");
+        assert.equal(mapCalls, 41, "timeline mapping runs immediately and on every interval tick");
+        assert.equal(timelineReads, 41, "the real timeline helper still checks the player each tick");
+        assert.deepEqual(captionTimes, [10000, 15250], "retain the existing > 5000ms caption throttle on 250ms ticks");
+        cleanup();
+        assert.equal(intervals.size, 0, "unmount removes the sync interval");
+    });
+}

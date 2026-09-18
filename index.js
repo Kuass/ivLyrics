@@ -4382,6 +4382,12 @@ class LyricsContainer extends react.Component {
         "video-background": { phase: "idle", revision: 0 },
       },
       currentLyricIndex: 0,
+      // Keep the previous fullscreen layout while loading, without retaining
+      // outgoing lyric arrays under the next track's identity.
+      lyricsStatus: "idle",
+      lyricsTransitionSeq: 0,
+      lyricsDisplayUri: null,
+      lyricsLoadingHasLyrics: false,
       videoInfo: null,
       // 메타데이터 번역
       translatedMetadata: null,
@@ -4407,6 +4413,7 @@ class LyricsContainer extends react.Component {
     this._lyricsFetchSeq = 0;
     this._activeLyricsFetchSeq = 0;
     this._lyricsPresentationSeq = 0;
+    this._lyricsTransitionSeq = 0;
     this._lyricsEditRequestSeq = 0;
     this._playbackTrackResolutionSeq = 0;
     this._playbackTrackResolutionTimer = null;
@@ -5564,19 +5571,30 @@ class LyricsContainer extends react.Component {
     this.clearCulturalAnnotationsLoading();
   }
 
+  getLyricsLayoutHasLyrics(lyricsState = this.state) {
+    const hasLyrics = [lyricsState?.karaoke, lyricsState?.synced, lyricsState?.unsynced]
+      .some((lyrics) => Array.isArray(lyrics) && lyrics.length > 0);
+    return hasLyrics || (lyricsState?.isLoading === true && lyricsState?.lyricsLoadingHasLyrics === true);
+  }
+
   getLoadingLyricsState(info, requestSeq) {
+    const lyricsLoadingHasLyrics = this.getLyricsLayoutHasLyrics();
     return {
       ...emptyState,
+      currentLyrics: [],
+      lyricsDisplayUri: info?.uri || null,
+      lyricsLoadingHasLyrics,
       uri: info?.uri || "",
       lyricsRequestSeq: requestSeq || 0,
       provider: "",
       contributors: null,
-      currentLyrics: [],
       language: null,
       translatedMetadata: null,
       trackLyricsProviderOverride: null,
       trackBackgroundOverride: null,
       isLoading: true,
+      lyricsStatus: "loading",
+      lyricsTransitionSeq: this._lyricsTransitionSeq,
       isCached: false,
       error: null,
       artist: info?.artist || "",
@@ -6707,6 +6725,7 @@ class LyricsContainer extends react.Component {
       }
 
       const requestSeq = ++this._lyricsFetchSeq;
+      const transitionSeq = ++this._lyricsTransitionSeq;
       const requestUri = info.uri;
       const hasSpotifyTrackId = !!Utils.extractTrackId(info.uri);
       this._activeLyricsFetchSeq = requestSeq;
@@ -6737,6 +6756,7 @@ class LyricsContainer extends react.Component {
         uri: requestUri,
         lyricsRequestSeq: requestSeq,
         currentLyrics: sharedDisplayLyrics,
+        lyricsDisplayUri: requestUri,
         provider: sharedSnapshot.provider || sharedRawResult?.provider || "",
         karaokeSource: sharedSnapshot.karaokeSource || sharedRawResult?.karaokeSource || null,
         // Track overrides are asynchronous. Keep processing paused until the
@@ -6877,17 +6897,9 @@ class LyricsContainer extends react.Component {
         this.lastModeBeforeLoading = currentMode !== -1 ? currentMode : SYNCED;
         lyricsLoadingToken = this.startLyricsLoading();
         this.setState({
-          ...emptyState,
-          uri: requestUri,
-          lyricsRequestSeq: requestSeq,
-          artist: info.artist,
-          title: info.title,
-          coverUrl: info.image,
-          provider: "",
-          contributors: null,
+          ...this.getLoadingLyricsState(info, requestSeq),
           trackLyricsProviderOverride,
           trackBackgroundOverride,
-          isLoading: true,
           isCached: false,
         });
 
@@ -6929,6 +6941,10 @@ class LyricsContainer extends react.Component {
         }
       }
 
+      if (!isLatestLyricsRequest()) {
+        return;
+      }
+
       // Check if lyrics indicate no lyrics / instrumental
       // Conditions: 
       // 1. Total lines <= 3
@@ -6965,6 +6981,7 @@ class LyricsContainer extends react.Component {
       }
 
       const initialLyricsForMode = this.resolveLyricsForMode(tempState, finalMode);
+      const hasResolvedLyrics = Array.isArray(initialLyricsForMode) && initialLyricsForMode.length > 0;
       const canCompleteLyricsLoading = lyricsLoadingToken !== null &&
         isLatestLyricsRequest() &&
         Array.isArray(initialLyricsForMode) &&
@@ -7042,6 +7059,9 @@ class LyricsContainer extends react.Component {
           language: defaultLanguage,
           ...this.applyTranslationStates(tempState),
           currentLyrics: sharedLyricsForMode || initialLyricsForMode || [],
+          lyricsStatus: hasResolvedLyrics ? "ready" : "empty",
+          lyricsTransitionSeq: transitionSeq,
+          lyricsDisplayUri: info.uri,
         });
         lyricsLoadingCompleted = canCompleteLyricsLoading && isLatestLyricsRequest();
         return;
@@ -7052,6 +7072,9 @@ class LyricsContainer extends react.Component {
         ...tempState,
         ...this.applyTranslationStates(tempState),
         currentLyrics: sharedLyricsForMode || initialLyricsForMode || [],
+        lyricsStatus: hasResolvedLyrics ? "ready" : "empty",
+        lyricsTransitionSeq: transitionSeq,
+        lyricsDisplayUri: info.uri,
       });
       lyricsLoadingCompleted = canCompleteLyricsLoading && isLatestLyricsRequest();
     } catch (error) {
@@ -7062,9 +7085,11 @@ class LyricsContainer extends react.Component {
       this.setState({
         error: `Failed to fetch lyrics: ${error.message}`,
         isLoading: false,
+        lyricsStatus: "empty",
         ...emptyState,
         uri: this.currentTrackUri,
         lyricsRequestSeq: this._activeLyricsFetchSeq,
+        lyricsDisplayUri: this.currentTrackUri,
       });
     } finally {
       if (lyricsLoadingToken !== null) {
@@ -7107,7 +7132,11 @@ class LyricsContainer extends react.Component {
     if (!lyrics) {
       if (lyricsState.isLoading) return;
       if (!isActivePresentation()) return;
-      this.setState({ currentLyrics: [] });
+      this.setState({
+        currentLyrics: [],
+        lyricsStatus: "empty",
+        lyricsDisplayUri: lyricsState.uri || this.state.uri || null,
+      });
       return;
     }
 
@@ -8441,6 +8470,8 @@ class LyricsContainer extends react.Component {
         ...nextLyrics,
         ...this.applyTranslationStates(nextLyrics),
         isLoading: false,
+        lyricsStatus: "ready",
+        lyricsDisplayUri: currentUri,
         isCached: true,
         error: null,
       },
@@ -8554,18 +8585,23 @@ class LyricsContainer extends react.Component {
     if (candidateUri && candidateUri === this.currentTrackUri) return false;
 
     const transitionSeq = ++this._lyricsFetchSeq;
+    this._lyricsTransitionSeq += 1;
     this._activeLyricsFetchSeq = transitionSeq;
     this.clearPendingLyricsUpdates();
     if (this.state.isLyricsEditModalOpen) {
       this.closeLyricsEditModal({ force: true });
     }
+    // Only carry layout availability across the handoff. Keeping the arrays
+    // here lets mode selection, snapshots and overlays consume the old song.
+    const lyricsLoadingHasLyrics = this.getLyricsLayoutHasLyrics();
     this.setState({
-      karaoke: null,
-      karaokeGranularity: null,
-      synced: null,
-      unsynced: null,
-      currentLyrics: null,
+      ...emptyState,
+      currentLyrics: [],
+      lyricsDisplayUri: null,
+      lyricsLoadingHasLyrics,
       isLoading: true,
+      lyricsStatus: "loading",
+      lyricsTransitionSeq: this._lyricsTransitionSeq,
       lyricsRequestSeq: transitionSeq,
     });
     return true;
@@ -8591,6 +8627,10 @@ class LyricsContainer extends react.Component {
       coverUrl: track?.metadata?.image_xlarge_url || track?.metadata?.image_url || null,
       error: "DJ narration",
       isLoading: false,
+      lyricsStatus: "empty",
+      lyricsTransitionSeq: ++this._lyricsTransitionSeq,
+      lyricsDisplayUri: uri,
+      lyricsLoadingHasLyrics: false,
       explicitMode: -1,
       lyricsRequestSeq: transitionSeq,
       videoInfo: null,
@@ -8644,6 +8684,7 @@ class LyricsContainer extends react.Component {
     const deadline = Date.now() + 4000;
     this.clearPlaybackTrackResolutionTimer();
     let transitionCleared = this.beginPlaybackTrackTransition(candidateTrack);
+    let recoveredTrackUri = null;
 
     const resolve = () => {
       if (!this._isComponentMounted || resolutionSeq !== this._playbackTrackResolutionSeq) {
@@ -8654,8 +8695,9 @@ class LyricsContainer extends react.Component {
       const stableTrack = window.Utils?.resolveStablePlaybackTrack?.(candidateTrack, snapshot) || null;
       const trackChanged = !!stableTrack?.uri && stableTrack.uri !== this.currentTrackUri;
 
-      if (!transitionCleared && snapshot?.uri && snapshot.uri !== this.currentTrackUri) {
+      if ((!transitionCleared || recoveredTrackUri) && snapshot?.uri && snapshot.uri !== this.currentTrackUri) {
         transitionCleared = this.beginPlaybackTrackTransition({ uri: snapshot.uri });
+        recoveredTrackUri = null;
       }
 
       if (snapshot?.djNarration === true && snapshot.uri) {
@@ -8670,10 +8712,23 @@ class LyricsContainer extends react.Component {
         return;
       }
 
+      if (stableTrack && transitionCleared && recoveredTrackUri !== stableTrack.uri) {
+        // Resume a cancelled skip once, but keep watching until the deadline:
+        // songchange can precede both the public item and playback snapshot.
+        recoveredTrackUri = stableTrack.uri;
+        this.fetchLyrics(stableTrack, -1);
+      }
+
       if (Date.now() >= deadline) {
         this.clearPlaybackTrackResolutionTimer();
-        if (transitionCleared) {
-          this.setState({ isLoading: false, error: "Playback transition unresolved" });
+        if (transitionCleared && !stableTrack) {
+          this.setState({
+            ...emptyState,
+            isLoading: false,
+            lyricsStatus: "empty",
+            lyricsLoadingHasLyrics: false,
+            error: "Playback transition unresolved",
+          });
         }
         return;
       }
@@ -8686,7 +8741,6 @@ class LyricsContainer extends react.Component {
 
   componentDidMount() {
     this._isComponentMounted = true;
-    document.body.classList.add('ivlyrics-page-active');
 
     // Prevent duplicate global registration
     if (window.lyricContainer && window.lyricContainer !== this) {
@@ -8697,6 +8751,7 @@ class LyricsContainer extends react.Component {
 
     // Register instance for external access
     window.lyricContainer = this;
+    document.body.classList.add('ivlyrics-page-active');
     // Note: reloadLyrics will be exposed after it's defined below
 
     this._unsubscribeLyricsProviderAttempt = window.LyricsAddonManager?.on?.(
@@ -9128,6 +9183,7 @@ class LyricsContainer extends react.Component {
   }
 
   componentWillUnmount() {
+    if (this._isComponentMounted === false) return;
     this._isComponentMounted = false;
     this._lyricsEditRequestSeq += 1;
     document.body.classList.remove('ivlyrics-page-active');
@@ -9243,6 +9299,12 @@ class LyricsContainer extends react.Component {
     if (this._dmResults) {
       this._dmResults = null;
     }
+
+    // 페이지가 더 이상 표시 결과를 발행하지 않으므로 전역 오버레이 서비스가
+    // 아직 끝나지 않은 번역/발음 생성을 이어받게 한다.
+    window.dispatchEvent(new CustomEvent('ivLyrics:presentation-owner-released', {
+      detail: { source: 'ivlyrics-page', trackUri: this.currentTrackUri }
+    }));
 
     // Force garbage collection hint
     if (window.gc && typeof window.gc === "function") {
@@ -9676,6 +9738,9 @@ class LyricsContainer extends react.Component {
 		syncTypeBreakdown: this.state.syncTypeBreakdown,
         copyright: this.state.copyright,
         isLoading: this.state.isLoading,
+        trackRevealKey: !this.state.isLoading && renderedCurrentLyrics?.length > 0
+          ? this.state.uri
+          : null,
         reRenderLyricsPage: this.reRenderLyricsPage,
       })
       : (() => {
@@ -9706,6 +9771,9 @@ class LyricsContainer extends react.Component {
           )
         );
       })());
+    // Reject an inconsistent display identity even after a failed request.
+    const suppressStaleLyricsPage = !!this.state.lyricsDisplayUri &&
+      this.state.lyricsDisplayUri !== this.state.uri;
 
     // Tab bar removed - modes are now auto-detected
     const topBarContent = null;
@@ -9726,18 +9794,20 @@ class LyricsContainer extends react.Component {
         ? updateBannerDOM.createPortal(updateBannerContent, document.body)
         : updateBannerContent;
 
-    const hasLyrics = !!(this.state.karaoke || this.state.synced || this.state.unsynced);
+    const hasLyrics = [this.state.karaoke, this.state.synced, this.state.unsynced]
+      .some((lyrics) => Array.isArray(lyrics) && lyrics.length > 0);
+    const hasLyricsLayout = this.getLyricsLayoutHasLyrics();
     const isTwoColumn = CONFIG.visual["fullscreen-two-column"] !== false;
     const isLayoutReversed = CONFIG.visual["fullscreen-layout-reverse"] === true;
     const centerWhenNoLyrics = CONFIG.visual["fullscreen-center-when-no-lyrics"] !== false;
     const shouldHideFullscreenLyrics =
       this.state.isFullscreen &&
       this.state.fullscreenLyricsHidden &&
-      hasLyrics &&
+      hasLyricsLayout &&
       !isSyncCreatorActive;
     const shouldUseFullscreenNoLyricsLayout =
       shouldHideFullscreenLyrics ||
-      (!hasLyrics && centerWhenNoLyrics);
+      (!hasLyricsLayout && centerWhenNoLyrics);
     const shouldReduceMotion = this.shouldReduceMotion();
     const isFullscreenPageUi = this.state.isFullscreen && this.fullscreenUsesPageUi === true;
     const shouldRenderFloatingMenu =
@@ -9879,6 +9949,9 @@ class LyricsContainer extends react.Component {
       if (shouldUseFullscreenNoLyricsLayout) {
         fullscreenClasses += " fullscreen-no-lyrics";
       }
+      if (this.state.isLoading && this.state.lyricsStatus === "loading") {
+        fullscreenClasses += " fullscreen-lyrics-loading";
+      }
       // Portrait mode class (not in TV mode)
       if (this._isPortraitViewport && CONFIG.visual["fullscreen-tv-mode"] !== true) {
         fullscreenClasses += " portrait-mode";
@@ -10019,6 +10092,7 @@ class LyricsContainer extends react.Component {
       (isKaraokeRenderMode(mode) && Array.isArray(this.state.karaoke) && this.state.karaoke.length > 0) ||
       (mode === SYNCED && Array.isArray(this.state.synced) && this.state.synced.length > 0);
     const canAdjustTrackSync = hasTrackSyncLyrics &&
+      !suppressStaleLyricsPage &&
       !shouldHideFullscreenLyrics &&
       !isSyncCreatorActive &&
       Boolean(renderTrackUri);
@@ -10060,23 +10134,23 @@ class LyricsContainer extends react.Component {
         title: this.state.title,
         artist: this.state.artist,
         isFullscreen: this.state.isFullscreen,
-        currentLyricIndex: shouldHideFullscreenLyrics ? 0 : this.state.currentLyricIndex || 0,
-        totalLyrics: shouldHideFullscreenLyrics
+        currentLyricIndex: shouldHideFullscreenLyrics || suppressStaleLyricsPage ? 0 : this.state.currentLyricIndex || 0,
+        totalLyrics: shouldHideFullscreenLyrics || suppressStaleLyricsPage
           ? 0
           : Array.isArray(this.state.currentLyrics)
             ? this.state.currentLyrics.length
             : 0,
-        activeLyric: shouldHideFullscreenLyrics
+        activeLyric: shouldHideFullscreenLyrics || suppressStaleLyricsPage
           ? ""
           : getPlainLyricsLineText(
             Array.isArray(this.state.currentLyrics)
               ? this.state.currentLyrics[this.state.currentLyricIndex || 0]
               : null
           ),
-        activeLyrics: shouldHideFullscreenLyrics || !Array.isArray(this.state.currentLyrics)
+        activeLyrics: shouldHideFullscreenLyrics || suppressStaleLyricsPage || !Array.isArray(this.state.currentLyrics)
           ? []
           : this.state.currentLyrics,
-        activeLyricsKaraoke: !shouldHideFullscreenLyrics && isKaraokeRenderMode(mode) && !!this.state.karaoke,
+        activeLyricsKaraoke: !shouldHideFullscreenLyrics && !suppressStaleLyricsPage && isKaraokeRenderMode(mode) && !!this.state.karaoke,
         karaokeSource: this.state.karaokeSource,
         lyricsSettingsRevision: this.reRenderLyricsPage,
         translatedMetadata: this.state.translatedMetadata,
@@ -10357,7 +10431,7 @@ class LyricsContainer extends react.Component {
         )
       ),
       cacheEditModal,
-      !shouldHideFullscreenLyrics && activeLyricsPage
+      !shouldHideFullscreenLyrics && !suppressStaleLyricsPage && activeLyricsPage
     );
 
     const dom = ensureReactDOM();
