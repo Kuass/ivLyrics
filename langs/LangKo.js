@@ -28,6 +28,7 @@ window.LANG_KO = {
     "inSection": "{section}에서"
   },
   "settingsUi": {
+    "aiAutosave": "설정은 자동으로 저장됩니다. 다시 생성하면 현재 곡에 적용됩니다.",
     "groups": {
       "core": "기본",
       "display": "화면 구성",
@@ -424,6 +425,10 @@ window.LANG_KO = {
       }
     },
     "aiProviders": {
+      "openaiConnections": "추가 OpenAI 호환 제공자",
+      "openaiConnectionsDesc": "기본 연결이 실패하면 아래의 활성화된 제공자를 순서대로 시도합니다.",
+      "addOpenaiConnection": "커스텀 제공자 추가",
+      "connectionName": "제공자 이름",
       "title": "AI 제공자",
       "description": "AI 제공자를 선택하고 우선순위를 설정합니다. 위에 있는 제공자부터 먼저 시도하며, 실패 시 다음 제공자로 자동 전환됩니다.",
       "translationStyle": {
@@ -464,7 +469,40 @@ window.LANG_KO = {
       "noEnabledProviders": "활성화된 AI 제공자가 없습니다. 설정에서 최소 하나 이상의 제공자를 활성화해주세요.",
       "allProvidersFailed": "모든 AI 제공자가 요청에 실패했습니다.",
       "enabledCapabilities": "활성화된 기능",
-      "capabilitiesDesc": "이 제공자가 처리할 기능을 선택하세요"
+      "capabilitiesDesc": "이 제공자가 처리할 기능을 선택하세요",
+      "removeConnection": "제공자 삭제",
+      "testThisConnection": "이 제공자 연결 테스트",
+      "connectionSuccess": "연결에 성공했습니다.",
+      "saveConnection": "저장",
+      "sonarModelsFallback": "Sonar는 모델 목록 API가 없어 기본 지원 목록을 표시합니다.",
+      "pollinationsAllModels": "모든 모델에 대한 접근을 요청합니다. 연결 후 사용할 모델을 선택하세요.",
+      "model": "모델",
+      "modelId": "모델 ID",
+      "baseUrl": "기본 URL",
+      "apiKey": "API 키",
+      "apiKeyDesc": "단일 키, 줄바꿈 목록, JSON 배열을 지원합니다. 이 기기에만 저장됩니다.",
+      "refreshModels": "새로고침",
+      "selectModel": "모델 목록에서 선택",
+      "loadingModels": "모델 불러오는 중…",
+      "modelsUnavailable": "모델 목록을 불러오지 못했습니다. 모델 ID를 직접 입력할 수 있습니다.",
+      "testingConnection": "연결 테스트…",
+      "testConnection": "연결 테스트",
+      "getApiKey": "키 받기",
+      "noModels": "사용 가능한 모델이 없습니다",
+      "pollinationsAccount": "Pollinations 계정",
+      "pollinationsConnect": "Pollinations 로그인",
+      "pollinationsReconnect": "다시 연결",
+      "pollinationsWaiting": "로그인 대기 중",
+      "pollinationsOpenLogin": "로그인 페이지 열기",
+      "pollinationsDisconnect": "연결 해제",
+      "pollinationsDisconnected": "Pollinations 계정 · 비활성화됨",
+      "pollinationsRequesting": "Pollinations 로그인…",
+      "pollinationsConnected": "Pollinations 계정 · 활성화됨",
+      "pollinationsKeyConfigured": "Pollinations 계정 · 설정됨",
+      "pollinationsKeyStatus": "Pollinations 계정 · 활성화됨: %s",
+      "pollinationsDescription": "수동 API 키와 계정 로그인 토큰을 모두 지원합니다. 로그인 토큰이 있으면 우선 사용합니다.",
+      "pollinationsInvalid": "API 키가 유효하지 않습니다. 다시 연결하거나 새 키를 입력하세요.",
+      "pollinationsExpires": "%d일 후 만료"
     },
     "lyricsProviders": {
       "title": "가사 제공자",

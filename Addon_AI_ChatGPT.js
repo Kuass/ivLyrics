@@ -1,7 +1,7 @@
 /**
  * ChatGPT AI Addon for ivLyrics
  * OpenAI ChatGPT를 사용한 번역, 발음, Research 생성
- * 
+ *
  * @author default
  * @version 1.0.1
  */
@@ -9,6 +9,7 @@
 (() => {
     'use strict';
 
+    function createOpenAICompatibleAddon(config = {}) {
     // ============================================
     // Addon Metadata
     // ============================================
@@ -43,13 +44,16 @@
         models: [] // API에서 동적으로 로드
     };
 
+    Object.assign(ADDON_INFO, config.info || {});
+    const DEFAULT_OPENAI_BASE_URL = config.baseUrl || 'https://api.openai.com/v1';
+
     /**
      * OpenAI API에서 사용 가능한 모델 목록을 가져옴 (채팅/텍스트 생성용 모델만)
      */
     async function fetchAvailableModels(apiKey, baseUrl) {
         if (!apiKey) return [];
 
-        const normalizedBaseUrl = (baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
+        const normalizedBaseUrl = (baseUrl || DEFAULT_OPENAI_BASE_URL).replace(/\/$/, '');
         const isOpenAIBaseUrl = normalizedBaseUrl === 'https://api.openai.com/v1';
 
         // 제외할 모델 패턴 (이미지 생성, 음성, 임베딩 등)
@@ -165,7 +169,7 @@
      */
     async function getModels() {
         const apiKeys = getApiKeys();
-        const baseUrl = getSetting('base-url', 'https://api.openai.com/v1');
+        const baseUrl = getSetting('base-url', DEFAULT_OPENAI_BASE_URL);
         if (apiKeys.length === 0) return [];
         return await fetchAvailableModels(apiKeys[0], baseUrl);
     }
@@ -173,11 +177,6 @@
     // ============================================
     // Helper Functions
     // ============================================
-
-    function getLocalizedText(textObj, lang) {
-        if (typeof textObj === 'string') return textObj;
-        return textObj[lang] || textObj['en'] || Object.values(textObj)[0] || '';
-    }
 
     function getSetting(key, defaultValue = null) {
         return window.AIAddonManager?.getAddonSetting(ADDON_INFO.id, key, defaultValue) ?? defaultValue;
@@ -192,52 +191,73 @@
         return value && value !== key ? value : fallback;
     }
 
-    function getApiKeys() {
-        // 새 키 먼저 확인, 없으면 기존 키 fallback
-        let raw = getSetting('api-keys', '');
-        if (!raw) {
-            raw = getSetting('api-key', '');
-        }
-        if (!raw) return [];
+    const aiText = (key, fallback) => t(`settings.aiProviders.${key}`, fallback);
 
-        // 이미 배열인 경우 (getAddonSetting이 JSON 파싱함)
-        if (Array.isArray(raw)) {
-            return raw
-                .map(k => typeof k === 'string' ? k.trim() : '')
-                .filter(k => k);
-        }
-
-        // 문자열이 아닌 경우
-        if (typeof raw !== 'string') return [];
-
-        try {
-            if (raw.startsWith('[')) {
-                return JSON.parse(raw)
-                    .map(k => typeof k === 'string' ? k.trim() : '')
-                    .filter(k => k);
-            }
-            return [raw.trim()].filter(k => k);
-        } catch {
-            return [raw.trim()].filter(k => k);
-        }
+    function getApiKeys(connection = null) {
+        if (connection) return parseConnectionKeys(connection.apiKeys);
+        return parseConnectionKeys(getSetting('api-keys', '') || getSetting('api-key', ''));
     }
 
-    const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
     function normalizeBaseUrl(value) {
         return String(value || '').trim().replace(/\/+$/, '');
     }
 
-    function getBaseUrl() {
+    function getBaseUrl(connection = null) {
+        if (connection) return normalizeBaseUrl(connection.baseUrl) || DEFAULT_OPENAI_BASE_URL;
         return getSetting('base-url', DEFAULT_OPENAI_BASE_URL) || DEFAULT_OPENAI_BASE_URL;
     }
 
-    function getSelectedModel() {
+    function getSelectedModel(connection = null) {
+        if (connection) return String(connection.model || '').trim();
         return getSetting('model', null);
     }
 
+    function resolveApiCredentials(connection) {
+        const apiKeys = getApiKeys(connection);
+        if (apiKeys.length === 0) {
+            throw new Error('[ChatGPT] API key is required. Please configure your API key in settings.');
+        }
+
+        const baseUrl = getBaseUrl(connection);
+        const model = getSelectedModel(connection);
+        if (!model) {
+            throw new Error('[ChatGPT] Model is not selected. Please select a model in settings.');
+        }
+        return { apiKeys, baseUrl, model };
+    }
+
+
+    function parseConnectionKeys(raw) {
+        if (Array.isArray(raw)) return raw.filter(key => typeof key === 'string').map(key => key.trim()).filter(Boolean);
+        if (typeof raw !== 'string') return [];
+        try { if (raw.trim().startsWith('[')) return parseConnectionKeys(JSON.parse(raw)); } catch { }
+        return raw.split(/[\n,]/).map(key => key.trim()).filter(Boolean);
+    }
+
+    function getFallbackProviders() {
+        let value = getSetting('fallback-providers', []);
+        if (typeof value === 'string') { try { value = JSON.parse(value); } catch { return []; } }
+        return Array.isArray(value) ? value.filter(item => item && typeof item === 'object' && !Array.isArray(item)) : [];
+    }
+
+    function getProviderConnections() {
+        return [{ id: 'primary', name: 'Primary', apiKeys: getApiKeys(), baseUrl: getBaseUrl(), model: getSelectedModel() },
+            ...getFallbackProviders().filter(connection => connection.enabled !== false).map(connection => ({ ...connection }))];
+    }
+
+    async function withProviderConnections(request) {
+        let lastError;
+        for (const connection of getProviderConnections()) {
+            try { return await request(connection); }
+            catch (error) {
+                lastError = error;
+            }
+        }
+        throw lastError || new Error('[ChatGPT] No OpenAI-compatible provider is configured.');
+    }
 
     function getDefaultRequestBodyMergePatch() {
-        return {
+        return config.requestDefaults ? { ...config.requestDefaults } : {
             max_completion_tokens: 16000,
             temperature: 0.3
         };
@@ -327,7 +347,7 @@
     function buildChatGPTRequestBody(model, prompt, { stream = false } = {}) {
         const { systemPrompt, userPrompt } = normalizePromptRequest(prompt);
         const requestBody = {
-            model: model,
+            model,
             messages: [
                 ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
                 { role: 'user', content: userPrompt }
@@ -465,22 +485,36 @@
         return { text, finishReason };
     }
 
+    // Shared 401 / non-OK handling for the chat/completions request loops.
+    // On 401 it throws the permission message; otherwise it reports the HTTP status.
+    // Either branch reads the JSON body at most once, matching the inline versions.
+    async function throwChatGPTApiResponseError(response) {
+        if (response.status === 401) {
+            let errorMessage = 'Invalid API key or permission denied.';
+            try {
+                const errorData = await response.json();
+                if (errorData.error?.message) errorMessage = errorData.error.message;
+            } catch (parseError) { }
+            throw new Error(`[ChatGPT] ${errorMessage}`);
+        }
+
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+            const errorData = await response.json();
+            if (errorData.error?.message) errorMessage = errorData.error.message;
+        } catch (parseError) { }
+        throw new Error(`[ChatGPT] ${errorMessage}`);
+    }
+
     async function callChatGPTAPIRaw(
         prompt,
         maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3,
         transformResult = null,
-        requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000
+        requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000,
+        connection = null
     ) {
-        const apiKeys = getApiKeys();
-        if (apiKeys.length === 0) {
-            throw new Error('[ChatGPT] API key is required. Please configure your API key in settings.');
-        }
-
-        const baseUrl = getBaseUrl();
-        const model = getSelectedModel();
-        if (!model) {
-            throw new Error('[ChatGPT] Model is not selected. Please select a model in settings.');
-        }
+        if (!connection) return withProviderConnections(provider => callChatGPTAPIRaw(prompt, maxRetries, transformResult, requestTimeoutMs, provider));
+        const { apiKeys, baseUrl, model } = resolveApiCredentials(connection);
         let lastError = null;
 
         for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex++) {
@@ -504,26 +538,8 @@
                         break; // Try next key
                     }
 
-                    if (response.status === 401) {
-                        let errorMessage = 'Invalid API key or permission denied.';
-                        try {
-                            const errorData = await response.json();
-                            if (errorData.error?.message) {
-                                errorMessage = errorData.error.message;
-                            }
-                        } catch (parseError) { }
-                        throw new Error(`[ChatGPT] ${errorMessage}`);
-                    }
-
-                    if (!response.ok) {
-                        let errorMessage = `HTTP ${response.status}`;
-                        try {
-                            const errorData = await response.json();
-                            if (errorData.error?.message) {
-                                errorMessage = errorData.error.message;
-                            }
-                        } catch (parseError) { }
-                        throw new Error(`[ChatGPT] ${errorMessage}`);
+                    if (response.status === 401 || !response.ok) {
+                        await throwChatGPTApiResponseError(response);
                     }
 
                     const data = await response.json();
@@ -585,6 +601,13 @@
         }
     }
 
+    function drainSseLines(buffer, flush, processSseLine) {
+        const lines = buffer.split(/\r?\n/);
+        const remaining = flush ? '' : (lines.pop() || '');
+        for (const line of lines) processSseLine(line);
+        return remaining;
+    }
+
     function createResponsesAPIError(data, fallback = 'Responses API request failed') {
         const response = data?.response || data;
         const error = response?.error || data?.error;
@@ -611,18 +634,11 @@
         maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3,
         transformResult = null,
         requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000,
-        onRawChunk = null
+        onRawChunk = null,
+        connection = null
     ) {
-        const apiKeys = getApiKeys();
-        if (apiKeys.length === 0) {
-            throw new Error('[ChatGPT] API key is required. Please configure your API key in settings.');
-        }
-
-        const baseUrl = getBaseUrl();
-        const model = getSelectedModel();
-        if (!model) {
-            throw new Error('[ChatGPT] Model is not selected. Please select a model in settings.');
-        }
+        if (!connection) return withProviderConnections(provider => callResponsesAPIStream(prompt, onLine, onStreamReset, maxRetries, transformResult, requestTimeoutMs, onRawChunk, provider));
+        const { apiKeys, baseUrl, model } = resolveApiCredentials(connection);
         let lastError = null;
 
         for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex++) {
@@ -684,6 +700,7 @@
                         return transformed;
                     }
 
+                    const consumeResponsesStream = async () => {
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder();
                     let sseBuffer = '';
@@ -726,10 +743,7 @@
                     };
 
                     const drainSseBuffer = (flush = false) => {
-                        const lines = sseBuffer.split(/\r?\n/);
-                        if (flush) sseBuffer = '';
-                        else sseBuffer = lines.pop() || '';
-                        for (const line of lines) processSseLine(line);
+                        sseBuffer = drainSseLines(sseBuffer, flush, processSseLine);
                     };
 
                     while (true) {
@@ -765,6 +779,9 @@
                         transformed.forEach((line, index) => onLine(index, line));
                     }
                     return transformed;
+                    };
+
+                    return await consumeResponsesStream();
                 } catch (error) {
                     lastError = error;
                     window.__ivLyricsDebugLog?.(`[ChatGPT Addon] Responses API attempt ${attempt + 1} failed:`, error.message);
@@ -785,18 +802,11 @@
         maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3,
         transformResult = null,
         requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000,
-        onRawChunk = null
+        onRawChunk = null,
+        connection = null
     ) {
-        const apiKeys = getApiKeys();
-        if (apiKeys.length === 0) {
-            throw new Error('[ChatGPT] API key is required. Please configure your API key in settings.');
-        }
-
-        const baseUrl = getBaseUrl();
-        const model = getSelectedModel();
-        if (!model) {
-            throw new Error('[ChatGPT] Model is not selected. Please select a model in settings.');
-        }
+        if (!connection) return withProviderConnections(provider => callChatGPTAPIStream(prompt, onLine, onStreamReset, maxRetries, transformResult, requestTimeoutMs, onRawChunk, provider));
+        const { apiKeys, baseUrl, model } = resolveApiCredentials(connection);
         let lastError = null;
 
         for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex++) {
@@ -843,16 +853,8 @@
                         break;
                     }
 
-                    if (response.status === 401) {
-                        let errorMessage = 'Invalid API key or permission denied.';
-                        try { const d = await response.json(); if (d.error?.message) errorMessage = d.error.message; } catch (e) { }
-                        throw new Error(`[ChatGPT] ${errorMessage}`);
-                    }
-
-                    if (!response.ok) {
-                        let errorMessage = `HTTP ${response.status}`;
-                        try { const d = await response.json(); if (d.error?.message) errorMessage = d.error.message; } catch (e) { }
-                        throw new Error(`[ChatGPT] ${errorMessage}`);
+                    if (response.status === 401 || !response.ok) {
+                        await throwChatGPTApiResponseError(response);
                     }
 
                     // Some compatible APIs accept `stream: true` but still
@@ -877,6 +879,7 @@
                         return transformed;
                     }
 
+                    const consumeChatGPTStream = async () => {
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder();
                     let sseBuffer = '';
@@ -902,13 +905,7 @@
                     };
 
                     const drainSseBuffer = (flush = false) => {
-                        const parts = sseBuffer.split(/\r?\n/);
-                        if (flush) {
-                            sseBuffer = '';
-                        } else {
-                            sseBuffer = parts.pop() || '';
-                        }
-                        for (const line of parts) processSseLine(line);
+                        sseBuffer = drainSseLines(sseBuffer, flush, processSseLine);
                     };
 
                     while (true) {
@@ -958,6 +955,9 @@
                     }
 
                     return transformed;
+                    };
+
+                    return await consumeChatGPTStream();
 
                 } catch (e) {
                     lastError = e;
@@ -1042,7 +1042,7 @@
             if (!trimmed.includes('{')) return false;
             return !trimmed.endsWith('}') || trimmed.lastIndexOf('}') < trimmed.lastIndexOf('{');
         };
-        let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+        const cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
 
         try {
             return JSON.parse(cleaned);
@@ -1088,7 +1088,7 @@
                 const [apiKeys, setApiKeys] = useState(
                     Array.isArray(initialApiKeys) ? JSON.stringify(initialApiKeys) : initialApiKeys
                 );
-                const [baseUrl, setBaseUrl] = useState(getSetting('base-url', 'https://api.openai.com/v1'));
+                const [baseUrl, setBaseUrl] = useState(getSetting('base-url', DEFAULT_OPENAI_BASE_URL));
                 const [model, setModel] = useState(getSelectedModel());
                 const [customModel, setCustomModel] = useState(getSetting('custom-model', ''));
                 const [testStatus, setTestStatus] = useState('');
@@ -1156,40 +1156,33 @@
                 }, [loadModels]);
 
                 const handleTest = useCallback(async () => {
-                    setTestStatus('Testing...');
+                    setTestStatus(aiText('testingConnection', 'Testing...'));
                     try {
                         await callChatGPTAPIRaw('Reply with just "OK" if you receive this.');
-                        setTestStatus('✓ Connection successful!');
+                        setTestStatus('✓ ' + aiText('connectionSuccess', 'Connection successful.'));
                     } catch (e) {
                         setTestStatus(`✗ Error: ${e.message}`);
                     }
                 }, []);
 
-
-
-                // ... (existing code for models)
-
-                // ... (existing code for test)
-
                 const isModelInList = availableModels.find(m => m.id === model);
                 const hasApiKey = getApiKeys().length > 0;
 
-                return React.createElement('div', { className: 'ai-addon-settings chatgpt-settings' },
-                    React.createElement('div', { className: 'ai-addon-setting' },
-                        React.createElement('label', null, 'API Key(s)'),
+                const renderApiKeyRow = () => React.createElement('div', { className: 'ai-addon-setting' },
+                        React.createElement('label', null, aiText('apiKey', 'API Key(s)')),
                         React.createElement('div', { className: 'ai-addon-input-group' },
                             React.createElement('input', { type: 'text', value: apiKeys, onChange: handleApiKeyChange, placeholder: 'sk-... (multiple: ["key1", "key2"])' }),
-                            React.createElement('button', { onClick: () => window.open(ADDON_INFO.apiKeyUrl, '_blank'), className: 'ai-addon-btn-secondary' }, 'Get API Key')
+                            React.createElement('button', { onClick: () => window.open(ADDON_INFO.apiKeyUrl, '_blank'), className: 'ai-addon-btn-secondary' }, aiText('getApiKey', 'Get API Key'))
                         ),
-                        React.createElement('small', null, 'Enter a single key or JSON array for rotation')
-                    ),
-                    React.createElement('div', { className: 'ai-addon-setting' },
-                        React.createElement('label', null, 'Base URL'),
-                        React.createElement('input', { type: 'text', value: baseUrl, onChange: handleBaseUrlChange, placeholder: 'https://api.openai.com/v1' }),
+                        React.createElement('small', null, aiText('apiKeyDesc', 'Enter an API key or JSON array.'))
+                    );
+                const renderBaseUrlRow = () => React.createElement('div', { className: 'ai-addon-setting' },
+                        React.createElement('label', null, aiText('baseUrl', 'Base URL')),
+                        React.createElement('input', { type: 'text', value: baseUrl, onChange: handleBaseUrlChange, placeholder: DEFAULT_OPENAI_BASE_URL }),
                         React.createElement('small', null, 'Change this to use OpenAI-compatible APIs')
-                    ),
-                    React.createElement('div', { className: 'ai-addon-setting' },
-                        React.createElement('label', null, 'Model'),
+                    );
+                const renderModelRow = () => React.createElement('div', { className: 'ai-addon-setting' },
+                        React.createElement('label', null, aiText('model', 'Model')),
                         React.createElement('div', { className: 'ai-addon-input-group' },
                             React.createElement('select', {
                                 value: isModelInList ? model : '',
@@ -1197,43 +1190,124 @@
                                 disabled: modelsLoading
                             },
                                 modelsLoading
-                                    ? React.createElement('option', { value: '' }, 'Loading models...')
+                                    ? React.createElement('option', { value: '' }, aiText('loadingModels', 'Loading models...'))
                                     : availableModels.length > 0
                                         ? [
-                                            !model && React.createElement('option', { key: '__placeholder__', value: '' }, '-- Select a model --'),
+                                            !model && React.createElement('option', { key: '__placeholder__', value: '' }, aiText('selectModel', 'Select a model')),
                                             ...availableModels.map(m => React.createElement('option', { key: m.id, value: m.id }, m.name)),
-                                            React.createElement('option', { key: 'custom', value: '' }, 'Custom...')
+                                            React.createElement('option', { key: 'custom', value: '' }, aiText('modelId', 'Model ID'))
                                         ].filter(Boolean)
                                         : [
-                                            React.createElement('option', { key: 'empty', value: '' }, hasApiKey ? 'No models found' : 'Enter API key first'),
-                                            React.createElement('option', { key: 'custom', value: '' }, 'Custom...')
+                                            React.createElement('option', { key: 'empty', value: '' }, hasApiKey ? aiText('noModels', 'No models found') : aiText('apiKey', 'API Key')),
+                                            React.createElement('option', { key: 'custom', value: '' }, aiText('modelId', 'Model ID'))
                                         ]
                             ),
                             React.createElement('button', {
                                 onClick: handleRefreshModels,
                                 className: 'ai-addon-btn-secondary',
                                 disabled: modelsLoading || !hasApiKey,
-                                title: 'Refresh model list'
+                                title: aiText('refreshModels', 'Refresh model list')
                             }, modelsLoading ? '...' : '↻')
                         ),
-                        availableModels.length > 0 && React.createElement('small', null, `${availableModels.length} models available`)
-                    ),
-                    (!isModelInList || customModel) &&
-                    React.createElement('div', { className: 'ai-addon-setting' },
-                        React.createElement('label', null, 'Custom Model ID'),
+                        availableModels.length > 0 && React.createElement('small', null, `${aiText('model', 'Model')}: ${availableModels.length}`)
+                    );
+                const renderCustomModelRow = () => React.createElement('div', { className: 'ai-addon-setting' },
+                        React.createElement('label', null, aiText('modelId', 'Custom Model ID')),
                         React.createElement('input', { type: 'text', value: customModel, onChange: handleCustomModelChange, placeholder: 'e.g., gpt-4-turbo' })
-                    ),
-                    // Advanced API Parameters
-                    React.createElement(AdvancedParamsSection)
-                    ,
-                    React.createElement('div', { className: 'ai-addon-setting' },
-                        React.createElement('button', { onClick: handleTest, className: 'ai-addon-btn-primary' }, 'Test Connection'),
+                    );
+                const renderTestRow = () => React.createElement('div', { className: 'ai-addon-setting' },
+                        React.createElement('button', { onClick: handleTest, className: 'ai-addon-btn-primary' }, aiText('testConnection', 'Test Connection')),
                         testStatus && React.createElement('span', {
                             className: `ai-addon-test-status ${testStatus.startsWith('✓') ? 'success' : testStatus.startsWith('✗') ? 'error' : ''}`
                         }, testStatus)
-                    )
+                    );
+
+                return React.createElement('div', { className: 'ai-addon-settings chatgpt-settings' },
+                    renderApiKeyRow(),
+                    renderBaseUrlRow(),
+                    renderModelRow(),
+                    (!isModelInList || customModel) &&
+                    renderCustomModelRow(),
+                    React.createElement(FallbackProvidersSection),
+                    // Advanced API Parameters
+                    React.createElement(AdvancedParamsSection)
+                    ,
+                    renderTestRow()
                 );
             };
+
+            function FallbackProvidersSection() {
+                const [connections, setConnections] = useState(getFallbackProviders);
+                const save = next => { setConnections(next); setSetting('fallback-providers', next); };
+                const move = (index, delta) => {
+                    const next = [...connections];
+                    [next[index], next[index + delta]] = [next[index + delta], next[index]];
+                    save(next);
+                };
+                return React.createElement('div', { className: 'ai-addon-setting' },
+                    React.createElement('label', null, t('settings.aiProviders.openaiConnections', 'Additional OpenAI-compatible providers')),
+                    React.createElement('small', null, t('settings.aiProviders.openaiConnectionsDesc', 'Try the primary connection first, then enabled connections below in order when a request fails.')),
+                    connections.map((connection, index) => React.createElement(ConnectionEditor, {
+                        key: connection.id,
+                        connection, index, count: connections.length,
+                        onChange: patch => save(connections.map(item => item.id === connection.id ? { ...item, ...patch } : item)),
+                        onRemove: () => save(connections.filter(item => item.id !== connection.id)),
+                        onMove: delta => move(index, delta)
+                    })),
+                    React.createElement('button', {
+                        className: 'ai-addon-btn-secondary',
+                        onClick: () => save([...connections, { id: `custom-${Date.now()}-${Math.random().toString(36).slice(2)}`, name: `API ${connections.length + 1}`, baseUrl: DEFAULT_OPENAI_BASE_URL, apiKeys: '', model: '', enabled: true }])
+                    }, t('settings.aiProviders.addOpenaiConnection', 'Add provider'))
+                );
+            }
+
+            function ConnectionEditor({ connection, index, count, onChange, onRemove, onMove }) {
+                const [models, setModels] = useState([]);
+                const [loading, setLoading] = useState(false);
+                const [revision, setRevision] = useState(0);
+                const [status, setStatus] = useState('');
+                useEffect(() => {
+                    let active = true;
+                    setModels([]);
+                    const keys = parseConnectionKeys(connection.apiKeys);
+                    if (!keys.length) { setLoading(false); return; }
+                    setLoading(true);
+                    const timer = setTimeout(() => {
+                        fetchAvailableModels(keys[0], connection.baseUrl).then(values => {
+                            if (active) setModels(values);
+                        }).finally(() => { if (active) setLoading(false); });
+                    }, 350);
+                    return () => { active = false; clearTimeout(timer); };
+                }, [connection.apiKeys, connection.baseUrl, revision]);
+                const field = (label, key, type = 'text') => React.createElement('label', null, label,
+                    React.createElement('input', { type, value: connection[key] || '', onChange: event => onChange({ [key]: event.target.value }), autoComplete: 'off' }));
+                return React.createElement('div', { style: { padding: '12px', margin: '10px 0', border: '1px solid rgba(255,255,255,.15)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' } },
+                    React.createElement('div', { className: 'ai-addon-input-group' },
+                        React.createElement('label', null,
+                            React.createElement('input', { type: 'checkbox', checked: connection.enabled !== false, onChange: event => onChange({ enabled: event.target.checked }) }),
+                            `${index + 2}. ${connection.name || 'API'}`),
+                        React.createElement('button', { onClick: () => onMove(-1), disabled: index === 0, 'aria-label': aiText('moveUp', 'Move up') }, '↑'),
+                        React.createElement('button', { onClick: () => onMove(1), disabled: index === count - 1, 'aria-label': aiText('moveDown', 'Move down') }, '↓'),
+                        React.createElement('button', { onClick: onRemove, 'aria-label': aiText('removeConnection', 'Remove provider') }, '×')
+                    ),
+                    field(t('settings.aiProviders.connectionName', 'Name'), 'name'),
+                    field(aiText('baseUrl', 'Base URL'), 'baseUrl'),
+                    field(aiText('apiKey', 'API Key(s)'), 'apiKeys', 'password'),
+                    React.createElement('div', { className: 'ai-addon-input-group' },
+                        React.createElement('select', { value: connection.model || '', disabled: loading || !models.length, onChange: event => onChange({ model: event.target.value }) },
+                            !models.some(model => model.id === connection.model) && React.createElement('option', { value: connection.model || '' }, connection.model || aiText('selectModel', 'Select a model')),
+                            models.map(model => React.createElement('option', { key: model.id, value: model.id }, model.name))),
+                        React.createElement('button', { onClick: () => setRevision(value => value + 1), disabled: loading, title: aiText('refreshModels', 'Refresh model list') }, loading ? '...' : '↻')
+                    ),
+                    field(aiText('modelId', 'Model ID'), 'model'),
+                    React.createElement('button', { className: 'ai-addon-btn-secondary', onClick: async () => {
+                        setStatus(aiText('testingConnection', 'Testing...'));
+                        try { await callChatGPTAPIRaw('Reply with just "OK".', 1, null, undefined, { ...connection }); setStatus('✓ ' + aiText('connectionSuccess', 'Connection successful.')); }
+                        catch (error) { setStatus(`✗ ${error.message}`); }
+                    } }, aiText('testThisConnection', 'Test this provider')),
+                    status && React.createElement('small', null, status)
+                );
+            }
 
             function AdvancedParamsSection() {
                 const [expanded, setExpanded] = useState(getSetting('adv-expanded', false));
@@ -1305,11 +1379,7 @@
                 : await callChatGPTAPIRaw(prompt, undefined, parseLines);
 
             // Return in the format expected by LyricsService
-            if (wantSmartPhonetic) {
-                return { phonetic: lines };
-            } else {
-                return { translation: lines };
-            }
+            return wantSmartPhonetic ? { phonetic: lines } : { translation: lines };
         },
 
         async generateCharacterPronunciation({ lines, characterPronunciationPrompt }) {
@@ -1372,7 +1442,7 @@
                     onResearchProgress(null, { ...details, reset: true });
                 }
                 : null;
-            const request = webSearch !== false
+            const request = ADDON_INFO.supports.researchWebSearch && webSearch !== false
                 ? callResponsesAPIStream
                 : callChatGPTAPIStream;
             return await request(
@@ -1421,5 +1491,10 @@
 
     registerAddon();
 
-    window.__ivLyricsDebugLog?.('[ChatGPT Addon] Module loaded');
+    return ChatGPTAddon;
+    }
+
+    // Share request validation, streaming and settings without sharing credentials.
+    window.createOpenAICompatibleAddon = createOpenAICompatibleAddon;
+    createOpenAICompatibleAddon();
 })();

@@ -7,7 +7,7 @@ const source = readFileSync(new URL("../FullscreenOverlay.js", import.meta.url),
 
 // Run the actual overlay with persistent hooks, effects and event subscriptions.
 // Child components stay as elements so only work scheduled by the root is counted.
-const createHarness = ({ mode = "standard", visual = {} } = {}) => {
+const createHarness = ({ mode = "standard", visual = {}, windowOverrides = {} } = {}) => {
   const slots = [];
   const intervals = new Map();
   const listeners = new Map();
@@ -82,7 +82,7 @@ const createHarness = ({ mode = "standard", visual = {} } = {}) => {
     Spicetify: { React: react, Player: player },
     CONFIG: config,
     I18n: { t: (key) => key },
-    window: { ivLyricsVinylPlayerMode: vinyl },
+    window: { ivLyricsVinylPlayerMode: vinyl, ...windowOverrides },
     document: { documentElement: { classList: { remove() {} } } },
     setInterval(callback, delay) { intervals.set(++timerId, { callback, delay }); return timerId; },
     clearInterval(id) { intervals.delete(id); },
@@ -184,6 +184,32 @@ for (const mode of ["standard"]) {
     assert.equal(h.listenerCount, 0);
   });
 }
+
+test("refactored metadata retains title fitting and track-specific entrance keys", () => {
+  const h = createHarness({ visual: { "translate-metadata-mode": "all" } });
+  const original = "긴 제목이 여러 번 반복되어 화면 너비를 넘어가는 아주 긴 노래 제목";
+  const translated = "An extremely long translated song title that should also fit the available width";
+  h.player.data.item.metadata.title = original;
+  h.update({ translatedMetadata: {
+    translated: { title: translated, artist: "Translated artist" },
+    romanized: { title: "A romanized title", artist: "Romanized artist" },
+  } });
+  const main = byClass(h.tree, "lyrics-fullscreen-title");
+  const secondary = byClass(h.tree, "lyrics-fullscreen-title-translated");
+  const fittedSize = Number.parseFloat(main.props.style.fontSize);
+  assert.equal(text(main), original);
+  assert.ok(fittedSize < 48 && fittedSize >= Math.round(48 * 0.55));
+  assert.ok(Number.parseFloat(secondary.props.style.fontSize) < Math.round(48 * 0.6));
+  assert.equal(main.props.key, "title-original:spotify:track:one");
+  assert.equal(byClass(h.tree, "lyrics-fullscreen-artist").props.key, "artist-original:spotify:track:one");
+  assert.equal(byClass(h.tree, "lyrics-fullscreen-artist-romanized"), undefined,
+    "all-mode artist rendering preserves the fork's original/translated pair");
+  h.player.data.item.uri = "spotify:track:two";
+  h.emit("songchange");
+  assert.equal(byClass(h.tree, "lyrics-fullscreen-title").props.key, "title-original:spotify:track:two");
+  assert.equal(byClass(h.tree, "lyrics-fullscreen-artist").props.key, "artist-original:spotify:track:two");
+  h.unmount();
+});
 
 test("TV progress preserves clock, fill, seek, pause and hidden-progress behavior", () => {
   const h = createHarness({ visual: { "fullscreen-tv-mode": true } });

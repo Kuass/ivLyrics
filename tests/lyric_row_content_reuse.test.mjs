@@ -11,8 +11,8 @@ const current = readFileSync(new URL('Pages.js', repo), 'utf8');
 const baseline = execFileSync('git', ['show', '3353a5d:Pages.js'], { cwd: repo, encoding: 'utf8' })
   .replace('!shouldRenderInterlude && !hasParallelKaraokeRows && renderLyricSubLine(\n\t\t\t"lyrics-lyricsContainer-LyricsLine-phonetic"',
     '!shouldRenderInterlude && !isKara && renderLyricSubLine(\n\t\t\t"lyrics-lyricsContainer-LyricsLine-phonetic"');
-const plain = value => JSON.parse(JSON.stringify(value, (_, entry) =>
-  typeof entry === 'function' ? { callback: entry.copyArguments || 'handler' } : entry));
+const plain = value => JSON.parse(JSON.stringify(value, (key, entry) =>
+  key === 'data-lyrics-seek-time' ? undefined : typeof entry === 'function' ? { callback: entry.copyArguments || 'handler' } : entry));
 
 function renderer(source) {
   const slots = [];
@@ -72,6 +72,7 @@ test('row movement reuses text and supplements while preserving baseline DOM, co
     assert.equal(old.counts.copy, 60);
     assert.equal(next.counts.html * 60, old.counts.html);
     assert.equal(last.props.role, 'button');
+    assert.equal(last.props['data-lyrics-seek-time'], props.seekTime);
   }
 });
 

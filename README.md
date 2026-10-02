@@ -19,8 +19,25 @@ A personal derivative of [ivLis-Studio/ivLyrics](https://github.com/ivLis-Studio
 
 ## 1. 원본과 달라진 점 / Differences from upstream
 
-원본 6.6.21(2026-09-13)까지의 변경을 반영하고 있습니다. 원본 저장소는 로컬 `origin` 원격으로만 연결되어 있어, 업스트림 반영은 가져오기와 병합으로 이루어집니다.\
-Tracks upstream through 6.6.21 (2026-09-13). The upstream repository is only linked as a local `origin` remote, so syncing is a fetch-and-merge, not a GitHub fork comparison.
+원본 6.6.25(2026-09-30)까지의 변경을 반영하고 있습니다. 원본 저장소는 로컬 `origin` 원격으로만 연결되어 있어, 업스트림 반영은 가져오기와 병합으로 이루어집니다.\
+Tracks upstream through 6.6.25 (2026-09-30). The upstream repository is only linked as a local `origin` remote, so syncing is a fetch-and-merge, not a GitHub fork comparison.
+
+### 6.6.25 병합 / Upstream 6.6.25 sync
+
+비교 기준은 6.6.21 `c3f6e62`에서 6.6.25 [`f66de42`](https://github.com/ivLis-Studio/ivLyrics/commit/f66de4283c0a6e987efd03c97191287449419926)까지의 318개 원본 커밋입니다. 다음 변경을 반영하며, 아래에 적힌 제거 기능과 Kuass edition의 설정 보호·한국어 가사 우선순위·발음 배치·앨범 전환은 유지합니다.\
+Merges 318 upstream commits from 6.6.21 (`c3f6e62`) through 6.6.25 (`f66de42`), preserving the removals below and this edition's settings protection, Korean lyric preference, pronunciation layout and album transitions.
+
+- DeepL 번역, NVIDIA NIM, OpenAI 호환 연결별 순차 폴백과 설정 가능한 재시도\
+  DeepL translation, NVIDIA NIM, ordered fallback across OpenAI-compatible connections and configurable retries
+- Gemini 모델별 thinking 설정, Pollinations 모델 선택 개선\
+  Model-specific Gemini thinking parameters and improved Pollinations model selection
+- 가사 스크롤·키보드 탐색·툴팁 위치, 설정 드래그·탐색·업데이트 확인 수정\
+  Native lyric scrolling, keyboard navigation, tooltip positioning, settings drag/navigation and update-check fixes
+- 싱크 편집 시 겹치는 보컬 파트의 독립 타이밍 보존, 관련 공통 코드 정리와 회귀 테스트\
+  Preserve independent overlapping vocal timing during sync editing; shared-code cleanup and regression tests
+
+제거한 기능 전용 변경(학습·LP·마켓·클라우드·별도 오버레이)과 추가 언어 팩은 다시 활성화하지 않습니다. 실제 Spotify/Spicetify 화면과 새 제공자의 실계정 연결은 설치 환경에서 별도로 확인해야 합니다.\
+Changes exclusive to removed study/vinyl/marketplace/cloud/external-overlay features and additional language packs remain excluded. Live Spotify/Spicetify UI and real-account connections for new providers still need validation in the installed environment.
 
 ### 제거한 기능 / Removed
 
@@ -43,8 +60,8 @@ Tracks upstream through 6.6.21 (2026-09-13). The upstream repository is only lin
   Synced, unsynced and karaoke lyrics; translation, pronunciation, furigana
 - 전체 화면 모드, 우측 "지금 재생 중" 패널 가사, 재생 막대 버튼, 전역 단축키\
   Fullscreen mode, Now Playing panel lyrics, playbar button, global shortcuts
-- 모든 AI 제공자(Bing, Google, Gemini, ChatGPT, Claude, Groq, OpenRouter, Perplexity, Pollinations, Paxsenix)와 가사 소스(LRCLIB, Spotify, LyricsPlus, Unison, Paxsenix, 커뮤니티 싱크 데이터)\
-  Every AI provider (Bing, Google, Gemini, ChatGPT, Claude, Groq, OpenRouter, Perplexity, Pollinations, Paxsenix) and lyrics source (LRCLIB, Spotify, LyricsPlus, Unison, Paxsenix, community sync data)
+- 모든 AI 제공자(Bing, Google, DeepL, Gemini, ChatGPT, NVIDIA NIM, Claude, Groq, OpenRouter, Perplexity, Pollinations, Paxsenix)와 가사 소스(LRCLIB, Spotify, LyricsPlus, Unison, Paxsenix, 커뮤니티 싱크 데이터)\
+  Every AI provider (Bing, Google, DeepL, Gemini, ChatGPT, NVIDIA NIM, Claude, Groq, OpenRouter, Perplexity, Pollinations, Paxsenix) and lyrics source (LRCLIB, Spotify, LyricsPlus, Unison, Paxsenix, community sync data)
 - 커뮤니티 뮤직비디오 배경, 곡 정보 리서치 리더, 싱크 데이터 제작기\
   Community music-video background, song research reader, sync data creator
 - 곡별 싱크 오프셋과 언어 오버라이드, 설정 내보내기·가져오기\

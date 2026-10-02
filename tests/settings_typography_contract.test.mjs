@@ -129,6 +129,18 @@ const normalizeReleasedTree = (tree) => {
       }
     }
   }
+  // Display controls now follow providers on every platform. Normalize only
+  // this intentional navigation move; retain the independent control oracle.
+  const categories = elements(expected).filter(node => node.props.className === "settings-nav-category");
+  const items = key => elements(categories.find(node => node.props.key === key))
+    .find(node => node.props.className === "settings-nav-category-items")?.props.children[0];
+  const general = items("general");
+  const screen = items("screen");
+  if (general && screen) {
+    const moved = general.filter(node => ["appearance", "performance"].includes(node.props.key));
+    general.splice(0, general.length, ...general.filter(node => !moved.includes(node)));
+    screen.unshift(...moved);
+  }
   return expected;
 };
 
@@ -202,3 +214,17 @@ for (const tab of ["appearance"]) {
     }
   });
 }
+
+test('all supported settings tabs render and exclude removed integrations', () => {
+  const excluded = new Set(['overlay-enabled', 'cloud-sync', 'vinyl-mode', 'about-account']);
+  for (const tab of ['general','appearance','performance','lyrics','advanced','fullscreen','nowplaying','about','debug','ai-providers','lyrics-providers']) {
+    const h = createHarness(currentSource);
+    h.context.Spicetify = {Platform:{}, LocalStorage: {get: () => null}};
+    h.context.thresholdSizeLimit = {min: 0, max: 100, step: 1};
+    const tree = h.render(tab);
+    for (const node of elements(tree)) {
+      assert.ok(!excluded.has(node.props.sectionKey), `${tab} restored section ${node.props.sectionKey}`);
+      for (const item of node.props.items || []) assert.ok(!excluded.has(item.key), `${tab} restored setting ${item.key}`);
+    }
+  }
+});

@@ -1,7 +1,7 @@
 /**
  * Gemini AI Addon for ivLyrics
  * Google Gemini AI를 사용한 번역, 발음, Research 생성
- * 
+ *
  * @author default
  * @version 1.0.1
  */
@@ -100,7 +100,7 @@
                 .map(m => {
                     const id = m.name.replace('models/', '');
                     return {
-                        id: id,
+                        id,
                         name: m.displayName || id,
                         description: m.description || '',
                         input_token_limit: asPositiveInteger(m.inputTokenLimit),
@@ -146,11 +146,6 @@
     // ============================================
     // Helper Functions
     // ============================================
-
-    function getLocalizedText(textObj, lang) {
-        if (typeof textObj === 'string') return textObj;
-        return textObj[lang] || textObj['en'] || Object.values(textObj)[0] || '';
-    }
 
     function getSetting(key, defaultValue = null) {
         return window.AIAddonManager?.getAddonSetting(ADDON_INFO.id, key, defaultValue) ?? defaultValue;
@@ -211,14 +206,23 @@
             config.maxOutputTokens = parseInt(getSetting('adv-maxOutputTokens-value', DEFAULT_MAX_OUTPUT_TOKENS)) || DEFAULT_MAX_OUTPUT_TOKENS;
         }
 
-        // thinking config
+        // Gemini 3 uses levels; zero token budgets are not supported by every
+        // model. Older/non-thinking models must not receive thinking fields.
         const useThinking = getSetting('adv-thinking-enabled', false);
-        if (useThinking) {
-            const budget = parseInt(getSetting('adv-thinking-budget', 1024)) || 1024;
-            config.thinkingConfig = { thinkingBudget: budget };
-        } else {
-            // Disable thinking to enable true streaming
-            config.thinkingConfig = { thinkingBudget: 0 };
+        const model = String(getSelectedModel() || '').replace(/^models\//, '').toLowerCase();
+        if (/^gemini-3(?:[.-])/.test(model)) {
+            const supportsMinimal = /^gemini-3\.(?:1|5)-flash-lite(?:-|$)/.test(model);
+            config.thinkingConfig = { thinkingLevel: useThinking ? 'high' : supportsMinimal ? 'minimal' : 'low' };
+        } else if (/^gemini-2\.5-(?:flash|pro)(?:-|$)/.test(model)) {
+            const isPro = model.startsWith('gemini-2.5-pro');
+            if (useThinking) {
+                const budget = parseInt(getSetting('adv-thinking-budget', 1024)) || 1024;
+                const minimum = isPro ? 128 : model.startsWith('gemini-2.5-flash-lite') ? 512 : 0;
+                const maximum = isPro ? 32768 : 24576;
+                config.thinkingConfig = { thinkingBudget: Math.max(minimum, Math.min(maximum, budget)) };
+            } else if (!isPro) {
+                config.thinkingConfig = { thinkingBudget: 0 };
+            }
         }
 
         return config;
@@ -492,6 +496,7 @@
                         throw new Error(`[Gemini] ${msg}`);
                     }
 
+                    const consumeGeminiStream = async () => {
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder();
                     let sseBuffer = '';
@@ -574,6 +579,9 @@
                     }
 
                     return transformed;
+                    };
+
+                    return await consumeGeminiStream();
 
                 } catch (e) {
                     lastError = e;
@@ -652,7 +660,7 @@
             if (!trimmed.includes('{')) return false;
             return !trimmed.endsWith('}') || trimmed.lastIndexOf('}') < trimmed.lastIndexOf('{');
         };
-        let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+        const cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
 
         try {
             return JSON.parse(cleaned);
@@ -767,16 +775,9 @@
                     }
                 }, []);
 
-
-
-                // ... (existing code for models)
-
-                // ... (existing code for test)
-
                 const hasApiKey = getApiKeys().length > 0;
 
-                return React.createElement('div', { className: 'ai-addon-settings gemini-settings' },
-                    React.createElement('div', { className: 'ai-addon-setting' },
+                const renderApiKeyRow = () => React.createElement('div', { className: 'ai-addon-setting' },
                         React.createElement('label', null, 'API Key(s)'),
                         React.createElement('div', { className: 'ai-addon-input-group' },
                             React.createElement('input', {
@@ -791,8 +792,8 @@
                             }, 'Get API Key')
                         ),
                         React.createElement('small', null, 'Enter a single key or JSON array for rotation')
-                    ),
-                    React.createElement('div', { className: 'ai-addon-setting' },
+                    );
+                const renderBaseUrlRow = () => React.createElement('div', { className: 'ai-addon-setting' },
                         React.createElement('label', null, 'Base URL'),
                         React.createElement('input', {
                             type: 'text',
@@ -801,8 +802,8 @@
                             placeholder: 'https://generativelanguage.googleapis.com/v1beta'
                         }),
                         React.createElement('small', null, 'Change this to use Gemini-compatible APIs')
-                    ),
-                    React.createElement('div', { className: 'ai-addon-setting' },
+                    );
+                const renderModelRow = () => React.createElement('div', { className: 'ai-addon-setting' },
                         React.createElement('label', null, 'Model'),
                         React.createElement('div', { className: 'ai-addon-input-group' },
                             React.createElement('select', {
@@ -827,16 +828,22 @@
                             }, modelsLoading ? '...' : '↻')
                         ),
                         availableModels.length > 0 && React.createElement('small', null, `${availableModels.length} models available`)
-                    ),
-                    // Advanced API Parameters
-                    React.createElement(AdvancedParamsSection)
-                    ,
-                    React.createElement('div', { className: 'ai-addon-setting' },
+                    );
+                const renderTestRow = () => React.createElement('div', { className: 'ai-addon-setting' },
                         React.createElement('button', { onClick: handleTest, className: 'ai-addon-btn-primary' }, 'Test Connection'),
                         testStatus && React.createElement('span', {
                             className: `ai-addon-test-status ${testStatus.startsWith('✓') ? 'success' : testStatus.startsWith('✗') ? 'error' : ''}`
                         }, testStatus)
-                    )
+                    );
+
+                return React.createElement('div', { className: 'ai-addon-settings gemini-settings' },
+                    renderApiKeyRow(),
+                    renderBaseUrlRow(),
+                    renderModelRow(),
+                    // Advanced API Parameters
+                    React.createElement(AdvancedParamsSection)
+                    ,
+                    renderTestRow()
                 );
             };
 
@@ -913,11 +920,7 @@
                 : await callGeminiAPIRaw(prompt, undefined, parseLines);
 
             // Return in the format expected by LyricsService
-            if (wantSmartPhonetic) {
-                return { phonetic: lines };
-            } else {
-                return { translation: lines };
-            }
+            return wantSmartPhonetic ? { phonetic: lines } : { translation: lines };
         },
 
         async generateCharacterPronunciation({ lines, characterPronunciationPrompt }) {
