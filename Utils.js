@@ -69,7 +69,6 @@ if (!window.ApiTracker) {
 
 // 하위 호환성을 위해 LyricsCache 별칭 생성 (기존 코드에서 LyricsCache 직접 참조하는 경우)
 const LyricsCache = window.LyricsCache;
-const ApiTracker = window.ApiTracker;
 const HAN_CHARACTER_REGEX = /\p{Script=Han}/u;
 const KANJI_CHARACTER_REGEX = /[\u4E00-\u9FAF\u3400-\u4DBF]/;
 const CLEAN_HTML_RT_REGEX = /<rt[^>]*>.*?<\/rt>/gi;
@@ -526,7 +525,7 @@ const Utils = {
       /^\s*\[\s*(verse|chorus|bridge|intro|outro|pre-?chorus|hook|refrain)\s*(\d+)?\s*(:|：)?\s*.*\]\s*$/i,
       /^\s*\[\s*(절|후렴|브릿지|인트로|아웃트로|간주|부분)\s*(\d+)?\s*(:|：)?\s*.*\]\s*$/i,
       /^\s*\[\s*(ヴァース|コーラス|ブリッジ|イントロ|アウトロ)\s*(\d+)?\s*(:|：)?\s*.*\]\s*$/i,
-      /^\s*\[\s*(verse|chorus|bridge|intro|outro)\s*(\d+)?\s*(:|：)?\s*[^,\[\]]*\]\s*$/i,
+      /^\s*\[\s*(verse|chorus|bridge|intro|outro)\s*(\d+)?\s*(:|：)?\s*[^,[\]]*\]\s*$/i,
     ];
 
     // 패턴 중 하나라도 매칭되면 섹션 헤더로 판단
@@ -1215,7 +1214,6 @@ const Utils = {
         // Try to convert even if not fully initialized - it will return original text if not ready
         const result = window.FuriganaConverter.convertToFurigana(text);
         return result || text;
-      } else {
       }
       return text;
     } catch (error) {
@@ -1461,7 +1459,7 @@ const Utils = {
   /**
    * Current version of the ivLyrics app
    */
-  currentVersion: "6.6.21",
+  currentVersion: "6.6.25",
 
   /**
    * Check for updates from remote repository

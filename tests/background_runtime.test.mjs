@@ -146,3 +146,22 @@ test("helper worker releases its Blob URL when startup fails", () => {
   assert.equal(urls.size, 0);
   assert.equal(sender._worker, undefined);
 });
+
+
+test("refactored blur background retains the fork's per-color ambient fallbacks", () => {
+  const ambientStart = indexSource.indexOf("function buildAmbientGradientColorVars(");
+  const ambientEnd = indexSource.indexOf("function getIvLyricsTrackBackgroundMode(", ambientStart);
+  const styleStart = indexSource.indexOf("const computeLyricsBackgroundStyle =");
+  const styleEnd = indexSource.indexOf("const createInitialLyricsContainerState =", styleStart);
+  assert.ok(ambientStart >= 0 && ambientEnd > ambientStart && styleStart >= 0 && styleEnd > styleStart);
+  const context = vm.createContext({ CONFIG: { visual: { "background-brightness": 80 } } });
+  vm.runInContext(indexSource.slice(ambientStart, ambientEnd) + indexSource.slice(styleStart, styleEnd)
+    + "globalThis.compute = computeLyricsBackgroundStyle;", context);
+  for (const colors of [null, {}, { minContrast: "#123456" }, { highContrast: "invalid", overlayColor: "invalid" }]) {
+    const style = context.compute({ effectiveBackgroundMode: "blur-gradient-background", dynamicColors: colors });
+    assert.equal(style["--ivLyrics-c1"], colors?.minContrast ? "18, 52, 86" : "30, 30, 40");
+    assert.equal(style["--ivLyrics-c2"], "60, 40, 70");
+    assert.equal(style["--ivLyrics-c3"], "20, 50, 60");
+    assert.equal(style.filter, "brightness(0.8) saturate(2.5)");
+  }
+});

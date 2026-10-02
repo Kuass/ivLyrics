@@ -1,7 +1,7 @@
 /**
  * OpenRouter AI Addon for ivLyrics
  * OpenRouter를 통한 다양한 AI 모델 사용 (번역, 발음, Research 생성)
- * 
+ *
  * @author default
  * @version 1.0.1
  */
@@ -100,20 +100,9 @@
         }
     }
 
-    async function getModels() {
-        const apiKeys = getApiKeys();
-        if (apiKeys.length === 0) return [];
-        return await fetchAvailableModels(apiKeys[0]);
-    }
-
     // ============================================
     // Helper Functions
     // ============================================
-
-    function getLocalizedText(textObj, lang) {
-        if (typeof textObj === 'string') return textObj;
-        return textObj[lang] || textObj['en'] || Object.values(textObj)[0] || '';
-    }
 
     function getSetting(key, defaultValue = null) {
         return window.AIAddonManager?.getAddonSetting(ADDON_INFO.id, key, defaultValue) ?? defaultValue;
@@ -288,6 +277,27 @@
         return { text, finishReason };
     }
 
+    // Shared 401 / non-OK handling for the request loop. On 401 it throws the
+    // permission message; otherwise it reports the HTTP status. Either branch
+    // reads the JSON body at most once, matching the inline versions.
+    async function throwOpenRouterApiResponseError(response) {
+        if (response.status === 401) {
+            let errorMessage = 'Invalid API key or permission denied.';
+            try {
+                const errorData = await response.json();
+                if (errorData.error?.message) errorMessage = errorData.error.message;
+            } catch (parseError) { }
+            throw new Error(`[OpenRouter] ${errorMessage}`);
+        }
+
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+            const errorData = await response.json();
+            if (errorData.error?.message) errorMessage = errorData.error.message;
+        } catch (parseError) { }
+        throw new Error(`[OpenRouter] ${errorMessage}`);
+    }
+
     async function callOpenRouterAPIRaw(prompt, maxRetries = window.AIAddonManager?.getProviderRequestAttempts?.() ?? 3, transformResult = null) {
         const apiKeys = getApiKeys();
         if (apiKeys.length === 0) {
@@ -311,7 +321,7 @@
                             'X-Title': 'ivLyrics'
                         },
                         body: JSON.stringify({
-                            model: model,
+                            model,
                             messages: buildPromptMessages(prompt),
                             ...getAdvancedRequestParams()
                         })
@@ -322,26 +332,8 @@
                         break; // Try next key
                     }
 
-                    if (response.status === 401) {
-                        let errorMessage = 'Invalid API key or permission denied.';
-                        try {
-                            const errorData = await response.json();
-                            if (errorData.error?.message) {
-                                errorMessage = errorData.error.message;
-                            }
-                        } catch (parseError) { }
-                        throw new Error(`[OpenRouter] ${errorMessage}`);
-                    }
-
-                    if (!response.ok) {
-                        let errorMessage = `HTTP ${response.status}`;
-                        try {
-                            const errorData = await response.json();
-                            if (errorData.error?.message) {
-                                errorMessage = errorData.error.message;
-                            }
-                        } catch (parseError) { }
-                        throw new Error(`[OpenRouter] ${errorMessage}`);
+                    if (response.status === 401 || !response.ok) {
+                        await throwOpenRouterApiResponseError(response);
                     }
 
                     const data = await response.json();
@@ -456,6 +448,7 @@
                         try { const d = await response.json(); if (d.error?.message) msg = d.error.message; } catch (e) { }
                         throw new Error(`[OpenRouter] ${msg}`);
                     }
+                    const consumeOpenRouterStream = async () => {
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder();
                     let sseBuffer = '', accumulated = '';
@@ -535,6 +528,9 @@
                     }
 
                     return transformed;
+                    };
+
+                    return await consumeOpenRouterStream();
                 } catch (e) {
                     lastError = e;
                     resetProvisionalOutput(attempt < maxRetries - 1 ? 'retry' : 'failed', e);
@@ -606,7 +602,7 @@
             if (!trimmed.includes('{')) return false;
             return !trimmed.endsWith('}') || trimmed.lastIndexOf('}') < trimmed.lastIndexOf('{');
         };
-        let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+        const cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
 
         try {
             return JSON.parse(cleaned);
@@ -712,8 +708,7 @@
                 const isModelInList = availableModels.some(m => m.id === selectedModel);
                 const hasApiKey = getApiKeys().length > 0;
 
-                return React.createElement('div', { className: 'ai-addon-settings openrouter-settings' },
-                    React.createElement('div', { className: 'ai-addon-setting' },
+                const renderApiKeyRow = () => React.createElement('div', { className: 'ai-addon-setting' },
                         React.createElement('label', null, 'API Key(s)'),
                         React.createElement('div', { className: 'ai-addon-input-group' },
                             React.createElement('input', {
@@ -728,8 +723,8 @@
                             }, 'Get API Key')
                         ),
                         React.createElement('small', null, 'Enter a single key or JSON array for rotation')
-                    ),
-                    React.createElement('div', { className: 'ai-addon-setting' },
+                    );
+                const renderModelRow = () => React.createElement('div', { className: 'ai-addon-setting' },
                         React.createElement('label', null, 'Model'),
                         React.createElement('div', { className: 'ai-addon-input-group' },
                             React.createElement('select', {
@@ -750,19 +745,25 @@
                             }, modelsLoading ? '...' : '↻')
                         ),
                         availableModels.length > 0 && React.createElement('small', null, `${availableModels.length} models available`)
-                    ),
-                    (!isModelInList || customModel) &&
-                    React.createElement('div', { className: 'ai-addon-setting' },
+                    );
+                const renderCustomModelRow = () => React.createElement('div', { className: 'ai-addon-setting' },
                         React.createElement('label', null, 'Custom Model ID'),
                         React.createElement('input', { type: 'text', value: customModel, onChange: handleCustomModelChange, placeholder: 'e.g., anthropic/claude-3-opus' })
-                    ),
-                    React.createElement(AdvancedParamsSection),
-                    React.createElement('div', { className: 'ai-addon-setting' },
+                    );
+                const renderTestRow = () => React.createElement('div', { className: 'ai-addon-setting' },
                         React.createElement('button', { onClick: handleTest, className: 'ai-addon-btn-primary' }, 'Test Connection'),
                         testStatus && React.createElement('span', {
                             className: `ai-addon-test-status ${testStatus.startsWith('✓') ? 'success' : testStatus.startsWith('✗') ? 'error' : ''}`
                         }, testStatus)
-                    )
+                    );
+
+                return React.createElement('div', { className: 'ai-addon-settings openrouter-settings' },
+                    renderApiKeyRow(),
+                    renderModelRow(),
+                    (!isModelInList || customModel) &&
+                    renderCustomModelRow(),
+                    React.createElement(AdvancedParamsSection),
+                    renderTestRow()
                 );
             };
 
@@ -820,11 +821,7 @@
                 ? await callOpenRouterAPIStream(prompt, onLine, onStreamReset, undefined, parseLines)
                 : await callOpenRouterAPIRaw(prompt, undefined, parseLines);
 
-            if (wantSmartPhonetic) {
-                return { phonetic: lines };
-            } else {
-                return { translation: lines };
-            }
+            return wantSmartPhonetic ? { phonetic: lines } : { translation: lines };
         },
 
         async generateCharacterPronunciation({ lines, characterPronunciationPrompt }) {
