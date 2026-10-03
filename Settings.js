@@ -1186,10 +1186,9 @@ const LocalCacheManager = () => {
         window.lyricContainer._dmResults = {};
       }
 
-      // 진행 중인 Gemini 요청도 취소
-      if (window.lyricContainer?._inflightGemini) {
-        window.lyricContainer._inflightGemini.clear();
-      }
+      // Invalidate ownership without aborting already-running provider calls.
+      window.lyricContainer?._inflightGemini?.invalidate();
+      window.lyricContainer?._inflightTrad?.invalidate();
 
       // SyncDataService 메모리 캐시 초기화
       window.SyncDataService?.clearCache(undefined, { preserveOpenDb: true });
@@ -1237,14 +1236,9 @@ const LocalCacheManager = () => {
         delete window.lyricContainer._dmResults[trackUri];
       }
 
-      // 진행 중인 Gemini 요청에서 해당 트랙 취소
-      if (window.lyricContainer?._inflightGemini) {
-        for (const [key] of window.lyricContainer._inflightGemini) {
-          if (key.includes(trackUri)) {
-            window.lyricContainer._inflightGemini.delete(key);
-          }
-        }
-      }
+      // Invalidate only this track's ownership; provider calls may still settle.
+      window.lyricContainer?._inflightGemini?.invalidate((key) => key.startsWith(`${trackUri}:`));
+      window.lyricContainer?._inflightTrad?.invalidate((key) => key.startsWith(`${trackUri}:`));
 
       // SyncDataService 메모리 캐시 초기화
       window.SyncDataService?.clearCache(trackId, { preserveOpenDb: true });
