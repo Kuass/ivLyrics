@@ -74,19 +74,33 @@
             }
         };
 
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            drainBuffer();
-            emit();
-        }
+        let reachedEOF = false;
+        try {
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) {
+                    reachedEOF = true;
+                    break;
+                }
+                buffer += decoder.decode(value, { stream: true });
+                drainBuffer();
+                emit();
+            }
 
-        buffer += decoder.decode();
-        drainBuffer(true);
-        // Keep the existing EOF callback boundary: the remaining text is emitted
-        // together, even when a final unterminated data frame adds more newlines.
-        emit(true);
-        return { text, finishReason };
+            buffer += decoder.decode();
+            drainBuffer(true);
+            // Keep the existing EOF callback boundary: the remaining text is emitted
+            // together, even when a final unterminated data frame adds more newlines.
+            emit(true);
+            return { text, finishReason };
+        } finally {
+            if (!reachedEOF) {
+                // A parse/provider/callback error must stop the discarded response.
+                // Do not delay a retry or replace its error if cancellation stalls
+                // or rejects (including cancellation of an already-errored stream).
+                reader.cancel().catch(() => {});
+            }
+            reader.releaseLock();
+        }
     };
 })();
