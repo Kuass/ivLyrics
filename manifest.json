@@ -44,6 +44,7 @@
 		"InstrumentalBreaks.js",
 		"StoragePersistence.js",
 		"AIRequest.js",
+		"AIStreamReader.js",
 		"Addon_AI_Pollinations.js",
 		"Addon_AI_ChatGPT.js",
 		"Addon_AI_NvidiaNim.js",

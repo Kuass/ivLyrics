@@ -365,36 +365,6 @@
         throw lastError || new Error('[OpenRouter] All API keys and retries exhausted');
     }
 
-    function emitStreamingLines(accumulated, onLine, state, flush = false) {
-        if (!onLine) return;
-
-        if (flush) {
-            if (state.offset >= accumulated.length) return;
-            const finalLine = accumulated.slice(state.offset);
-            onLine(state.index, finalLine);
-            state.index += 1;
-            state.offset = accumulated.length;
-            return;
-        }
-
-        let newlineIndex = accumulated.indexOf('\n', state.offset);
-        if (newlineIndex === -1) return;
-
-        const completedLines = [];
-        let lineStart = state.offset;
-        while (newlineIndex !== -1) {
-            completedLines.push(accumulated.slice(lineStart, newlineIndex));
-            lineStart = newlineIndex + 1;
-            newlineIndex = accumulated.indexOf('\n', lineStart);
-        }
-
-        for (const line of completedLines) {
-            onLine(state.index, line);
-            state.index += 1;
-            state.offset += line.length + 1;
-        }
-    }
-
     async function callOpenRouterAPIStream(
         prompt,
         onLine,
@@ -448,63 +418,18 @@
                         try { const d = await response.json(); if (d.error?.message) msg = d.error.message; } catch (e) { }
                         throw new Error(`[OpenRouter] ${msg}`);
                     }
-                    const consumeOpenRouterStream = async () => {
-                    const reader = response.body.getReader();
-                    const decoder = new TextDecoder();
-                    let sseBuffer = '', accumulated = '';
-                    let finalFinishReason = '';
-                    const lineState = { index: 0, offset: 0 };
-
-                    const processSseLine = (line) => {
-                        const trimmedLine = String(line || '').trim();
-                        if (!trimmedLine.startsWith('data:')) return;
-
-                        const payload = trimmedLine.slice(5).trimStart();
-                        if (!payload || payload === '[DONE]') return;
-
-                        const parsed = JSON.parse(payload);
-                        const chunk = readOpenRouterStreamChunk(parsed);
-                        if (chunk.text) {
-                            accumulated += chunk.text;
+                    const { text: accumulated, finishReason: finalFinishReason } = await window.ivLyricsReadAIStream(response.body, {
+                        readChunk: readOpenRouterStreamChunk,
+                        onText: (text) => {
                             receivedStreamText = true;
-                            if (typeof onRawChunk === 'function') onRawChunk(chunk.text);
-                        }
-                        if (chunk.finishReason) finalFinishReason = chunk.finishReason;
-                    };
-
-                    const drainSseBuffer = (flush = false) => {
-                        const parts = sseBuffer.split(/\r?\n/);
-                        if (flush) {
-                            sseBuffer = '';
-                        } else {
-                            sseBuffer = parts.pop() || '';
-                        }
-                        for (const line of parts) processSseLine(line);
-                    };
-
-                    while (true) {
-                        const { value, done } = await reader.read();
-                        if (done) break;
-                        sseBuffer += decoder.decode(value, { stream: true });
-                        drainSseBuffer();
-
-                        const beforeEmitCount = lineState.index;
-                        emitStreamingLines(accumulated, onLine, lineState);
-                        if (lineState.index > beforeEmitCount) {
+                            if (typeof onRawChunk === 'function') onRawChunk(text);
+                        },
+                        onLine,
+                        onLinesEmitted: (count) => {
                             emittedProvisionalOutput = true;
-                            emittedLineCount = Math.max(emittedLineCount, lineState.index);
+                            emittedLineCount = Math.max(emittedLineCount, count);
                         }
-                    }
-
-                    sseBuffer += decoder.decode();
-                    drainSseBuffer(true);
-
-                    const beforeFlushCount = lineState.index;
-                    emitStreamingLines(accumulated, onLine, lineState, true);
-                    if (lineState.index > beforeFlushCount) {
-                        emittedProvisionalOutput = true;
-                        emittedLineCount = Math.max(emittedLineCount, lineState.index);
-                    }
+                    });
 
                     if (finalFinishReason !== 'stop') {
                         throw createOpenRouterResponseError(finalFinishReason);
@@ -528,9 +453,6 @@
                     }
 
                     return transformed;
-                    };
-
-                    return await consumeOpenRouterStream();
                 } catch (e) {
                     lastError = e;
                     resetProvisionalOutput(attempt < maxRetries - 1 ? 'retry' : 'failed', e);
