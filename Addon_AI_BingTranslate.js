@@ -170,15 +170,17 @@
         };
     }
 
-    async function fetchWithTimeout(targetUrl, options = {}) {
+    async function fetchWithTimeout(targetUrl, options, consumeResponse) {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
         try {
-            return await fetch(getProxiedUrl(targetUrl), {
+            const response = await fetch(getProxiedUrl(targetUrl), {
                 ...options,
                 signal: controller.signal
             });
+            // Fetch resolves at headers; keep the deadline through body reading.
+            return await consumeResponse(response);
         } catch (error) {
             if (error?.name === 'AbortError') {
                 const timeoutError = new Error('[Bing Translate] Request timed out');
@@ -255,24 +257,24 @@
 
     async function fetchGlobalConfig() {
         const websiteUrl = `${BING_ORIGIN}${TRANSLATOR_PATH}`;
-        const response = await fetchWithTimeout(websiteUrl, {
+        return fetchWithTimeout(websiteUrl, {
             method: 'GET',
             headers: buildProxyHeaders({
                 Accept: 'text/html,application/xhtml+xml'
             }),
             cache: 'no-store'
+        }, async response => {
+            if (!response.ok) {
+                const error = new Error(`[Bing Translate] Failed to load translator (${response.status})`);
+                error.status = response.status;
+                error.retryable = RETRYABLE_STATUS_CODES.has(response.status);
+                throw error;
+            }
+
+            const origin = getFinalBingOrigin(response);
+            const cookieHeader = extractCookieHeader(response.headers.get('x-set-cookie'));
+            return parseGlobalConfig(await response.text(), origin, cookieHeader);
         });
-
-        if (!response.ok) {
-            const error = new Error(`[Bing Translate] Failed to load translator (${response.status})`);
-            error.status = response.status;
-            error.retryable = RETRYABLE_STATUS_CODES.has(response.status);
-            throw error;
-        }
-
-        const origin = getFinalBingOrigin(response);
-        const cookieHeader = extractCookieHeader(response.headers.get('x-set-cookie'));
-        return parseGlobalConfig(await response.text(), origin, cookieHeader);
     }
 
     function isTokenExpired() {
@@ -361,33 +363,33 @@
             headers['X-Cookie'] = config.cookieHeader;
         }
 
-        const response = await fetchWithTimeout(requestUrl, {
+        return fetchWithTimeout(requestUrl, {
             method: 'POST',
             headers,
             body: body.toString()
-        });
-
-        const responseText = await response.text();
-        let payload = null;
-        try {
-            payload = JSON.parse(responseText);
-        } catch {
-            if (response.ok) {
-                const error = new Error('[Bing Translate] Invalid translation response');
-                error.retryable = true;
-                throw error;
+        }, async response => {
+            const responseText = await response.text();
+            let payload = null;
+            try {
+                payload = JSON.parse(responseText);
+            } catch {
+                if (response.ok) {
+                    const error = new Error('[Bing Translate] Invalid translation response');
+                    error.retryable = true;
+                    throw error;
+                }
             }
-        }
 
-        if (!response.ok || payload?.ShowCaptcha || payload?.StatusCode === 401) {
-            throw createResponseError(response, payload);
-        }
+            if (!response.ok || payload?.ShowCaptcha || payload?.StatusCode === 401) {
+                throw createResponseError(response, payload);
+            }
 
-        const translatedText = payload?.[0]?.translations?.[0]?.text;
-        if (typeof translatedText !== 'string') {
-            throw new Error('[Bing Translate] Invalid translation response format');
-        }
-        return translatedText.replace(/\r\n?/g, '\n');
+            const translatedText = payload?.[0]?.translations?.[0]?.text;
+            if (typeof translatedText !== 'string') {
+                throw new Error('[Bing Translate] Invalid translation response format');
+            }
+            return translatedText.replace(/\r\n?/g, '\n');
+        });
     }
 
     async function requestTranslation(text, targetLanguage) {
