@@ -53,7 +53,7 @@ async function run(provider, version, scenario = {}) {
           if (chunk instanceof Error) throw chunk;
           return chunk === undefined ? { done: true }
             : { value: typeof chunk === 'string' ? encoder.encode(chunk) : chunk, done: false };
-        } }; } },
+        }, async cancel() {}, releaseLock() {} }; } },
       };
     },
   };
