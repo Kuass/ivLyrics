@@ -10431,8 +10431,7 @@ class LyricsContainer extends react.Component {
                 enabled: shouldUseVideoBackground,
                 videoInfo: this.state.videoInfo,
                 defaultStartTime: defaultCommunityVideoStartTime,
-                onVideoSelect: async (newVideoInfo) => {
-                  const selectionTrackUri = this.currentTrackUri;
+                onVideoSelect: async (newVideoInfo, selectionTrackUri) => {
                   if (!selectionTrackUri) return;
                   if (newVideoInfo?.youtubeVideoId) {
                     await Utils.saveSelectedVideo(selectionTrackUri, newVideoInfo);
