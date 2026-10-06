@@ -735,7 +735,7 @@ const CommunityVideoSelector = ({
   const [skipSegmentEnd, setSkipSegmentEnd] = useState("");
   const [editingSkipSegmentIndex, setEditingSkipSegmentIndex] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [votingId, setVotingId] = useState(null);
+  const [votingIds, setVotingIds] = useState(() => new Set());
   const [previewVideoId, setPreviewVideoId] = useState(null); // 목록에서 미리보기 중인 영상
   const [previewStartTime, setPreviewStartTime] = useState(0);
   const [submitVideoTitle, setSubmitVideoTitle] = useState("");
@@ -752,6 +752,7 @@ const CommunityVideoSelector = ({
     () => CONFIG?.visual?.["community-video-hide-disliked"] !== false
   );
   const titleFetchTimeout = useRef(null);
+  const pendingVotesRef = useRef(new Set());
 
   // 현재 사용자 해시 ID
   const currentUserHash = Utils.getCurrentUserHash();
@@ -1016,9 +1017,10 @@ const CommunityVideoSelector = ({
 
   // 투표 처리
   const handleVote = async (videoEntryId, currentVote, newVote) => {
-    if (isLocalVideoMode) return;
+    if (isLocalVideoMode || pendingVotesRef.current.has(videoEntryId)) return;
 
-    setVotingId(videoEntryId);
+    pendingVotesRef.current.add(videoEntryId);
+    setVotingIds(new Set(pendingVotesRef.current));
 
     // 같은 버튼을 다시 누르면 투표 취소
     const voteType = currentVote === newVote ? 0 : newVote;
@@ -1058,7 +1060,8 @@ const CommunityVideoSelector = ({
       console.error("Vote failed:", e);
     }
 
-    setVotingId(null);
+    pendingVotesRef.current.delete(videoEntryId);
+    setVotingIds(new Set(pendingVotesRef.current));
   };
 
   const applyVideoSelection = useCallback((video, options = {}) => {
@@ -1418,7 +1421,7 @@ const CommunityVideoSelector = ({
                               }`,
                             onClick: () =>
                               handleVote(video.id, video.userVote, 1),
-                            disabled: votingId === video.id,
+                            disabled: votingIds.has(video.id),
                           },
                           react.createElement(
                             "svg",
@@ -1442,7 +1445,7 @@ const CommunityVideoSelector = ({
                               }`,
                             onClick: () =>
                               handleVote(video.id, video.userVote, -1),
-                            disabled: votingId === video.id,
+                            disabled: votingIds.has(video.id),
                           },
                           react.createElement(
                             "svg",

@@ -15,14 +15,16 @@ const initial = () => ['a','b','c'].map(id => ({id, youtubeVideoId:id, youtubeTi
 // The real handler and button factory run with inert React/provider boundaries.
 // Functional setters can be queued to model React batching without executing React.
 function harness(options = {}) {
-  const state = {videos:initial(), votingId:null, preview:options.preview ?? null};
+  const state = {videos:initial(), votingId:null, votingIds:new Set(), preview:options.preview ?? null};
+  const pendingVotesRef = {current:new Set()};
   const requests=[], errors=[], replacements=[], updates=[];
   const apply = value => { state.videos = typeof value === 'function' ? value(state.videos) : value; };
   const render = () => {
-    const ctx = { videos:state.videos, votingId:state.votingId, isLocalVideoMode:options.local ?? false,
+    const ctx = { videos:state.videos, votingId:state.votingId, votingIds:state.votingIds, pendingVotesRef, isLocalVideoMode:options.local ?? false,
       trackUri:'spotify:track:fixture', hideDislikedVideos:options.hide ?? true, previewVideoId:state.preview, deletingId:null, currentUserHash:'other',
       setVideos(value) { updates.push(value); if (!options.queued) apply(value); },
       setVotingId(value) { state.votingId = value; }, setPreviewVideoId(value) { state.preview = value; },
+      setVotingIds(value) { state.votingIds=value; state.votingId=Array.from(value).at(-1)??null; },
       replaceHiddenCurrentVideo: async (...args) => replacements.push(args),
       Utils:{voteCommunityVideo(...args) {const d=deferred();requests.push({...d,args});return d.promise;}},
       console:{error:(...args)=>errors.push(args)}, I18n:{t:x=>x},
