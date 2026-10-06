@@ -689,6 +689,7 @@
 
                 const handleApiKeyChange = (e) => {
                     const val = e.target.value;
+                    if (val !== apiKeys) modelsRequestRef.current++;
                     setApiKeys(val);
                     setSetting('api-keys', val);
                 };
@@ -711,33 +712,38 @@
 
                 const [availableModels, setAvailableModels] = useState([]);
                 const [modelsLoading, setModelsLoading] = useState(false);
+                const modelsRequestRef = React.useRef(0);
 
                 const loadModels = useCallback(async () => {
+                    const requestId = ++modelsRequestRef.current;
+                    const isCurrent = () => requestId === modelsRequestRef.current;
                     const keys = getApiKeys();
                     if (keys.length === 0) {
                         setAvailableModels([]);
+                        if (isCurrent()) setModelsLoading(false);
                         return;
                     }
                     setModelsLoading(true);
                     try {
                         const models = await getModels();
+                        if (!isCurrent()) return;
                         setAvailableModels(models);
-                        if (models.length > 0) {
+                        if (isCurrent() && models.length > 0) {
                             ADDON_INFO.models = models;
                         }
                     } catch (e) {
+                        if (!isCurrent()) return;
                         console.error('[Claude Addon] Failed to load models:', e);
+                    } finally {
+                        if (isCurrent()) setModelsLoading(false);
                     }
-                    setModelsLoading(false);
                 }, [apiKeys]);
 
                 React.useEffect(() => {
-                    const keys = getApiKeys();
-                    if (keys.length > 0) {
-                        loadModels();
-                    } else {
-                        setAvailableModels([]);
-                    }
+                    loadModels();
+                    return () => {
+                        modelsRequestRef.current++;
+                    };
                 }, [apiKeys]);
 
 

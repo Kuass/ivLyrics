@@ -711,49 +711,55 @@
                 const [testStatus, setTestStatus] = useState('');
                 const [availableModels, setAvailableModels] = useState([]);
                 const [modelsLoading, setModelsLoading] = useState(false);
+                const modelsRequestRef = React.useRef(0);
 
                 // 모델 목록 로드
                 const loadModels = useCallback(async () => {
+                    const requestId = ++modelsRequestRef.current;
+                    const isCurrent = () => requestId === modelsRequestRef.current;
                     const keys = getApiKeys();
                     if (keys.length === 0) {
                         setAvailableModels([]);
+                        if (isCurrent()) setModelsLoading(false);
                         return;
                     }
                     setModelsLoading(true);
                     try {
                         const models = await getModels();
+                        if (!isCurrent()) return;
                         setAvailableModels(models);
                         // ADDON_INFO.models 업데이트 (다른 곳에서 사용할 수 있도록)
-                        ADDON_INFO.models = models;
+                        if (isCurrent()) ADDON_INFO.models = models;
                     } catch (e) {
+                        if (!isCurrent()) return;
                         window.__ivLyricsDebugLog?.('[Gemini Addon] Failed to load models:', e);
                         setAvailableModels([]);
                     } finally {
-                        setModelsLoading(false);
+                        if (isCurrent()) setModelsLoading(false);
                     }
                 }, [apiKeys, baseUrl]);
 
                 // API 키가 변경되면 모델 목록 다시 로드
                 useEffect(() => {
-                    const keys = getApiKeys();
-                    if (keys.length > 0) {
-                        loadModels();
-                    } else {
-                        setAvailableModels([]);
-                    }
+                    loadModels();
+                    return () => {
+                        modelsRequestRef.current++;
+                    };
                 }, [apiKeys, baseUrl]);
 
                 const handleApiKeyChange = useCallback((e) => {
                     const value = e.target.value;
+                    if (value !== apiKeys) modelsRequestRef.current++;
                     setApiKeys(value);
                     setSetting('api-keys', value);
-                }, []);
+                }, [apiKeys]);
 
                 const handleBaseUrlChange = useCallback((e) => {
                     const value = e.target.value;
+                    if (value !== baseUrl) modelsRequestRef.current++;
                     setBaseUrl(value);
                     setSetting('base-url', value);
-                }, []);
+                }, [baseUrl]);
 
                 const handleModelChange = useCallback((e) => {
                     const value = e.target.value;
