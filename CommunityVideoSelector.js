@@ -724,7 +724,16 @@ const CommunityVideoSelector = ({
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
   };
 
-  const [videos, setVideos] = useState([]);
+  const [videos, setVideoState] = useState([]);
+  const videosRef = useRef(videos);
+  // Async selection needs accepted list updates even before React commits them.
+  const setVideos = useCallback((update) => {
+    const nextVideos = typeof update === "function"
+      ? update(videosRef.current)
+      : update;
+    videosRef.current = nextVideos;
+    setVideoState(nextVideos);
+  }, []);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showSubmitForm, setShowSubmitForm] = useState(false);
@@ -735,7 +744,7 @@ const CommunityVideoSelector = ({
   const [skipSegmentEnd, setSkipSegmentEnd] = useState("");
   const [editingSkipSegmentIndex, setEditingSkipSegmentIndex] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [votingId, setVotingId] = useState(null);
+  const [votingIds, setVotingIds] = useState(() => new Set());
   const [previewVideoId, setPreviewVideoId] = useState(null); // 목록에서 미리보기 중인 영상
   const [previewStartTime, setPreviewStartTime] = useState(0);
   const [submitVideoTitle, setSubmitVideoTitle] = useState("");
@@ -752,6 +761,7 @@ const CommunityVideoSelector = ({
     () => CONFIG?.visual?.["community-video-hide-disliked"] !== false
   );
   const titleFetchTimeout = useRef(null);
+  const pendingVotesRef = useRef(new Set());
 
   // 현재 사용자 해시 ID
   const currentUserHash = Utils.getCurrentUserHash();
@@ -861,14 +871,14 @@ const CommunityVideoSelector = ({
     CONFIG.visual["community-video-hide-disliked"] = nextValue;
     StorageManager.saveConfig("community-video-hide-disliked", nextValue);
     if (nextValue) {
-      const hiddenCurrentVideo = videos.find((video) =>
+      const hiddenCurrentVideo = videosRef.current.find((video) =>
         video.userVote === -1 && video.youtubeVideoId === currentVideoId
       );
       if (hiddenCurrentVideo) {
-        await replaceHiddenCurrentVideo(videos, hiddenCurrentVideo.youtubeVideoId);
+        await replaceHiddenCurrentVideo(videosRef.current, hiddenCurrentVideo.youtubeVideoId);
       }
     }
-  }, [currentVideoId, hideDislikedVideos, replaceHiddenCurrentVideo, videos]);
+  }, [currentVideoId, hideDislikedVideos, replaceHiddenCurrentVideo]);
 
   const resetSubmitForm = useCallback(() => {
     setShowSubmitForm(false);
@@ -1016,9 +1026,10 @@ const CommunityVideoSelector = ({
 
   // 투표 처리
   const handleVote = async (videoEntryId, currentVote, newVote) => {
-    if (isLocalVideoMode) return;
+    if (isLocalVideoMode || pendingVotesRef.current.has(videoEntryId)) return;
 
-    setVotingId(videoEntryId);
+    pendingVotesRef.current.add(videoEntryId);
+    setVotingIds(new Set(pendingVotesRef.current));
 
     // 같은 버튼을 다시 누르면 투표 취소
     const voteType = currentVote === newVote ? 0 : newVote;
@@ -1027,28 +1038,29 @@ const CommunityVideoSelector = ({
       const result = await Utils.voteCommunityVideo(videoEntryId, voteType, trackUri);
       if (result) {
         // 투표 결과로 목록 업데이트
-        const updatedVideos = videos
+        const { likes, dislikes, score } = result.data;
+        const updateVote = (currentVideos) => currentVideos
           .map((v) => {
             if (v.id === videoEntryId) {
               return {
                 ...v,
-                likes: result.data.likes,
-                dislikes: result.data.dislikes,
-                score: result.data.score,
+                likes,
+                dislikes,
+                score,
                 userVote: voteType === 0 ? null : voteType,
               };
             }
             return v;
           })
           .sort((a, b) => b.score - a.score);
-        setVideos(updatedVideos);
+        setVideos(updateVote);
         if (voteType === -1 && hideDislikedVideos) {
           const dislikedVideo = videos.find((video) => video.id === videoEntryId);
           if (dislikedVideo?.youtubeVideoId === previewVideoId) {
             setPreviewVideoId(null);
           }
           await replaceHiddenCurrentVideo(
-            updatedVideos,
+            videosRef.current,
             dislikedVideo?.youtubeVideoId
           );
         }
@@ -1057,7 +1069,8 @@ const CommunityVideoSelector = ({
       console.error("Vote failed:", e);
     }
 
-    setVotingId(null);
+    pendingVotesRef.current.delete(videoEntryId);
+    setVotingIds(new Set(pendingVotesRef.current));
   };
 
   const applyVideoSelection = useCallback((video, options = {}) => {
@@ -1417,7 +1430,7 @@ const CommunityVideoSelector = ({
                               }`,
                             onClick: () =>
                               handleVote(video.id, video.userVote, 1),
-                            disabled: votingId === video.id,
+                            disabled: votingIds.has(video.id),
                           },
                           react.createElement(
                             "svg",
@@ -1441,7 +1454,7 @@ const CommunityVideoSelector = ({
                               }`,
                             onClick: () =>
                               handleVote(video.id, video.userVote, -1),
-                            disabled: votingId === video.id,
+                            disabled: votingIds.has(video.id),
                           },
                           react.createElement(
                             "svg",
