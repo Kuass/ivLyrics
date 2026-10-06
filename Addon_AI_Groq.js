@@ -156,16 +156,16 @@
         return params;
     }
 
-    async function getResearchMaxCompletionTokens() {
-        const selectedModel = getSelectedModel();
+    async function getResearchMaxCompletionTokens(requestContext) {
+        const selectedModel = requestContext.model;
         let capabilities = groqModelCapabilities.get(selectedModel);
         if (!capabilities) {
-            const models = await fetchAvailableModels(getApiKeys()[0]);
+            const models = await fetchAvailableModels(requestContext.apiKeys[0]);
             capabilities = models.find(model => model.id === selectedModel);
         }
 
         return asPositiveInteger(capabilities?.max_completion_tokens)
-            || asPositiveInteger(getAdvancedRequestParams().max_tokens)
+            || asPositiveInteger(requestContext.advancedParams.max_tokens)
             || DEFAULT_RESEARCH_MAX_TOKENS;
     }
 
@@ -400,11 +400,12 @@
         transformResult = null,
         requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000,
         onRawChunk = null,
-        requestOptions = {}
+        requestOptions = {},
+        requestContext = null
     ) {
-        const apiKeys = getApiKeys();
+        const apiKeys = requestContext ? requestContext.apiKeys : getApiKeys();
         if (apiKeys.length === 0) throw new Error('[Groq] API key is required.');
-        const model = requestOptions.model || getSelectedModel();
+        const model = requestOptions.model || (requestContext ? requestContext.model : getSelectedModel());
         let lastError = null;
 
         for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex++) {
@@ -437,7 +438,7 @@
                     const response = await window.ivLyricsFetch(`${BASE_URL}/chat/completions`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                        body: JSON.stringify({ model, messages: buildPromptMessages(prompt), ...getAdvancedRequestParams(), ...(requestOptions.body || {}), stream: true })
+                        body: JSON.stringify({ model, messages: buildPromptMessages(prompt), ...(requestContext ? requestContext.advancedParams : getAdvancedRequestParams()), ...(requestOptions.body || {}), stream: true })
                     }, requestTimeoutMs);
                     if (response.status === 429 || response.status === 403) { break; }
                     if (!response.ok) {
@@ -818,12 +819,18 @@
                     onResearchProgress(null, { ...details, reset: true });
                 }
                 : null;
+            // Keep model metadata and final generation on the same settings.
+            const requestContext = {
+                apiKeys: getApiKeys(),
+                model: getSelectedModel(),
+                advancedParams: getAdvancedRequestParams()
+            };
             const requestBody = {
                 // Prefer Groq's current parameter name for Research and remove
                 // the deprecated max_tokens value supplied by advanced settings.
                 max_tokens: undefined,
-                max_completion_tokens: await getResearchMaxCompletionTokens(),
-                ...(/^groq\/compound(?:-mini)?$/i.test(getSelectedModel() || '')
+                max_completion_tokens: await getResearchMaxCompletionTokens(requestContext),
+                ...(/^groq\/compound(?:-mini)?$/i.test(requestContext.model || '')
                     // Groq documents tool allow-listing, but not an empty
                     // list. Keep only the non-web tool so this final model
                     // pass cannot start another search.
@@ -839,9 +846,10 @@
                 requestTimeoutMs,
                 progressParser ? chunk => progressParser.push(chunk) : null,
                 {
-                    model: getSelectedModel(),
+                    model: requestContext.model,
                     body: requestBody
-                }
+                },
+                requestContext
             );
         },
 

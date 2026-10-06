@@ -164,16 +164,16 @@
         return params;
     }
 
-    async function getResearchMaxTokens() {
-        const selectedModel = getSelectedModel();
+    async function getResearchMaxTokens(requestContext) {
+        const selectedModel = requestContext.model;
         let capabilities = claudeModelCapabilities.get(selectedModel);
         if (!capabilities) {
-            const models = await fetchAvailableModels(getApiKeys()[0]);
+            const models = await fetchAvailableModels(requestContext.apiKeys[0]);
             capabilities = models.find(model => model.id === selectedModel);
         }
 
         return asPositiveInteger(capabilities?.max_tokens)
-            || asPositiveInteger(getAdvancedRequestParams().max_tokens)
+            || asPositiveInteger(requestContext.advancedParams.max_tokens)
             || DEFAULT_RESEARCH_MAX_TOKENS;
     }
 
@@ -187,13 +187,13 @@
         return { systemPrompt: '', userPrompt: String(prompt ?? '') };
     }
 
-    function resolveClaudeRequestPreamble(prompt) {
-        const apiKeys = getApiKeys();
+    function resolveClaudeRequestPreamble(prompt, requestContext = null) {
+        const apiKeys = requestContext ? requestContext.apiKeys : getApiKeys();
         if (apiKeys.length === 0) {
             throw new Error('[Claude] API key is required. Please configure your API key in settings.');
         }
 
-        const model = getSelectedModel();
+        const model = requestContext ? requestContext.model : getSelectedModel();
         const { systemPrompt, userPrompt } = normalizePromptRequest(prompt);
         return { apiKeys, model, systemPrompt, userPrompt };
     }
@@ -378,9 +378,10 @@
         transformResult = null,
         requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000,
         onRawChunk = null,
-        requestOverrides = {}
+        requestOverrides = {},
+        requestContext = null
     ) {
-        const { apiKeys, model, systemPrompt, userPrompt } = resolveClaudeRequestPreamble(prompt);
+        const { apiKeys, model, systemPrompt, userPrompt } = resolveClaudeRequestPreamble(prompt, requestContext);
         let lastError = null;
 
         for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex++) {
@@ -421,7 +422,7 @@
                         },
                         body: JSON.stringify({
                             model,
-                            ...getAdvancedRequestParams(),
+                            ...(requestContext ? requestContext.advancedParams : getAdvancedRequestParams()),
                             ...requestOverrides,
                             ...(systemPrompt ? { system: systemPrompt } : {}),
                             stream: true,
@@ -916,10 +917,16 @@
                     onResearchProgress(null, { ...details, reset: true });
                 }
                 : null;
+            // Keep model metadata and final generation on the same settings.
+            const requestContext = {
+                apiKeys: getApiKeys(),
+                model: getSelectedModel(),
+                advancedParams: getAdvancedRequestParams()
+            };
             const requestOverrides = {
-                max_tokens: await getResearchMaxTokens(),
+                max_tokens: await getResearchMaxTokens(requestContext),
                 ...(webSearch === false ? {} : {
-                    tools: [getClaudeWebSearchTool(getSelectedModel())]
+                    tools: [getClaudeWebSearchTool(requestContext.model)]
                 })
             };
             return await callClaudeAPIStream(
@@ -930,7 +937,8 @@
                 extractJSON,
                 requestTimeoutMs,
                 progressParser ? chunk => progressParser.push(chunk) : null,
-                requestOverrides
+                requestOverrides,
+                requestContext
             );
         },
 
