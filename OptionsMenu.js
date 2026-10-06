@@ -127,24 +127,25 @@ function createFluentModalHost({
   let isClosed = false;
 
   const finalizeClose = () => {
-    document.removeEventListener("keydown", handleKeydown, true);
     onBeforeClose?.();
 
     if (overlay.parentNode) {
       overlay.remove();
-    }
-
-    if (previouslyFocused && document.contains(previouslyFocused)) {
-      previouslyFocused.focus();
     }
   };
 
   const closeModal = (immediate = false) => {
     if (isClosed) return;
     isClosed = true;
+    // Release keyboard and focus ownership before another modal can open.
+    document.removeEventListener("keydown", handleKeydown, true);
     overlay.classList.remove("is-open");
     overlay.classList.add("is-closing");
     overlay.setAttribute("aria-hidden", "true");
+
+    if (overlay.contains(document.activeElement) && previouslyFocused && document.contains(previouslyFocused)) {
+      previouslyFocused.focus();
+    }
 
     if (immediate === true || window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
       finalizeClose();
@@ -203,6 +204,7 @@ function createFluentModalHost({
   shell.tabIndex = -1;
 
   requestAnimationFrame(() => {
+    if (isClosed) return;
     overlay.classList.add("is-open");
     if (!autoFocus) return;
     const focusTarget = shell.querySelector(
