@@ -784,8 +784,15 @@ const SongResearch = (() => {
 
     const SourceList = ({ sources }) => {
         const safeSources = (Array.isArray(sources) ? sources : [])
-            .map((source) => window.AIAddonManager?.normalizeResearchSource?.(source) || source)
-            .filter((source) => source?.url);
+            .map((source) => {
+                const normalizeSource = window.AIAddonManager?.normalizeResearchSource;
+                const normalized = typeof normalizeSource === "function"
+                    ? normalizeSource.call(window.AIAddonManager, source)
+                    : source;
+                const url = getSafeHttpUrl(normalized?.url);
+                return url ? { ...normalized, url } : null;
+            })
+            .filter(Boolean);
         if (safeSources.length === 0) return react.createElement("p", { className: "research-muted" }, t("research.sourcesEmpty", "No source links were returned"));
         return react.createElement("ol", { className: "research-source-list" },
             safeSources.map((source, index) => react.createElement("li", { key: `${source.url}:${index}` },
