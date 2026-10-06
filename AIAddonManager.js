@@ -3354,15 +3354,27 @@ ${normalizedText}
                 try {
                     window.__ivLyricsDebugLog?.(`[AIAddonManager] Trying Research provider: ${addon.id}`);
                     const researchPrompt = this.buildResearchPrompt(params);
-                    const callResearchProvider = (webSearch) => this._callProvider(addon, method, {
-                        ...params,
-                        webSearch,
-                        researchPrompt,
-                        requestTimeoutMs: PROVIDER_RESEARCH_REQUEST_TIMEOUT_MS,
-                        onResearchProgress: reportProgress,
-                        // Existing provider addons consume this property.
-                        tmiPrompt: researchPrompt
-                    });
+                    const callResearchProvider = async (webSearch) => {
+                        // A timed-out provider may keep streaming. Retire this
+                        // call's callback before retrying or moving to another
+                        // provider, including retries without web search.
+                        let active = true;
+                        try {
+                            return await this._callProvider(addon, method, {
+                                ...params,
+                                webSearch,
+                                researchPrompt,
+                                requestTimeoutMs: PROVIDER_RESEARCH_REQUEST_TIMEOUT_MS,
+                                onResearchProgress: (partial, details) => {
+                                    if (active) reportProgress(partial, details);
+                                },
+                                // Existing provider addons consume this property.
+                                tmiPrompt: researchPrompt
+                            });
+                        } finally {
+                            active = false;
+                        }
+                    };
 
                     reportProgress(null, { reset: true, webSearchStatus: 'searching' });
 
