@@ -169,25 +169,34 @@ const getPreviewLyricsStartTimeSeconds = () => {
 // 동일했던 timeout·요청·정리 절차를 모은다. 컴포넌트별로 다른 로그/상태 처리는
 // onUnavailable / onError 콜백으로만 넘기고, effect 래퍼·의존성 배열·상태 초기화는 각자 유지한다.
 const startPreviewHelperVideoDownload = ({ videoId, abortRef, setHelperVideoUrl, onUnavailable, onError }) => {
+  let isActive = true;
+  let abortRequest = null;
+
   // 1.5초 이내 응답 시 toast 숨기기 위한 변수
   const requestStartTime = Date.now();
   const preparingToastTimeout = setTimeout(() => {
+    if (!isActive) return;
     Toast.progress(I18n.t("videoBackground.preparing"), 0);
   }, 1500);
 
   const requestVideo = async () => {
-    if (typeof VideoHelperService === "undefined") return;
-
-    const isAvailable = await VideoHelperService.isHelperAvailable();
-    if (!isAvailable) {
+    if (typeof VideoHelperService === "undefined") {
       clearTimeout(preparingToastTimeout);
-      if (onUnavailable) onUnavailable();
-      Toast.error(I18n.t("videoBackground.helperNotConnected"));
       return;
     }
 
-    abortRef.current = VideoHelperService.requestVideo(videoId, {
+    const isAvailable = await VideoHelperService.isHelperAvailable();
+    if (!isActive) return;
+    if (!isAvailable) {
+      clearTimeout(preparingToastTimeout);
+      if (onUnavailable) onUnavailable();
+      if (isActive) Toast.error(I18n.t("videoBackground.helperNotConnected"));
+      return;
+    }
+
+    const abort = VideoHelperService.requestVideo(videoId, {
       onProgress: (progress) => {
+        if (!isActive) return;
         clearTimeout(preparingToastTimeout);
         const percent = Math.round(progress.percent || 0);
         if (progress.status === "downloading") {
@@ -197,33 +206,44 @@ const startPreviewHelperVideoDownload = ({ videoId, abortRef, setHelperVideoUrl,
         }
       },
       onComplete: (url) => {
+        if (!isActive) return;
         clearTimeout(preparingToastTimeout);
         Toast.dismissProgress();
         setHelperVideoUrl(url);
         // 1.5초 이내로 완료되면 완료 toast도 숨김
         const elapsed = Date.now() - requestStartTime;
-        if (elapsed > 1500) {
+        if (isActive && elapsed > 1500) {
           Toast.success(I18n.t("videoBackground.downloadComplete"));
         }
       },
       onError: (message) => {
+        if (!isActive) return;
         clearTimeout(preparingToastTimeout);
         Toast.dismissProgress();
         if (onError) onError(message);
-        Toast.error(I18n.t("videoBackground.helperError"));
+        if (isActive) Toast.error(I18n.t("videoBackground.helperError"));
       },
     });
+    // A callback may synchronously retire this effect before requestVideo returns.
+    if (!isActive) {
+      abort?.();
+      return;
+    }
+    abortRequest = abort;
+    abortRef.current = abort;
   };
 
   requestVideo();
 
   return () => {
+    if (!isActive) return;
+    isActive = false;
     clearTimeout(preparingToastTimeout);
+    const abort = abortRequest;
+    abortRequest = null;
+    if (abortRef.current === abort) abortRef.current = null;
     Toast.dismissProgress(); // 컴포넌트 언마운트 시 progress toast 닫기
-    if (abortRef.current) {
-      abortRef.current();
-      abortRef.current = null;
-    }
+    abort?.();
   };
 };
 
