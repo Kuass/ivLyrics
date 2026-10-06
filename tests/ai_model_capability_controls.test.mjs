@@ -27,6 +27,11 @@ for (const [provider, cacheName] of Object.entries(cacheNames)) {
                 requests.push({url, options, resolve}); return promise;
             }}
         });
+        const keyStart = source.indexOf('    const modelCapabilitiesKey =');
+        if (keyStart >= 0) {
+            // Include the actual helper dependency when the cache has endpoint keys.
+            vm.runInContext(source.slice(keyStart, source.indexOf('\n\n', keyStart)), context);
+        }
         vm.runInContext(helper, context);
         const getFixture = (suffix, limit) => provider === 'Gemini'
             ? {models:[{name:`models/gemini-${suffix}`, displayName:suffix, supportedGenerationMethods:['generateContent'], outputTokenLimit:limit, inputTokenLimit:10000}]}
@@ -39,12 +44,14 @@ for (const [provider, cacheName] of Object.entries(cacheNames)) {
         requests[0].resolve({ok:true, json:async () => getFixture('old', 1024)});
         const oldModels = await old;
         assert.equal(currentModels.length, 1); assert.equal(oldModels.length,1);
-        assert.equal(cache.get(currentModels[0].id), currentModels[0]);
-        assert.equal(cache.get(oldModels[0].id), oldModels[0]);
+        const currentRecord = Array.from(cache.values()).find(value => value.id === currentModels[0].id);
+        const oldRecord = Array.from(cache.values()).find(value => value.id === oldModels[0].id);
+        assert.equal(currentRecord, currentModels[0]);
+        assert.equal(oldRecord, oldModels[0]);
         assert.equal(cache.get('sentinel-unrelated-model').max_tokens, 123);
         const limitField = provider === 'Claude' ? 'max_tokens' : provider === 'Gemini' ? 'max_output_tokens' : 'max_completion_tokens';
-        assert.equal(cache.get(currentModels[0].id)[limitField], 2048);
-        assert.equal(cache.get(oldModels[0].id)[limitField], 1024);
+        assert.equal(currentRecord[limitField], 2048);
+        assert.equal(oldRecord[limitField], 1024);
         if (provider === 'Gemini') {
             assert.ok(requests[0].url.startsWith('https://fixture-a.invalid/custom/models?'));
             assert.ok(requests[1].url.startsWith('https://fixture-b.invalid/custom/models?'));
