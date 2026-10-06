@@ -751,7 +751,7 @@ const CommunityVideoSelector = ({
   const [isLoadingTitle, setIsLoadingTitle] = useState(false);
   const [editingVideo, setEditingVideo] = useState(null);
   const [formPreviewVideoId, setFormPreviewVideoId] = useState(null); // 폼에서 미리보기 중인 영상
-  const [deletingId, setDeletingId] = useState(null); // 삭제 중인 영상 ID
+  const [deletingIds, setDeletingIds] = useState(() => new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState(null); // 삭제 확인 다이얼로그용
   const [deleteConfirmTitle, setDeleteConfirmTitle] = useState(""); // 삭제할 영상 제목
   const [randomSelectionEnabled, setRandomSelectionEnabled] = useState(
@@ -762,6 +762,7 @@ const CommunityVideoSelector = ({
   );
   const titleFetchTimeout = useRef(null);
   const pendingVotesRef = useRef(new Set());
+  const pendingDeletesRef = useRef(new Set());
 
   // 현재 사용자 해시 ID
   const currentUserHash = Utils.getCurrentUserHash();
@@ -1226,10 +1227,11 @@ const CommunityVideoSelector = ({
   // 영상 삭제 실행 (본인만 가능)
   const executeDelete = async () => {
     const videoEntryId = deleteConfirmId;
-    if (!videoEntryId) return;
+    if (!videoEntryId || pendingDeletesRef.current.has(videoEntryId)) return;
 
+    pendingDeletesRef.current.add(videoEntryId);
+    setDeletingIds(new Set(pendingDeletesRef.current));
     closeDeleteConfirm();
-    setDeletingId(videoEntryId);
 
     try {
       if (isLocalVideoMode) {
@@ -1240,7 +1242,6 @@ const CommunityVideoSelector = ({
         setVideos([]);
         onVideoSelect?.(null);
         Toast.success(I18n.t("communityVideo.deleted"));
-        setDeletingId(null);
         return;
       }
 
@@ -1262,9 +1263,10 @@ const CommunityVideoSelector = ({
     } catch (e) {
       console.error("Delete failed:", e);
       Toast.error(I18n.t("communityVideo.deleteError"));
+    } finally {
+      pendingDeletesRef.current.delete(videoEntryId);
+      setDeletingIds(new Set(pendingDeletesRef.current));
     }
-
-    setDeletingId(null);
   };
 
   // 영상 미리보기 토글
@@ -1477,10 +1479,10 @@ const CommunityVideoSelector = ({
                           {
                             className: "action-btn delete",
                             onClick: (e) => showDeleteConfirm(video, e),
-                            disabled: deletingId === video.id,
+                            disabled: deletingIds.has(video.id),
                             title: I18n.t("communityVideo.delete"),
                           },
-                          deletingId === video.id
+                          deletingIds.has(video.id)
                             ? "..."
                             : react.createElement(
                               "svg",
