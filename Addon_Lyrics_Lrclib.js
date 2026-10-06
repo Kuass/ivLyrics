@@ -648,9 +648,9 @@
      * @param {string} url - 요청할 URL
      * @param {Object} options - fetch 옵션 (headers 등)
      * @param {number} timeoutMs - 타임아웃 시간 (기본 35초)
-     * @returns {Promise<Response|null>} Response 객체 또는 실패 시 null
+     * @returns {Promise<{response: Response, data: *}|null>} 응답과 JSON 본문 또는 네트워크 실패 시 null
      */
-    async function fetchWithTimeout(url, options = {}, timeoutMs = 35000) {
+    async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 35000) {
         // 최대 2회 시도 (첫 시도 + 1회 재시도)
         for (let attempt = 0; attempt < 2; attempt++) {
             // AbortController: fetch 요청을 강제 중단할 수 있게 해주는 Web API
@@ -662,10 +662,16 @@
             try {
                 // fetch 요청 실행 (signal 연결로 abort 가능하게 함)
                 const response = await fetch(url, { ...options, signal: controller.signal });
-                clearTimeout(id);  // 성공 시 타임아웃 타이머 정리
-                return response;   // 응답 반환 (성공)
+                // Headers alone are not completion. Keep the same deadline
+                // through successful JSON bodies; error statuses stay immediate.
+                const data = response.ok ? await response.json() : null;
+                clearTimeout(id);
+                return { response, data };
             } catch (error) {
                 clearTimeout(id);  // 실패 시에도 타이머 정리
+                // Invalid JSON is a payload failure, not a transient transport
+                // error. Preserve the caller's existing parsing-error handling.
+                if (error?.name === 'SyntaxError') throw error;
 
                 if (attempt === 0) {
                     // 첫 번째 시도 실패: 500ms 대기 후 재시도
@@ -1575,13 +1581,14 @@
         const lrclibId = getSyncDataLrclibId(source);
         if (!lrclibId) return null;
 
-        const response = await fetchWithTimeout(`${LRCLIB_API_BASE}/get/${encodeURIComponent(lrclibId)}`, { headers }, 35000);
+        const fetched = await fetchJsonWithTimeout(`${LRCLIB_API_BASE}/get/${encodeURIComponent(lrclibId)}`, { headers }, 35000);
+        const response = fetched?.response;
         if (!response || !response.ok) {
             window.__ivLyricsDebugLog?.(`[LR-DEBUG] Direct LRCLIB get failed for id=${lrclibId}: ${response?.status || 'network'}`);
             return null;
         }
 
-        const candidate = await response.json();
+        const candidate = fetched.data;
         if (!candidate || (!candidate.syncedLyrics && !candidate.plainLyrics && !candidate.instrumental)) {
             window.__ivLyricsDebugLog?.(`[LR-DEBUG] Direct LRCLIB get returned no lyrics for id=${lrclibId}`);
             return null;
@@ -1819,7 +1826,8 @@
                     if (params.q) query.set('q', params.q);
 
                     const searchUrl = `${LRCLIB_API_BASE}/search?${query.toString()}`;
-                    const response = await fetchWithTimeout(searchUrl, { headers }, 35000);
+                    const fetched = await fetchJsonWithTimeout(searchUrl, { headers }, 35000);
+                    const response = fetched?.response;
 
                     if (!response) {
                         return {
@@ -1859,7 +1867,7 @@
                         };
                     }
 
-                    const data = await response.json();
+                    const data = fetched.data;
                     if (!Array.isArray(data)) {
                         return {
                             fatal: true,
@@ -2344,7 +2352,8 @@
 
                 const headers = { 'x-user-agent': `spicetify v${Spicetify.Config?.version || 'unknown'}` };
                 const query = new URLSearchParams({ q: queryValue });
-                const response = await fetchWithTimeout(`${LRCLIB_API_BASE}/search?${query.toString()}`, { headers }, 35000);
+                const fetched = await fetchJsonWithTimeout(`${LRCLIB_API_BASE}/search?${query.toString()}`, { headers }, 35000);
+                const response = fetched?.response;
 
                 // 수동 검색 실패 응답은 error 메시지만 다르고 나머지 형태가 동일하다.
                 const manualSearchFailure = (errorMessage) => ({
@@ -2364,7 +2373,7 @@
                     return manualSearchFailure(response.status === 404 ? 'No lyrics found' : `API error: ${response.status}`);
                 }
 
-                const data = await response.json();
+                const data = fetched.data;
                 if (!Array.isArray(data)) {
                     return manualSearchFailure('Invalid LRCLIB response');
                 }
