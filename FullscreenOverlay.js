@@ -2661,7 +2661,9 @@ const FullscreenOverlay = (() => {
         const beginResearch = useCallback(async () => {
             if (tmiMode || tmiOpeningRef.current) return;
 
-            const trackId = trackUri?.split(":")[2];
+            const trackId = trackUri?.startsWith("spotify:local:")
+                ? trackUri
+                : trackUri?.split(":")[2];
             if (!trackId) return;
 
             tmiOpeningRef.current = true;
@@ -2773,7 +2775,9 @@ const FullscreenOverlay = (() => {
 
         // Handle Regenerate
         const handleRegenerate = useCallback(async () => {
-            const trackId = trackUri?.split(":")[2];
+            const trackId = trackUri?.startsWith("spotify:local:")
+                ? trackUri
+                : trackUri?.split(":")[2];
             if (!trackId) return;
 
             await loadResearch(trackId, true);

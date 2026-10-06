@@ -77,10 +77,17 @@ const SongResearch = (() => {
     };
 
     const getTrackContext = (trackId, context = {}) => {
-        const item = Spicetify.Player.data?.item || {};
+        const currentItem = Spicetify.Player.data?.item || {};
+        // Local tracks use their complete URI as the cache key; the artist
+        // fragment alone is not a unique track identity.
+        const isLocalTrack = typeof trackId === "string" && trackId.startsWith("spotify:local:");
+        const trackUri = isLocalTrack ? trackId : (trackId ? `spotify:track:${trackId}` : currentItem.uri || "");
+        // Playback can move ahead of the research view. Only borrow player
+        // metadata when it belongs to the requested track's cache identity.
+        const item = currentItem.uri === trackUri ? currentItem : {};
         const metadata = item.metadata || {};
-        const trackUri = item.uri || (trackId ? `spotify:track:${trackId}` : "");
         const snapshot = trackUri ? window.LyricsService?.getLyricsSnapshot?.(trackUri) : null;
+        const trackInfo = snapshot?.trackInfo || {};
         const snapshotLyrics = snapshot?.currentLyrics
             || snapshot?.displayLyrics
             || snapshot?.synced
@@ -94,12 +101,12 @@ const SongResearch = (() => {
             : "";
         return {
             trackId,
-            title: asText(context.title || item.name || metadata.title),
-            artist: asText(context.artist || artists || metadata.artist_name),
-            album: asText(context.album || item.album?.name || metadata.album_title),
-            releaseDate: asText(context.releaseDate || metadata.release_date || metadata.album_release_date),
-            isrc: asText(context.isrc || metadata.isrc),
-            spotifyUrl: asText(context.spotifyUrl || (trackId ? `https://open.spotify.com/track/${trackId}` : "")),
+            title: asText(context.title || item.name || metadata.title || trackInfo.title),
+            artist: asText(context.artist || artists || metadata.artist_name || trackInfo.artist),
+            album: asText(context.album || item.album?.name || metadata.album_title || trackInfo.album),
+            releaseDate: asText(context.releaseDate || metadata.release_date || metadata.album_release_date || trackInfo.releaseDate),
+            isrc: asText(context.isrc || metadata.isrc || trackInfo.isrc),
+            spotifyUrl: asText(context.spotifyUrl || (!isLocalTrack && trackId ? `https://open.spotify.com/track/${trackId}` : "")),
             lyrics: Array.isArray(context.lyrics) && context.lyrics.length > 0
                 ? context.lyrics
                 : (Array.isArray(snapshotLyrics) ? snapshotLyrics : [])
@@ -137,14 +144,16 @@ const SongResearch = (() => {
             promise: null
         };
         const unsubscribe = subscribeToResearchRequest(request, context.onProgress);
+        let capturedContext;
         request.promise = Promise.resolve().then(async () => {
             try {
                 const lyricsService = window.LyricsService;
                 if (!lyricsService?.getResearch && !lyricsService?.getTMI) {
                     return { error: true, message: "LyricsService.getResearch is not available." };
                 }
+                if ('error' in capturedContext) throw capturedContext.error;
                 const input = {
-                    ...getTrackContext(trackId, context),
+                    ...capturedContext.value,
                     lang,
                     ignoreCache: regenerate,
                     onProgress: (partial, details = {}) => publishResearchProgress(request, partial, details)
@@ -167,6 +176,14 @@ const SongResearch = (() => {
             return { error: true, message: "Research data is unavailable." };
         });
         researchInFlight.set(cacheKey, request);
+        // Capture inputs before playback can change, after the pending promise
+        // is registered so a reentrant snapshot lookup still shares this work.
+        // Keep lookup errors on the existing recoverable error-result path.
+        try {
+            capturedContext = { value: getTrackContext(trackId, context) };
+        } catch (error) {
+            capturedContext = { error };
+        }
 
         try {
             return await request.promise;
