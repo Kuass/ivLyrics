@@ -57,6 +57,7 @@ function harness() {
     const container = new context.Container();
     Object.assign(container, {
         currentTrackUri: 'spotify:track:A', _isComponentMounted: true, _lyricsTransitionSeq: 0, _dmResults: {},
+        _lyricsFetchSeq: 0, _activeLyricsFetchSeq: 0, _localLyricsImportGeneration: 0, clearLyricsLoading() {},
         state: { uri: 'spotify:track:A', title: 'Song A', artist: 'Artist A' },
         getText: (_key, fallback) => fallback,
         applyTranslationStates: () => ({}), getCurrentMode: () => 0,
@@ -179,6 +180,8 @@ test('successful import preserves source, captured duration, metadata, cache and
     assert.equal(h.saves.length, 1);
     assert.equal(h.saves[0].uri, 'spotify:track:A');
     assert.equal(h.container.state.localLyricsSource, 'file');
+    assert.equal(h.container.state.lyricsRequestSeq, h.container._activeLyricsFetchSeq);
+    assert.ok(Number.isInteger(h.container.state.lyricsRequestSeq));
     assert.deepEqual(h.snapshots[0].trackInfo, { uri: 'spotify:track:A', title: 'Song A', artist: 'Artist A' });
     assert.deepEqual(h.toasts, [['success', 'fixture success']]);
     assert.equal(h.events[0].type, 'ivLyrics:local-lyrics-updated');

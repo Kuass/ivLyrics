@@ -4644,6 +4644,7 @@ class LyricsContainer extends react.Component {
     this._lyricsTransitionSeq = 0;
     this._lyricsEditRequestSeq = 0;
     this._localLyricsRequest = null;
+    this._localLyricsImportGeneration = 0;
     this._inflightGemini = new InflightRequestRegistry();
     this._inflightTrad = new InflightRequestRegistry();
     this._playbackTrackResolutionSeq = 0;
@@ -6938,6 +6939,7 @@ class LyricsContainer extends react.Component {
 
       const requestSeq = ++this._lyricsFetchSeq;
       const transitionSeq = ++this._lyricsTransitionSeq;
+      const importGeneration = this._localLyricsImportGeneration;
       const requestUri = info.uri;
       const hasSpotifyTrackId = !!Utils.extractTrackId(info.uri);
       this._activeLyricsFetchSeq = requestSeq;
@@ -7037,6 +7039,7 @@ class LyricsContainer extends react.Component {
           if (window.PseudoKaraokeService?.applyToResult) {
             await window.PseudoKaraokeService.applyToResult(restoredLocalLyrics, info);
           }
+          if (importGeneration !== this._localLyricsImportGeneration) return;
           CACHE[info.uri] = restoredLocalLyrics;
           isCached = true;
         }
@@ -7125,6 +7128,10 @@ class LyricsContainer extends react.Component {
           getLyricsDataMode(mode),
           trackLyricsProviderOverride
         );
+        // Accepted manual imports supersede older loads, including cache-only
+        // completions after playback has moved on. Ordinary track skips can
+        // still warm their own cache when no import has intervened.
+        if (importGeneration !== this._localLyricsImportGeneration) return;
         if (!resp.uri) resp.uri = info.uri;
 
         if (resp.provider) {
@@ -8610,6 +8617,14 @@ class LyricsContainer extends react.Component {
       duration: localRequest.duration,
     }) || nextLyrics;
     if (!this.isCurrentLocalLyricsRequest(localRequest)) return false;
+    // Commit the manual choice only after validation/normalization succeeds.
+    // Retire older provider state updates and keep the imported state's
+    // request identity valid for the renderer and translation workers.
+    this._localLyricsImportGeneration += 1;
+    const requestSeq = ++this._lyricsFetchSeq;
+    this._activeLyricsFetchSeq = requestSeq;
+    this.clearLyricsLoading();
+    if (!this.isCurrentLocalLyricsRequest(localRequest)) return false;
     const resetTranslations = {
       romaji: null,
       furigana: null,
@@ -8658,6 +8673,7 @@ class LyricsContainer extends react.Component {
         ...this.applyTranslationStates(nextLyrics),
         isLoading: false,
         lyricsStatus: "ready",
+        lyricsRequestSeq: requestSeq,
         lyricsDisplayUri: currentUri,
         isCached: true,
         error: null,
