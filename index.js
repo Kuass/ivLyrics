@@ -3598,8 +3598,7 @@ const Prefetcher = {
     // 언어 감지
     const detectedLanguage = LyricsService.detectLanguage(lyricsArray);
     if (!detectedLanguage) return;
-    // Update Utils detected language for furigana check
-    Utils.setDetectedLanguage(detectedLanguage);
+    // The active lyrics container owns the display language; keep prefetch detection local.
 
     // 현재 설정된 display mode 확인
     let friendlyLanguage = null;
