@@ -4009,7 +4009,7 @@ function openCommunityVideoSelector(trackUri, currentVideoId, onVideoSelect, def
         defaultStartTime,
         onVideoSelect: async (newVideoInfo) => {
           try {
-            await onVideoSelect?.(newVideoInfo);
+            await onVideoSelect?.(newVideoInfo, trackUri);
           } finally {
             closeModal();
           }
