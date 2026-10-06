@@ -2344,38 +2344,67 @@ const LocalLyricsLrclibSearchModal = ({ trackInfo = {}, onApplyLocalLyrics, onCl
   const [statusText, setStatusText] = react.useState("");
   const [isSearching, setIsSearching] = react.useState(false);
   const [applyingKey, setApplyingKey] = react.useState(null);
+  const searchRequestRef = react.useRef({ active: true, sequence: 0 });
+
+  react.useEffect(() => {
+    const requestState = searchRequestRef.current;
+    requestState.active = true;
+    return () => {
+      requestState.active = false;
+      requestState.sequence += 1;
+    };
+  }, []);
 
   const performSearch = react.useCallback(async () => {
+    const requestState = searchRequestRef.current;
+    if (!requestState.active) return;
+    // Enter can submit a replacement while the search button is disabled.
+    const sequence = ++requestState.sequence;
+    const isCurrent = () => requestState.active && requestState.sequence === sequence;
     const searchValue = String(query || "").trim();
     if (!searchValue) {
+      setIsSearching(false);
+      if (!isCurrent()) return;
       setStatusText(getOptionsText("menu.localLyricsSearchEmpty", "검색어를 입력해 주세요."));
       return;
     }
 
     const addon = getLrclibLocalSearchAddon();
     if (!addon?.searchCandidatesByQuery) {
+      setIsSearching(false);
+      if (!isCurrent()) return;
       setCandidates([]);
+      if (!isCurrent()) return;
       setStatusText(getOptionsText("menu.localLyricsLrclibUnavailable", "LRCLIB provider를 사용할 수 없습니다."));
       return;
     }
 
+    if (!isCurrent()) return;
     setIsSearching(true);
+    if (!isCurrent()) return;
     setStatusText("");
+    if (!isCurrent()) return;
     try {
       const result = await addon.searchCandidatesByQuery(searchValue, trackInfo || {});
+      if (!isCurrent()) return;
       const nextCandidates = Array.isArray(result?.candidates) ? result.candidates : [];
+      if (!isCurrent()) return;
       setCandidates(nextCandidates);
+      if (!isCurrent()) return;
       setStatusText(
         nextCandidates.length
           ? getOptionsText("menu.localLyricsSearchResultCount", "{count}개 결과").replace("{count}", nextCandidates.length)
           : (result?.error || getOptionsText("menu.localLyricsSearchNoResults", "검색 결과가 없습니다."))
       );
     } catch (error) {
+      if (!isCurrent()) return;
       console.error("[ivLyrics] LRCLIB local lyrics search failed:", error);
+      if (!isCurrent()) return;
       setCandidates([]);
+      if (!isCurrent()) return;
       setStatusText(error?.message || getOptionsText("menu.localLyricsSearchFailed", "가사 검색에 실패했습니다."));
     } finally {
-      setIsSearching(false);
+      if (isCurrent()) setIsSearching(false);
     }
   }, [query, trackInfo]);
 
