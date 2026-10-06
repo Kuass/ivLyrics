@@ -155,7 +155,7 @@ function createFluentModalHost({
     window.setTimeout(finalizeClose, 180);
   };
 
-  const getFocusableElements = () => Array.from(shell.querySelectorAll(
+  const getFocusableElements = (scope = shell) => Array.from(scope.querySelectorAll(
     "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])"
   )).filter((element) => !element.hidden && element.getAttribute("aria-hidden") !== "true");
 
@@ -169,10 +169,12 @@ function createFluentModalHost({
     }
 
     if (event.key === "Tab" && trapFocus) {
-      const focusable = getFocusableElements();
+      const activeDialog = document.activeElement?.closest?.('[role="dialog"][aria-modal="true"]');
+      const focusScope = activeDialog && shell.contains(activeDialog) ? activeDialog : shell;
+      const focusable = getFocusableElements(focusScope);
       if (!focusable.length) {
         event.preventDefault();
-        shell.focus();
+        focusScope.focus();
         return;
       }
 
