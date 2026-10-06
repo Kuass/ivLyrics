@@ -495,7 +495,9 @@ download_source() {
   if ! curl -fsSL --connect-timeout 20 "${url}" -o "${WORK_TMP}/src.tar.gz"; then
     die "download failed: ${url}"
   fi
-  tar -xzf "${WORK_TMP}/src.tar.gz" -C "${WORK_TMP}"
+  if ! tar -xzf "${WORK_TMP}/src.tar.gz" -C "${WORK_TMP}"; then
+    die "downloaded archive could not be extracted: ${url}"
+  fi
   local extracted
   extracted="$(find "${WORK_TMP}" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
   [ -n "${extracted}" ] && [ -f "${extracted}/manifest.json" ] && [ -f "${extracted}/index.js" ] \
