@@ -3113,7 +3113,10 @@ const Toast = {
       if (this._progressToast.timeout) {
         clearTimeout(this._progressToast.timeout);
       }
-      this._progressToast.timeout = setTimeout(() => this.dismissProgress(), 60000);
+      const progressToast = this._progressToast;
+      this._progressToast.timeout = setTimeout(() => {
+        if (this._progressToast === progressToast) this.dismissProgress();
+      }, 60000);
 
       return this._progressToast.id;
     }
@@ -3150,7 +3153,7 @@ const Toast = {
     closeBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>';
     closeBtn.onclick = (e) => {
       e.stopPropagation();
-      this.dismissProgress();
+      if (this._progressToast?.id === id) this.dismissProgress();
     };
 
     toast.appendChild(icon);
@@ -3161,12 +3164,14 @@ const Toast = {
     this._container.appendChild(toast);
 
     // 안전장치: 60초 후 자동 닫힘
-    const timeout = setTimeout(() => this.dismissProgress(), 60000);
+    const timeout = setTimeout(() => {
+      if (this._progressToast?.id === id) this.dismissProgress();
+    }, 60000);
     this._progressToast = { id, element: toast, timeout };
 
-    // Trigger animation
+    // Trigger animation only while this progress toast still owns the slot.
     requestAnimationFrame(() => {
-      toast.classList.add('ivlyrics-toast-show');
+      if (this._progressToast?.id === id) toast.classList.add('ivlyrics-toast-show');
     });
 
     return id;
@@ -3176,14 +3181,17 @@ const Toast = {
    * Dismiss progress toast
    */
   dismissProgress() {
-    if (!this._progressToast) return;
+    const progressToast = this._progressToast;
+    if (!progressToast) return;
+    // Release ownership before the exit animation so new work gets a fresh toast.
+    this._progressToast = null;
 
     // 타임아웃 정리
-    if (this._progressToast.timeout) {
-      clearTimeout(this._progressToast.timeout);
+    if (progressToast.timeout) {
+      clearTimeout(progressToast.timeout);
     }
 
-    const toast = this._progressToast.element;
+    const toast = progressToast.element;
     toast.classList.remove('ivlyrics-toast-show');
     toast.classList.add('ivlyrics-toast-hide');
 
@@ -3191,7 +3199,6 @@ const Toast = {
       if (toast.parentNode) {
         toast.parentNode.removeChild(toast);
       }
-      this._progressToast = null;
     }, 300);
   },
 
