@@ -4002,12 +4002,14 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             const loadingForTrackUri = trackUri;
             const loadSeq = ++loadSeqRef.current;
 
+            const durationMs = item.duration?.milliseconds || Number(item.metadata?.duration || 0);
             const trackInfo = {
                 uri: trackUri,
                 title: item.name || item.metadata?.title || '',
                 artist: item.artists?.map(a => a.name).join(', ') || item.metadata?.artist_name || '',
                 album: item.album?.name || item.metadata?.album_title || '',
-                duration: item.duration?.milliseconds || Number(item.metadata?.duration || 0),
+                duration: durationMs,
+                durationMs,
                 trackId
             };
 
