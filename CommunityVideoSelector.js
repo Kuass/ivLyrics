@@ -880,6 +880,7 @@ const CommunityVideoSelector = ({
 
   // URL 변경 시 YouTube 제목 자동 가져오기
   useEffect(() => {
+    let isActive = true;
     if (titleFetchTimeout.current) {
       clearTimeout(titleFetchTimeout.current);
     }
@@ -895,27 +896,34 @@ const CommunityVideoSelector = ({
     if (!videoId) {
       setSubmitVideoTitle("");
       setFormPreviewVideoId(null);
+      setIsLoadingTitle(false);
       return;
     }
 
     // 디바운스: 500ms 후에 제목 가져오기
-    titleFetchTimeout.current = setTimeout(async () => {
+    const timeout = setTimeout(async () => {
+      if (!isActive) return;
       setIsLoadingTitle(true);
+      if (!isActive) return;
       try {
         const title = await Utils.getYouTubeVideoTitle(videoId);
+        if (!isActive) return;
         setSubmitVideoTitle(title || "");
+        if (!isActive) return;
         setFormPreviewVideoId(videoId); // 폼 미리보기용 상태 사용
       } catch (e) {
+        if (!isActive) return;
         console.error("Failed to fetch YouTube title:", e);
         setSubmitVideoTitle("");
       }
-      setIsLoadingTitle(false);
+      if (isActive) setIsLoadingTitle(false);
     }, 500);
+    titleFetchTimeout.current = timeout;
 
     return () => {
-      if (titleFetchTimeout.current) {
-        clearTimeout(titleFetchTimeout.current);
-      }
+      isActive = false;
+      clearTimeout(timeout);
+      if (titleFetchTimeout.current === timeout) titleFetchTimeout.current = null;
     };
   }, [editingVideo, submitUrl]);
 
