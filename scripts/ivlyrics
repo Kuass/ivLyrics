@@ -152,23 +152,28 @@ spotify_quit() {
 spotify_launch_now_if_owed() {
   # Success path: relaunch immediately so the user is not left waiting for exit.
   if [ "${RELAUNCH_SPOTIFY}" = true ]; then
-    RELAUNCH_SPOTIFY=false
     spotify_launch
   fi
 }
 
 spotify_launch() {
-  local flags
+  local flags launch_status=0
   flags="$(spotify_launch_flags)"
   # IVLYRICS_SPOTIFY_ARGS lets a developer add flags such as --remote-debugging-port=9222.
   flags="${flags} ${IVLYRICS_SPOTIFY_ARGS:-}"
   flags="${flags# }"
   if [ -n "${flags}" ]; then
     # shellcheck disable=SC2086
-    open -a Spotify --args ${flags}
+    open -a Spotify --args ${flags} || launch_status=$?
   else
-    open -a Spotify
+    open -a Spotify || launch_status=$?
   fi
+  if [ "${launch_status}" -ne 0 ]; then
+    warn "Spotify launch failed (open exited with ${launch_status})." || true
+    return "${launch_status}"
+  fi
+  # Keep the exit-trap retry owed until the native launch actually succeeds.
+  RELAUNCH_SPOTIFY=false
   log "Spotify launched."
 }
 
