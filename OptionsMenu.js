@@ -2387,7 +2387,11 @@ const LocalLyricsLrclibSearchModal = ({ trackInfo = {}, onApplyLocalLyrics, onCl
     const candidateKey = candidate.candidateKey || `${candidate.id || "candidate"}`;
     setApplyingKey(candidateKey);
     try {
-      await onApplyLocalLyrics?.(candidate, { source: "lrclib-local-search", query });
+      await onApplyLocalLyrics?.(candidate, {
+        source: "lrclib-local-search", query,
+        trackUri: trackInfo?.uri,
+        transitionSeq: trackInfo?.lyricsTransitionSeq,
+      });
       onClose?.();
     } catch (error) {
       console.error("[ivLyrics] Failed to apply local LRCLIB lyrics:", error);
@@ -2395,7 +2399,7 @@ const LocalLyricsLrclibSearchModal = ({ trackInfo = {}, onApplyLocalLyrics, onCl
     } finally {
       setApplyingKey(null);
     }
-  }, [applyingKey, onApplyLocalLyrics, onClose, query]);
+  }, [applyingKey, onApplyLocalLyrics, onClose, query, trackInfo]);
 
   const handleKeyDown = (event) => {
     if (event.key === "Enter") {
@@ -3025,7 +3029,10 @@ const LyricsProviderSelectButton = react.memo(
               text: getOptionsText("menu.import", "가져오기"),
               onChange: () => {
                 closeModal?.();
-                onImportLocalLyricsFile?.();
+                onImportLocalLyricsFile?.({
+                  trackUri: trackInfo?.uri,
+                  transitionSeq: trackInfo?.lyricsTransitionSeq,
+                });
               },
             },
             {
