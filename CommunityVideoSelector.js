@@ -1078,7 +1078,7 @@ const CommunityVideoSelector = ({
   };
 
   const applyVideoSelection = useCallback((video, options = {}) => {
-    if (randomSelectionEnabled) {
+    if (selectionPreferencesRef.current.randomSelectionEnabled) {
       updateRandomSelection(false);
     }
     onVideoSelect?.(getCommunityVideoSelectionInfo(
@@ -1089,7 +1089,7 @@ const CommunityVideoSelector = ({
     if (options.notify !== false) {
       Toast.success(I18n.t("communityVideo.applied"));
     }
-  }, [onVideoSelect, randomSelectionEnabled, updateRandomSelection]);
+  }, [onVideoSelect, updateRandomSelection]);
 
   // 영상 등록 처리
 	  const handleSubmit = async () => {
