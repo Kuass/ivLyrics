@@ -1027,28 +1027,29 @@ const CommunityVideoSelector = ({
       const result = await Utils.voteCommunityVideo(videoEntryId, voteType, trackUri);
       if (result) {
         // 투표 결과로 목록 업데이트
-        const updatedVideos = videos
+        const { likes, dislikes, score } = result.data;
+        const updateVote = (currentVideos) => currentVideos
           .map((v) => {
             if (v.id === videoEntryId) {
               return {
                 ...v,
-                likes: result.data.likes,
-                dislikes: result.data.dislikes,
-                score: result.data.score,
+                likes,
+                dislikes,
+                score,
                 userVote: voteType === 0 ? null : voteType,
               };
             }
             return v;
           })
           .sort((a, b) => b.score - a.score);
-        setVideos(updatedVideos);
+        setVideos(updateVote);
         if (voteType === -1 && hideDislikedVideos) {
           const dislikedVideo = videos.find((video) => video.id === videoEntryId);
           if (dislikedVideo?.youtubeVideoId === previewVideoId) {
             setPreviewVideoId(null);
           }
           await replaceHiddenCurrentVideo(
-            updatedVideos,
+            updateVote(videos),
             dislikedVideo?.youtubeVideoId
           );
         }
