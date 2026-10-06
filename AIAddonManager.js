@@ -3398,10 +3398,18 @@ ${normalizedText}
                         result = await callResearchProvider(false);
                     }
 
-                    const normalized = normalizeResearchResult(result, params);
-                    if (!normalized || typeof normalized !== 'object') {
-                        throw new Error('Research provider returned an invalid document.');
+                    // The partial-stream normalizer intentionally turns missing
+                    // fields into an empty template. A final empty/malformed
+                    // payload must fail this attempt rather than stop fallback.
+                    const parsed = parseResearchJson(result);
+                    let document = isResearchObject(parsed.research) ? parsed.research : parsed;
+                    if (isResearchObject(document.track) && !document.type && !document.editorial_thesis) {
+                        document = document.track;
                     }
+                    if (Object.keys(document).length === 0) {
+                        throw new Error('Research provider returned an empty or invalid document.');
+                    }
+                    const normalized = normalizeResearchResult(parsed, params);
                     normalized._research = {
                         ...(normalized._research || {}),
                         provider: addon.id,
