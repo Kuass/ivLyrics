@@ -10,19 +10,30 @@ const source = readFileSync(file, 'utf8');
 const cut = (start, end) => { const a = source.indexOf(start), b = source.indexOf(end, a); assert.ok(a >= 0 && b > a); return source.slice(a,b); };
 const vote = cut('  const handleVote = async', '\n  const applyVideoSelection');
 const actions = cut('  const renderVideoActions =', '\n  const renderVideoListItem');
+const publisher = source.includes('  const setVideos = useCallback(')
+  ? cut('  const setVideos = useCallback(', '  const [isLoading')
+  : null;
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => {resolve=a;reject=b;}); return {promise,resolve,reject}; };
 const initial = () => ['a','b','c'].map(id => ({id, youtubeVideoId:id, youtubeTitle:id, likes:0, dislikes:0, score:0, userVote:null}));
 // The real handler and button factory run with inert React/provider boundaries.
-// Functional setters can be queued to model React batching without executing React.
+// State publications can be queued to model React batching without executing React.
 function harness(options = {}) {
-  const state = {videos:initial(), votingId:null, votingIds:new Set(), preview:options.preview ?? null};
+  let committedVideos = initial();
+  const state = {votingId:null, votingIds:new Set(), preview:options.preview ?? null};
+  const videosRef = {current:committedVideos};
   const pendingVotesRef = {current:new Set()};
   const requests=[], errors=[], replacements=[], updates=[];
-  const apply = value => { state.videos = typeof value === 'function' ? value(state.videos) : value; };
+  const apply = value => { committedVideos = typeof value === 'function' ? value(committedVideos) : value; };
+  const enqueue = value => { updates.push(value); if (!options.queued) apply(value); };
+  const publish = publisher
+    ? vm.runInNewContext(`${publisher}\nsetVideos;`, {useCallback:fn=>fn, videosRef, setVideoState:enqueue})
+    : enqueue;
+  // Fixture list changes model component publications through its real setter.
+  Object.defineProperty(state, 'videos', {get:()=>committedVideos, set:publish});
   const render = () => {
-    const ctx = { videos:state.videos, votingId:state.votingId, votingIds:state.votingIds, pendingVotesRef, isLocalVideoMode:options.local ?? false,
+    const ctx = { videos:state.videos, videosRef, votingId:state.votingId, votingIds:state.votingIds, pendingVotesRef, isLocalVideoMode:options.local ?? false,
       trackUri:'spotify:track:fixture', hideDislikedVideos:options.hide ?? true, previewVideoId:state.preview, deletingId:null, currentUserHash:'other',
-      setVideos(value) { updates.push(value); if (!options.queued) apply(value); },
+      setVideos:publish,
       setVotingId(value) { state.votingId = value; }, setPreviewVideoId(value) { state.preview = value; },
       setVotingIds(value) { state.votingIds=value; state.votingId=Array.from(value).at(-1)??null; },
       replaceHiddenCurrentVideo: async (...args) => replacements.push(args),

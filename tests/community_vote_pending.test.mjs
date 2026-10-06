@@ -31,6 +31,7 @@ function harness(options={}) {
       return [slots[index],value=>{slots[index]=typeof value==='function'?value(slots[index]):value;writes.push({index,value:slots[index]});options.onWrite?.();}];
     },
     useRef(initial) {const index=cursor++;if (!(index in slots))slots[index]={current:initial};return slots[index];},
+    useCallback: callback => callback,
     createElement:(type,props,...children)=>({type,props:props||{},children}),
   };
   const component=vm.runInNewContext(`${setup}\n${handler}\n${actions}\nreturn {handleVote,renderVideoActions,setVideos,videos};\n};\nCommunityVideoSelector;`,{
