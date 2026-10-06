@@ -127,9 +127,11 @@
     }
 
     function normalizeDurationMs(info) {
-        const duration = Number(info?.durationMs ?? info?.duration_ms ?? info?.duration ?? 0);
+        const explicitMs = info?.durationMs ?? info?.duration_ms;
+        const duration = Number(explicitMs ?? info?.duration ?? 0);
         if (!Number.isFinite(duration) || duration <= 0) return 0;
-        return duration > 10000 ? Math.round(duration) : Math.round(duration * 1000);
+        // Only the legacy, unitless field needs the seconds/milliseconds heuristic.
+        return explicitMs != null || duration > 10000 ? Math.round(duration) : Math.round(duration * 1000);
     }
 
     function normalizeDurationSeconds(info) {
