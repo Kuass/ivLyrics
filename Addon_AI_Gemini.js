@@ -327,6 +327,8 @@
         if (!model) {
             throw new Error('[Gemini] Model is not selected. Please select a model in settings.');
         }
+        const baseUrl = getBaseUrl();
+        const generationConfig = getGenerationConfig();
         const { systemPrompt, userPrompt } = normalizePromptRequest(prompt);
         let lastError = null;
 
@@ -335,7 +337,6 @@
 
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 try {
-                    const baseUrl = getBaseUrl();
                     const endpoint = `${baseUrl.replace(/\/$/, '')}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
                     const response = await window.ivLyricsFetch(endpoint, {
@@ -351,7 +352,7 @@
                                 role: 'user',
                                 parts: [{ text: userPrompt }]
                             }],
-                            generationConfig: getGenerationConfig()
+                            generationConfig
                         })
                     });
 
@@ -443,6 +444,8 @@
         if (apiKeys.length === 0) throw new Error('[Gemini] API key is required.');
         const model = getSelectedModel();
         if (!model) throw new Error('[Gemini] Model is not selected.');
+        const baseUrl = getBaseUrl();
+        const generationConfig = getGenerationConfig();
         const { systemPrompt, userPrompt } = normalizePromptRequest(prompt);
         let lastError = null;
 
@@ -473,7 +476,6 @@
                 };
 
                 try {
-                    const baseUrl = getBaseUrl();
                     const endpoint = `${baseUrl.replace(/\/$/, '')}/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
 
                     const response = await window.ivLyricsFetch(endpoint, {
@@ -484,7 +486,7 @@
                                 systemInstruction: { parts: [{ text: systemPrompt }] }
                             } : {}),
                             contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-                            generationConfig: getGenerationConfig(),
+                            generationConfig,
                             ...requestOverrides
                         })
                     }, requestTimeoutMs);
