@@ -379,6 +379,24 @@ window.ivLyricsSpeakerColors = ivLyricsSpeakerColors;
 setTimeout(() => window.ivLyricsSpeakerColors?.applyCssVariables?.(), 0);
 
 // Optimized Utils with performance improvements and caching
+// Keep video metadata headers and successful JSON bodies within one attempt deadline.
+async function fetchVideoMetadataWithDeadline(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      // Rejected bodies are unused; cancellation must not delay status handling.
+      try { response.body?.cancel()?.catch(() => {}); } catch { }
+      return { ok: false, status: response.status, data: null };
+    }
+    const data = await response.json();
+    return { ok: true, status: response.status, data };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 const Utils = {
   // LRU caches for frequently used operations (최적화 #10 - LRU 캐시 적용)
   _colorCache: new LRUCache(100),
@@ -2918,7 +2936,7 @@ const Utils = {
 
     try {
       // YouTube oEmbed API는 API 키 없이도 사용 가능
-      const response = await fetch(
+      const response = await fetchVideoMetadataWithDeadline(
         `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
       );
 
@@ -2932,19 +2950,19 @@ const Utils = {
         throw new Error(`HTTP ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = response.data;
       return data.title || null;
     } catch (error) {
       console.error("[ivLyrics] Failed to get YouTube title:", error);
 
       // 백업: noembed.com 사용
       try {
-        const backupResponse = await fetch(
+        const backupResponse = await fetchVideoMetadataWithDeadline(
           `https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`
         );
 
         if (backupResponse.ok) {
-          const backupData = await backupResponse.json();
+          const backupData = backupResponse.data;
           // noembed은 존재하지 않는 영상에 대해 error 필드를 반환함
           if (backupData.error) {
             window.__ivLyricsDebugLog?.("[ivLyrics] Video not found via noembed:", videoId);
@@ -2976,7 +2994,7 @@ const Utils = {
 
     try {
       // oEmbed API로 영상 존재 여부 확인
-      const response = await fetch(
+      const response = await fetchVideoMetadataWithDeadline(
         `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
       );
 
@@ -2994,7 +3012,7 @@ const Utils = {
         return { valid: false, title: null, error: 'httpError' };
       }
 
-      const data = await response.json();
+      const data = response.data;
 
       if (!data.title) {
         return { valid: false, title: null, error: 'noTitle' };
