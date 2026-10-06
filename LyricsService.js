@@ -7836,12 +7836,14 @@
             const item = Utils.resolveStablePlaybackTrack(null, snapshot);
             if (!item) return null;
 
+            const durationMs = snapshot.duration || item.duration?.milliseconds || 0;
             return {
                 uri: item.uri,
                 title: item.name,
                 artist: item.artists?.map(a => a.name).join(', ') || '',
                 album: item.album?.name || '',
-                duration: snapshot.duration || item.duration?.milliseconds || 0,
+                duration: durationMs,
+                durationMs,
                 playbackId: snapshot.playbackId || null,
                 trackId: Utils.extractTrackId(item.uri)
             };
