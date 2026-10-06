@@ -158,16 +158,16 @@
         return params;
     }
 
-    async function getResearchMaxTokens() {
-        const selectedModel = getSelectedModel();
+    async function getResearchMaxTokens(requestContext) {
+        const selectedModel = requestContext.model;
         let capabilities = openRouterModelCapabilities.get(selectedModel);
         if (!capabilities) {
-            const models = await fetchAvailableModels(getApiKeys()[0]);
+            const models = await fetchAvailableModels(requestContext.apiKeys[0]);
             capabilities = models.find(model => model.id === selectedModel);
         }
 
         return asPositiveInteger(capabilities?.max_completion_tokens)
-            || asPositiveInteger(getAdvancedRequestParams().max_tokens)
+            || asPositiveInteger(requestContext.advancedParams.max_tokens)
             || DEFAULT_RESEARCH_MAX_TOKENS;
     }
 
@@ -373,11 +373,12 @@
         transformResult = null,
         requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000,
         onRawChunk = null,
-        requestOverrides = {}
+        requestOverrides = {},
+        requestContext = null
     ) {
-        const apiKeys = getApiKeys();
+        const apiKeys = requestContext ? requestContext.apiKeys : getApiKeys();
         if (apiKeys.length === 0) throw new Error('[OpenRouter] API key is required.');
-        const model = getSelectedModel();
+        const model = requestContext ? requestContext.model : getSelectedModel();
         let lastError = null;
 
         for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex++) {
@@ -410,7 +411,7 @@
                     const response = await window.ivLyricsFetch(`${BASE_URL}/chat/completions`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`, 'HTTP-Referer': 'https://github.com/ivLis-STUDIO/ivLyrics', 'X-Title': 'ivLyrics' },
-                        body: JSON.stringify({ model, messages: buildPromptMessages(prompt), ...getAdvancedRequestParams(), ...requestOverrides, stream: true })
+                        body: JSON.stringify({ model, messages: buildPromptMessages(prompt), ...(requestContext ? requestContext.advancedParams : getAdvancedRequestParams()), ...requestOverrides, stream: true })
                     }, requestTimeoutMs);
                     if (response.status === 429 || response.status === 403) { break; }
                     if (!response.ok) {
@@ -801,8 +802,14 @@
                     onResearchProgress(null, { ...details, reset: true });
                 }
                 : null;
+            // Keep model metadata and final generation on the same settings.
+            const requestContext = {
+                apiKeys: getApiKeys(),
+                model: getSelectedModel(),
+                advancedParams: getAdvancedRequestParams()
+            };
             const requestOverrides = {
-                max_tokens: await getResearchMaxTokens(),
+                max_tokens: await getResearchMaxTokens(requestContext),
                 ...(webSearch === false
                     ? { tools: [], plugins: [{ id: 'web', enabled: false }] }
                     : {
@@ -825,7 +832,8 @@
                 extractJSON,
                 requestTimeoutMs,
                 progressParser ? chunk => progressParser.push(chunk) : null,
-                requestOverrides
+                requestOverrides,
+                requestContext
             );
         },
 
