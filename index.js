@@ -6743,8 +6743,10 @@ class LyricsContainer extends react.Component {
     if (!meta) {
       return null;
     }
+    const durationMs = Number(meta.duration);
     return {
-      duration: Number(meta.duration),
+      duration: durationMs,
+      durationMs,
       album: meta.album_title,
       artist: track.artists?.map((artist) => artist?.name).filter(Boolean).join(", ") || meta.artist_name,
       title: meta.title,

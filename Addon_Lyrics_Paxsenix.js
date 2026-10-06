@@ -74,9 +74,11 @@
     };
 
     function normalizeDurationMilliseconds(info) {
-        const raw = Number(info?.durationMs ?? info?.duration_ms ?? info?.duration ?? 0);
+        const explicitMs = info?.durationMs ?? info?.duration_ms;
+        const raw = Number(explicitMs ?? info?.duration ?? 0);
         if (!Number.isFinite(raw) || raw <= 0) return 0;
-        return raw > 10000 ? Math.round(raw) : Math.round(raw * 1000);
+        // Only the legacy, unitless field needs the seconds/milliseconds heuristic.
+        return explicitMs != null || raw > 10000 ? Math.round(raw) : Math.round(raw * 1000);
     }
 
     function normalizeComparable(value) {
