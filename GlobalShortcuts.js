@@ -85,9 +85,30 @@
 
     // 전체화면 진입 전 페이지 저장 (GlobalShortcuts를 통해 진입한 경우만)
     let previousPathBeforeFullscreen = null;
+    let pendingFullscreenRequest = null;
+
+    const forgetPreviousFullscreenPath = () => {
+        previousPathBeforeFullscreen = null;
+        window._ivLyricsPreviousPath = null;
+    };
+
+    const clearPendingFullscreen = () => {
+        if (pendingFullscreenRequest) {
+            clearTimeout(pendingFullscreenRequest.timer);
+            pendingFullscreenRequest = null;
+        }
+    };
+
+    const cancelPendingFullscreen = () => {
+        clearPendingFullscreen();
+        forgetPreviousFullscreenPath();
+    };
 
     // 전체화면 토글 함수 (LyricsContainer가 있으면 해당 메서드 사용, 없으면 직접 처리)
     const toggleFullscreen = () => {
+        // Repeated keys or playbar clicks while the page loads share one entry.
+        if (pendingFullscreenRequest) return;
+
         // 현재 ivLyrics 페이지에 있고 lyricContainer가 준비되어 있으면 바로 토글
         if (isOnLyricsPage() && window.lyricContainer && typeof window.lyricContainer.toggleFullscreen === 'function') {
             window.lyricContainer.toggleFullscreen();
@@ -101,31 +122,47 @@
             window._ivLyricsPreviousPath = currentPath;
         }
 
-        // ivLyrics 페이지로 이동
-        if (!isOnLyricsPage()) {
-            Spicetify.Platform?.History?.push?.("/ivLyrics");
-        }
-
         // lyricContainer가 준비될 때까지 대기 후 전체화면 토글
         let retryCount = 0;
         const maxRetries = 20; // 최대 2초 대기 (100ms * 20)
+        const request = { timer: null };
+        pendingFullscreenRequest = request;
+
+        // Establish ownership before push: history listeners may synchronously
+        // navigate again, close fullscreen, or request another toggle.
+        try {
+            if (!isOnLyricsPage()) {
+                Spicetify.Platform?.History?.push?.("/ivLyrics");
+            }
+        } catch (error) {
+            if (pendingFullscreenRequest === request) cancelPendingFullscreen();
+            throw error;
+        }
+        if (pendingFullscreenRequest !== request) return;
 
         const waitAndToggle = () => {
+            if (pendingFullscreenRequest !== request) return;
+            if (!isOnLyricsPage()) {
+                cancelPendingFullscreen();
+                return;
+            }
             retryCount++;
 
             if (window.lyricContainer && typeof window.lyricContainer.toggleFullscreen === 'function') {
                 // lyricContainer가 준비됨 - 전체화면 토글
+                pendingFullscreenRequest = null;
                 window.lyricContainer.toggleFullscreen();
             } else if (retryCount < maxRetries) {
                 // 아직 준비되지 않음 - 재시도
-                setTimeout(waitAndToggle, 100);
+                request.timer = setTimeout(waitAndToggle, 100);
             } else {
+                cancelPendingFullscreen();
                 console.warn("[ivLyrics] Failed to toggle fullscreen - lyricContainer not ready after retries");
             }
         };
 
         // 첫 시도는 약간의 딜레이 후 시작 (페이지 이동 시간 고려)
-        setTimeout(waitAndToggle, 200);
+        request.timer = setTimeout(waitAndToggle, 200);
     };
 
     // TV 모드 토글 함수 (전체화면 모드에서만 작동)
@@ -177,9 +214,9 @@
     // 전체화면 종료 시 이전 페이지로 돌아가기
     const goBackToPreviousPage = () => {
         if (previousPathBeforeFullscreen) {
-            Spicetify.Platform?.History?.push?.(previousPathBeforeFullscreen);
-            previousPathBeforeFullscreen = null;
-            window._ivLyricsPreviousPath = null;
+            const previousPath = previousPathBeforeFullscreen;
+            forgetPreviousFullscreenPath();
+            Spicetify.Platform?.History?.push?.(previousPath);
         }
     };
 
@@ -311,6 +348,9 @@
     const cleanupOrphanedFullscreenContainer = () => {
         // ivLyrics 페이지가 아닌데 fullscreen container가 남아있으면 삭제
         if (!isOnLyricsPage()) {
+            // A newer navigation owns the destination, even if cleanup emits
+            // the fullscreen-closed event after that navigation has finished.
+            cancelPendingFullscreen();
             const fullscreenContainer = document.getElementById('lyrics-fullscreen-container');
             if (fullscreenContainer) {
                 console.debug("[ivLyrics] Cleaning up orphaned fullscreen container (not on ivLyrics page)");
@@ -366,7 +406,14 @@
         // 페이지 이동 감지하여 orphaned fullscreen container 정리
         // Spicetify History 이벤트 리스너 등록
         if (Spicetify.Platform?.History) {
-            const unlisten = Spicetify.Platform.History.listen(() => {
+            const unlisten = Spicetify.Platform.History.listen((location, action) => {
+                const leftLyricsPage = typeof location?.pathname === 'string'
+                    ? !location.pathname.includes('/ivLyrics')
+                    : !isOnLyricsPage();
+                // Navigation wins even if another listener synchronously
+                // requests entry again during the same dispatch. Back/Forward
+                // can also reuse a stored location, including this same page.
+                if (action === 'POP' || leftLyricsPage) cancelPendingFullscreen();
                 // 페이지 이동 시 약간의 딜레이 후 체크 (DOM 업데이트 대기)
                 setTimeout(() => {
                     cleanupOrphanedFullscreenContainer();
@@ -381,6 +428,7 @@
         }, 500);
 
         moduleState.fullscreenClosedHandler = () => {
+            clearPendingFullscreen();
             goBackToPreviousPage();
         };
         registerGlobalEventListeners();
