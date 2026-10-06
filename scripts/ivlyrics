@@ -224,23 +224,49 @@ cmd_backup() {
   done
   local copied=0
   local name source
-  mkdir -p "${target}"
+  if ! mkdir -p "${BACKUP_ROOT}"; then
+    warn "could not create backup directory: ${BACKUP_ROOT}"
+    return 1
+  fi
+  local staging
+  if ! staging="$(mktemp -d "${BACKUP_ROOT}/.incomplete-XXXXXX")"; then
+    warn "could not create an incomplete snapshot in ${BACKUP_ROOT}"
+    return 1
+  fi
+  # Optional callers use `cmd_backup || true`, which disables errexit here.
+  # Keep failed or interrupted copies outside list_snapshots until complete.
   for name in "${PROTECTED_ITEMS[@]}"; do
     source="$(snapshot_source_dir "${name}")"
     if [ -d "${source}" ]; then
-      rsync -a "${source}/" "${target}/${name}/"
+      if ! rsync -a "${source}/" "${staging}/${name}/"; then
+        rm -rf "${staging}" || true
+        warn "backup failed copying ${name}; incomplete snapshot was not published."
+        return 1
+      fi
       copied=$((copied + 1))
     fi
   done
   if [ "${copied}" -eq 0 ]; then
-    rmdir "${target}" 2>/dev/null || true
+    rmdir "${staging}" 2>/dev/null || true
     warn "nothing to back up: Spotify storage not found at ${SPOTIFY_CACHE_PROFILE}"
     return 1
   fi
   if spotify_is_running; then
-    printf 'spotify-running\n' > "${target}/.taken-while-running"
+    if ! printf 'spotify-running\n' > "${staging}/.taken-while-running"; then
+      rm -rf "${staging}" || true
+      warn "could not mark the running-Spotify snapshot; incomplete snapshot was not published."
+      return 1
+    fi
   fi
-  ln -sfn "${target}" "${BACKUP_ROOT}/latest"
+  if ! mv "${staging}" "${target}"; then
+    rm -rf "${staging}" || true
+    warn "could not publish completed snapshot: ${target}"
+    return 1
+  fi
+  if ! ln -sfn "${target}" "${BACKUP_ROOT}/latest"; then
+    warn "snapshot saved but latest link could not be updated: ${target}"
+    return 1
+  fi
   prune_snapshots "${1:-}"
   log "Snapshot saved: ${target} ($(du -sh "${target}" | cut -f1))"
 }
