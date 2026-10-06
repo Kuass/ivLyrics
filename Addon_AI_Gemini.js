@@ -47,6 +47,7 @@
 
     const DEFAULT_MAX_OUTPUT_TOKENS = 32_768;
     const geminiModelCapabilities = new Map();
+
     const modelCapabilitiesKey = (modelId, baseUrl) => JSON.stringify([
         (baseUrl || 'https://generativelanguage.googleapis.com/v1beta').replace(/\/$/, ''),
         modelId
@@ -232,14 +233,13 @@
         return config;
     }
 
-    async function getResearchGenerationConfig() {
-        const config = getGenerationConfig();
-        const selectedModel = getSelectedModel();
-        const baseUrl = getBaseUrl();
-        let capabilities = geminiModelCapabilities.get(modelCapabilitiesKey(selectedModel, baseUrl));
+    async function getResearchGenerationConfig(requestContext) {
+        const config = { ...requestContext.generationConfig };
+        const selectedModel = requestContext.model;
+        let capabilities = geminiModelCapabilities.get(modelCapabilitiesKey(selectedModel, requestContext.baseUrl));
 
         if (!capabilities) {
-            const models = await fetchAvailableModels(getApiKeys()[0], baseUrl);
+            const models = await fetchAvailableModels(requestContext.apiKeys[0], requestContext.baseUrl);
             capabilities = models.find(model => model.id === selectedModel);
         }
 
@@ -332,6 +332,8 @@
         if (!model) {
             throw new Error('[Gemini] Model is not selected. Please select a model in settings.');
         }
+        const baseUrl = getBaseUrl();
+        const generationConfig = getGenerationConfig();
         const { systemPrompt, userPrompt } = normalizePromptRequest(prompt);
         let lastError = null;
 
@@ -340,7 +342,6 @@
 
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 try {
-                    const baseUrl = getBaseUrl();
                     const endpoint = `${baseUrl.replace(/\/$/, '')}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
                     const response = await window.ivLyricsFetch(endpoint, {
@@ -356,7 +357,7 @@
                                 role: 'user',
                                 parts: [{ text: userPrompt }]
                             }],
-                            generationConfig: getGenerationConfig()
+                            generationConfig
                         })
                     });
 
@@ -442,12 +443,15 @@
         transformResult = null,
         requestTimeoutMs = window.ivLyricsFetch?.DEFAULT_TIMEOUT_MS || 90_000,
         onRawChunk = null,
-        requestOverrides = {}
+        requestOverrides = {},
+        requestContext = null
     ) {
-        const apiKeys = getApiKeys();
+        const apiKeys = requestContext ? requestContext.apiKeys : getApiKeys();
         if (apiKeys.length === 0) throw new Error('[Gemini] API key is required.');
-        const model = getSelectedModel();
+        const model = requestContext ? requestContext.model : getSelectedModel();
         if (!model) throw new Error('[Gemini] Model is not selected.');
+        const baseUrl = requestContext ? requestContext.baseUrl : getBaseUrl();
+        const generationConfig = requestContext ? requestContext.generationConfig : getGenerationConfig();
         const { systemPrompt, userPrompt } = normalizePromptRequest(prompt);
         let lastError = null;
 
@@ -478,7 +482,6 @@
                 };
 
                 try {
-                    const baseUrl = getBaseUrl();
                     const endpoint = `${baseUrl.replace(/\/$/, '')}/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
 
                     const response = await window.ivLyricsFetch(endpoint, {
@@ -489,7 +492,7 @@
                                 systemInstruction: { parts: [{ text: systemPrompt }] }
                             } : {}),
                             contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-                            generationConfig: getGenerationConfig(),
+                            generationConfig,
                             ...requestOverrides
                         })
                     }, requestTimeoutMs);
@@ -990,8 +993,16 @@
                     onResearchProgress(null, { ...details, reset: true });
                 }
                 : null;
+            // Model metadata and generation must use the same settings, even
+            // when the user edits them while the catalog request is pending.
+            const requestContext = {
+                apiKeys: getApiKeys(),
+                model: getSelectedModel(),
+                baseUrl: getBaseUrl(),
+                generationConfig: getGenerationConfig()
+            };
             const requestOverrides = {
-                generationConfig: await getResearchGenerationConfig(),
+                generationConfig: await getResearchGenerationConfig(requestContext),
                 // The SDK uses `googleSearch`, while the raw generateContent
                 // REST request used here requires `google_search`.
                 ...(webSearch === false ? {} : { tools: [{ google_search: {} }] })
@@ -1005,7 +1016,8 @@
                     extractJSON,
                     requestTimeoutMs,
                     progressParser ? chunk => progressParser.push(chunk) : null,
-                    requestOverrides
+                    requestOverrides,
+                    requestContext
                 );
             } catch (error) {
                 throw webSearch === false ? error : markGeminiWebSearchFailure(error);
