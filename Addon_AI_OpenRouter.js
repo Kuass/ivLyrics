@@ -563,35 +563,41 @@
                 const [customModel, setCustomModel] = useState(getSetting('custom-model', ''));
                 const [availableModels, setAvailableModels] = useState([]);
                 const [modelsLoading, setModelsLoading] = useState(false);
+                const modelsRequestRef = React.useRef(0);
                 const [testStatus, setTestStatus] = useState('');
 
                 const loadModels = useCallback(async () => {
+                    const requestId = ++modelsRequestRef.current;
+                    const isCurrent = () => requestId === modelsRequestRef.current;
                     const keys = getApiKeys();
                     if (keys.length === 0) {
                         setAvailableModels([]);
+                        if (isCurrent()) setModelsLoading(false);
                         return;
                     }
                     setModelsLoading(true);
                     try {
                         const models = await fetchAvailableModels(keys[0]);
+                        if (!isCurrent()) return;
                         setAvailableModels(models);
                     } catch (e) {
+                        if (!isCurrent()) return;
                         console.error('[OpenRouter Addon] Failed to load models:', e);
+                    } finally {
+                        if (isCurrent()) setModelsLoading(false);
                     }
-                    setModelsLoading(false);
                 }, [apiKeys]);
 
                 useEffect(() => {
-                    const keys = getApiKeys();
-                    if (keys.length > 0) {
-                        loadModels();
-                    } else {
-                        setAvailableModels([]);
-                    }
+                    loadModels();
+                    return () => {
+                        modelsRequestRef.current++;
+                    };
                 }, [apiKeys]);
 
                 const handleApiKeyChange = (e) => {
                     const val = e.target.value;
+                    if (val !== apiKeys) modelsRequestRef.current++;
                     setApiKeys(val);
                     setSetting('api-keys', val);
                 };
