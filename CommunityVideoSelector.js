@@ -4,7 +4,7 @@
  */
 
 // 커스텀 확인 다이얼로그 컴포넌트
-const ConfirmDialog = ({ isOpen, title, message, onConfirm, onCancel }) => {
+const ConfirmDialog = ({ isOpen, title, message, onConfirm, onCancel, registerEscapeHandler }) => {
   const confirmButtonRef = react.useRef(null);
 
   react.useEffect(() => {
@@ -14,18 +14,24 @@ const ConfirmDialog = ({ isOpen, title, message, onConfirm, onCancel }) => {
       if (event.key === "Escape") {
         event.preventDefault();
         onCancel();
+        return true;
       }
+      return false;
     };
 
-    document.addEventListener("keydown", handleEscape);
+    const unregisterEscape = typeof registerEscapeHandler === "function"
+      ? registerEscapeHandler(handleEscape)
+      : null;
+    if (!unregisterEscape) document.addEventListener("keydown", handleEscape);
     requestAnimationFrame(() => {
       confirmButtonRef.current?.focus?.();
     });
 
     return () => {
-      document.removeEventListener("keydown", handleEscape);
+      if (unregisterEscape) unregisterEscape();
+      else document.removeEventListener("keydown", handleEscape);
     };
-  }, [isOpen, onCancel]);
+  }, [isOpen, onCancel, registerEscapeHandler]);
 
   if (!isOpen) return null;
 
@@ -717,6 +723,7 @@ const CommunityVideoSelector = ({
   onVideoSelect,
   defaultStartTime = 0,
   onClose,
+  registerEscapeHandler,
 }) => {
   const { useState, useEffect, useCallback, useRef } = react;
   const getDefaultSubmitStartTime = () => {
@@ -2060,6 +2067,7 @@ const CommunityVideoSelector = ({
         I18n.t("communityVideo.deleteConfirm") + "\n\n" + deleteConfirmTitle,
       onConfirm: executeDelete,
       onCancel: closeDeleteConfirm,
+      registerEscapeHandler,
     })
   );
 };

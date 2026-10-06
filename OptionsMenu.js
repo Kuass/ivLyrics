@@ -89,6 +89,7 @@ function createFluentModalHost({
   trapFocus = modal,
   autoFocus = modal,
   onBeforeClose = null,
+  onEscape = null,
 }) {
   if (removeExisting && overlayId) {
     const existingOverlay = document.getElementById(overlayId);
@@ -164,7 +165,7 @@ function createFluentModalHost({
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation?.();
-      closeModal();
+      if (onEscape?.(event) !== true) closeModal();
       return;
     }
 
@@ -239,12 +240,21 @@ function openFluentReactModal({
   }
 
   let shell = null;
+  let escapeRegistration = null;
+  const registerEscapeHandler = (handler) => {
+    const registration = { handler };
+    escapeRegistration = registration;
+    return () => {
+      if (escapeRegistration === registration) escapeRegistration = null;
+    };
+  };
   const host = createFluentModalHost({
     overlayId,
     overlayClassName,
     shellClassName,
     shellStyle,
     removeExisting,
+    onEscape: (event) => escapeRegistration?.handler?.(event) === true,
     onBeforeClose: () => {
       if (shell && reactDom.unmountComponentAtNode) {
         reactDom.unmountComponentAtNode(shell);
@@ -252,7 +262,7 @@ function openFluentReactModal({
     },
   });
   shell = host.shell;
-  reactDom.render(render(host.closeModal), shell);
+  reactDom.render(render(host.closeModal, registerEscapeHandler), shell);
   return host.closeModal;
 }
 
@@ -4002,10 +4012,11 @@ function openCommunityVideoSelector(trackUri, currentVideoId, onVideoSelect, def
       width: 560px;
     `,
     removeExisting: false,
-    render: (closeModal) =>
+    render: (closeModal, registerEscapeHandler) =>
       react.createElement(CommunityVideoSelector, {
         trackUri,
         currentVideoId,
+        registerEscapeHandler,
         defaultStartTime,
         onVideoSelect: async (newVideoInfo) => {
           try {
