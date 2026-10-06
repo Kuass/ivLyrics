@@ -47,6 +47,10 @@
 
     const DEFAULT_MAX_OUTPUT_TOKENS = 32_768;
     const geminiModelCapabilities = new Map();
+    const modelCapabilitiesKey = (modelId, baseUrl) => JSON.stringify([
+        (baseUrl || 'https://generativelanguage.googleapis.com/v1beta').replace(/\/$/, ''),
+        modelId
+    ]);
 
     const asPositiveInteger = (value) => {
         const parsed = Number.parseInt(value, 10);
@@ -123,7 +127,7 @@
                 models[0].default = true;
             }
             for (const model of models) {
-                geminiModelCapabilities.set(model.id, model);
+                geminiModelCapabilities.set(modelCapabilitiesKey(model.id, baseUrl), model);
             }
 
             return models;
@@ -231,10 +235,11 @@
     async function getResearchGenerationConfig() {
         const config = getGenerationConfig();
         const selectedModel = getSelectedModel();
-        let capabilities = geminiModelCapabilities.get(selectedModel);
+        const baseUrl = getBaseUrl();
+        let capabilities = geminiModelCapabilities.get(modelCapabilitiesKey(selectedModel, baseUrl));
 
         if (!capabilities) {
-            const models = await fetchAvailableModels(getApiKeys()[0], getBaseUrl());
+            const models = await fetchAvailableModels(getApiKeys()[0], baseUrl);
             capabilities = models.find(model => model.id === selectedModel);
         }
 
