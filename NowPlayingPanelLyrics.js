@@ -3680,11 +3680,18 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
     // ============================================
     // 일반 가사 라인 컴포넌트
     // ============================================
+    // Only the ruby tags used by the main lyric renderer may enter normal-line HTML.
+    // Keep this boundary local because the panel extension can run without custom-app Utils.
+    const renderPanelLyricHTML = value => String(value ?? '')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/&lt;(\/?(?:ruby|rt|rp)|ruby class="lyrics-pronunciation-ruby")&gt;/g, '<$1>');
+
     const NormalLine = memo(({ displayText, phonetic, translation, lineClass, lineStyle }) => {
         return react.createElement("div", { className: lineClass, style: lineStyle },
             react.createElement("p", {
                 className: "ivlyrics-panel-line-text",
-                dangerouslySetInnerHTML: displayText ? { __html: displayText } : undefined
+                dangerouslySetInnerHTML: displayText ? { __html: renderPanelLyricHTML(displayText) } : undefined
             }, displayText ? undefined : " "),
             phonetic && react.createElement("div", {
                 className: "ivlyrics-panel-line-phonetic"
