@@ -36,6 +36,9 @@
     let lastError = null;
     let conflictError = null;
     const isAuthorized = () => options.isAuthorized?.() !== false;
+    const assertAuthorized = () => {
+      if (!isAuthorized()) throw new Error('Sync scoring account changed.');
+    };
     const persist = () => {
       const snapshot = clone(state);
       persistChain = persistChain.catch(() => undefined).then(() => options.storage?.saveScoreWork?.(scope, snapshot));
@@ -102,6 +105,7 @@
           }
           let resumed;
           try {
+            assertAuthorized();
             resumed = await options.request({ action: 'resume', eventId: eventId(),
               isrc: options.isrc, provider: 'lrclib', ...(state.sessionId ? { sessionId: state.sessionId } : {}) });
           } catch (resumeError) {
@@ -136,7 +140,7 @@
           await persist();
         };
         while (state.queue.length) {
-          if (!isAuthorized()) throw new Error('Sync scoring account changed.');
+          assertAuthorized();
           const next = state.queue[0];
           const payload = {
             ...clone(next), isrc: options.isrc, provider: 'lrclib',
@@ -145,6 +149,9 @@
           };
           // Persist before sending. Retried requests retain the same event ID.
           await persist();
+          // Storage may settle after an account switch. Check again at the
+          // request boundary, before the caller builds current-account headers.
+          assertAuthorized();
           let result;
           try {
             result = await options.request(payload);
@@ -184,6 +191,7 @@
         if (conflictError) throw conflictError;
         if (!enqueue('checkpoint', syncData)) throw new Error('Sync scoring account changed.');
         await flush();
+        assertAuthorized();
         if (state.queue.length || !state.sessionId) throw lastError || new Error('Sync work could not be saved.');
         return { workSessionId: state.sessionId, workSequence: state.sequence };
       },
