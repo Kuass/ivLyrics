@@ -64,9 +64,9 @@ function harness(initialPath = '/collection') {
         setInterval() { throw new Error('Spicetify is already initialized'); }, clearInterval() {},
     });
     return {
-        window, document, history, timers, pushes, bindings,
+        window, document, history, timers, pushes, bindings, storage,
         get toggles() { return toggles; },
-        activate() { bindings.get('f12')({ preventDefault() {} }); },
+        activate(event = {}) { bindings.get('f12')({ preventDefault() {}, ...event }); },
         clickPlaybar() { window.dispatchEvent({ type: 'ivLyrics', detail: { type: 'fullscreen-toggle' } }); },
         ready() { window.lyricContainer = { state: { isFullscreen: false }, toggleFullscreen() { toggles++; this.state.isFullscreen = !this.state.isFullscreen; } }; },
         addFullscreenNode() { nodes.set('lyrics-fullscreen-container', { remove() { nodes.delete('lyrics-fullscreen-container'); } }); },
@@ -381,4 +381,73 @@ test('Back/Forward between lyrics locations supersedes delayed fullscreen entry'
     h.ready(); h.advance(3000);
     assert.equal(h.toggles, 0);
     assert.deepEqual(h.pushes, []);
+});
+
+test('holding the fullscreen key toggles once while each distinct press still toggles', () => {
+    const h = harness('/ivLyrics'); h.ready();
+    let prevented = 0;
+    const event = repeat => ({ repeat, preventDefault() { prevented++; } });
+    h.activate(event(false));
+    for (let i = 0; i < 12; i++) h.activate(event(true));
+    assert.equal(h.toggles, 1);
+    assert.equal(h.window.lyricContainer.state.isFullscreen, true);
+    assert.equal(prevented, 13, 'repeated owned shortcuts must still suppress their native default');
+    h.activate(event(false));
+    assert.equal(h.toggles, 2);
+    assert.equal(h.window.lyricContainer.state.isFullscreen, false);
+});
+
+test('a held fullscreen key cannot close the page as its delayed entry becomes ready', () => {
+    const h = harness(); h.activate();
+    h.ready(); h.advance(200);
+    h.activate({ repeat: true });
+    assert.equal(h.toggles, 1);
+    assert.equal(h.window.lyricContainer.state.isFullscreen, true);
+});
+
+test('an autorepeat event alone cannot begin a delayed fullscreen navigation', () => {
+    const h = harness(); let prevented = false;
+    h.activate({ repeat: true, preventDefault() { prevented = true; } });
+    h.ready(); h.advance(3000);
+    assert.equal(prevented, true);
+    assert.deepEqual(h.pushes, []);
+    assert.equal(h.toggles, 0);
+});
+
+test('holding the TV mode key changes the setting only once', () => {
+    const h = harness('/ivLyrics'); h.ready(); h.window.lyricContainer.state.isFullscreen = true;
+    let prevented = 0, writes = 0;
+    const set = h.storage.set.bind(h.storage);
+    h.storage.set = (key, value) => { if (key === 'ivLyrics:visual:fullscreen-tv-mode') writes++; return set(key, value); };
+    const press = repeat => h.bindings.get('t')({ repeat, preventDefault() { prevented++; } });
+    press(false);
+    for (let i = 0; i < 12; i++) press(true);
+    assert.equal(h.storage.get('ivLyrics:visual:fullscreen-tv-mode'), 'true');
+    assert.equal(prevented, 13);
+    assert.equal(writes, 1);
+    press(false);
+    assert.equal(h.storage.get('ivLyrics:visual:fullscreen-tv-mode'), 'false');
+});
+
+test('legacy events without repeat information and custom modifier shortcuts remain usable', () => {
+    const h = harness('/ivLyrics'); h.ready();
+    h.activate(); assert.equal(h.toggles, 1);
+    h.storage.set('ivLyrics:visual:fullscreen-key', 'ctrl+shift+f12');
+    h.window.dispatchEvent({ type: 'ivLyrics', detail: { name: 'fullscreen-key' } });
+    assert.equal(h.bindings.has('f12'), false);
+    h.bindings.get('ctrl+shift+f12')({ ctrlKey: true, shiftKey: true, repeat: false, preventDefault() {} });
+    assert.equal(h.toggles, 2);
+});
+
+test('focused inputs and inactive TV mode retain their existing shortcut exclusions', () => {
+    const h = harness('/ivLyrics'); h.ready();
+    let prevented = 0;
+    const event = { repeat: false, preventDefault() { prevented++; } };
+    h.bindings.get('t')(event);
+    assert.equal(prevented, 0);
+    assert.equal(h.storage.has('ivLyrics:visual:fullscreen-tv-mode'), false);
+    h.document.activeElement = { tagName: 'INPUT' };
+    h.activate(event);
+    assert.equal(h.toggles, 0);
+    assert.equal(prevented, 0);
 });

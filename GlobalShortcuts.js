@@ -300,6 +300,7 @@
             globalMousetrap.bind(newKey, (e) => {
                 if (isInputFocused()) return;
                 e.preventDefault();
+                if (e.repeat) return;
                 toggleFullscreen();
             });
             currentBoundKey = newKey;
@@ -330,6 +331,7 @@
                 if (!isInFullscreenMode()) return;
 
                 e.preventDefault();
+                if (e.repeat) return;
                 toggleTvMode();
             });
             currentToggleTvKey = newToggleTvKey;
