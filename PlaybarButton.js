@@ -12,6 +12,8 @@
 	// ===== 가사 버튼 교체 (기존 기능) =====
 	let button = null;
 	let buttonRegistrationFailed = false;
+	let buttonGeneration = 0;
+	let cancelButtonVerification = null;
 
 	// Spicetify.Playbar.Button 또는 Widget API 사용 시도
 	const PlaybarButtonClass = Spicetify.Playbar?.Button || Spicetify.Playbar?.Widget;
@@ -65,23 +67,35 @@
 	}
 
 	function verifyPlaybarButtonRegistration(selector, successMessage, failureMessage, callback, retries = 5) {
-		// 버튼이 실제로 DOM에 추가되었는지 확인
-		setTimeout(() => {
-			const registeredButton = document.querySelector(selector);
-			if (registeredButton) {
-				window.__ivLyricsDebugLog?.(successMessage);
-				callback(true);
-			} else if (retries > 0) {
-				verifyPlaybarButtonRegistration(selector, successMessage, failureMessage, callback, retries - 1);
-			} else {
-				console.warn(failureMessage);
-				callback(false);
-			}
-		}, 200);
+		let cancelled = false;
+		let timer = null;
+		const verify = remaining => {
+			timer = setTimeout(() => {
+				timer = null;
+				if (cancelled) return;
+				const registeredButton = document.querySelector(selector);
+				if (cancelled) return;
+				if (registeredButton) {
+					window.__ivLyricsDebugLog?.(successMessage);
+					callback(true);
+				} else if (remaining > 0) {
+					verify(remaining - 1);
+				} else {
+					console.warn(failureMessage);
+					callback(false);
+				}
+			}, 200);
+		};
+		verify(retries);
+		return () => {
+			cancelled = true;
+			if (timer !== null) clearTimeout(timer);
+			timer = null;
+		};
 	}
 
 	function verifyButtonRegistration(callback, retries = 5) {
-		verifyPlaybarButtonRegistration(
+		return verifyPlaybarButtonRegistration(
 			'.main-nowPlayingBar-extraControls button svg path[d*="M13.426 2.574"]',
 			"[ivLyrics] Playbar button successfully registered",
 			"[ivLyrics] Playbar button registration verification failed",
@@ -91,6 +105,9 @@
 	}
 
 	function setPlaybarButton() {
+		const generation = ++buttonGeneration;
+		cancelButtonVerification?.();
+		cancelButtonVerification = null;
 		if (buttonRegistrationFailed || !button) {
 			console.warn("[ivLyrics] Cannot set playbar button - registration failed");
 			return;
@@ -98,15 +115,15 @@
 
 		try {
 			button.register();
+			if (generation !== buttonGeneration) return;
 			// 버튼이 성공적으로 등록되었는지 확인 후 CSS 적용
-			verifyButtonRegistration((success) => {
+			cancelButtonVerification = verifyButtonRegistration((success) => {
+				if (generation !== buttonGeneration) return;
 				if (success) {
 					document.head.appendChild(style);
 				} else {
 					// 버튼 등록 실패 시 deregister하고 로그 출력
-					try {
-						button.deregister();
-					} catch (e) { /* ignore */ }
+					deregisterPlaybarWidget(style, button);
 					console.warn("[ivLyrics] Playbar button not visible, keeping original lyrics button");
 				}
 			});
@@ -125,12 +142,18 @@
 	}
 
 	function removePlaybarButton() {
+		buttonGeneration++;
+		cancelButtonVerification?.();
+		cancelButtonVerification = null;
 		deregisterPlaybarWidget(style, button);
 	}
 
 	// ===== 전체화면 버튼 교체 (새 기능) =====
 	let fullscreenButton = null;
 	let fullscreenButtonRegistrationFailed = false;
+	let fullscreenGeneration = 0;
+	let cancelFullscreenVerification = null;
+	let fullscreenClassTimer = null;
 
 	if (PlaybarButtonClass) {
 		try {
@@ -180,7 +203,7 @@
 	});
 
 	function verifyFullscreenButtonRegistration(callback, retries = 5) {
-		verifyPlaybarButtonRegistration(
+		return verifyPlaybarButtonRegistration(
 			'.main-nowPlayingBar-extraControls button svg path[d*="M0.25 3C0.25"]',
 			"[ivLyrics] Fullscreen button successfully registered",
 			"[ivLyrics] Fullscreen button registration verification failed",
@@ -190,6 +213,11 @@
 	}
 
 	function setFullscreenButton() {
+		const generation = ++fullscreenGeneration;
+		cancelFullscreenVerification?.();
+		cancelFullscreenVerification = null;
+		if (fullscreenClassTimer !== null) clearTimeout(fullscreenClassTimer);
+		fullscreenClassTimer = null;
 		if (fullscreenButtonRegistrationFailed || !fullscreenButton) {
 			console.warn("[ivLyrics] Cannot set fullscreen button - registration failed");
 			return;
@@ -197,10 +225,13 @@
 
 		try {
 			fullscreenButton.register();
+			if (generation !== fullscreenGeneration) return;
 			// 버튼이 성공적으로 등록되었는지 확인 후 CSS 적용
-			verifyFullscreenButtonRegistration((success) => {
+			cancelFullscreenVerification = verifyFullscreenButtonRegistration((success) => {
+				if (generation !== fullscreenGeneration) return;
 				if (success) {
 					document.head.appendChild(fullscreenStyle);
+					if (generation !== fullscreenGeneration) return;
 					// 버튼에 고유 클래스 추가하여 CSS로 위치 조정 가능하게 함
 					const applyFullscreenButtonClass = () => {
 						// Spicetify.Playbar.Button의 내부 element 속성 사용 시도
@@ -219,12 +250,14 @@
 							}
 						}
 					};
-					setTimeout(applyFullscreenButtonClass, 100);
+					fullscreenClassTimer = setTimeout(() => {
+						if (generation !== fullscreenGeneration) return;
+						fullscreenClassTimer = null;
+						applyFullscreenButtonClass();
+					}, 100);
 				} else {
 					// 버튼 등록 실패 시 deregister하고 로그 출력
-					try {
-						fullscreenButton.deregister();
-					} catch (e) { /* ignore */ }
+					deregisterPlaybarWidget(fullscreenStyle, fullscreenButton);
 					console.warn("[ivLyrics] Fullscreen button not visible, keeping original fullscreen button");
 				}
 			});
@@ -234,6 +267,11 @@
 	}
 
 	function removeFullscreenButton() {
+		fullscreenGeneration++;
+		cancelFullscreenVerification?.();
+		cancelFullscreenVerification = null;
+		if (fullscreenClassTimer !== null) clearTimeout(fullscreenClassTimer);
+		fullscreenClassTimer = null;
 		deregisterPlaybarWidget(fullscreenStyle, fullscreenButton);
 	}
 })();
