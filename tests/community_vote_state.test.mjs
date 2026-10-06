@@ -32,7 +32,7 @@ function harness(options = {}) {
   Object.defineProperty(state, 'videos', {get:()=>committedVideos, set:publish});
   const render = () => {
     const ctx = { videos:state.videos, videosRef, votingId:state.votingId, votingIds:state.votingIds, pendingVotesRef, isLocalVideoMode:options.local ?? false,
-      trackUri:'spotify:track:fixture', hideDislikedVideos:options.hide ?? true, previewVideoId:state.preview, deletingId:null, currentUserHash:'other',
+      trackUri:'spotify:track:fixture', hideDislikedVideos:options.hide ?? true, selectionPreferencesRef:{current:{hideDislikedVideos:options.hide ?? true}}, previewVideoId:state.preview, deletingId:null, currentUserHash:'other',
       setVideos:publish,
       setVotingId(value) { state.votingId = value; }, setPreviewVideoId(value) { state.preview = value; },
       setVotingIds(value) { state.votingIds=value; state.votingId=Array.from(value).at(-1)??null; },
