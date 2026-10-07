@@ -7694,23 +7694,38 @@
          * @param {string[]} providerOrder - (deprecated) LyricsAddonManager의 순서 사용
          * @param {number} mode - (deprecated) 가사 모드
          * @param {string|null} forcedProviderId - 이 트랙에서 강제로 사용할 제공자 ID
+         * @param {Function|null} onRequest - Called with the admitted progress identity before publish/replay
          * @returns {Promise<Object>} - 가사 결과
          */
-        async getLyricsFromProviders(info, providerOrder = [], mode = 1, forcedProviderId = null) {
+        async getLyricsFromProviders(info, providerOrder = [], mode = 1, forcedProviderId = null, onRequest = null) {
             // LyricsAddonManager를 통해 가사 가져오기
             if (window.LyricsAddonManager) {
                 const requestGeneration = lyricsProviderRequestGeneration;
                 const requestKey = `${requestGeneration}:${info?.uri || ''}:${forcedProviderId || 'auto'}`;
                 if (lyricsProviderInflightRequests.has(requestKey)) {
+                    const activeRequest = lyricsProviderInflightRequests.get(requestKey);
+                    onRequest?.(activeRequest.requestId);
                     window.LyricsAddonManager.replayActiveLyricsSearchProgress?.(
                         info?.uri || '',
-                        forcedProviderId
+                        forcedProviderId,
+                        activeRequest.requestId
                     );
-                    return lyricsProviderInflightRequests.get(requestKey);
+                    return activeRequest.promise;
                 }
 
+                const requestId = Symbol("lyrics-provider-request");
                 const initialSnapshot = this.getLyricsSnapshot(info?.uri);
-                const request = window.LyricsAddonManager.getLyrics(info, forcedProviderId)
+                let startRequest;
+                const providerRequest = new Promise((resolve, reject) => {
+                    startRequest = () => {
+                        try {
+                            resolve(window.LyricsAddonManager.getLyrics(info, forcedProviderId, requestId));
+                        } catch (error) {
+                            reject(error);
+                        }
+                    };
+                });
+                const request = providerRequest
                     .then((result) => {
                         if (requestGeneration === lyricsProviderRequestGeneration &&
                             this.getLyricsSnapshot(info?.uri) === initialSnapshot &&
@@ -7730,12 +7745,24 @@
                     .finally(() => {
                         window.LyricsAddonManager.clearActiveLyricsSearchProgress?.(
                             info?.uri || '',
-                            forcedProviderId
+                            forcedProviderId,
+                            requestId
                         );
                         lyricsProviderInflightRequests.delete(requestKey);
                     });
 
-                lyricsProviderInflightRequests.set(requestKey, request);
+                // Admit a usable promise before callbacks or the manager's synchronous
+                // first progress event can reenter this method and join the same work.
+                lyricsProviderInflightRequests.set(requestKey, { promise: request, requestId });
+                try {
+                    onRequest?.(requestId);
+                } catch (error) {
+                    // This caller failed admission, but joined callers still own the work.
+                    request.catch(() => {});
+                    throw error;
+                } finally {
+                    startRequest();
+                }
                 return request;
             }
 
