@@ -2917,32 +2917,37 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
 
       // 트랙별 언어 오버라이드 처리
       if (name === "track-language-override") {
-        const trackUri = Spicetify.Player.data?.item?.uri;
+        const getPlaybackUri = () => window.Utils?.getPlayerPlaybackSnapshot?.()?.uri ||
+          Spicetify.Player.data?.item?.uri;
+        const trackUri = getPlaybackUri();
         if (!trackUri) return;
 
         if (value === "auto") {
           // 자동 감지로 되돌리기 - DB에서 삭제
           await window.TrackLanguageDB?.clearLanguage(trackUri);
-          if (window.lyricContainer) {
-            window.lyricContainer.trackLanguageOverride = null;
-          }
         } else {
           // 언어 오버라이드 저장
           await window.TrackLanguageDB?.setLanguage(trackUri, value);
-          if (window.lyricContainer) {
-            window.lyricContainer.trackLanguageOverride = value;
-          }
         }
 
-        // 번역 캐시 클리어 및 강제 리로드
-        window.LyricsService?.clearLyricsSnapshot?.(trackUri);
-        if (window.lyricContainer) {
-          window.lyricContainer._dmResults = {};
-          window.lyricContainer.lastProcessedUri = null;
-          window.lyricContainer.lastProcessedMode = null;
-          window.lyricContainer.forceUpdate();
+        const container = window.lyricContainer;
+        let ownsCurrentTrack = false;
+        try {
+          ownsCurrentTrack = getPlaybackUri() === trackUri && container?.currentTrackUri === trackUri;
+          if (ownsCurrentTrack) {
+            container.trackLanguageOverride = value === "auto" ? null : value;
+          }
+        } finally {
+          // The stored choice still invalidates its origin after playback moves on.
+          window.LyricsService?.clearLyricsSnapshot?.(trackUri);
         }
-        lyricContainerUpdate?.();
+        if (ownsCurrentTrack) {
+          container._dmResults = {};
+          container.lastProcessedUri = null;
+          container.lastProcessedMode = null;
+          container.forceUpdate();
+          lyricContainerUpdate?.();
+        }
         return;
       }
 
