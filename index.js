@@ -6036,6 +6036,7 @@ class LyricsContainer extends react.Component {
   applyStreamingTranslation({
     uri,
     presentationSeq = null,
+    requirePlaybackUri = false,
     lyrics,
     lyricsMode1,
     lyricsMode2,
@@ -6045,6 +6046,7 @@ class LyricsContainer extends react.Component {
     this.pendingStreamingPayload = {
       uri,
       presentationSeq,
+      requirePlaybackUri,
       lyrics,
       lyricsMode1,
       lyricsMode2,
@@ -6066,6 +6068,17 @@ class LyricsContainer extends react.Component {
         (payload.presentationSeq !== null && payload.presentationSeq !== this._lyricsPresentationSeq)
       ) {
         return;
+      }
+
+      if (payload.requirePlaybackUri) {
+        try {
+          if (!this.isPlaybackUriCurrent(payload.uri)) {
+            return;
+          }
+        } catch {
+          // A failed playback read cannot authorize this regeneration update.
+          return;
+        }
       }
 
       const optimizedTranslations = this.optimizeTranslations(
@@ -6402,6 +6415,7 @@ class LyricsContainer extends react.Component {
 
         this.applyStreamingTranslation({
           uri: currentUri,
+          requirePlaybackUri: true,
           lyrics: originalLyrics,
           lyricsMode1: streamedLyrics1,
           lyricsMode2: streamedLyrics2,
