@@ -8066,6 +8066,13 @@ class LyricsContainer extends react.Component {
         const text = getNonSectionLyricsText(lyrics);
         const legacyText = getLegacyNonSectionLyricsText(lyrics);
         const trackId = Utils.extractTrackId(lyricsState.uri || this.state.uri);
+        // Retired work may still finish. Keep origin context before cache
+        // awaits so it cannot read a replacement track's presentation state.
+        const artist = this.state.artist || lyricsState.artist;
+        const title = this.state.title || lyricsState.title;
+        const sourceLang =
+          this.trackLanguageOverride ||
+          this.provideLanguageCode(lyrics, { updateDetectedLanguage: false }) || "auto";
         const userLang = this.getTranslationTargetLanguage();
 
         const mapResultLinesToLyrics = (linesInput, splitVocalParts = true) => {
@@ -8132,14 +8139,17 @@ class LyricsContainer extends react.Component {
               );
             }
 
+            const requestStillCurrent = isCurrent() && this.isCurrentLyricsState(lyricsState);
             const response = await window.Translator.callGemini({
               apiKey,
-              artist: this.state.artist || lyricsState.artist,
-              title: this.state.title || lyricsState.title,
+              trackId,
+              artist: requestStillCurrent ? this.state.artist || lyricsState.artist : artist,
+              title: requestStillCurrent ? this.state.title || lyricsState.title : title,
               text,
               wantSmartPhonetic,
-              sourceLang:
-                this.trackLanguageOverride || this.provideLanguageCode(lyrics) || "auto",
+              sourceLang: requestStillCurrent
+                ? this.trackLanguageOverride || this.provideLanguageCode(lyrics) || "auto"
+                : sourceLang,
               provider: lyricsState.provider,
               onLine: handleStreamLine,
               onStreamReset: handleStreamReset,
@@ -8234,12 +8244,12 @@ class LyricsContainer extends react.Component {
     });
   }
 
-  provideLanguageCode(lyrics) {
+  provideLanguageCode(lyrics, { updateDetectedLanguage = true } = {}) {
     if (!lyrics) return null;
 
     // 1. 트랙별 언어 오버라이드 우선 확인 (IndexedDB에서 로드된 값)
     if (this.trackLanguageOverride) {
-      Utils.setDetectedLanguage(this.trackLanguageOverride);
+      if (updateDetectedLanguage) Utils.setDetectedLanguage(this.trackLanguageOverride);
       return this.trackLanguageOverride;
     }
 
@@ -8248,21 +8258,21 @@ class LyricsContainer extends react.Component {
       const overrideLanguage =
         CONFIG.visual["translate:detect-language-override"];
       // Update Utils detected language for furigana check
-      Utils.setDetectedLanguage(overrideLanguage);
+      if (updateDetectedLanguage) Utils.setDetectedLanguage(overrideLanguage);
       return overrideLanguage;
     }
 
     // If we have a cached language in state, use it
     if (this.state.language) {
       // Update Utils detected language for furigana check
-      Utils.setDetectedLanguage(this.state.language);
+      if (updateDetectedLanguage) Utils.setDetectedLanguage(this.state.language);
       return this.state.language;
     }
 
     // Otherwise, detect language from lyrics
     const detectedLanguage = Utils.detectLanguage(lyrics);
     // Update Utils detected language for furigana check
-    Utils.setDetectedLanguage(detectedLanguage);
+    if (updateDetectedLanguage) Utils.setDetectedLanguage(detectedLanguage);
     return detectedLanguage;
   }
 

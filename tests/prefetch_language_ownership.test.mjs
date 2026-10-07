@@ -85,7 +85,7 @@ function harness({ active = 'ja', next = 'en', visual = {} } = {}) {
     `globalThis.container = { state: { explicitMode: -1, language: ${JSON.stringify(active)} },
       currentTrackUri: ${JSON.stringify(track('A').uri)}, infoFromTrack: value => value,
       schedulePlaybackTrackResolution() { throw new Error('current track did not change'); },
-      ${section(indexSource, '  provideLanguageCode(lyrics) {', '  async translateLyrics(')}
+      ${section(indexSource, '  provideLanguageCode(', '  async translateLyrics(')}
     };`,
     `(function () { ${section(indexSource, '    this.onQueueChange = async ({ data: queue }) => {', '    this.handlePlaybackSongChange =')} }).call(container);`,
     section(pagesSource, 'const safeRenderText =', 'function renderLyricsUnavailable'),
