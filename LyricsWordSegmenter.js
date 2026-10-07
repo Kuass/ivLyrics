@@ -192,69 +192,84 @@
 		return words.length ? words : [run];
 	};
 
-	const segmentLyricsWithTokenizer = (text, locale, tokenizer) => {
+	const segmentRangesWithTokenizer = (text, locale, tokenizer) => {
 		const source = String(text || "");
+		if (!source) return [];
 		const resolvedLocale = normalizeLocale(locale, source);
-		const chars = graphemes(source, resolvedLocale);
+		const chars = [...getSegmenters(resolvedLocale).grapheme.segment(source)];
+		const boundaries = new Set(chars.map(({ index }) => index));
 		const output = [];
-		let lexical = "";
-		let pendingPrefix = "";
+		let lexicalStart = null;
+		let lexicalEnd = 0;
+		let pendingPrefix = null;
 		const isLatinNum = (value) => /^[\p{Script=Latin}\p{N}]$/u.test(value);
 		const isLatinJoiner = (value, previous, next) => ["'", "’", "-", "‐"].includes(value)
 			&& !!previous && !!next && isLatinNum(previous) && isLatinNum(next);
 		const flush = () => {
-			if (!lexical) return;
+			if (lexicalStart === null) return;
+			const lexical = source.slice(lexicalStart, lexicalEnd);
 			const tokens = segmentLexicalRun(lexical, resolvedLocale, tokenizer);
-			if (pendingPrefix && tokens.length) {
-				tokens[0] = pendingPrefix + tokens[0];
-				pendingPrefix = "";
+			const starts = [lexicalStart];
+			let cursor = 0;
+			for (const token of tokens) {
+				if (!token) continue;
+				// Align untouched lexical surfaces locally, before punctuation attaches.
+				const start = lexical.indexOf(token, cursor);
+				if (start < 0) {
+					// A custom tokenizer may return a non-source surface. Keep this run intact.
+					starts.length = 1;
+					break;
+				}
+				// Keep skipped hyphens/emoji in the preceding span (or the first span
+				// for leading material). Never cut a grapheme into tokenizer fragments.
+				if (cursor > 0 && boundaries.has(lexicalStart + start)) starts.push(lexicalStart + start);
+				cursor = start + token.length;
 			}
-			output.push(...tokens.filter(Boolean));
-			lexical = "";
+			starts.forEach((start, index) => output.push({
+				start: index === 0 && pendingPrefix ? pendingPrefix.start : start,
+				end: starts[index + 1] ?? lexicalEnd,
+			}));
+			pendingPrefix = null;
+			lexicalStart = null;
 		};
-		chars.forEach((char, index) => {
-			const previous = chars[index - 1];
-			const next = chars[index + 1];
+		chars.forEach(({ segment: char, index: start }, index) => {
+			const end = start + char.length;
+			const previous = chars[index - 1]?.segment;
+			const next = chars[index + 1]?.segment;
 			if (isLatinJoiner(char, previous, next)) {
-				lexical += char;
+				lexicalStart ??= start;
+				lexicalEnd = end;
 			} else if (/^\s+$/u.test(char)) {
 				flush();
 			} else if (/^[\p{Ps}\p{Pi}]$/u.test(char)) {
 				flush();
-				pendingPrefix += char;
+				pendingPrefix = { start: pendingPrefix?.start ?? start, end };
 			} else if (/^\p{P}$/u.test(char)) {
 				flush();
-				if (output.length) output[output.length - 1] += char;
-				else pendingPrefix += char;
+				// A pending opener owns its punctuation cluster, even after a word.
+				if (pendingPrefix) pendingPrefix.end = end;
+				else if (output.length) output[output.length - 1].end = end;
+				else pendingPrefix = { start, end };
 			} else if (/^\p{S}$/u.test(char)) {
 				flush();
-				output.push(pendingPrefix ? pendingPrefix + char : char);
-				pendingPrefix = "";
+				output.push({ start: pendingPrefix?.start ?? start, end });
+				pendingPrefix = null;
 			} else {
-				lexical += char;
+				lexicalStart ??= start;
+				lexicalEnd = end;
 			}
 		});
 		flush();
 		if (pendingPrefix) {
-			if (output.length) output[output.length - 1] += pendingPrefix;
+			if (output.length) output[output.length - 1].end = pendingPrefix.end;
 			else output.push(pendingPrefix);
 		}
-		return output;
+		return output.map(({ start, end }) => ({ start, end, text: source.slice(start, end) }));
 	};
 
-	const segmentRangesWithTokenizer = (text, locale, tokenizer) => {
-		const source = String(text || "");
-		if (!source) return [];
-		const ranges = [];
-		let cursor = 0;
-		for (const token of segmentLyricsWithTokenizer(source, locale, tokenizer)) {
-			const start = source.indexOf(token, cursor);
-			if (start < 0) continue;
-			ranges.push({ start, end: start + token.length, text: token });
-			cursor = start + token.length;
-		}
-		return ranges;
-	};
+	const segmentLyricsWithTokenizer = (text, locale, tokenizer) => (
+		segmentRangesWithTokenizer(text, locale, tokenizer).map(({ text }) => text)
+	);
 
 	const createLyricsSegmenter = ({ locale = "auto", tokenizer = defaultJapaneseTokenizer } = {}) => Object.freeze({
 		segmentLyrics: (text, requestedLocale = locale) => segmentLyricsWithTokenizer(text, requestedLocale, tokenizer),
