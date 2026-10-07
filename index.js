@@ -5838,8 +5838,10 @@ class LyricsContainer extends react.Component {
             if (resolution.replacement?.youtubeVideoId) {
               selectedVideo = resolution.replacement;
               await Utils.saveSelectedVideo(trackUri, selectedVideo);
+              if (this.currentTrackUri !== trackUri) return;
             } else {
               await Utils.removeSelectedVideo(trackUri);
+              if (this.currentTrackUri !== trackUri) return;
               this.setState({
                 videoInfo: {
                   suppressVideoBackground: true,
