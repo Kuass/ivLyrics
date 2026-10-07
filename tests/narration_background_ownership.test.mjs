@@ -273,7 +273,8 @@ for(const detection of ['media','provider'])for(const queuedState of [false,true
   assert.deepEqual(before.stateOverride,{mode});assert.equal(before.menu.selected,mode);
   await h.play(narration(detection));await h.finish();const after=inspect(h);
   assert.deepEqual(after.stateOverride,{mode});assert.equal(after.menu.selected,mode);
-  assert.equal(after.instanceOverride,null,'existing instance clear is characterized separately');
+  assert.deepEqual(after.instanceOverride,{mode},'same-URI narration keeps the instance override aligned with state');
+  assert.equal(after.defaultEffectiveMode,mode,'mode-dependent consumers use the preserved track choice');
   assert.deepEqual(after.counts,counts);assert.equal(h.events.length,eventCount);assert.equal(h.toasts.length,toastCount);
   assert.deepEqual(h.persisted.get(narration(detection).uri),{mode});
   observations.push({case:'settled-own-choice-repeat',detection,mode,queuedState,before,after});
