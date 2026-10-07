@@ -1125,7 +1125,7 @@ const Utils = {
   /**
    * Parse furigana HTML to extract readings for each kanji (최적화 #3)
    * @param {string} processedText - HTML text with ruby tags
-   * @returns {Map<number, string>} - Map of position to reading
+   * @returns {Map<number, string>} - Map of creator code-point position to reading
    */
   parseFuriganaMapping(processedText) {
     const furiganaMap = new Map();
@@ -1147,14 +1147,14 @@ const Utils = {
       // Calculate position by counting plain text before this match
       const beforeMatch = processedText.substring(lastMatchEnd, match.index);
       const plainTextBefore = beforeMatch.replace(/<[^>]+>/g, '');
-      currentPos += plainTextBefore.length;
+      currentPos += Array.from(plainTextBefore).length;
 
       // Map each kanji to its reading
-      if (kanjiSequence.length === 1) {
+      const kanjiChars = Array.from(kanjiSequence);
+      if (kanjiChars.length === 1) {
         furiganaMap.set(currentPos, reading);
       } else {
         // Multiple kanji - split the reading
-        const kanjiChars = Array.from(kanjiSequence);
         const readingChars = Array.from(reading);
         const charsPerKanji = Math.floor(readingChars.length / kanjiChars.length);
 
@@ -1170,8 +1170,8 @@ const Utils = {
         });
       }
 
-      // Move position forward by the number of kanji
-      currentPos += kanjiSequence.length;
+      // Match the creator's Array.from character cells, including astral bases.
+      currentPos += kanjiChars.length;
       lastMatchEnd = match.index + match[0].length;
     }
 
