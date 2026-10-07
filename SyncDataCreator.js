@@ -2940,6 +2940,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const historyResizeDragRef = useRef(null);
 	const styleRangeDragRef = useRef(null);
 	const characterPronunciationCacheRequestRef = useRef(0);
+	const characterPronunciationContextRef = useRef(null);
 	const characterPronunciationGenerationRequestRef = useRef(0);
 	const characterPronunciationProgressOwnerRef = useRef(0);
 	const characterPronunciationConsentForceRef = useRef(false);
@@ -4307,6 +4308,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		sessionLyricsFingerprint,
 		sessionTrackKey
 	]);
+	characterPronunciationContextRef.current = {
+		cacheOptions: characterPronunciationCacheOptions,
+		lyricsLines
+	};
 	const readCachedCharacterPronunciation = useCallback(async () => {
 		if (
 			!lyricsLines.length
@@ -4579,6 +4584,14 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (!forceRegenerate) {
 			const cachedPronunciation = await readCachedCharacterPronunciation();
 			if (cachedPronunciation) {
+				const currentContext = characterPronunciationContextRef.current;
+				if (
+					currentContext.cacheOptions.trackKey !== characterPronunciationCacheOptions.trackKey
+					|| currentContext.cacheOptions.lyricsFingerprint !== characterPronunciationCacheOptions.lyricsFingerprint
+					|| currentContext.cacheOptions.sourceLang !== characterPronunciationCacheOptions.sourceLang
+					|| currentContext.cacheOptions.targetLang !== characterPronunciationCacheOptions.targetLang
+					|| !isSyncCreatorCharacterPronunciationCompatible(cachedPronunciation, currentContext.lyricsLines)
+				) return;
 				setCharacterPronunciations(cachedPronunciation);
 				setShowCharacterPronunciations(true);
 				return;
