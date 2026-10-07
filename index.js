@@ -5704,12 +5704,16 @@ class LyricsContainer extends react.Component {
 
         service.overrideDetectedLanguage?.(lyrics, language);
         await TrackLanguageDB.setLanguage(info.uri, language);
-        this.trackLanguageOverride = language;
+        if (this.currentTrackUri === info.uri) {
+          this.trackLanguageOverride = language;
+        }
         service.clearLyricsSnapshot?.(info.uri);
-        this._dmResults = {};
-        this.lastProcessedUri = null;
-        this.lastProcessedMode = null;
-        this.forceUpdate();
+        if (this.currentTrackUri === info.uri) {
+          this._dmResults = {};
+          this.lastProcessedUri = null;
+          this.lastProcessedMode = null;
+          this.forceUpdate();
+        }
         window.__ivLyricsDebugLog?.(`[ivLyrics] AI language detection: ${heuristicLanguage || "none"} -> ${language}`);
       })
       .catch((error) => {
