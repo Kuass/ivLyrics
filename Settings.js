@@ -1206,14 +1206,15 @@ const LocalCacheManager = () => {
 
   // 현재 곡 캐시 삭제
   const handleClearCurrent = async () => {
-    const trackUri = Spicetify.Player.data?.item?.uri;
-    const trackId = trackUri?.split(':')[2];
-    if (!trackId) {
-      Toast.error(I18n.t("notifications.noTrackPlaying"));
-      return;
-    }
-
     try {
+      const trackUri = window.Utils?.getPlayerPlaybackSnapshot?.()?.uri
+        || Spicetify.Player.data?.item?.uri;
+      const trackId = trackUri?.split(':')[2];
+      if (!trackId) {
+        Toast.error(I18n.t("notifications.noTrackPlaying"));
+        return;
+      }
+
       // 번역 메모리 캐시도 함께 초기화
       window.Translator?.clearMemoryCache?.(trackId);
       window.Translator?.clearInflightRequests?.(trackId);
