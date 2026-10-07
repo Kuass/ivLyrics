@@ -8853,6 +8853,7 @@ class LyricsContainer extends react.Component {
 
   commitDjNarrationTrack(track, snapshot) {
     const uri = track?.uri || snapshot?.uri || "";
+    const sameTrack = this.state.uri === uri;
     if (this.state.isLyricsEditModalOpen) {
       this.closeLyricsEditModal({ force: true });
     }
@@ -8861,7 +8862,7 @@ class LyricsContainer extends react.Component {
     this.currentTrackUri = uri;
     this.trackLanguageOverride = null;
     this.trackLyricsProviderOverride = null;
-    this.trackBackgroundOverride = null;
+    if (!sameTrack) this.trackBackgroundOverride = null;
     this.clearPendingLyricsUpdates();
     this.setState({
       ...emptyState,
@@ -8869,6 +8870,8 @@ class LyricsContainer extends react.Component {
       title: track?.metadata?.title || track?.name || "Spotify DJ",
       artist: track?.metadata?.artist_name || "",
       coverUrl: track?.metadata?.image_xlarge_url || track?.metadata?.image_url || null,
+      // Omit the field for this URI so queued narration choices remain intact.
+      ...(sameTrack ? {} : { trackBackgroundOverride: null }),
       error: "DJ narration",
       isLoading: false,
       lyricsStatus: "empty",
