@@ -8848,6 +8848,8 @@ class LyricsContainer extends react.Component {
       title: track?.metadata?.title || track?.name || "Spotify DJ",
       artist: track?.metadata?.artist_name || "",
       coverUrl: track?.metadata?.image_xlarge_url || track?.metadata?.image_url || null,
+      // Omit the field for this URI so queued narration choices remain intact.
+      ...(this.state.uri === uri ? {} : { trackBackgroundOverride: null }),
       error: "DJ narration",
       isLoading: false,
       lyricsStatus: "empty",
