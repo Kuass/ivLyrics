@@ -4702,6 +4702,7 @@ class LyricsContainer extends react.Component {
     this._sharedPresentationKeys = new Map();
     this._invalidatedSharedPresentationSnapshots = new WeakSet();
     this._culturalAnnotationResults = new Map();
+    this._culturalAnnotationRequestedKeys = new Map();
     this._culturalAnnotationRequests = new Map();
     this._culturalAnnotationCacheEpoch = 0;
     this._isComponentMounted = false;
@@ -5107,6 +5108,7 @@ class LyricsContainer extends react.Component {
 
     this._culturalAnnotationCacheEpoch += 1;
     this._culturalAnnotationResults.delete(uri);
+    this._culturalAnnotationRequestedKeys.delete(uri);
     for (const requestKey of this._culturalAnnotationRequests.keys()) {
       if (requestKey.startsWith(`${uri}:`)) {
         this._culturalAnnotationRequests.delete(requestKey);
@@ -5124,6 +5126,7 @@ class LyricsContainer extends react.Component {
   clearAllCulturalAnnotations({ updateState = false } = {}) {
     this._culturalAnnotationCacheEpoch += 1;
     this._culturalAnnotationResults.clear();
+    this._culturalAnnotationRequestedKeys.clear();
     this._culturalAnnotationRequests.clear();
     this.clearCulturalAnnotationsLoading();
 
@@ -5140,7 +5143,15 @@ class LyricsContainer extends react.Component {
     const result = this.isCulturalAnnotationsEnabled()
       ? this._culturalAnnotationResults.get(uri)
       : null;
-    const notesByIndex = result?.notesByIndex || null;
+    // Presentation can run before the next annotation request is admitted.
+    // Match the actual source lines too, including their original line indices.
+    const notesByIndex = result &&
+      result.key === this._culturalAnnotationRequestedKeys.get(uri) &&
+      result.sourceSignature === getTranslationSourceCacheHash(
+        JSON.stringify(this.getCulturalAnnotationSourceLines(lyrics))
+      )
+      ? result.notesByIndex
+      : null;
 
     return lyrics.map((line, index) => {
       if (!line || typeof line !== "object") return line;
@@ -5173,6 +5184,8 @@ class LyricsContainer extends react.Component {
     const sourceSignature = getTranslationSourceCacheHash(JSON.stringify(lines));
     const schemaVersion = 4;
     const resultKey = `v${schemaVersion}:${sourceLang || "auto"}:${targetLang}:${sourceSignature}`;
+    // Re-entering a cached or pending source must restore its ownership too.
+    this._culturalAnnotationRequestedKeys.set(uri, resultKey);
     if (!ignoreCache && this._culturalAnnotationResults.get(uri)?.key === resultKey) {
       return Promise.resolve(this._culturalAnnotationResults.get(uri));
     }
@@ -5227,8 +5240,13 @@ class LyricsContainer extends react.Component {
         });
         notesByIndex.set(lineIndex, lineAnnotations);
       }
+      if (this._culturalAnnotationRequestedKeys.get(uri) !== resultKey) {
+        completed = true;
+        return result;
+      }
       this._culturalAnnotationResults.set(uri, {
         key: resultKey,
+        sourceSignature,
         notesByIndex,
         provider: result?.provider || null,
       });
