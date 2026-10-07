@@ -6761,7 +6761,12 @@ class LyricsContainer extends react.Component {
   }
 
 
-  async fetchColors(uri) {
+  async fetchColors(uri, track = Spicetify.Player.data?.item) {
+    const getCoverUrl = (item) =>
+      item?.metadata?.image_xlarge_url ||
+      item?.metadata?.image_large_url ||
+      item?.metadata?.image_url;
+    const originCoverUrl = track?.uri === uri ? getCoverUrl(track) : null;
     let vibrant = 0;
     let dynamicColors = null;
 
@@ -6793,10 +6798,12 @@ class LyricsContainer extends react.Component {
       .includes(this.getEffectiveBackgroundMode());
     if (needsDynamicColors) {
       try {
-        const coverUrl =
-          Spicetify.Player.data?.item?.metadata?.image_xlarge_url ||
-          Spicetify.Player.data?.item?.metadata?.image_large_url ||
-          Spicetify.Player.data?.item?.metadata?.image_url;
+        const currentTrack = Spicetify.Player.data?.item;
+        // Preserve live artwork updates for this URI, including removal of its cover.
+        // A lagging or changed public item must not supply another track's artwork.
+        const coverUrl = currentTrack?.uri === uri
+          ? getCoverUrl(currentTrack)
+          : originCoverUrl;
 
         if (coverUrl && Spicetify.GraphQL?.Definitions?.getDynamicColorsByUris) {
           const colorQuery = await Spicetify.GraphQL.Request(
@@ -7050,7 +7057,7 @@ class LyricsContainer extends react.Component {
 
       // The extracted track color also drives LP label accents, so keep it
       // available even when the selected background is video or solid.
-      this.fetchColors(info.uri);
+      this.fetchColors(info.uri, track);
 
       this.fetchTempo(info.uri);
       this.resetDelay();
