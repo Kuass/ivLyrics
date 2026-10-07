@@ -6249,7 +6249,7 @@ class LyricsContainer extends react.Component {
 
     const requestUri = this.state.uri;
     // trackId 가져오기
-    const trackId = Utils.extractTrackId(Spicetify.Player.data?.item?.uri);
+    const trackId = Utils.extractTrackId(requestUri);
     if (!trackId) {
       Toast.error(I18n.t("notifications.noTrackPlaying"));
       return;
