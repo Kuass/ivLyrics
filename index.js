@@ -6655,20 +6655,20 @@ class LyricsContainer extends react.Component {
         await TrackLyricsProviderDB.clearProvider(trackUri);
       }
 
-      this.trackLyricsProviderOverride = normalizedProviderId;
       delete CACHE[trackUri];
       if (this._dmResults?.[trackUri]) {
         delete this._dmResults[trackUri];
       }
       CacheManager.clearByUri(trackUri);
-      this.lastProcessedUri = null;
-      this.lastProcessedMode = null;
 
+      // Keep the commit callback, but let an admitted fetch own local state.
       this.setState(
-        { trackLyricsProviderOverride: normalizedProviderId, isLoading: true },
+        {},
         () => {
-          const item = Spicetify.Player.data?.item;
-          if (item) {
+          const item = typeof window.Utils?.resolveStablePlaybackTrack === "function"
+            ? window.Utils.resolveStablePlaybackTrack()
+            : Spicetify.Player.data?.item;
+          if (item?.metadata && this.isPlaybackUriCurrent(item.uri)) {
             this.fetchLyrics(item, this.state.explicitMode, true);
           }
         }
