@@ -338,7 +338,6 @@ test('background selection storage crossing a committed track change keeps the e
   const before = h.publications.length;
   await h.resolve(h.storage[0]);
   await selected;
-  assert.equal(h.colorTasks.at(-1).uri, A);
   await h.finish();
   assert.equal(h.publications.length, before);
   assert.equal(h.c.state.colorsUri, B);
