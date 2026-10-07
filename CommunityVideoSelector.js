@@ -726,11 +726,25 @@ const CommunityVideoSelector = ({
 
   const [videos, setVideoState] = useState([]);
   const videosRef = useRef(videos);
+  const listReadRef = useRef(null);
   // Async selection needs accepted list updates even before React commits them.
-  const setVideos = useCallback((update) => {
-    const nextVideos = typeof update === "function"
+  const setVideos = useCallback((update, readRequest = null) => {
+    if (readRequest && listReadRef.current !== readRequest) return;
+    let nextVideos = typeof update === "function"
       ? update(videosRef.current)
       : update;
+    if (readRequest) {
+      // Preserve local acknowledgments made while this snapshot was pending,
+      // without losing new rows or metadata returned by the read.
+      for (const mutation of readRequest.mutations) {
+        nextVideos = mutation(nextVideos);
+      }
+      if (listReadRef.current !== readRequest) return;
+    } else if (listReadRef.current) {
+      listReadRef.current.mutations.push(
+        typeof update === "function" ? update : () => update
+      );
+    }
     videosRef.current = nextVideos;
     setVideoState(nextVideos);
   }, []);
@@ -771,12 +785,15 @@ const CommunityVideoSelector = ({
   // 영상 목록 로드 (skipCache: 등록/삭제 후 캐시 우회)
   const loadVideos = useCallback(
     async (skipCache = false) => {
+      const readRequest = { mutations: [] };
+      listReadRef.current = readRequest;
       setIsLoading(true);
       setError(null);
 
       try {
         if (isLocalVideoMode) {
           const savedVideo = await Utils.getSelectedVideo(trackUri);
+          if (listReadRef.current !== readRequest) return;
           setVideos(savedVideo?.youtubeVideoId ? [{
             id: "local",
             youtubeVideoId: savedVideo.youtubeVideoId,
@@ -790,25 +807,30 @@ const CommunityVideoSelector = ({
             dislikes: 0,
             score: 0,
             userVote: null,
-          }] : []);
-          setIsLoading(false);
+          }] : [], readRequest);
           return;
         }
 
         const data = await Utils.getCommunityVideos(trackUri, skipCache);
+        if (listReadRef.current !== readRequest) return;
         if (data && data.videos) {
           setVideos(data.videos.map((video) => ({
             ...video,
             skipSegments: Utils.normalizeVideoSkipSegments(video?.skipSegments),
-          })));
+          })), readRequest);
         } else {
-          setVideos([]);
+          setVideos([], readRequest);
         }
       } catch (e) {
-        setError(I18n.t("communityVideo.loadError"));
+        if (listReadRef.current === readRequest) {
+          setError(I18n.t("communityVideo.loadError"));
+        }
+      } finally {
+        if (listReadRef.current === readRequest) {
+          listReadRef.current = null;
+          setIsLoading(false);
+        }
       }
-
-      setIsLoading(false);
     },
     [trackUri, isLocalVideoMode, currentUserHash]
   );

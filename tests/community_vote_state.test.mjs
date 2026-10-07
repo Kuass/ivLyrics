@@ -21,12 +21,13 @@ function harness(options = {}) {
   let committedVideos = initial();
   const state = {votingId:null, votingIds:new Set(), preview:options.preview ?? null};
   const videosRef = {current:committedVideos};
+  const listReadRef = {current:null};
   const pendingVotesRef = {current:new Set()};
   const requests=[], errors=[], replacements=[], updates=[];
   const apply = value => { committedVideos = typeof value === 'function' ? value(committedVideos) : value; };
   const enqueue = value => { updates.push(value); if (!options.queued) apply(value); };
   const publish = publisher
-    ? vm.runInNewContext(`${publisher}\nsetVideos;`, {useCallback:fn=>fn, videosRef, setVideoState:enqueue})
+    ? vm.runInNewContext(`${publisher}\nsetVideos;`, {useCallback:fn=>fn, videosRef, listReadRef, setVideoState:enqueue})
     : enqueue;
   // Fixture list changes model component publications through its real setter.
   Object.defineProperty(state, 'videos', {get:()=>committedVideos, set:publish});
