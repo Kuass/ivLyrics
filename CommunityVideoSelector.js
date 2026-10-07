@@ -774,6 +774,7 @@ const CommunityVideoSelector = ({
   const [hideDislikedVideos, setHideDislikedVideos] = useState(
     () => CONFIG?.visual?.["community-video-hide-disliked"] !== false
   );
+  const selectionPreferencesRef = useRef({ randomSelectionEnabled, hideDislikedVideos });
   const titleFetchTimeout = useRef(null);
   const pendingVotesRef = useRef(new Set());
 
@@ -840,6 +841,7 @@ const CommunityVideoSelector = ({
   }, [loadVideos]);
 
   const updateRandomSelection = useCallback((nextValue) => {
+    selectionPreferencesRef.current.randomSelectionEnabled = nextValue;
     setRandomSelectionEnabled(nextValue);
     CONFIG.visual["community-video-random"] = nextValue;
     StorageManager.saveConfig("community-video-random", nextValue);
@@ -868,7 +870,7 @@ const CommunityVideoSelector = ({
 
     setPreviewVideoId(null);
 
-    if (randomSelectionEnabled) {
+    if (selectionPreferencesRef.current.randomSelectionEnabled) {
       window.dispatchEvent(new CustomEvent(
         "ivLyrics:communityVideoCurrentHidden",
         { detail: { trackUri, videoId: hiddenVideoId } }
@@ -885,10 +887,11 @@ const CommunityVideoSelector = ({
         )
         : null
     );
-  }, [currentVideoId, onVideoSelect, randomSelectionEnabled, trackUri]);
+  }, [currentVideoId, onVideoSelect, trackUri]);
 
   const toggleHideDislikedVideos = useCallback(async () => {
     const nextValue = !hideDislikedVideos;
+    selectionPreferencesRef.current.hideDislikedVideos = nextValue;
     setHideDislikedVideos(nextValue);
     CONFIG.visual["community-video-hide-disliked"] = nextValue;
     StorageManager.saveConfig("community-video-hide-disliked", nextValue);
@@ -1059,6 +1062,7 @@ const CommunityVideoSelector = ({
     try {
       const result = await Utils.voteCommunityVideo(videoEntryId, voteType, trackUri);
       if (result) {
+        const shouldHideDisliked = selectionPreferencesRef.current.hideDislikedVideos;
         // 투표 결과로 목록 업데이트
         const { likes, dislikes, score } = result.data;
         const updateVote = (currentVideos) => currentVideos
@@ -1076,7 +1080,7 @@ const CommunityVideoSelector = ({
           })
           .sort((a, b) => b.score - a.score);
         setVideos(updateVote);
-        if (voteType === -1 && hideDislikedVideos) {
+        if (voteType === -1 && shouldHideDisliked) {
           const dislikedVideo = videos.find((video) => video.id === videoEntryId);
           if (dislikedVideo?.youtubeVideoId === previewVideoId) {
             setPreviewVideoId(null);
@@ -1096,7 +1100,7 @@ const CommunityVideoSelector = ({
   };
 
   const applyVideoSelection = useCallback((video, options = {}) => {
-    if (randomSelectionEnabled) {
+    if (selectionPreferencesRef.current.randomSelectionEnabled) {
       updateRandomSelection(false);
     }
     onVideoSelect?.(getCommunityVideoSelectionInfo(
@@ -1107,7 +1111,7 @@ const CommunityVideoSelector = ({
     if (options.notify !== false) {
       Toast.success(I18n.t("communityVideo.applied"));
     }
-  }, [onVideoSelect, randomSelectionEnabled, updateRandomSelection]);
+  }, [onVideoSelect, updateRandomSelection]);
 
   // 영상 등록 처리
 	  const handleSubmit = async () => {
