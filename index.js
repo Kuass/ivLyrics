@@ -5204,6 +5204,7 @@ class LyricsContainer extends react.Component {
       onProviderLoading: ({ providerId, providerName }) => {
         const providerLabel = String(providerName || providerId || "").trim();
         if (!providerLabel) return;
+        if (!this._activeCulturalAnnotationsLoadingTokens.has(loadingToken)) return;
         this.updateGenerationRequestLoading("cultural-annotations", {
           description: `${culturalAnnotationLoadingDescription}: ${providerLabel}`,
         });
