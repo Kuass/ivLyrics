@@ -9097,17 +9097,29 @@ class LyricsContainer extends react.Component {
       // 메모리 캐시는 항상 초기화 (window.CACHE와의 참조를 유지하기 위해 객체의 키만 삭제)
       Object.keys(CACHE).forEach(key => delete CACHE[key]);
 
-      // 현재 트랙 정보
-      const item = Spicetify.Player.data?.item;
+      // Resolve playback independently of the public item and component, which can lag.
+      const resolveCurrentReloadItem = () => {
+        const snapshot = window.Utils?.getPlayerPlaybackSnapshot?.() || null;
+        const resolver = window.Utils?.resolveStablePlaybackTrack;
+        const resolved = typeof resolver === "function"
+          ? resolver.call(window.Utils, null, snapshot)
+          : Spicetify.Player?.data?.item || null;
+        return resolved?.uri && this.isPlaybackUriCurrent(resolved.uri)
+          ? resolved : null;
+      };
+      const item = resolveCurrentReloadItem();
       const trackUri = item?.uri;
       const spotifyTrackId = Utils.extractTrackId(trackUri);
       const lyricsCacheId = spotifyTrackId || (trackUri ? `local-uri:${trackUri}` : null);
+      let reloadOwner = null;
 
-      if (item && trackUri) {
-        const reloadInfo = this.infoFromTrack(item) || { uri: trackUri };
+      // URI-only origins still invalidate caches, but cannot own a new loader.
+      const reloadInfo = this.infoFromTrack(item);
+      if (reloadInfo && trackUri && this._isComponentMounted !== false) {
         const reloadSeq = ++this._lyricsFetchSeq;
         this.currentTrackUri = trackUri;
         this._activeLyricsFetchSeq = reloadSeq;
+        reloadOwner = { uri: trackUri, requestSeq: reloadSeq };
         this.clearPendingLyricsUpdates();
         this.lastProcessedUri = null;
         this.lastProcessedMode = null;
@@ -9156,14 +9168,27 @@ class LyricsContainer extends react.Component {
         }
       }
 
+      if (this._isComponentMounted === false) return;
       this.updateVisualOnConfigChange();
       this.forceUpdate();
-      ivLyricsDebug("[ivLyrics] Fetching new lyrics...");
-      this.fetchLyrics(
-        Spicetify.Player.data.item,
-        this.state.explicitMode,
-        true
-      );
+      const currentItem = resolveCurrentReloadItem();
+      // Keep metadata parsing inside fetchLyrics's error boundary.
+      if (currentItem?.metadata) {
+        ivLyricsDebug("[ivLyrics] Fetching new lyrics...");
+        this.fetchLyrics(currentItem, this.state.explicitMode, true);
+      } else if (reloadOwner) {
+        // Recheck queued ownership: rejected input must not finish a newer loader.
+        this.setState((state) => {
+          const ownsLoading = this._isComponentMounted !== false
+            && this._activeLyricsFetchSeq === reloadOwner.requestSeq
+            && this.currentTrackUri === reloadOwner.uri
+            && this.isPlaybackUriCurrent(reloadOwner.uri)
+            && state.lyricsRequestSeq === reloadOwner.requestSeq
+            && state.uri === reloadOwner.uri
+            && state.isLoading === true;
+          return ownsLoading ? { error: "No track info", isLoading: false } : null;
+        });
+      }
     };
 
     // Expose reloadLyrics for external calls (e.g. SyncDataCreator)
