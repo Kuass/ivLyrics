@@ -6716,16 +6716,18 @@ class LyricsContainer extends react.Component {
         await TrackBackgroundDB.clearOverride(trackUri);
       }
 
-      this.trackBackgroundOverride = normalizedOverride;
       const nextMode = this.getEffectiveBackgroundMode(normalizedOverride);
-      if (shouldFetchIvLyricsBackgroundColors(nextMode)) {
-        this.fetchColors(trackUri);
-      }
+      if (this.currentTrackUri === trackUri) {
+        this.trackBackgroundOverride = normalizedOverride;
+        if (shouldFetchIvLyricsBackgroundColors(nextMode)) {
+          this.fetchColors(trackUri);
+        }
 
-      this.setState({ trackBackgroundOverride: normalizedOverride }, () => {
-        this.updateVisualOnConfigChange();
-        this.forceUpdate();
-      });
+        this.setState({ trackBackgroundOverride: normalizedOverride }, () => {
+          this.updateVisualOnConfigChange();
+          this.forceUpdate();
+        });
+      }
 
       window.dispatchEvent(new CustomEvent("ivLyrics:track-background-changed", {
         detail: { trackUri, override: normalizedOverride, effectiveMode: nextMode },
