@@ -361,9 +361,9 @@ function renderLyricsUnavailable(message = I18n.t("messages.noLyrics"), messageC
 
 const getCurrentTrackUri = () => Spicetify.Player?.data?.item?.uri || "";
 
-const useTrackOffsetState = () => {
+const useTrackOffsetState = (displayedTrackUri) => {
 	const [trackOffset, setTrackOffset] = useState(0);
-	const trackUri = getCurrentTrackUri();
+	const trackUri = displayedTrackUri || getCurrentTrackUri();
 
 	useEffect(() => {
 		let cancelled = false;
@@ -443,8 +443,8 @@ const getCurrentLyricsPlaybackPosition = (trackOffset = 0, globalOffset = getGlo
 	return Math.round((newPos + delay) / quantizeMs) * quantizeMs;
 };
 
-const useLyricsPlaybackPosition = () => {
-	const trackOffset = useTrackOffsetState();
+const useLyricsPlaybackPosition = (trackUri) => {
+	const trackOffset = useTrackOffsetState(trackUri);
 	const globalOffset = useGlobalSyncOffsetState();
 	const [position, setPosition] = useState(() => getCurrentLyricsPlaybackPosition(0, getGlobalSyncOffsetValue()));
 
@@ -6317,8 +6317,8 @@ const useLyricsTrackReveal = (pageRef, trackRevealKey, hasLyrics) => {
 	}, [pageRef, trackRevealKey, hasLyrics]);
 };
 
-const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara, karaokeSource = null, karaokeRenderGranularity = null, reRenderLyricsPage = null, trackRevealKey = null }) => {
-	const position = useLyricsPlaybackPosition();
+const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara, karaokeSource = null, karaokeRenderGranularity = null, reRenderLyricsPage = null, trackRevealKey = null, trackUri = "" }) => {
+	const position = useLyricsPlaybackPosition(trackUri);
 	const karaokePosition = isKara ? position + getPseudoKaraokeRenderAdvance(karaokeSource) : position;
 	const karaokeLineTransitionClass = isKara && CONFIG.visual["karaoke-line-transition"]
 		? " karaoke-line-transition-enabled"
@@ -6632,8 +6632,8 @@ function isInViewport(element) {
 	);
 }
 
-const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara, karaokeSource = null, reRenderLyricsPage = null, trackRevealKey = null }) => {
-	const position = useLyricsPlaybackPosition();
+const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara, karaokeSource = null, reRenderLyricsPage = null, trackRevealKey = null, trackUri = "" }) => {
+	const position = useLyricsPlaybackPosition(trackUri);
 	const karaokePosition = isKara ? position + getPseudoKaraokeRenderAdvance(karaokeSource) : position;
 	const karaokeLineTransitionClass = isKara && CONFIG.visual["karaoke-line-transition"]
 		? " karaoke-line-transition-enabled"
