@@ -3620,6 +3620,9 @@ const Prefetcher = {
       return this._inflightRequests.get(versionedCacheKeyBase);
     }
 
+    // New AI prefetch work needs its own supported origin; never borrow playback identity.
+    if (!trackId) return;
+
     const lyricsArray = lyrics.karaoke || lyrics.synced || lyrics.unsynced;
     if (!lyricsArray || lyricsArray.length === 0) return;
 
