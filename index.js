@@ -1417,51 +1417,77 @@ const TrackSyncDB = {
     }
   },
 
-  async importOffsets(offsetsObj) {
+  // Returns true after commit, false on failure, or null when empty-only
+  // migration preserves an existing store. Explicit imports still replace it.
+  async importOffsets(offsetsObj, { onlyIfEmpty = false } = {}) {
     try {
       const normalizedOffsets = normalizeTrackSyncOffsets(offsetsObj);
       const db = await initDB();
-      await new Promise((resolve, reject) => {
+      return await new Promise((resolve, reject) => {
         const transaction = db.transaction([STORE_NAME], "readwrite");
         const store = transaction.objectStore(STORE_NAME);
         let settled = false;
+        let imported = true;
         const rejectOnce = (error) => {
           if (settled) return;
           settled = true;
           reject(error || new Error("Track sync offset transaction failed."));
         };
 
-        // Clear existing data first
-        const clearRequest = store.clear();
-
-        clearRequest.onsuccess = () => {
+        const abortImport = (error) => {
           try {
-            // Add all new offsets
-            Object.entries(normalizedOffsets).forEach(([trackUri, offset]) => {
-              store.put(offset, trackUri);
-            });
+            transaction.abort();
+          } catch {
+            // Reject with the original read/write error below.
+          }
+          rejectOnce(error);
+        };
+        const replaceOffsets = () => {
+          try {
+            const clearRequest = store.clear();
+            clearRequest.onsuccess = () => {
+              try {
+                Object.entries(normalizedOffsets).forEach(([trackUri, offset]) => {
+                  store.put(offset, trackUri);
+                });
+              } catch (error) {
+                abortImport(error);
+              }
+            };
+            clearRequest.onerror = () => rejectOnce(clearRequest.error);
           } catch (error) {
-            try {
-              transaction.abort();
-            } catch {
-              // Reject with the original write error below.
-            }
-            rejectOnce(error);
+            abortImport(error);
           }
         };
-        clearRequest.onerror = () => rejectOnce(clearRequest.error);
 
         transaction.oncomplete = () => {
           if (settled) return;
           settled = true;
-          resolve();
+          resolve(imported);
         };
         transaction.onerror = () => rejectOnce(transaction.error);
         transaction.onabort = () => rejectOnce(
           transaction.error || new Error("Track sync offset transaction aborted.")
         );
+
+        if (onlyIfEmpty) {
+          // Count and write in one transaction, so another writer cannot slip
+          // between the emptiness decision and the import. Zero is data too.
+          const countRequest = store.count();
+          countRequest.onsuccess = () => {
+            if (countRequest.result === 0) {
+              replaceOffsets();
+            } else if (Number.isInteger(countRequest.result) && countRequest.result > 0) {
+              imported = null;
+            } else {
+              abortImport(new Error("Invalid track sync offset count."));
+            }
+          };
+          countRequest.onerror = () => rejectOnce(countRequest.error);
+        } else {
+          replaceOffsets();
+        }
       });
-      return true;
     } catch (error) {
       console.error("[ivLyrics] Failed to import offsets:", error);
       return false;
@@ -1621,10 +1647,12 @@ window.TrackBackgroundDB = TrackBackgroundDB;
         console.error("[ivLyrics] Keeping invalid legacy track offsets:", error);
         return;
       }
-      const imported = await TrackSyncDB.importOffsets(offsetsObj);
-      if (imported) {
+      const imported = await TrackSyncDB.importOffsets(offsetsObj, { onlyIfEmpty: true });
+      if (imported === true) {
         localStorage.removeItem("ivLyrics:track-sync-offsets");
         ivLyricsDebug("[ivLyrics] Migration complete");
+      } else if (imported === null) {
+        ivLyricsDebug("[ivLyrics] Existing track offsets preserved; keeping the legacy backup.");
       } else {
         console.warn("[ivLyrics] Keeping legacy track offsets for a later retry.");
       }
