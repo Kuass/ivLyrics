@@ -676,6 +676,7 @@
             this._events = new Map();
             this._onceEvents = new Map();
             this._activeLyricsSearchProgress = new Map();
+            this._lyricsSearchProgressByRequest = new Map();
         }
 
         // ============================================
@@ -754,42 +755,62 @@
             return `${String(uri || '')}::${forcedProviderId || 'auto'}`;
         }
 
-        _publishLyricsSearchProgress(info, forcedProviderId, detail = {}) {
+        _publishLyricsSearchProgress(info, forcedProviderId, detail = {}, requestId = null) {
             const uri = String(info?.uri || '');
             if (!uri) return null;
 
             const progress = {
                 ...detail,
                 uri,
-                forcedProviderId: forcedProviderId || null
+                forcedProviderId: forcedProviderId || null,
+                requestId
             };
             this._activeLyricsSearchProgress.set(
-                this._getLyricsSearchProgressKey(uri, forcedProviderId),
-                progress
+                this._getLyricsSearchProgressKey(uri, forcedProviderId), progress
             );
+            if (requestId !== null) this._lyricsSearchProgressByRequest.set(requestId, progress);
             this.emit('lyrics:search:progress', progress);
             return progress;
         }
 
-        getActiveLyricsSearchProgress(uri, forcedProviderId = null) {
-            const progress = this._activeLyricsSearchProgress.get(
-                this._getLyricsSearchProgressKey(uri, forcedProviderId)
-            );
-            return progress ? { ...progress } : null;
+        // Omitted identity retains the last-published URI/provider slot for legacy callers.
+        getActiveLyricsSearchProgress(uri, forcedProviderId = null, requestId = null) {
+            const key = this._getLyricsSearchProgressKey(uri, forcedProviderId);
+            const progress = requestId !== null
+                ? this._lyricsSearchProgressByRequest.get(requestId)
+                : this._activeLyricsSearchProgress.get(key);
+            return progress && this._getLyricsSearchProgressKey(progress.uri, progress.forcedProviderId) === key
+                ? { ...progress } : null;
         }
 
-        replayActiveLyricsSearchProgress(uri, forcedProviderId = null) {
-            const progress = this.getActiveLyricsSearchProgress(uri, forcedProviderId);
+        replayActiveLyricsSearchProgress(uri, forcedProviderId = null, requestId = null) {
+            const progress = this.getActiveLyricsSearchProgress(uri, forcedProviderId, requestId);
             if (!progress) return null;
             const replayedProgress = { ...progress, replayed: true };
             this.emit('lyrics:search:progress', replayedProgress);
             return replayedProgress;
         }
 
-        clearActiveLyricsSearchProgress(uri, forcedProviderId = null) {
-            this._activeLyricsSearchProgress.delete(
-                this._getLyricsSearchProgressKey(uri, forcedProviderId)
-            );
+        _clearLegacyLyricsSearchProgress(uri, forcedProviderId, requestId) {
+            const key = this._getLyricsSearchProgressKey(uri, forcedProviderId);
+            if (this._activeLyricsSearchProgress.get(key)?.requestId === requestId) {
+                this._activeLyricsSearchProgress.delete(key);
+            }
+        }
+
+        clearActiveLyricsSearchProgress(uri, forcedProviderId = null, requestId = null) {
+            const key = this._getLyricsSearchProgressKey(uri, forcedProviderId);
+            if (requestId !== null) {
+                this._lyricsSearchProgressByRequest.delete(requestId);
+                this._clearLegacyLyricsSearchProgress(uri, forcedProviderId, requestId);
+                return;
+            }
+            this._activeLyricsSearchProgress.delete(key);
+            for (const [owner, progress] of this._lyricsSearchProgressByRequest) {
+                if (this._getLyricsSearchProgressKey(progress.uri, progress.forcedProviderId) === key) {
+                    this._lyricsSearchProgressByRequest.delete(owner);
+                }
+            }
         }
 
         /**
@@ -1662,8 +1683,21 @@
          * 가사를 가져온다. 품질 우선 옵션에서는 각 제공자를 한 번만 요청하며,
          * 글자 → 단어 → 줄 → 일반 단계 안에서 사용자 지정 제공자 순서를 유지한다.
          */
-        async getLyrics(info, forcedProviderId = null) {
-            this.clearActiveLyricsSearchProgress(info?.uri, forcedProviderId);
+        async getLyrics(info, forcedProviderId = null, requestId = null) {
+            const ownsProgress = requestId === null;
+            requestId ??= Symbol("lyrics-search");
+            try {
+                return await this._getLyricsForRequest(info, forcedProviderId, requestId);
+            } finally {
+                // Direct work ends here, including unexpected rejection. A supplied
+                // identity belongs to the caller until its inflight request retires.
+                if (ownsProgress) this._lyricsSearchProgressByRequest.delete(requestId);
+            }
+        }
+
+        async _getLyricsForRequest(info, forcedProviderId, requestId) {
+            // Reset only the legacy slot; overlapping request owners keep their replay.
+            this._activeLyricsSearchProgress.delete(this._getLyricsSearchProgressKey(info?.uri, forcedProviderId));
             const trackId = window.LyricsService?.extractTrackId?.(info.uri)
                 || window.ivLyricsTrackIdentity?.extractTrackId?.(info.uri)
                 || '';
@@ -1685,7 +1719,7 @@
                     providerId: forcedProvider?.id || 'ivlyrics-sync',
                     providerName: forcedProvider?.name || 'ivLyrics Sync',
                     attempt: forcedProvider ? 1 : 0
-                });
+                }, requestId);
             }
             const trackIsrc = (trackId ? await window.SyncDataService?.resolveTrackIsrc?.(trackId, info) : null)
                 || window.SyncDataService?.getTrackIsrc?.(trackId, info)
@@ -1755,7 +1789,7 @@
                     ...error,
                     reason: forcedProviderId ? 'provider_unavailable' : 'no_providers'
                 });
-                this.clearActiveLyricsSearchProgress(info.uri, forcedProviderId);
+                this._clearLegacyLyricsSearchProgress(info.uri, forcedProviderId, requestId);
                 return error;
             }
 
@@ -1788,7 +1822,7 @@
                     stage: 'provider',
                     lyricsType
                 };
-                this._publishLyricsSearchProgress(info, forcedProviderId, attemptDetail);
+                this._publishLyricsSearchProgress(info, forcedProviderId, attemptDetail, requestId);
                 this.emit('lyrics:provider:attempt', attemptDetail);
 
                 let candidate = null;
@@ -1844,7 +1878,7 @@
                             selectionPolicy,
                             lyricsType
                         );
-                        this.clearActiveLyricsSearchProgress(info.uri, forcedProviderId);
+                        this._clearLegacyLyricsSearchProgress(info.uri, forcedProviderId, requestId);
                         return finalResult;
                     }
                 }
@@ -1873,7 +1907,7 @@
                         selectionPolicy,
                         selectionType
                     );
-                    this.clearActiveLyricsSearchProgress(info.uri, forcedProviderId);
+                    this._clearLegacyLyricsSearchProgress(info.uri, forcedProviderId, requestId);
                     return finalResult;
                 }
             }
@@ -1888,7 +1922,7 @@
                     selectionPolicy,
                     deferredFallback.lyricsType
                 );
-                this.clearActiveLyricsSearchProgress(info.uri, forcedProviderId);
+                this._clearLegacyLyricsSearchProgress(info.uri, forcedProviderId, requestId);
                 return finalResult;
             }
 
@@ -1899,7 +1933,7 @@
 
             const errorResult = { error: 'No lyrics found', uri: info.uri };
             this.emit('lyrics:fetch:error', { ...errorResult, reason: 'not_found', selectionPolicy });
-            this.clearActiveLyricsSearchProgress(info.uri, forcedProviderId);
+            this._clearLegacyLyricsSearchProgress(info.uri, forcedProviderId, requestId);
             return errorResult;
         }
 

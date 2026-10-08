@@ -4706,6 +4706,7 @@ class LyricsContainer extends react.Component {
     this.translationLoadingTimer = null;
     this.culturalAnnotationsLoadingTimer = null;
     this._lyricsLoadingSeq = 0;
+    this._lyricsProgressRequestId = null;
     this._phoneticLoadingSeq = 0;
     this._translationLoadingSeq = 0;
     this._culturalAnnotationsLoadingSeq = 0;
@@ -6020,6 +6021,7 @@ class LyricsContainer extends react.Component {
   }
 
   startLyricsLoading() {
+    this._lyricsProgressRequestId = null;
     this._generationRequestDetails.delete("lyrics");
     if (
       this._activeLyricsLoadingTokens.size > 0 &&
@@ -6032,6 +6034,7 @@ class LyricsContainer extends react.Component {
 
   handleLyricsProviderAttempt(detail = {}) {
     if (this._activeLyricsLoadingTokens.size === 0) return;
+    if ((detail.requestId ?? null) !== (this._lyricsProgressRequestId ?? null)) return;
 
     const requestUri = String(detail.uri || "");
     if (requestUri && requestUri !== this.currentTrackUri) return;
@@ -6058,6 +6061,7 @@ class LyricsContainer extends react.Component {
 
   clearLyricsLoading(token = null, options = {}) {
     this.clearGenerationRequestLoading("lyrics", token, options);
+    if (this._activeLyricsLoadingTokens.size === 0) this._lyricsProgressRequestId = null;
   }
 
   startPhoneticLoading() {
@@ -7203,7 +7207,12 @@ class LyricsContainer extends react.Component {
           info,
           [],
           getLyricsDataMode(mode),
-          trackLyricsProviderOverride
+          trackLyricsProviderOverride,
+          (requestId) => {
+            if (this._activeLyricsLoadingTokens.has(lyricsLoadingToken)) {
+              this._lyricsProgressRequestId = requestId;
+            }
+          }
         );
         // Accepted manual imports supersede older loads, including cache-only
         // completions after playback has moved on. Ordinary track skips can
