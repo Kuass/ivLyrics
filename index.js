@@ -173,11 +173,11 @@ const FuriganaConverter = (() => {
             const char = surface[i];
 
             if (containsKanji(char)) {
-              // Found a kanji - collect consecutive kanji
+              // Collect consecutive kanji, allowing 々 to continue the current base
               let kanjiSequence = char;
               i++;
 
-              while (i < surface.length && containsKanji(surface[i])) {
+              while (i < surface.length && (containsKanji(surface[i]) || surface[i] === "々")) {
                 kanjiSequence += surface[i];
                 i++;
               }
