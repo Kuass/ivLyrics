@@ -19,7 +19,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        # Exercise the next Ubuntu image before ubuntu-latest migrates.
+        # https://github.com/actions/runner-images/issues/14748
+        os: [ubuntu-latest, ubuntu-26.04, macos-latest]
     steps:
       - uses: actions/checkout@v7
         with:
