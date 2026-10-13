@@ -5359,6 +5359,75 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         return document.querySelector('.iHa_q9pq4un3VNRQgwTx')?.parentElement || null;
     };
 
+    // Header discovery and relocation adapted from ivLis-Studio/ivLyrics db65f382.
+    // Keep mapped anchors first and preserve element-sibling ordering (fork).
+    const PANEL_HEADER_VISUAL_SELECTOR = '[data-testid="minimized-track-visual-enhancement"]';
+    const PANEL_COVER_SELECTOR = '.main-nowPlayingView-coverArtContainer, [data-testid="track-visual-enhancement"], [data-testid="video-player-npv"]';
+
+    const findPanelContextItemInfo = (panel) => {
+        if (!panel) return null;
+        const mapped = panel.querySelector('.main-nowPlayingView-contextItemInfo');
+        if (mapped) return mapped;
+
+        const headerVisual = panel.querySelector(PANEL_HEADER_VISUAL_SELECTOR);
+        if (!headerVisual) return null;
+        // 곡 정보 블록은 커버(앨범아트/영상) 영역과 같은 그리드 안의 형제 요소다.
+        let node = headerVisual;
+        while (node.parentElement && node.parentElement !== panel) {
+            const parent = node.parentElement;
+            const cover = parent.querySelector(PANEL_COVER_SELECTOR);
+            if (cover && !node.contains(cover)) {
+                return node;
+            }
+            node = parent;
+        }
+        return headerVisual.parentElement !== panel ? headerVisual.parentElement : null;
+    };
+
+    // 가사 카드 자리: 곡 정보 블록 바로 다음, 없으면 첫 관련 섹션(뮤직비디오 등) 앞.
+    const getPanelLyricsSlot = (panel) => {
+        const contextItemInfo = findPanelContextItemInfo(panel);
+        if (contextItemInfo?.parentElement) {
+            return { parent: contextItemInfo.parentElement, after: contextItemInfo, before: null };
+        }
+        const relatedSection = panel?.querySelector('.main-nowPlayingView-section');
+        if (relatedSection?.parentElement) {
+            return { parent: relatedSection.parentElement, after: null, before: relatedSection };
+        }
+        return null;
+    };
+
+    const isPanelContainerPlaced = (container, slot) => {
+        if (!slot) return true;
+        if (container.parentElement !== slot.parent) return false;
+        return slot.after
+            ? container.previousElementSibling === slot.after
+            : container.nextElementSibling === slot.before;
+    };
+
+    // 자리를 찾으면 그 자리로 옮기고 true, 기준점이 아직 없으면 false.
+    const placePanelContainer = (panel, container) => {
+        const slot = getPanelLyricsSlot(panel);
+        if (!slot) return false;
+        if (!isPanelContainerPlaced(container, slot)) {
+            const reference = slot.after ? slot.after.nextElementSibling : slot.before;
+            if (reference !== container) {
+                slot.parent.insertBefore(container, reference);
+            }
+            panelDebug("[NowPlayingPanelLyrics] Placed panel lyrics under the track info");
+        }
+        return true;
+    };
+
+    // 곡 정보가 늦게 그려지거나 Spotify가 패널을 다시 그려 카드가 어긋났을 때 바로잡는다.
+    const ensurePanelContainerPlacement = (panel, container) => {
+        if (!panel || !container || !panel.contains(container)) return;
+        const slot = getPanelLyricsSlot(panel);
+        if (slot && !isPanelContainerPlaced(container, slot)) {
+            placePanelContainer(panel, container);
+        }
+    };
+
     // ============================================
     // Starry Night 테마 감지
     // ============================================
@@ -5507,6 +5576,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             if (!panel.contains(existingContainer)) {
                 removePanelLyrics();
             } else {
+                ensurePanelContainerPlacement(panel, existingContainer);
                 renderPanelLyricsIntoContainer(existingContainer);
                 return;
             }
@@ -5519,45 +5589,11 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const container = document.createElement('div');
         container.className = PANEL_CONTAINER_CLASS;
 
-        const placeLyricsContainer = () => {
-            const contextItemInfo = panel.querySelector('.main-nowPlayingView-contextItemInfo');
-
-            if (contextItemInfo && contextItemInfo.parentElement) {
-                // contextItemInfo 바로 다음에 삽입
-                const parent = contextItemInfo.parentElement;
-                const nextSibling = contextItemInfo.nextElementSibling;
-                if (nextSibling) {
-                    parent.insertBefore(container, nextSibling);
-                } else {
-                    parent.appendChild(container);
-                }
-                panelDebug("[NowPlayingPanelLyrics] Inserted after contextItemInfo");
-            } else {
-                // 폴백: 관련 뮤직비디오 섹션 앞에 삽입
-                const relatedSection = panel.querySelector('.main-nowPlayingView-section');
-                if (relatedSection && relatedSection.parentElement) {
-                    relatedSection.parentElement.insertBefore(container, relatedSection);
-                    panelDebug("[NowPlayingPanelLyrics] Inserted before related section");
-                } else {
-                    // 최종 폴백: 패널 끝에 삽입
-                    panel.appendChild(container);
-                    panelDebug("[NowPlayingPanelLyrics] Used fallback - appended to panel");
-                }
-            }
-        };
-
-        // 곡 정보 (곡명, 아티스트) 바로 **아래**에 삽입
-        // Now Playing 패널 구조:
-        // main-nowPlayingView-nowPlayingGrid
-        //   ├── main-nowPlayingView-coverArtContainer (동영상/앨범아트)
-        //   ├── 동영상 전환 버튼
-        //   ├── main-nowPlayingView-contextItemInfo (곡제목+아티스트+버튼들)
-        //   └── main-nowPlayingView-section (관련 뮤직비디오 등)
-        //
-        // 가사는 main-nowPlayingView-contextItemInfo 바로 **다음**에 삽입해야 함
-
-        // contextItemInfo 찾기 (곡제목, 아티스트, 버튼들을 포함하는 컨테이너)
-        placeLyricsContainer();
+        // 기준점이 아직 없으면 즉시 패널 끝에 삽입하고, 이후 감시자가 위치를 보정한다.
+        if (!placePanelContainer(panel, container)) {
+            panel.appendChild(container);
+            panelDebug("[NowPlayingPanelLyrics] Used fallback - appended to panel");
+        }
 
         if (renderPanelLyricsIntoContainer(container)) {
             panelDebug("[NowPlayingPanelLyrics] Panel lyrics inserted successfully");
@@ -5615,6 +5651,9 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             } else if (!panel && container) {
                 // 패널이 없지만 컨테이너가 있으면 제거
                 removePanelLyrics();
+            } else if (panel && container) {
+                // 곡 정보가 늦게 나타나거나 카드가 이동했으면 같은 컨테이너를 제자리로 옮긴다.
+                ensurePanelContainerPlacement(panel, container);
             }
         });
 
