@@ -3003,7 +3003,8 @@ const SETTINGS_MODAL_CSS = `
 
 #${APP_NAME}-config-container .lyrics-type-toggle-chip.type-synced.active,
 #${APP_NAME}-config-container .lyrics-type-toggle-chip.type-character.active,
-#${APP_NAME}-config-container .ai-addon-cap-chip.cap-translate.active {
+#${APP_NAME}-config-container .ai-addon-cap-chip.cap-translate.active,
+#${APP_NAME}-config-container .ai-addon-cap-chip.cap-pronunciation.active {
     color: var(--accent-primary);
 }
 
