@@ -24,10 +24,13 @@ const slice = (source, startMarker, endMarker) => {
 const normalize = (value) => JSON.parse(JSON.stringify(value));
 // Presentation phases are verified below. Exclude only their new fields from
 // the existing full settings/synchronization/geometry equivalence checks.
-const normalizePresentation = (value) => JSON.parse(JSON.stringify(value, function(key, entry) {
+const normalizePresentation = (value, compact = false) => JSON.parse(JSON.stringify(value, function(key, entry) {
 	// Anchor ownership now follows the visual handoff instead of assigning the
 	// same ref to both the prelude and first lyric. Its lifecycle is tested below.
 	if (key === "lineRef" && Object.hasOwn(this, "delay")) return undefined;
+	// The selected compact prelude duration is checked through its actual consumer
+	// in compact_interlude_duration.test.mjs; keep every other historical prop exact.
+	if (compact && key === "fadeDurationMs" && Object.hasOwn(this, "delay") && Object.hasOwn(this, "durationMs")) return undefined;
 	if (key === "detailClassName" || key === "--lyrics-interlude-fade-duration") return undefined;
 	if (key === "className" && typeof entry === "string") return entry.split(" ")
 		.filter(name => !/^lyrics-line-detail(?:-(?:current|past|future))?$/.test(name)
@@ -151,7 +154,7 @@ const createEngine = (source) => {
 				}),
 			};
 			if (raw) return output;
-			const comparable = normalizePresentation(output);
+			const comparable = normalizePresentation(output, props.compact);
 			if (props.compact && !props.isKara && !scrolling && !motionPreference.matches) {
 				// Normal compact rows now delegate movement to WAAPI. Verify that
 				// intentional routing change, then compare every remaining row prop.
@@ -556,7 +559,7 @@ test("explicit and detected instrumental endings fade before the next lyric with
   const handoff = render(11800);
   const marker = sourceElement(handoff, "♪");
   assert.match(marker.props.className, /lyrics-interlude-departing/);
-  assert.equal(marker.props.style["--lyrics-interlude-fade-duration"], "220ms");
+  assert.equal(marker.props.style["--lyrics-interlude-fade-duration"], "184ms");
   const next = sourceElement(handoff, "Final vocal");
   assert.match(next.props.className, /lyrics-line-detail-current/);
   assert.equal(next.props.isActive, false);
@@ -727,4 +730,12 @@ test("manual browsing retains row keys, text, spacing and layout anchor while pl
   engine.setScrolling(false);
   assert.deepEqual(engine.render(lyrics, 8500, { isKara }), createEngine(currentSource).render(lyrics, 8500, { isKara }));
  }
+});
+
+
+test("presentation equivalence keeps expanded numeric indicator fields visible", () => {
+ const output = { elements: [{ tag: "IdlingIndicator", props: { delay: 1, durationMs: 1000, fadeDurationMs: 184 } }] };
+ assert.equal(normalizePresentation(output, false).elements[0].props.fadeDurationMs, 184);
+ assert.equal(normalizePresentation(output, true).elements[0].props.fadeDurationMs, undefined);
+ assert.equal(normalizePresentation(output).elements[0].props.fadeDurationMs, 184);
 });
