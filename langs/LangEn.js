@@ -767,8 +767,8 @@ window.LANG_EN = {
     "pinyin": "Pinyin"
   },
   "firstLanguagePrompt": {
-    "title": "First time playing a {language} song",
-    "description": "How should this song be translated?",
+    "title": "{language} lyrics",
+    "description": "Choose what to show for songs in this language.",
     "original": "Original only",
     "originalDescription": "Show the original lyrics without pronunciation or translation.",
     "pronunciation": "Pronunciation",
@@ -778,7 +778,7 @@ window.LANG_EN = {
     "both": "Pronunciation + translation",
     "bothDescription": "Show both a pronunciation guide and a translation.",
     "notNow": "Don't set up",
-    "apply": "Apply these settings",
+    "apply": "Apply",
     "aiProviderHint": "Only Bing and Google Translate are active. Add an AI provider in AI provider settings for more natural, richer translations.",
     "pronunciationAiProviderHint": "Pronunciation is generated only after you add an AI provider in AI provider settings."
   },
