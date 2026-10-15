@@ -2024,13 +2024,13 @@ ${normalizedText}
          * - author: string (제작자)
          * - description: string | { en: string, ko: string, ... } (설명)
          * - version: string (버전)
-         * - supports: { translate: boolean, metadata: boolean, research|tmi: boolean, characterPronunciation: boolean, culturalAnnotations: boolean } (지원 기능)
+         * - supports: { translate: boolean, pronunciation: boolean, metadata: boolean, research|tmi: boolean, characterPronunciation: boolean, culturalAnnotations: boolean } (지원 기능)
          * 
          * 필수 메서드:
          * - getSettingsUI(): React.Component (설정 UI)
          *
          * 기능별 메서드:
-         * - translateLyrics(params): Promise<Object> (supports.translate = true인 경우)
+         * - translateLyrics(params): Promise<Object> (supports.translate 또는 supports.pronunciation = true인 경우)
          * - translateMetadata(params): Promise<Object> (supports.metadata = true인 경우)
          * - generateResearch(params) 또는 generateTMI(params): Promise<Object> (Research 지원 시)
          * - completeJson({ prompt }): Promise<Object> (짧은 JSON 보조 작업, LLM 제공자만)
@@ -2061,6 +2061,13 @@ ${normalizedText}
                     characterPronunciation: typeof addon.generateCharacterPronunciation === 'function',
                     culturalAnnotations: typeof addon.generateCulturalAnnotations === 'function'
                 };
+            }
+
+            // Legacy translating addons also pronounce unless they explicitly opt out.
+            if (addon.supports.pronunciation === undefined
+                && addon.supports.translate === true
+                && typeof addon.translateLyrics === 'function') {
+                addon.supports.pronunciation = true;
             }
 
             // 필수 메서드 검증
@@ -2255,7 +2262,7 @@ ${normalizedText}
 
         /**
          * 특정 기능을 지원하는 활성화된 Provider 목록 (순서대로)
-         * @param {'translate'|'metadata'|'research'|'tmi'|'characterPronunciation'|'culturalAnnotations'} capability - 기능 유형
+         * @param {'translate'|'pronunciation'|'metadata'|'research'|'tmi'|'characterPronunciation'|'culturalAnnotations'} capability - 기능 유형
          * @returns {Object[]}
          */
         getEnabledProvidersFor(capability) {
@@ -2288,6 +2295,13 @@ ${normalizedText}
          * 특정 Addon의 특정 기능 활성화 여부 확인
          */
         isCapabilityEnabled(addonId, capability) {
+            if (capability === 'pronunciation') {
+                const stored = this.getAddonSetting(addonId, 'capability:pronunciation', null);
+                if (stored !== null) return stored;
+                // One "translate" toggle used to cover translation and
+                // pronunciation, so it still decides until pronunciation is set.
+                return this.getAddonSetting(addonId, 'capability:translate', true);
+            }
             return this.getAddonSetting(addonId, `capability:${capability}`, true);
         }
 
@@ -2295,6 +2309,12 @@ ${normalizedText}
          * 특정 Addon의 특정 기능 활성화 설정 저장
          */
         setCapabilityEnabled(addonId, capability, enabled) {
+            if (capability === 'translate'
+                && this.getAddonSetting(addonId, 'capability:pronunciation', null) === null) {
+                // Pin the inherited pronunciation choice first so changing
+                // translation never flips pronunciation along with it.
+                this.setAddonSetting(addonId, 'capability:pronunciation', this.isCapabilityEnabled(addonId, 'pronunciation'));
+            }
             this.setAddonSetting(addonId, `capability:${capability}`, enabled);
         }
 
@@ -2423,14 +2443,14 @@ ${normalizedText}
          * @returns {Promise<Object|null>}
          */
         async translateLyrics(params) {
-            const translationProviders = this.getEnabledProvidersFor('translate');
-            const providers = params.wantSmartPhonetic
-                ? translationProviders.filter(addon => addon.supports?.pronunciation !== false)
-                : translationProviders;
+            const capability = params.wantSmartPhonetic ? 'pronunciation' : 'translate';
+            const providers = this.getEnabledProvidersFor(capability);
 
             if (providers.length === 0) {
-                console.warn(`[AIAddonManager] No ${params.wantSmartPhonetic ? 'pronunciation' : 'translate'} providers enabled`);
-                throw new Error(this._t('aiProviders.noEnabledProviders', 'No AI providers enabled. Please enable at least one provider in settings.'));
+                console.warn(`[AIAddonManager] No ${capability} providers enabled`);
+                throw new Error(params.wantSmartPhonetic
+                    ? this._t('settings.aiProviders.noPronunciationProviders', 'No enabled AI provider can generate pronunciation. Turn on Pronunciation for an AI provider in AI Providers settings.')
+                    : this._t('aiProviders.noEnabledProviders', 'No AI providers enabled. Please enable at least one provider in settings.'));
             }
 
             const translationStyle = this.getTranslationStyle();
