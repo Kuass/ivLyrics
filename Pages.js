@@ -4759,6 +4759,7 @@ const useSyncedLyricsEngine = ({
 				return [item];
 			}
 
+			const virtualAnimationIndex = visualAnchorUsesTrailingInterlude ? 0 : -1;
 			return [
 				item,
 				{
