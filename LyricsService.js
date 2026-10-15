@@ -1256,6 +1256,7 @@
     // ============================================
     const ApiTracker = {
         _logs: [],
+        _nextLogId: 0,
         _maxLogs: 100,
         _currentTrackId: null,
         _listeners: [],
@@ -1270,7 +1271,7 @@
 
         logRequest(category, endpoint, request = null) {
             const logEntry = {
-                id: Date.now() + Math.random(),
+                id: ++this._nextLogId,
                 category,
                 endpoint,
                 request,
@@ -1314,7 +1315,7 @@
 
         logCacheHit(category, cacheKey, data) {
             const logEntry = {
-                id: Date.now() + Math.random(),
+                id: ++this._nextLogId,
                 category,
                 endpoint: `[CACHE] ${cacheKey}`,
                 request: null,
