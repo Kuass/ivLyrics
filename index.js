@@ -933,7 +933,7 @@ const UpdateBanner = ({ updateInfo, onDismiss }) => {
     };
   }, []);
 
-  const closeLabel = I18n.t("settingsUi.close") || "Close";
+  const closeLabel = I18n.t("buttons.close") || "Close";
   const currentVersion = formatUpdateVersion(updateInfo.currentVersion);
   const latestVersion = formatUpdateVersion(updateInfo.latestVersion);
 
