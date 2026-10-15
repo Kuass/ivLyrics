@@ -14,8 +14,21 @@ let harness = helper.slice(helper.indexOf('const repoRoot'), helper.indexOf('tes
   .replace('6bb234835b0f5762876bbe521ddf665c8f952dfa', '3353a5d')
   // The first-line fix intentionally transfers the prelude ref before its
   // unmount. Compare every visual prop; anchor ownership has its own regression.
-  .replace('const comparable = normalizePresentation(output);', `const comparable = JSON.parse(JSON.stringify(output, function(key, value) {
-    return key === 'lineRef' && Object.hasOwn(this, 'delay') ? undefined : value;
+  .replace('const comparable = normalizePresentation(output, props.compact);', `const comparable = JSON.parse(JSON.stringify(output, function(key, value) {
+    if (key === 'lineRef' && Object.hasOwn(this, 'delay')) return undefined;
+    // Only compact duration declarations changed since this frozen baseline.
+    // The exact engine-to-consumer values have their own same-byte regression.
+    if (props.compact && key === 'fadeDurationMs' && Object.hasOwn(this, 'delay')
+      && Object.hasOwn(this, 'durationMs')) {
+      assert.ok(Number.isFinite(value) && value >= 0 && value <= 220);
+      return undefined;
+    }
+    if (props.compact && key === 'style' && this.line?.interludeInfo?.isInterlude
+      && !this.line?.isVirtualTrailingInterlude && Object.hasOwn(value, '--lyrics-interlude-fade-duration')) {
+      assert.match(value['--lyrics-interlude-fade-duration'], /^(?:[0-9]+(?:\\.[0-9]+)?)ms$/);
+      return { ...value, '--lyrics-interlude-fade-duration': 'verified-compact-handoff-duration' };
+    }
+    return value;
   }));`)
   .replace('if (props.compact && !props.isKara && !scrolling && !motionPreference.matches)', 'if (false)')
   .replace('const hooks = [];', 'const hooks = [];\nconst cache = { elementsByItem: new WeakMap() };\nlet creates = 0;')
