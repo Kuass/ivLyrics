@@ -10726,20 +10726,32 @@ class LyricsContainer extends react.Component {
 
   switchTo(mode) {
     this.lastProcessedMode = null;
-    this.setState((prevState) => ({
-      explicitMode: mode,
-      currentLyrics:
-        this.resolveLyricsForMode(prevState, mode) ||
-        prevState.currentLyrics ||
-        [],
-    }));
+    let movesLock = false;
+    this.setState((prevState) => {
+      // Recompute on every evaluation so a discarded migration cannot be saved.
+      movesLock =
+        prevState.lockedMode !== -1 &&
+        prevState.lockedMode !== mode &&
+        this.isModeAvailable(prevState.lockedMode, prevState);
+      return {
+        ...(movesLock ? { lockedMode: mode } : {}),
+        explicitMode: mode,
+        currentLyrics:
+          this.resolveLyricsForMode(prevState, mode) ||
+          prevState.currentLyrics ||
+          [],
+      };
+    }, () => {
+      if (movesLock && this.state.lockedMode === mode) {
+        rememberLyricsRenderModeLock(mode);
+      }
+    });
   }
 
   toggleModeLock(mode, event = null) {
     event?.preventDefault?.();
     event?.stopPropagation?.();
     const nextLockedMode = this.state.lockedMode === mode ? -1 : mode;
-    rememberLyricsRenderModeLock(nextLockedMode);
     this.lastProcessedMode = null;
     this.setState((prevState) => ({
       lockedMode: nextLockedMode,
@@ -10748,6 +10760,9 @@ class LyricsContainer extends react.Component {
         ? prevState.currentLyrics
         : this.resolveLyricsForMode(prevState, mode) || prevState.currentLyrics || [],
     }), () => {
+      if (this.state.lockedMode === nextLockedMode) {
+        rememberLyricsRenderModeLock(nextLockedMode);
+      }
       this.lyricsSource(this.state, this.getCurrentMode());
     });
   }
