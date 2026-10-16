@@ -1,0 +1,222 @@
+[
+  {
+    "id": "click-unmount-returns",
+    "route": "click",
+    "reduced": false,
+    "unmountThrows": false
+  },
+  {
+    "id": "click-unmount-throws",
+    "route": "click",
+    "reduced": false,
+    "unmountThrows": true
+  },
+  {
+    "id": "immediate-unmount-returns",
+    "route": "immediate",
+    "reduced": false,
+    "unmountThrows": false
+  },
+  {
+    "id": "immediate-unmount-throws",
+    "route": "immediate",
+    "reduced": false,
+    "unmountThrows": true
+  },
+  {
+    "id": "reduced-unmount-returns",
+    "route": "click",
+    "reduced": true,
+    "unmountThrows": false
+  },
+  {
+    "id": "reduced-unmount-throws",
+    "route": "click",
+    "reduced": true,
+    "unmountThrows": true
+  },
+  {
+    "id": "unmount-absent",
+    "route": "immediate",
+    "unmount": "absent"
+  },
+  {
+    "id": "unmount-false",
+    "route": "immediate",
+    "unmount": "false"
+  },
+  {
+    "id": "truthy-string-still-delayed",
+    "route": "truthy"
+  },
+  {
+    "id": "detachedFocus-unmount-returns",
+    "route": "immediate",
+    "detachedFocus": true,
+    "unmountThrows": false
+  },
+  {
+    "id": "detachedFocus-unmount-throws",
+    "route": "immediate",
+    "detachedFocus": true,
+    "unmountThrows": true
+  },
+  {
+    "id": "foreignHandle-unmount-returns",
+    "route": "immediate",
+    "foreignHandle": true,
+    "unmountThrows": false
+  },
+  {
+    "id": "foreignHandle-unmount-throws",
+    "route": "immediate",
+    "foreignHandle": true,
+    "unmountThrows": true
+  },
+  {
+    "id": "quick-unmount-returns",
+    "route": "immediate",
+    "quick": true,
+    "unmountThrows": false
+  },
+  {
+    "id": "quick-unmount-throws",
+    "route": "immediate",
+    "quick": true,
+    "unmountThrows": true
+  },
+  {
+    "id": "backdrop-unmount-returns",
+    "route": "backdrop",
+    "unmountThrows": false
+  },
+  {
+    "id": "backdrop-unmount-throws",
+    "route": "backdrop",
+    "unmountThrows": true
+  },
+  {
+    "id": "escape-keyup-unmount-returns",
+    "route": "escape",
+    "release": "keyup",
+    "unmountThrows": false
+  },
+  {
+    "id": "escape-keyup-unmount-throws",
+    "route": "escape",
+    "release": "keyup",
+    "unmountThrows": true
+  },
+  {
+    "id": "escape-timeout-unmount-returns",
+    "route": "escape",
+    "release": "timeout",
+    "unmountThrows": false
+  },
+  {
+    "id": "escape-timeout-unmount-throws",
+    "route": "escape",
+    "release": "timeout",
+    "unmountThrows": true
+  },
+  {
+    "id": "fault-overlay.remove-unmount-returns",
+    "route": "immediate",
+    "fault": "overlay.remove",
+    "unmountThrows": false
+  },
+  {
+    "id": "fault-overlay.remove-unmount-throws",
+    "route": "immediate",
+    "fault": "overlay.remove",
+    "unmountThrows": true
+  },
+  {
+    "id": "fault-html.visibility-unmount-returns",
+    "route": "immediate",
+    "fault": "html.visibility",
+    "unmountThrows": false
+  },
+  {
+    "id": "fault-html.visibility-unmount-throws",
+    "route": "immediate",
+    "fault": "html.visibility",
+    "unmountThrows": true
+  },
+  {
+    "id": "fault-body.visibility-unmount-returns",
+    "route": "immediate",
+    "fault": "body.visibility",
+    "unmountThrows": false
+  },
+  {
+    "id": "fault-body.visibility-unmount-throws",
+    "route": "immediate",
+    "fault": "body.visibility",
+    "unmountThrows": true
+  },
+  {
+    "id": "fault-visibility.dispatchMethod-unmount-returns",
+    "route": "immediate",
+    "fault": "visibility.dispatchMethod",
+    "unmountThrows": false
+  },
+  {
+    "id": "fault-visibility.dispatchMethod-unmount-throws",
+    "route": "immediate",
+    "fault": "visibility.dispatchMethod",
+    "unmountThrows": true
+  },
+  {
+    "id": "fault-main.removeListener-unmount-returns",
+    "route": "immediate",
+    "fault": "main.removeListener",
+    "unmountThrows": false
+  },
+  {
+    "id": "fault-main.removeListener-unmount-throws",
+    "route": "immediate",
+    "fault": "main.removeListener",
+    "unmountThrows": true
+  },
+  {
+    "id": "fault-handle.clear-unmount-returns",
+    "route": "immediate",
+    "fault": "handle.clear",
+    "unmountThrows": false
+  },
+  {
+    "id": "fault-handle.clear-unmount-throws",
+    "route": "immediate",
+    "fault": "handle.clear",
+    "unmountThrows": true
+  },
+  {
+    "id": "fault-focus.contains-unmount-returns",
+    "route": "immediate",
+    "fault": "focus.contains",
+    "unmountThrows": false
+  },
+  {
+    "id": "fault-focus.contains-unmount-throws",
+    "route": "immediate",
+    "fault": "focus.contains",
+    "unmountThrows": true
+  },
+  {
+    "id": "fault-focus.restore-unmount-returns",
+    "route": "immediate",
+    "fault": "focus.restore",
+    "unmountThrows": false
+  },
+  {
+    "id": "fault-focus.restore-unmount-throws",
+    "route": "immediate",
+    "fault": "focus.restore",
+    "unmountThrows": true
+  },
+  {
+    "id": "no-renderer-admission",
+    "noRenderer": true
+  }
+]
