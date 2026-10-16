@@ -2079,18 +2079,20 @@ const ConfigButton = ({ name, settingKey, info, text, onChange = () => { } }) =>
 const ConfigSlider = react.memo(
   ({ name, defaultValue, disabled, onChange = () => { } }) => {
     const [active, setActive] = useState(defaultValue);
+    const activeRef = useRef(defaultValue);
 
     useEffect(() => {
+      activeRef.current = defaultValue;
       setActive(defaultValue);
     }, [defaultValue]);
 
     const toggleState = useCallback(() => {
       if (disabled) return;
-      setActive((prevActive) => {
-        const newState = !prevActive;
-        onChange(newState);
-        return newState;
-      });
+      const newState = !activeRef.current;
+      activeRef.current = newState;
+      setActive(newState);
+      // Persist from the input event, not a replayable React state updater.
+      onChange(newState);
     }, [onChange, disabled]);
 
     return react.createElement(ButtonSVG, {

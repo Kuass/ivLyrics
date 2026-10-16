@@ -1,0 +1,2891 @@
+{
+  "format": 1,
+  "policy": "All inputs and compatibility/desired assertions are independent of source selector. Descriptive boundaries have no equality verdict beyond explicit common invariants. No expectations change after the first application run.",
+  "cases": [
+    {
+      "id": "initialize-false",
+      "class": "normal",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        }
+      ],
+      "expect": {
+        "callbacks": 0,
+        "saves": 0,
+        "dispatches": 0,
+        "errorCount": 0,
+        "active": false,
+        "displayedActive": false,
+        "configNoise": false,
+        "noiseChildKey": "noise"
+      }
+    },
+    {
+      "id": "initialize-true",
+      "class": "normal",
+      "initial": true,
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        }
+      ],
+      "expect": {
+        "callbacks": 0,
+        "saves": 0,
+        "dispatches": 0,
+        "errorCount": 0,
+        "active": true,
+        "displayedActive": true,
+        "configNoise": true
+      }
+    },
+    {
+      "id": "input-before-mount-passive-effect",
+      "class": "normal",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "snapshot",
+          "label": "input-before-mount-effect"
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "renderSlider"
+        },
+        {
+          "op": "snapshot",
+          "label": "mount-effect-reset-local-state",
+          "expect": {
+            "callbackValues": [
+              true
+            ],
+            "saveValues": [
+              true
+            ],
+            "dispatchValues": [
+              true
+            ],
+            "callbacks": 1,
+            "saves": 1,
+            "dispatches": 1,
+            "saveCompleted": 1,
+            "dispatchDelivered": 1,
+            "callbackNames": [
+              "noise"
+            ],
+            "saveNames": [
+              "noise"
+            ],
+            "dispatchNames": [
+              "noise"
+            ],
+            "dispatchTypes": [
+              "config"
+            ],
+            "errorCount": 0,
+            "configNoise": true,
+            "active": false
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        }
+      ],
+      "expect": {
+        "callbackValues": [
+          true,
+          true
+        ],
+        "saveValues": [
+          true,
+          true
+        ],
+        "dispatchValues": [
+          true,
+          true
+        ],
+        "callbacks": 2,
+        "saves": 2,
+        "dispatches": 2,
+        "saveCompleted": 2,
+        "dispatchDelivered": 2,
+        "callbackNames": [
+          "noise",
+          "noise"
+        ],
+        "saveNames": [
+          "noise",
+          "noise"
+        ],
+        "dispatchNames": [
+          "noise",
+          "noise"
+        ],
+        "dispatchTypes": [
+          "config",
+          "config"
+        ],
+        "errorCount": 0,
+        "configNoise": true,
+        "active": true
+      }
+    },
+    {
+      "id": "one-enabled-event",
+      "class": "normal",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-handler-before-evaluation",
+          "expect": {
+            "active": false
+          },
+          "desired": {
+            "callbacks": 1,
+            "saves": 1,
+            "dispatches": 1
+          }
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "snapshot",
+          "label": "evaluated-before-commit",
+          "expect": {
+            "active": false
+          }
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "default-effects-silent",
+          "expect": {
+            "callbackValues": [
+              true
+            ],
+            "saveValues": [
+              true
+            ],
+            "dispatchValues": [
+              true
+            ],
+            "callbacks": 1,
+            "saves": 1,
+            "dispatches": 1,
+            "saveCompleted": 1,
+            "dispatchDelivered": 1,
+            "callbackNames": [
+              "noise"
+            ],
+            "saveNames": [
+              "noise"
+            ],
+            "dispatchNames": [
+              "noise"
+            ],
+            "dispatchTypes": [
+              "config"
+            ],
+            "errorCount": 0,
+            "configNoise": true,
+            "active": true
+          }
+        }
+      ],
+      "expect": {
+        "callbackValues": [
+          true
+        ],
+        "saveValues": [
+          true
+        ],
+        "dispatchValues": [
+          true
+        ],
+        "callbacks": 1,
+        "saves": 1,
+        "dispatches": 1,
+        "saveCompleted": 1,
+        "dispatchDelivered": 1,
+        "callbackNames": [
+          "noise"
+        ],
+        "saveNames": [
+          "noise"
+        ],
+        "dispatchNames": [
+          "noise"
+        ],
+        "dispatchTypes": [
+          "config"
+        ],
+        "errorCount": 0,
+        "configNoise": true,
+        "active": true
+      }
+    },
+    {
+      "id": "two-events-before-render",
+      "class": "normal",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "snapshot",
+          "label": "both-handlers-before-evaluation",
+          "expect": {
+            "active": false
+          },
+          "desired": {
+            "callbackValues": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        }
+      ],
+      "expect": {
+        "callbackValues": [
+          true,
+          false
+        ],
+        "saveValues": [
+          true,
+          false
+        ],
+        "dispatchValues": [
+          true,
+          false
+        ],
+        "callbacks": 2,
+        "saves": 2,
+        "dispatches": 2,
+        "saveCompleted": 2,
+        "dispatchDelivered": 2,
+        "callbackNames": [
+          "noise",
+          "noise"
+        ],
+        "saveNames": [
+          "noise",
+          "noise"
+        ],
+        "dispatchNames": [
+          "noise",
+          "noise"
+        ],
+        "dispatchTypes": [
+          "config",
+          "config"
+        ],
+        "errorCount": 0,
+        "configNoise": false,
+        "active": false
+      }
+    },
+    {
+      "id": "five-rapid-events-before-render",
+      "class": "normal",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "snapshot",
+          "label": "five-handlers-before-evaluation",
+          "expect": {
+            "active": false
+          },
+          "desired": {
+            "callbackValues": [
+              true,
+              false,
+              true,
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        }
+      ],
+      "expect": {
+        "callbackValues": [
+          true,
+          false,
+          true,
+          false,
+          true
+        ],
+        "saveValues": [
+          true,
+          false,
+          true,
+          false,
+          true
+        ],
+        "dispatchValues": [
+          true,
+          false,
+          true,
+          false,
+          true
+        ],
+        "callbacks": 5,
+        "saves": 5,
+        "dispatches": 5,
+        "saveCompleted": 5,
+        "dispatchDelivered": 5,
+        "callbackNames": [
+          "noise",
+          "noise",
+          "noise",
+          "noise",
+          "noise"
+        ],
+        "saveNames": [
+          "noise",
+          "noise",
+          "noise",
+          "noise",
+          "noise"
+        ],
+        "dispatchNames": [
+          "noise",
+          "noise",
+          "noise",
+          "noise",
+          "noise"
+        ],
+        "dispatchTypes": [
+          "config",
+          "config",
+          "config",
+          "config",
+          "config"
+        ],
+        "errorCount": 0,
+        "configNoise": true,
+        "active": true
+      }
+    },
+    {
+      "id": "same-prior-updater-replay",
+      "class": "synthetic-replay",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "snapshot",
+          "label": "first-evaluation"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "snapshot",
+          "label": "same-prior-second-evaluation"
+        },
+        {
+          "op": "commit"
+        }
+      ],
+      "expect": {
+        "active": true,
+        "errorCount": 0
+      },
+      "desired": {
+        "callbackValues": [
+          true
+        ],
+        "saveValues": [
+          true
+        ],
+        "dispatchValues": [
+          true
+        ]
+      }
+    },
+    {
+      "id": "discard-without-commit",
+      "class": "descriptive-discard",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "discard"
+        }
+      ],
+      "expect": {
+        "active": false,
+        "errorCount": 0
+      }
+    },
+    {
+      "id": "discard-then-rebase",
+      "class": "synthetic-rebase",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "snapshot",
+          "label": "evaluation-to-be-discarded"
+        },
+        {
+          "op": "discard"
+        },
+        {
+          "op": "evaluate",
+          "prior": true
+        },
+        {
+          "op": "snapshot",
+          "label": "rebased-evaluation-before-commit"
+        },
+        {
+          "op": "commit"
+        }
+      ],
+      "expect": {
+        "errorCount": 0
+      },
+      "desired": {
+        "callbacks": 1,
+        "saves": 1,
+        "dispatches": 1
+      }
+    },
+    {
+      "id": "callback-replaced-before-input",
+      "class": "normal",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "callback",
+          "id": "B"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        }
+      ],
+      "expect": {
+        "callbackValues": [
+          true
+        ],
+        "saveValues": [
+          true
+        ],
+        "dispatchValues": [
+          true
+        ],
+        "callbacks": 1,
+        "saves": 1,
+        "dispatches": 1,
+        "saveCompleted": 1,
+        "dispatchDelivered": 1,
+        "callbackNames": [
+          "noise"
+        ],
+        "saveNames": [
+          "noise"
+        ],
+        "dispatchNames": [
+          "noise"
+        ],
+        "dispatchTypes": [
+          "config"
+        ],
+        "errorCount": 0,
+        "configNoise": true,
+        "active": true,
+        "callbackIds": [
+          "B"
+        ]
+      }
+    },
+    {
+      "id": "callback-replaced-between-handler-and-evaluation",
+      "class": "normal",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "callback",
+          "id": "B"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "replacement-before-evaluation"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        }
+      ],
+      "expect": {
+        "callbackValues": [
+          true,
+          false
+        ],
+        "saveValues": [
+          true,
+          false
+        ],
+        "dispatchValues": [
+          true,
+          false
+        ],
+        "callbacks": 2,
+        "saves": 2,
+        "dispatches": 2,
+        "saveCompleted": 2,
+        "dispatchDelivered": 2,
+        "callbackNames": [
+          "noise",
+          "noise"
+        ],
+        "saveNames": [
+          "noise",
+          "noise"
+        ],
+        "dispatchNames": [
+          "noise",
+          "noise"
+        ],
+        "dispatchTypes": [
+          "config",
+          "config"
+        ],
+        "errorCount": 0,
+        "configNoise": false,
+        "active": false,
+        "callbackIds": [
+          "A",
+          "B"
+        ]
+      }
+    },
+    {
+      "id": "disabled-native-button",
+      "class": "normal",
+      "disabled": true,
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click"
+        }
+      ],
+      "expect": {
+        "callbacks": 0,
+        "saves": 0,
+        "dispatches": 0,
+        "errorCount": 0,
+        "active": false,
+        "nativeDisabled": true
+      }
+    },
+    {
+      "id": "disabled-forced-slider-handler",
+      "class": "normal",
+      "disabled": true,
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click",
+          "forced": true
+        }
+      ],
+      "expect": {
+        "callbacks": 0,
+        "saves": 0,
+        "dispatches": 0,
+        "errorCount": 0,
+        "active": false,
+        "nativeDisabled": true
+      }
+    },
+    {
+      "id": "disabled-optionlist-callback-guard",
+      "class": "normal",
+      "disabled": true,
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "optionCallback",
+          "value": true
+        }
+      ],
+      "expect": {
+        "callbacks": 0,
+        "saves": 0,
+        "dispatches": 0,
+        "errorCount": 0,
+        "active": false,
+        "configNoise": false
+      }
+    },
+    {
+      "id": "enabled-optionlist-callback",
+      "class": "descriptive-callback-boundary",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "optionCallback",
+          "value": true
+        }
+      ],
+      "expect": {
+        "callbackValues": [
+          true
+        ],
+        "saveValues": [
+          true
+        ],
+        "dispatchValues": [
+          true
+        ],
+        "callbacks": 1,
+        "saves": 1,
+        "dispatches": 1,
+        "saveCompleted": 1,
+        "dispatchDelivered": 1,
+        "callbackNames": [
+          "noise"
+        ],
+        "saveNames": [
+          "noise"
+        ],
+        "dispatchNames": [
+          "noise"
+        ],
+        "dispatchTypes": [
+          "config"
+        ],
+        "errorCount": 0,
+        "configNoise": true,
+        "active": false
+      }
+    },
+    {
+      "id": "changed-default-no-input",
+      "class": "normal",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "default",
+          "value": true
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "changed-default-before-passive",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0,
+            "active": false,
+            "displayedActive": false
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-passive-before-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0,
+            "active": false
+          }
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        }
+      ],
+      "expect": {
+        "callbacks": 0,
+        "saves": 0,
+        "dispatches": 0,
+        "errorCount": 0,
+        "active": true,
+        "displayedActive": true,
+        "configNoise": true
+      }
+    },
+    {
+      "id": "changed-default-input-before-passive",
+      "class": "normal",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "default",
+          "value": true
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "snapshot",
+          "label": "input-before-default-effect"
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        }
+      ],
+      "expect": {
+        "callbackValues": [
+          true
+        ],
+        "saveValues": [
+          true
+        ],
+        "dispatchValues": [
+          true
+        ],
+        "callbacks": 1,
+        "saves": 1,
+        "dispatches": 1,
+        "saveCompleted": 1,
+        "dispatchDelivered": 1,
+        "callbackNames": [
+          "noise"
+        ],
+        "saveNames": [
+          "noise"
+        ],
+        "dispatchNames": [
+          "noise"
+        ],
+        "dispatchTypes": [
+          "config"
+        ],
+        "errorCount": 0,
+        "configNoise": true,
+        "active": true
+      }
+    },
+    {
+      "id": "changed-default-input-after-passive-before-commit",
+      "class": "normal",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "default",
+          "value": true
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "default-update-pending",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        }
+      ],
+      "expect": {
+        "callbackValues": [
+          false
+        ],
+        "saveValues": [
+          false
+        ],
+        "dispatchValues": [
+          false
+        ],
+        "callbacks": 1,
+        "saves": 1,
+        "dispatches": 1,
+        "saveCompleted": 1,
+        "dispatchDelivered": 1,
+        "callbackNames": [
+          "noise"
+        ],
+        "saveNames": [
+          "noise"
+        ],
+        "dispatchNames": [
+          "noise"
+        ],
+        "dispatchTypes": [
+          "config"
+        ],
+        "errorCount": 0,
+        "configNoise": false,
+        "active": false
+      }
+    },
+    {
+      "id": "changed-default-input-after-commit",
+      "class": "normal",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "default",
+          "value": true
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        }
+      ],
+      "expect": {
+        "callbackValues": [
+          false
+        ],
+        "saveValues": [
+          false
+        ],
+        "dispatchValues": [
+          false
+        ],
+        "callbacks": 1,
+        "saves": 1,
+        "dispatches": 1,
+        "saveCompleted": 1,
+        "dispatchDelivered": 1,
+        "callbackNames": [
+          "noise"
+        ],
+        "saveNames": [
+          "noise"
+        ],
+        "dispatchNames": [
+          "noise"
+        ],
+        "dispatchTypes": [
+          "config"
+        ],
+        "errorCount": 0,
+        "configNoise": false,
+        "active": false
+      }
+    },
+    {
+      "id": "delayed-default-resets-after-two-inputs",
+      "class": "normal",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "default",
+          "value": true
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "snapshot",
+          "label": "two-inputs-before-delayed-default"
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "renderSlider"
+        },
+        {
+          "op": "snapshot",
+          "label": "delayed-default-reset",
+          "expect": {
+            "callbackValues": [
+              true,
+              false
+            ],
+            "saveValues": [
+              true,
+              false
+            ],
+            "dispatchValues": [
+              true,
+              false
+            ],
+            "callbacks": 2,
+            "saves": 2,
+            "dispatches": 2,
+            "saveCompleted": 2,
+            "dispatchDelivered": 2,
+            "callbackNames": [
+              "noise",
+              "noise"
+            ],
+            "saveNames": [
+              "noise",
+              "noise"
+            ],
+            "dispatchNames": [
+              "noise",
+              "noise"
+            ],
+            "dispatchTypes": [
+              "config",
+              "config"
+            ],
+            "errorCount": 0,
+            "configNoise": false,
+            "active": true
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        }
+      ],
+      "expect": {
+        "callbackValues": [
+          true,
+          false,
+          false
+        ],
+        "saveValues": [
+          true,
+          false,
+          false
+        ],
+        "dispatchValues": [
+          true,
+          false,
+          false
+        ],
+        "callbacks": 3,
+        "saves": 3,
+        "dispatches": 3,
+        "saveCompleted": 3,
+        "dispatchDelivered": 3,
+        "callbackNames": [
+          "noise",
+          "noise",
+          "noise"
+        ],
+        "saveNames": [
+          "noise",
+          "noise",
+          "noise"
+        ],
+        "dispatchNames": [
+          "noise",
+          "noise",
+          "noise"
+        ],
+        "dispatchTypes": [
+          "config",
+          "config",
+          "config"
+        ],
+        "errorCount": 0,
+        "configNoise": false,
+        "active": false
+      }
+    },
+    {
+      "id": "unchanged-default-rerender",
+      "class": "normal",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "renderSlider"
+        },
+        {
+          "op": "snapshot",
+          "label": "same-default-local-state-retained",
+          "expect": {
+            "active": true,
+            "displayedActive": true,
+            "defaultProp": false
+          }
+        },
+        {
+          "op": "passive"
+        }
+      ],
+      "expect": {
+        "callbackValues": [
+          true
+        ],
+        "saveValues": [
+          true
+        ],
+        "dispatchValues": [
+          true
+        ],
+        "callbacks": 1,
+        "saves": 1,
+        "dispatches": 1,
+        "saveCompleted": 1,
+        "dispatchDelivered": 1,
+        "callbackNames": [
+          "noise"
+        ],
+        "saveNames": [
+          "noise"
+        ],
+        "dispatchNames": [
+          "noise"
+        ],
+        "dispatchTypes": [
+          "config"
+        ],
+        "errorCount": 0,
+        "configNoise": true,
+        "active": true
+      }
+    },
+    {
+      "id": "unmount-remount-after-commit",
+      "class": "normal",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "unmount"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-unmount",
+          "expect": {
+            "listenerCounts": {
+              "window": 0,
+              "document": 0
+            }
+          }
+        },
+        {
+          "op": "mount"
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        }
+      ],
+      "expect": {
+        "callbackValues": [
+          true
+        ],
+        "saveValues": [
+          true
+        ],
+        "dispatchValues": [
+          true
+        ],
+        "callbacks": 1,
+        "saves": 1,
+        "dispatches": 1,
+        "saveCompleted": 1,
+        "dispatchDelivered": 1,
+        "callbackNames": [
+          "noise"
+        ],
+        "saveNames": [
+          "noise"
+        ],
+        "dispatchNames": [
+          "noise"
+        ],
+        "dispatchTypes": [
+          "config"
+        ],
+        "errorCount": 0,
+        "configNoise": true,
+        "active": true
+      }
+    },
+    {
+      "id": "unmount-pending-input-remount",
+      "class": "descriptive-unmount-discard",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "unmount"
+        },
+        {
+          "op": "snapshot",
+          "label": "pending-input-unmounted"
+        },
+        {
+          "op": "mount"
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        }
+      ],
+      "expect": {
+        "errorCount": 0
+      }
+    },
+    {
+      "id": "throws-callback",
+      "class": "descriptive-throw-boundary",
+      "throwAt": "callback",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-handler-boundary"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-updater-boundary"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-available-commit",
+          "expect": {
+            "errorCount": 1,
+            "callbacks": 1,
+            "saves": 0,
+            "dispatches": 0,
+            "saveCompleted": 0,
+            "dispatchDelivered": 0
+          }
+        },
+        {
+          "op": "throw",
+          "at": null
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "boundary-rerender-before-delayed-effects"
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "snapshot",
+          "label": "next-click-after-boundary"
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "delayed-effects-after-next-click"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "renderSlider"
+        },
+        {
+          "op": "snapshot",
+          "label": "continued-queue-committed"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "renderSlider"
+        }
+      ],
+      "expect": {
+        "errorCount": 1
+      }
+    },
+    {
+      "id": "throws-storage",
+      "class": "descriptive-throw-boundary",
+      "throwAt": "storage",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-handler-boundary"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-updater-boundary"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-available-commit",
+          "expect": {
+            "errorCount": 1,
+            "callbacks": 1,
+            "saves": 1,
+            "dispatches": 0,
+            "saveCompleted": 0,
+            "dispatchDelivered": 0
+          }
+        },
+        {
+          "op": "throw",
+          "at": null
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "boundary-rerender-before-delayed-effects"
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "snapshot",
+          "label": "next-click-after-boundary"
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "delayed-effects-after-next-click"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "renderSlider"
+        },
+        {
+          "op": "snapshot",
+          "label": "continued-queue-committed"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "renderSlider"
+        }
+      ],
+      "expect": {
+        "errorCount": 1
+      }
+    },
+    {
+      "id": "throws-dispatch",
+      "class": "descriptive-throw-boundary",
+      "throwAt": "dispatch",
+      "steps": [
+        {
+          "op": "mount"
+        },
+        {
+          "op": "snapshot",
+          "label": "before-mount-effects",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-mount-effects-before-state-evaluation",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "evaluate",
+          "fiber": "OptionList"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "initialized",
+          "expect": {
+            "callbacks": 0,
+            "saves": 0,
+            "dispatches": 0,
+            "errorCount": 0
+          }
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-handler-boundary"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-updater-boundary"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "snapshot",
+          "label": "after-available-commit",
+          "expect": {
+            "errorCount": 1,
+            "callbacks": 1,
+            "saves": 1,
+            "dispatches": 1,
+            "saveCompleted": 1,
+            "dispatchDelivered": 0
+          }
+        },
+        {
+          "op": "throw",
+          "at": null
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "snapshot",
+          "label": "boundary-rerender-before-delayed-effects"
+        },
+        {
+          "op": "click"
+        },
+        {
+          "op": "snapshot",
+          "label": "next-click-after-boundary"
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "snapshot",
+          "label": "delayed-effects-after-next-click"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "renderSlider"
+        },
+        {
+          "op": "snapshot",
+          "label": "continued-queue-committed"
+        },
+        {
+          "op": "render"
+        },
+        {
+          "op": "passive"
+        },
+        {
+          "op": "evaluate"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "renderSlider"
+        }
+      ],
+      "expect": {
+        "errorCount": 1
+      }
+    }
+  ]
+}
