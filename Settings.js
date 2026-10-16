@@ -6976,8 +6976,8 @@ const ConfigModal = ({
               className: "settings-close-btn",
               type: "button",
               onClick: onRequestClose,
-              title: getSettingsText("settingsUi.close", "Close settings"),
-              "aria-label": getSettingsText("settingsUi.close", "Close settings"),
+              title: getSettingsText("buttons.close", "Close settings"),
+              "aria-label": getSettingsText("buttons.close", "Close settings"),
             },
             react.createElement("span", null, "×")
           )
