@@ -16,13 +16,18 @@ export function controls(h) {
     if (!(position in slots)) slots[position] = typeof initial === 'function' ? initial() : initial;
     return [slots[position], value => { slots[position] = typeof value === 'function' ? value(slots[position]) : value; }];
   };
+  const useRef = initial => {
+    const position = cursor++;
+    if (!(position in slots)) slots[position] = { current: initial };
+    return slots[position];
+  };
   const useEffect = effect => {
     const position = cursor++;
     if (!(position in slots)) { slots[position] = true; effects.push(effect); }
   };
   Object.assign(h.context, {
     react: { memo: fn => fn, createElement: (tag, props, ...children) => ({ tag, props, children }) },
-    useState, useEffect, useCallback: fn => fn, APP_NAME: 'ivLyrics',
+    useState, useEffect, useRef, useCallback: fn => fn, APP_NAME: 'ivLyrics',
     syncSettingsLyricsPreviewStyles() {}, loadGoogleFontFamily() {},
     getSafeSettingsLocale: () => 'en', getSettingsText: (key, fallback) => fallback,
     StorageManager: { saveConfig: (...args) => saves.push(args), setItem: (...args) => saves.push(args) },
